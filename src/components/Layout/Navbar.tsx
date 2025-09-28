@@ -257,13 +257,6 @@ export function Navbar({ currentPage, onPageChange }: NavbarProps) {
                         </div>
                         <div className="text-xs text-gray-500">
                           {userRole.name}
-                          <span className={`text-xs px-2 py-1 rounded-full font-bold ${
-                            userRole.level === 4 
-                              ? 'bg-gradient-to-r from-yellow-400 to-orange-400 text-white animate-pulse'
-                              : 'bg-white text-gray-600'
-                          }`}>
-                            {userRole.level === 4 ? '👑' : ''}
-                          </span>
                         </div>
                       </div>
                     </div>
