@@ -1,5 +1,4 @@
-import { serve } from "https://deno.land/std@0.168.0/http/server.ts"
-import { createClient } from 'https://esm.sh/@supabase/supabase-js@2'
+import { createClient } from 'npm:@supabase/supabase-js@2'
 
 const corsHeaders = {
   'Access-Control-Allow-Origin': '*',
@@ -7,7 +6,7 @@ const corsHeaders = {
   'Access-Control-Allow-Methods': 'GET, OPTIONS',
 }
 
-serve(async (req) => {
+Deno.serve(async (req) => {
   if (req.method === 'OPTIONS') {
     return new Response('ok', { headers: corsHeaders })
   }
@@ -15,30 +14,48 @@ serve(async (req) => {
   try {
     console.log('🔔 Demande de données publiques de réservation reçue')
     
-    // Vérifier la présence des variables d'environnement critiques
-    const supabaseUrl = Deno.env.get('SUPABASE_URL')
-    const supabaseServiceKey = Deno.env.get('SUPABASE_SERVICE_ROLE_KEY')
+    // Pour Supabase self-hosted, utiliser les variables d'environnement prédéfinies
+    const supabaseUrl = Deno.env.get('SUPABASE_URL') || Deno.env.get('_SUPABASE_URL')
+    const supabaseServiceKey = Deno.env.get('SUPABASE_SERVICE_ROLE_KEY') || Deno.env.get('_SUPABASE_SERVICE_ROLE_KEY')
+    
+    console.log('🔍 Variables d\'environnement détectées:')
+    console.log('- SUPABASE_URL:', supabaseUrl ? 'Définie' : 'Manquante')
+    console.log('- SERVICE_ROLE_KEY:', supabaseServiceKey ? 'Définie' : 'Manquante')
     
     if (!supabaseUrl) {
-      console.error('❌ SUPABASE_URL manquant dans les variables d\'environnement')
+      console.error('❌ SUPABASE_URL manquant. Variables disponibles:', Object.keys(Deno.env.toObject()).filter(k => k.includes('SUPABASE')))
       return new Response(
-        JSON.stringify({ error: 'SUPABASE_URL environment variable is missing' }),
+        JSON.stringify({ 
+          error: 'SUPABASE_URL environment variable is missing',
+          available_vars: Object.keys(Deno.env.toObject()).filter(k => k.includes('SUPABASE'))
+        }),
         { status: 500, headers: corsHeaders }
       )
     }
     
     if (!supabaseServiceKey) {
-      console.error('❌ SUPABASE_SERVICE_ROLE_KEY manquant dans les variables d\'environnement')
+      console.error('❌ SUPABASE_SERVICE_ROLE_KEY manquant. Variables disponibles:', Object.keys(Deno.env.toObject()).filter(k => k.includes('SERVICE')))
       return new Response(
-        JSON.stringify({ error: 'SUPABASE_SERVICE_ROLE_KEY environment variable is missing' }),
+        JSON.stringify({ 
+          error: 'SUPABASE_SERVICE_ROLE_KEY environment variable is missing',
+          available_vars: Object.keys(Deno.env.toObject()).filter(k => k.includes('SERVICE'))
+        }),
         { status: 500, headers: corsHeaders }
       )
     }
     
+    console.log('✅ Configuration Supabase:', supabaseUrl)
+    
     // Créer le client Supabase avec la clé service role pour contourner RLS
     const supabaseClient = createClient(
       supabaseUrl,
-      supabaseServiceKey
+      supabaseServiceKey,
+      {
+        auth: {
+          persistSession: false,
+          autoRefreshToken: false
+        }
+      }
     )
 
     // Récupérer l'userId depuis l'URL
