@@ -51,7 +51,7 @@ export const isSupabaseConfigured = () => {
     supabaseAnonKey && 
     supabaseUrl !== 'https://placeholder.supabase.co' && 
     supabaseAnonKey !== 'placeholder-key' &&
-    (supabaseUrl.includes('.supabase.co') || supabaseUrl.includes('localhost')) &&
+    (supabaseUrl.includes('.supabase.co') || supabaseUrl.includes('localhost') || supabaseUrl.includes('sslip.io') || /^\d+\.\d+\.\d+\.\d+/.test(supabaseUrl)) &&
     supabaseAnonKey.length > 20
   );
   
@@ -59,10 +59,16 @@ export const isSupabaseConfigured = () => {
     console.warn('⚠️ Supabase non configuré:', {
       hasUrl: !!supabaseUrl,
       hasKey: !!supabaseAnonKey,
-      urlValid: supabaseUrl?.includes('.supabase.co') || supabaseUrl?.includes('localhost'),
+      urlValid: supabaseUrl?.includes('.supabase.co') || supabaseUrl?.includes('localhost') || supabaseUrl?.includes('sslip.io') || /^\d+\.\d+\.\d+\.\d+/.test(supabaseUrl || ''),
       keyLength: supabaseAnonKey?.length
     });
   }
+  
+  console.log('🔍 Configuration Supabase détectée:', {
+    url: supabaseUrl,
+    hasAnonKey: !!supabaseAnonKey,
+    isConfigured
+  });
   
   return isConfigured;
 };
