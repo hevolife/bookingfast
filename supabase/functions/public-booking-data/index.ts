@@ -15,10 +15,30 @@ serve(async (req) => {
   try {
     console.log('🔔 Demande de données publiques de réservation reçue')
     
+    // Vérifier la présence des variables d'environnement critiques
+    const supabaseUrl = Deno.env.get('SUPABASE_URL')
+    const supabaseServiceKey = Deno.env.get('SUPABASE_SERVICE_ROLE_KEY')
+    
+    if (!supabaseUrl) {
+      console.error('❌ SUPABASE_URL manquant dans les variables d\'environnement')
+      return new Response(
+        JSON.stringify({ error: 'SUPABASE_URL environment variable is missing' }),
+        { status: 500, headers: corsHeaders }
+      )
+    }
+    
+    if (!supabaseServiceKey) {
+      console.error('❌ SUPABASE_SERVICE_ROLE_KEY manquant dans les variables d\'environnement')
+      return new Response(
+        JSON.stringify({ error: 'SUPABASE_SERVICE_ROLE_KEY environment variable is missing' }),
+        { status: 500, headers: corsHeaders }
+      )
+    }
+    
     // Créer le client Supabase avec la clé service role pour contourner RLS
     const supabaseClient = createClient(
-      Deno.env.get('SUPABASE_URL') ?? '',
-      Deno.env.get('SUPABASE_SERVICE_ROLE_KEY') ?? ''
+      supabaseUrl,
+      supabaseServiceKey
     )
 
     // Récupérer l'userId depuis l'URL
@@ -46,7 +66,7 @@ serve(async (req) => {
       console.error('❌ Erreur vérification utilisateur:', userError)
       return new Response(
         JSON.stringify({ error: 'User verification failed', details: userError.message }),
-        { status: 404, headers: corsHeaders }
+        { status: 500, headers: corsHeaders }
       )
     }
 
@@ -85,7 +105,11 @@ serve(async (req) => {
       .maybeSingle()
 
     if (settingsError) {
-      console.warn('⚠️ Erreur chargement paramètres:', settingsError)
+      console.error('❌ Erreur chargement paramètres:', settingsError)
+      return new Response(
+        JSON.stringify({ error: 'Failed to load business settings', details: settingsError.message }),
+        { status: 500, headers: corsHeaders }
+      )
     }
 
     console.log('✅ Paramètres récupérés:', !!settingsData)
@@ -98,7 +122,11 @@ serve(async (req) => {
       .in('booking_status', ['pending', 'confirmed'])
 
     if (bookingsError) {
-      console.warn('⚠️ Erreur chargement réservations:', bookingsError)
+      console.error('❌ Erreur chargement réservations:', bookingsError)
+      return new Response(
+        JSON.stringify({ error: 'Failed to load bookings', details: bookingsError.message }),
+        { status: 500, headers: corsHeaders }
+      )
     }
 
     console.log('✅ Réservations récupérées:', bookingsData?.length || 0)
