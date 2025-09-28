@@ -61,6 +61,31 @@ serve(async (req) => {
       const sessionId = session.id
       
       console.log('💳 Session de paiement complétée:', sessionId)
+     console.log('📊 Statut de la session:', session.status)
+     console.log('📊 Statut du paiement:', session.payment_status)
+     
+     // 🔒 VÉRIFICATION CRITIQUE : Ne traiter QUE les paiements complètement réussis
+     if (session.status !== 'complete' || session.payment_status !== 'paid') {
+       console.log('⚠️ PAIEMENT NON COMPLET - Session ignorée')
+       console.log('📊 Détails:', {
+         session_status: session.status,
+         payment_status: session.payment_status,
+         expected_session_status: 'complete',
+         expected_payment_status: 'paid'
+       })
+       
+       return new Response(JSON.stringify({ 
+         success: true, 
+         type: 'payment_not_complete',
+         message: 'Payment not complete - session ignored',
+         session_status: session.status,
+         payment_status: session.payment_status
+       }), {
+         headers: { ...corsHeaders, 'Content-Type': 'application/json' }
+       })
+     }
+     
+     console.log('✅ PAIEMENT COMPLET CONFIRMÉ - Traitement de la réservation')
       
       // 🔒 VÉRIFICATION CACHE GLOBAL - PREMIÈRE LIGNE DE DÉFENSE
       if (processedSessions.has(sessionId)) {
