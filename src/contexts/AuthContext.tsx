@@ -223,27 +223,21 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
     }
 
     console.log('🚀 Tentative d\'inscription pour:', email);
-    console.log('🔗 URL Supabase utilisée:', import.meta.env.VITE_SUPABASE_URL);
 
-    try {
-      const { data, error } = await supabase.auth.signUp({
-        email: email.trim(),
-        password,
-        options: {
-          emailRedirectTo: undefined
-        }
-      });
-
-      if (error) {
-        console.error('❌ Erreur d\'inscription:', error);
-        throw error;
+    const { data, error } = await supabase.auth.signUp({
+      email: email.trim(),
+      password,
+      options: {
+        emailRedirectTo: undefined
       }
+    });
 
-      console.log('✅ Inscription réussie pour:', data.user?.email);
-    } catch (networkError) {
-      console.error('❌ Erreur réseau lors de l\'inscription:', networkError);
-      throw new Error(`Impossible de se connecter au serveur Supabase. Vérifiez que votre instance est accessible depuis le navigateur.`);
+    if (error) {
+      console.error('❌ Erreur d\'inscription:', error);
+      throw error;
     }
+
+    console.log('✅ Inscription réussie pour:', data.user?.email);
   };
 
   const signOut = async () => {

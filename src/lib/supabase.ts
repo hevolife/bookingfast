@@ -51,7 +51,7 @@ export const isSupabaseConfigured = () => {
     supabaseAnonKey && 
     supabaseUrl !== 'https://placeholder.supabase.co' && 
     supabaseAnonKey !== 'placeholder-key' &&
-    (supabaseUrl.includes('.supabase.co') || supabaseUrl.includes('localhost') || supabaseUrl.includes('sslip.io') || supabaseUrl.includes('217.65.145.6') || supabaseUrl.startsWith('http')) &&
+    (supabaseUrl.includes('.supabase.co') || supabaseUrl.includes('localhost')) &&
     supabaseAnonKey.length > 20
   );
   
@@ -59,7 +59,7 @@ export const isSupabaseConfigured = () => {
     console.warn('⚠️ Supabase non configuré:', {
       hasUrl: !!supabaseUrl,
       hasKey: !!supabaseAnonKey,
-      urlValid: supabaseUrl?.includes('.supabase.co') || supabaseUrl?.includes('localhost') || supabaseUrl?.includes('sslip.io') || supabaseUrl?.includes('217.65.145.6') || supabaseUrl?.startsWith('http'),
+      urlValid: supabaseUrl?.includes('.supabase.co') || supabaseUrl?.includes('localhost'),
       keyLength: supabaseAnonKey?.length
     });
   }
@@ -79,8 +79,7 @@ if (isSupabaseConfigured()) {
     global: {
       headers: {
         'x-application-name': 'BookingFast',
-        'x-application-version': '1.0.0',
-        'Access-Control-Allow-Origin': '*'
+        'x-application-version': '1.0.0'
       }
     },
     db: {
@@ -90,16 +89,6 @@ if (isSupabaseConfigured()) {
       params: {
         eventsPerSecond: 10
       }
-    },
-    // Configuration pour self-hosted
-    fetch: (url, options = {}) => {
-      return fetch(url, {
-        ...options,
-        headers: {
-          ...options.headers,
-          'Access-Control-Allow-Origin': '*'
-        }
-      });
     }
   });
 } else {
