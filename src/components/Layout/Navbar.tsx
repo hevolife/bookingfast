@@ -257,7 +257,12 @@ export function Navbar({ currentPage, onPageChange }: NavbarProps) {
                         </div>
                         <div className="text-xs text-gray-500">
                           {userRole.name}
-                        </div>
+                          <span className={`text-xs px-2 py-1 rounded-full font-bold ${
+                            userRole.level === 4 
+                              ? 'bg-gradient-to-r from-yellow-400 to-orange-400 text-white animate-pulse'
+                              : 'bg-white text-gray-600'
+                          }`}>
+                            {userRole.level === 4 ? '👑' : ''}
                       </div>
                     </div>
                     
@@ -459,14 +464,18 @@ export function Navbar({ currentPage, onPageChange }: NavbarProps) {
                       <div className="text-xs opacity-75 flex items-center gap-1">
                         <span>👑</span>
                         <span>Administration</span>
-                      </div>
+                    {userRole.level === 4 ? <Crown className="w-4 h-4" /> : user.email?.charAt(0).toUpperCase()}
                     )}
                     <div className={`text-sm ${
-                      isActive 
+                    <div className="text-sm font-medium text-gray-700 truncate flex items-center gap-1">
                         ? 'text-white/80' 
+                      {userRole.level === 4 && (
+                        <Crown className="w-3 h-3 text-yellow-500" />
+                      )}
                         : 'text-gray-500'
-                    }`}>
-                      {item.description}
+                    <div className="text-xs text-gray-500 flex items-center gap-1">
+                      {userRole.name}
+                      {userRole.level === 4 && <span className="text-yellow-600">• Propriétaire</span>}
                     </div>
                   </div>
                   {isActive && (

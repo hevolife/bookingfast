@@ -229,7 +229,7 @@ export function DashboardPage() {
             </div>
             
             <div className={`bg-gradient-to-r ${userRole.color.replace('500', '50')} border-2 ${userRole.color.replace('500', '200').replace('from-', 'border-').replace(' to-', ' ')} rounded-xl p-3`}>
-              <div className="flex items-center gap-2">
+              <div className="flex items-center gap-3">
                 <div className={`w-8 h-8 bg-gradient-to-r ${userRole.color} rounded-lg flex items-center justify-center text-white`}>
                   {userRole.level === 4 ? <Crown className="w-4 h-4" /> :
                    userRole.level === 3 ? <Shield className="w-4 h-4" /> :
@@ -237,8 +237,18 @@ export function DashboardPage() {
                    <Award className="w-4 h-4" />}
                 </div>
                 <div>
-                  <div className="font-bold text-gray-900 text-sm">{userRole.name}</div>
-                  <div className="text-xs text-gray-600">Niveau {userRole.level}</div>
+                  <div className="font-bold text-gray-900 text-sm flex items-center gap-2">
+                    {userRole.name}
+                    {userRole.level === 4 && (
+                      <span className="bg-gradient-to-r from-yellow-400 to-orange-400 text-white px-2 py-1 rounded-full text-xs font-bold animate-pulse">
+                        👑 OWNER
+                      </span>
+                    )}
+                  </div>
+                  <div className="text-xs text-gray-600 flex items-center gap-1">
+                    <span>Niveau {userRole.level}</span>
+                    {userRole.level === 4 && <span>• Accès complet</span>}
+                  </div>
                 </div>
               </div>
             </div>
