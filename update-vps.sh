@@ -3,14 +3,20 @@ set -e
 
 # 🚀 Script de mise à jour BookingFast VPS depuis GitHub
 # Usage: ./update-vps.sh [branch]
+# Basé sur le script existant /root/update-bookingfast.sh
 
 # Configuration
-GITHUB_REPO="votre-username/bookingfast"  # ⚠️ MODIFIEZ AVEC VOTRE REPO
+GITHUB_REPO="votre-username/bookingfast"  # ⚠️ MODIFIEZ AVEC VOTRE REPO GITHUB
 BRANCH="${1:-main}"  # Branche par défaut: main
 APP_DIR="/var/www/bookingfast"
 SUPABASE_DIR="/opt/supabase"
 BACKUP_DIR="/root/backups"
 DATE=$(date +%Y%m%d_%H%M%S)
+
+# Variables Supabase (à adapter selon votre configuration)
+SUPABASE_URL="https://bookingfast.hevolife.fr"
+SERVICE_ROLE_KEY="eyJ0eXAiOiJKV1QiLCJhbGciOiJIUzI1NiJ9.eyJpc3MiOiJzdXBhYmFzZSIsImlhdCI6MTc1OTA4ODc2MCwiZXhwIjo0OTE0NzYyMzYwLCJyb2xlIjoic2VydmljZV9yb2xlIn0.D17ig-Q-dCSgM3_ICJT6OXqx_Fr97yFmeNLTNmKCTeY"
+ANON_KEY="VOTRE_ANON_KEY_ICI"  # ⚠️ À RÉCUPÉRER DE VOTRE SUPABASE
 
 echo "🚀 Début mise à jour BookingFast VPS - $DATE"
 echo "📦 Repository: $GITHUB_REPO"
