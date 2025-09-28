@@ -273,6 +273,7 @@ export function LoginPage() {
         {/* Footer */}
         <div className="text-center mt-8 text-gray-500 text-sm">
           <p>© 2025 BookingFast - Système de réservation professionnel</p>
+          <p className="text-xs text-gray-400 mt-1">Version 1.2.3 - Build 2025.01.28</p>
         </div>
       </div>
     </div>
