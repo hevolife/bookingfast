@@ -1,5 +1,5 @@
 import { useState, useEffect } from 'react';
-import { supabase, isSupabaseConfigured } from '../lib/supabase';
+import { supabase, isSupabaseConfigured, isNetworkError, retryRequest } from '../lib/supabase';
 import { Service } from '../types';
 import { useAuth } from '../contexts/AuthContext';
 
@@ -95,12 +95,16 @@ export function useServices() {
       
       // Vérifier si l'utilisateur est membre d'une équipe
       try {
-        const { data: membershipData, error: membershipError } = await supabase
-          .from('team_members')
-          .select('owner_id')
-          .eq('user_id', user.id)
-          .eq('is_active', true)
-          .maybeSingle();
+        const { data: membershipData, error: membershipError } = await retryRequest(
+          () => supabase
+            .from('team_members')
+            .select('owner_id')
+            .eq('user_id', user.id)
+            .eq('is_active', true)
+            .maybeSingle(),
+          3,
+          1000
+        );
 
         if (!membershipError && membershipData?.owner_id) {
           targetUserId = membershipData.owner_id;
@@ -112,17 +116,15 @@ export function useServices() {
         console.warn('⚠️ Erreur vérification équipe, utilisation ID utilisateur:', teamError);
       }
 
-      let userServicesQuery = supabase
-        .from('services')
-        .select('*')
-        .eq('user_id', targetUserId)
-        .order('created_at', { ascending: true });
-      
-      const timeoutPromise = new Promise((_, reject) => 
-        setTimeout(() => reject(new Error('Timeout chargement services')), 30000)
+      const { data: userServices, error: userServicesError } = await retryRequest(
+        () => supabase
+          .from('services')
+          .select('*')
+          .eq('user_id', targetUserId)
+          .order('created_at', { ascending: true }),
+        3,
+        1000
       );
-      
-      let { data: userServices, error: userServicesError } = await Promise.race([userServicesQuery, timeoutPromise]);
       
       console.log('📊 Services chargés:', userServices?.length || 0);
       
@@ -150,15 +152,16 @@ export function useServices() {
     } catch (err) {
       console.error('Erreur lors de la récupération des services:', err);
       
-      // Ne pas afficher d'erreur pour les timeouts, juste utiliser les services par défaut
-      if (err instanceof Error && err.message.includes('Timeout')) {
-        console.log('⏰ Timeout détecté - utilisation des services par défaut');
-        setError(null);
+      // Gestion spécifique des erreurs réseau
+      if (isNetworkError(err)) {
+        console.warn('🌐 useServices: Erreur réseau détectée - utilisation des services par défaut');
+        setError('Connexion réseau indisponible. Services par défaut chargés.');
       } else {
         const errorMessage = err instanceof Error ? err.message : 'Une erreur est survenue';
         setError(errorMessage);
       }
       
+      // Charger les services par défaut en cas d'erreur
       const defaultServices = [
         {
           id: 'demo-1',
@@ -205,11 +208,6 @@ export function useServices() {
       ];
       
       setServices(defaultServices);
-      
-      if (!(err instanceof Error && err.message.includes('Timeout'))) {
-        const errorMessage = err instanceof Error ? err.message : 'Une erreur est survenue';
-        setError(errorMessage);
-      }
     } finally {
       setLoading(false);
     }

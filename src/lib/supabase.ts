@@ -3,6 +3,48 @@ import { createClient } from '@supabase/supabase-js';
 const supabaseUrl = import.meta.env.VITE_SUPABASE_URL;
 const supabaseAnonKey = import.meta.env.VITE_SUPABASE_ANON_KEY;
 
+// Helper function to check if error is a network/connectivity issue
+export const isNetworkError = (error: any): boolean => {
+  if (!error) return false;
+  
+  const errorMessage = error.message?.toLowerCase() || '';
+  const errorName = error.name?.toLowerCase() || '';
+  
+  return (
+    errorMessage.includes('failed to fetch') ||
+    errorMessage.includes('network error') ||
+    errorMessage.includes('fetch error') ||
+    errorName === 'typeerror' ||
+    error.code === 'NETWORK_ERROR' ||
+    error.status === 0
+  );
+};
+
+// Helper function to retry failed requests
+export const retryRequest = async <T>(
+  requestFn: () => Promise<T>,
+  maxRetries: number = 3,
+  delay: number = 1000
+): Promise<T> => {
+  let lastError: any;
+  
+  for (let attempt = 1; attempt <= maxRetries; attempt++) {
+    try {
+      return await requestFn();
+    } catch (error) {
+      lastError = error;
+      
+      if (!isNetworkError(error) || attempt === maxRetries) {
+        throw error;
+      }
+      
+      console.warn(`🔄 Tentative ${attempt}/${maxRetries} échouée, retry dans ${delay}ms...`, error);
+      await new Promise(resolve => setTimeout(resolve, delay * attempt));
+    }
+  }
+  
+  throw lastError;
+};
 export const isSupabaseConfigured = () => {
   const isConfigured = !!(
     supabaseUrl && 

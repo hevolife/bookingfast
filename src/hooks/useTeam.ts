@@ -1,5 +1,5 @@
 import { useState, useEffect } from 'react';
-import { supabase, isSupabaseConfigured } from '../lib/supabase';
+import { supabase, isSupabaseConfigured, isNetworkError, retryRequest } from '../lib/supabase';
 import { useAuth } from '../contexts/AuthContext';
 import { TeamMember, AVAILABLE_PERMISSIONS, TEAM_ROLES, getUserRole, canPerformAction } from '../types/team';
 
@@ -47,13 +47,18 @@ export function useTeam() {
 
       // ÉTAPE 1: Vérifier si l'utilisateur possède une équipe (= propriétaire)
       console.log('👑 useTeam: Vérification si propriétaire d\'équipe...');
-      const { data: ownedTeamMembers, error: ownedError } = await supabase
-        .from('team_members')
-        .select('*')
-        .eq('owner_id', user.id)
-        .neq('user_id', user.id) // Exclure l'utilisateur lui-même
-        .eq('is_active', true)
-        .order('created_at', { ascending: false });
+      
+      const { data: ownedTeamMembers, error: ownedError } = await retryRequest(
+        () => supabase
+          .from('team_members')
+          .select('*')
+          .eq('owner_id', user.id)
+          .neq('user_id', user.id) // Exclure l'utilisateur lui-même
+          .eq('is_active', true)
+          .order('created_at', { ascending: false }),
+        3,
+        1000
+      );
 
       console.log('📊 useTeam: Requête propriétaire terminée');
       console.log('🔍 useTeam: Erreur propriétaire:', ownedError);
@@ -86,12 +91,16 @@ export function useTeam() {
         console.log('👥 useTeam: Vérification si membre d\'équipe...');
         console.log('🔍 useTeam: Vérification si membre d\'équipe pour user_id:', user.id);
         
-        const { data: membershipData, error: membershipError } = await supabase
-          .from('team_members')
-          .select('*')
-          .eq('user_id', user.id)
-          .eq('is_active', true)
-          .maybeSingle();
+        const { data: membershipData, error: membershipError } = await retryRequest(
+          () => supabase
+            .from('team_members')
+            .select('*')
+            .eq('user_id', user.id)
+            .eq('is_active', true)
+            .maybeSingle(),
+          3,
+          1000
+        );
 
         console.log('📊 useTeam: Requête membership terminée');
         console.log('🔍 useTeam: Erreur membership:', membershipError);
@@ -131,14 +140,28 @@ export function useTeam() {
 
     } catch (err) {
       console.error('❌ useTeam: Erreur chargement équipe:', err);
-      setError(err instanceof Error ? err.message : 'Erreur de chargement');
       
-      // Fallback en cas d'erreur - donner accès propriétaire
-      console.log('🔄 useTeam: Fallback - accès propriétaire accordé');
-      setIsOwner(true);
-      setTeamMembers([]);
-      setUserPermissions(AVAILABLE_PERMISSIONS.map(p => p.id));
-      setUserRole('owner');
+      // Gestion spécifique des erreurs réseau
+      if (isNetworkError(err)) {
+        console.warn('🌐 useTeam: Erreur réseau détectée - mode hors ligne');
+        setError('Connexion réseau indisponible. Mode hors ligne activé.');
+        
+        // Mode hors ligne - donner accès propriétaire par défaut
+        setIsOwner(true);
+        setTeamMembers([]);
+        setUserPermissions(AVAILABLE_PERMISSIONS.map(p => p.id));
+        setUserRole('owner');
+      } else {
+        // Autres erreurs
+        setError(err instanceof Error ? err.message : 'Erreur de chargement');
+        
+        // Fallback en cas d'erreur - donner accès propriétaire
+        console.log('🔄 useTeam: Fallback - accès propriétaire accordé');
+        setIsOwner(true);
+        setTeamMembers([]);
+        setUserPermissions(AVAILABLE_PERMISSIONS.map(p => p.id));
+        setUserRole('owner');
+      }
     } finally {
       console.log('🏁 useTeam: Finally block - setLoading(false)');
       setLoading(false);
