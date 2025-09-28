@@ -202,14 +202,8 @@ export function IframeBookingPage() {
       while (currentHour < endHour || (currentHour === endHour && currentMinute < endMinute)) {
         const time = `${currentHour.toString().padStart(2, '0')}:${currentMinute.toString().padStart(2, '0')}`;
         
-        // Check if slot is occupied
-        const isOccupied = data.bookings.some(booking => 
-          booking.date === date && booking.time === time
-        );
-        
-        // Check minimum delay for public bookings
-        const validation = validateBookingDateTime(date, time, data.settings, true);
-        const isAvailable = !isOccupied && validation.isValid;
+        // Vérifier si le créneau est disponible pour le service sélectionné
+        const isAvailable = isTimeSlotAvailable(time, selectedService);
         
         slots.push({ time, available: isAvailable });
         
@@ -224,8 +218,62 @@ export function IframeBookingPage() {
     return slots.sort((a, b) => a.time.localeCompare(b.time));
   };
 
+  // Fonction pour vérifier si un créneau est disponible pour un service donné
+  const isTimeSlotAvailable = (time: string, service: Service | null): boolean => {
+    if (!service || !selectedDate) return false;
+    
+    // Vérifier le délai minimum pour les réservations publiques
+    const validation = validateBookingDateTime(selectedDate, time, data.settings, true);
+    if (!validation.isValid) {
+      return false;
+    }
+    
+    // Calculer l'heure de fin du service sélectionné
+    const [startHour, startMinute] = time.split(':').map(Number);
+    const startTime = startHour * 60 + startMinute; // en minutes
+    const endTime = startTime + service.duration_minutes; // en minutes
+    
+    // Vérifier les conflits avec les réservations existantes
+    const dayBookings = data.bookings.filter(booking => booking.date === selectedDate);
+    
+    for (const booking of dayBookings) {
+      const [bookingHour, bookingMinute] = booking.time.split(':').map(Number);
+      const bookingStartTime = bookingHour * 60 + bookingMinute;
+      const bookingEndTime = bookingStartTime + booking.duration_minutes;
+      
+      // Vérifier s'il y a chevauchement
+      const hasOverlap = (startTime < bookingEndTime && endTime > bookingStartTime);
+      
+      if (hasOverlap) {
+        // Si c'est le même service, vérifier la capacité
+        if (booking.service_id === service.id) {
+          // Compter les participants déjà réservés pour ce créneau et ce service
+          const existingParticipants = dayBookings
+            .filter(b => 
+              b.service_id === service.id && 
+              b.time === booking.time && 
+              b.booking_status !== 'cancelled'
+            )
+            .reduce((sum, b) => sum + b.quantity, 0);
+          
+          // Vérifier s'il reste de la place (on assume quantity = 1 pour la vérification)
+          if (existingParticipants >= service.capacity) {
+            return false; // Plus de place pour ce service
+          }
+        } else {
+          // Services différents qui se chevauchent = conflit
+          return false;
+        }
+      }
+    }
+    
+    return true;
+  };
+
   const handleServiceSelect = (service: Service) => {
     setSelectedService(service);
+    // Réinitialiser la sélection de temps quand on change de service
+    setSelectedTime('');
     setCurrentStep(2);
   };
 
