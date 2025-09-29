@@ -181,6 +181,11 @@ export function PaymentSection({
       paymentUrl.searchParams.set('date', bookingDate);
       paymentUrl.searchParams.set('time', bookingTime);
       paymentUrl.searchParams.set('expires', expiresAt.toString());
+      paymentUrl.searchParams.set('ownerId', user?.id || '');
+      
+      // Ajouter un identifiant unique pour tracer le paiement
+      const paymentId = crypto.randomUUID();
+      paymentUrl.searchParams.set('payment_id', paymentId);
       
       await navigator.clipboard.writeText(paymentUrl.toString());
       alert('Lien de paiement copié dans le presse-papiers !');
