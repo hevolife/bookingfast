@@ -56,10 +56,9 @@ export class ClientPaymentManager {
           'line_items[0][price_data][unit_amount]': (amount * 100).toString(),
           'line_items[0][quantity]': '1',
           'mode': 'payment',
-          'success_url': `${window.location.origin}/payment-success`,
+          'success_url': `${window.location.origin}/payment-success?session_id={CHECKOUT_SESSION_ID}&amount=${amount}&email=${customerEmail}&date=${metadata.date || metadata.booking_date}&time=${metadata.time || metadata.booking_time}&booking_id=${metadata.booking_id || ''}`,
           'cancel_url': `${window.location.origin}/payment-cancel`,
           'customer_email': customerEmail,
-          'success_url': `${window.location.origin}/payment-success?session_id={CHECKOUT_SESSION_ID}&amount=${amount}&email=${customerEmail}&date=${metadata.booking_date}&time=${metadata.booking_time}`,
           ...Object.entries(metadata).reduce((acc, [key, value]) => {
             acc[`metadata[${key}]`] = value;
             return acc;
