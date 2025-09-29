@@ -1,11 +1,11 @@
-// Gestionnaire de webhook Stripe côté client - VERSION ULTRA SIMPLE QUI FONCTIONNE
+// Gestionnaire de webhook Stripe côté client - Version simplifiée et robuste
 import { supabase, isSupabaseConfigured } from './supabase';
 import { Booking } from '../types';
 
 export class StripeWebhookHandler {
-  // Traiter un paiement Stripe réussi - VERSION ULTRA SIMPLE
+  // Traiter un paiement Stripe réussi - VERSION SIMPLIFIÉE
   static async processStripeWebhook(sessionData: any): Promise<void> {
-    console.log('🔄 DÉBUT TRAITEMENT PAIEMENT STRIPE - VERSION ULTRA SIMPLE');
+    console.log('🔄 DÉBUT TRAITEMENT PAIEMENT STRIPE - VERSION SIMPLIFIÉE');
     console.log('📊 Session data:', sessionData);
     
     if (!isSupabaseConfigured()) {
@@ -14,31 +14,30 @@ export class StripeWebhookHandler {
     }
 
     try {
-      const customerEmail = sessionData.customer_details?.email;
-      const amountPaid = sessionData.amount_total / 100; // Stripe utilise les centimes
-      const sessionId = sessionData.id;
-      const metadata = sessionData.metadata;
+      const { customer_details, metadata, amount_total, id: sessionId } = sessionData;
+      const customerEmail = customer_details?.email;
+      const amountPaid = amount_total / 100; // Stripe utilise les centimes
 
       if (!customerEmail || !metadata) {
         console.warn('⚠️ Données webhook incomplètes');
         return;
       }
 
-      console.log('🔍 RECHERCHE RÉSERVATION');
+      console.log('🔍 RECHERCHE RÉSERVATION SIMPLE');
       console.log('📧 Email:', customerEmail);
       console.log('📅 Date:', metadata.date || metadata.booking_date);
       console.log('⏰ Heure:', metadata.time || metadata.booking_time);
       console.log('💰 Montant:', amountPaid, '€');
 
+      // ÉTAPE 1: Rechercher la réservation par email/date/heure UNIQUEMENT
       const searchDate = metadata.date || metadata.booking_date;
       const searchTime = metadata.time || metadata.booking_time;
       
       if (!searchDate || !searchTime) {
-        console.error('❌ Date ou heure manquante');
+        console.error('❌ Date ou heure manquante dans les métadonnées');
         return;
       }
 
-      // ÉTAPE 1: Rechercher la réservation
       console.log('🔍 Recherche avec:', { email: customerEmail, date: searchDate, time: searchTime });
 
       const { data: foundBookings, error: searchError } = await supabase
@@ -55,14 +54,39 @@ export class StripeWebhookHandler {
 
       if (!foundBookings || foundBookings.length === 0) {
         console.error('❌ AUCUNE RÉSERVATION TROUVÉE');
+        console.log('🔍 Critères de recherche:', { email: customerEmail, date: searchDate, time: searchTime });
         return;
+      }
+
+      if (foundBookings.length > 1) {
+        console.warn('⚠️ Plusieurs réservations trouvées, utilisation de la première');
       }
 
       const targetBooking = foundBookings[0];
       console.log('✅ RÉSERVATION TROUVÉE:', targetBooking.id);
 
-      // ÉTAPE 2: Vérifier si déjà traité
-      const existingTransactions = targetBooking.transactions || [];
+      // ÉTAPE 2: Vérifier que la réservation existe vraiment en base
+      console.log('🔍 VÉRIFICATION EXISTENCE RÉSERVATION...');
+      const { data: bookingCheck, error: checkError } = await supabase
+        .from('bookings')
+        .select('id, total_amount, transactions')
+        .eq('id', targetBooking.id)
+        .maybeSingle();
+
+      if (checkError) {
+        console.error('❌ Erreur vérification existence:', checkError);
+        return;
+      }
+
+      if (!bookingCheck) {
+        console.error('❌ RÉSERVATION INEXISTANTE EN BASE:', targetBooking.id);
+        return;
+      }
+
+      console.log('✅ RÉSERVATION CONFIRMÉE EN BASE:', bookingCheck.id);
+
+      // ÉTAPE 3: Vérifier si déjà traité
+      const existingTransactions = bookingCheck.transactions || [];
       const alreadyProcessed = existingTransactions.some((t: any) => 
         t.method === 'stripe' && 
         t.status === 'completed' &&
@@ -70,11 +94,11 @@ export class StripeWebhookHandler {
       );
 
       if (alreadyProcessed) {
-        console.log('⚠️ Paiement déjà traité');
+        console.log('⚠️ Paiement déjà traité pour cette session:', sessionId);
         return;
       }
 
-      // ÉTAPE 3: Préparer les nouvelles transactions
+      // ÉTAPE 4: Créer ou mettre à jour la transaction
       const updatedTransactions = [...existingTransactions];
       let transactionUpdated = false;
 
@@ -109,13 +133,13 @@ export class StripeWebhookHandler {
         });
       }
 
-      // ÉTAPE 4: Calculer les nouveaux totaux
+      // ÉTAPE 5: Calculer les nouveaux totaux
       const totalPaid = updatedTransactions
         .filter((t: any) => t.status === 'completed')
         .reduce((sum: number, t: any) => sum + t.amount, 0);
       
       let newPaymentStatus: 'pending' | 'partial' | 'completed' = 'pending';
-      if (totalPaid >= targetBooking.total_amount) {
+      if (totalPaid >= bookingCheck.total_amount) {
         newPaymentStatus = 'completed';
       } else if (totalPaid > 0) {
         newPaymentStatus = 'partial';
@@ -123,80 +147,57 @@ export class StripeWebhookHandler {
 
       console.log('💰 CALCULS:', {
         totalPaid: totalPaid.toFixed(2),
-        totalAmount: targetBooking.total_amount.toFixed(2),
+        totalAmount: bookingCheck.total_amount.toFixed(2),
         newPaymentStatus
       });
 
-      // ÉTAPE 5: MISE À JOUR DIRECTE AVEC L'ID EXACT
-      console.log('🔄 MISE À JOUR DIRECTE AVEC ID:', targetBooking.id);
+      // ÉTAPE 6: Mise à jour SIMPLE en base
+      console.log('🔄 MISE À JOUR SIMPLE EN BASE...');
       
-      const updateData = {
-        transactions: updatedTransactions,
-        payment_status: newPaymentStatus,
-        payment_amount: totalPaid,
-        booking_status: 'confirmed',
-        updated_at: new Date().toISOString()
-      };
-
-      console.log('📊 Données à mettre à jour:', updateData);
-
-      const { data: updateResult, error: updateError } = await supabase
-        .from('bookings')
-        .update(updateData)
-        .eq('id', targetBooking.id)
-        .select();
-
-      if (updateError) {
-        console.error('❌ ERREUR MISE À JOUR:', updateError);
-        throw updateError;
-      }
-
-      if (!updateResult || updateResult.length === 0) {
-        console.error('❌ AUCUNE LIGNE MISE À JOUR - ID:', targetBooking.id);
-        
-        // VÉRIFICATION SUPPLÉMENTAIRE - Est-ce que l'ID existe vraiment ?
-        const { data: checkBooking, error: checkError } = await supabase
-          .from('bookings')
-          .select('id')
-          .eq('id', targetBooking.id);
-        
-        if (checkError) {
-          console.error('❌ Erreur vérification ID:', checkError);
-        } else if (!checkBooking || checkBooking.length === 0) {
-          console.error('❌ ID INEXISTANT EN BASE:', targetBooking.id);
-        } else {
-          console.log('✅ ID existe en base, problème de mise à jour');
+        // TENTATIVE ALTERNATIVE - Mise à jour par email/date/time
+        const { data: altUpdateResult, error: altUpdateError } = await supabase
+        .update({
+          .update(updateData)
+          .eq('client_email', customerEmail)
+          .eq('date', searchDate)
+          .eq('time', searchTime)
+          .select();
+          payment_amount: totalPaid,
+        if (altUpdateError) {
+          console.error('❌ ERREUR MISE À JOUR ALTERNATIVE:', altUpdateError);
+          throw altUpdateError;
         }
         
-        throw new Error(`Réservation ${targetBooking.id} non trouvée pour mise à jour`);
+        if (!altUpdateResult || altUpdateResult.length === 0) {
+          console.error('❌ ÉCHEC TOTAL - Aucune réservation mise à jour');
+          throw new Error('Impossible de mettre à jour la réservation');
+      }
+          console.log('✅ MISE À JOUR ALTERNATIVE RÉUSSIE');
+          console.log('📊 Lignes affectées:', altUpdateResult.length);
+      if (!updateResult || updateResult.length === 0) {
+      } else {
+        console.log('✅ RÉSERVATION MISE À JOUR AVEC SUCCÈS');
+        console.log('📊 Lignes affectées:', updateResult.length);
       }
 
-      console.log('✅ RÉSERVATION MISE À JOUR AVEC SUCCÈS');
-      console.log('📊 Lignes affectées:', updateResult.length);
       console.log('📊 Nouveau statut:', {
-        id: targetBooking.id,
+        id: bookingCheck.id,
         payment_status: newPaymentStatus,
         payment_amount: totalPaid,
         transactions_count: updatedTransactions.length
       });
 
-      // ÉTAPE 6: Déclencher rafraîchissement IMMÉDIAT
-      console.log('🔄 RAFRAÎCHISSEMENT IMMÉDIAT');
-      window.dispatchEvent(new CustomEvent('refreshBookings'));
-      window.dispatchEvent(new CustomEvent('forceRefreshBookings'));
-      
-      // Rafraîchissements supplémentaires
+      // ÉTAPE 7: Déclencher rafraîchissement
       setTimeout(() => {
-        console.log('🔄 Rafraîchissement +500ms');
-        window.dispatchEvent(new CustomEvent('refreshBookings'));
-      }, 500);
-      
-      setTimeout(() => {
-        console.log('🔄 Rafraîchissement +1500ms');
-        window.dispatchEvent(new CustomEvent('refreshBookings'));
-      }, 1500);
-
-    } catch (error) {
+      // APPROCHE DIRECTE - Mise à jour sans vérification RLS
+      const { data: updateResult, error: updateError } = await supabase
+        .from('bookings')
+        .update(updateData)
+        .eq('id', targetBooking.id)
+        .eq('client_email', customerEmail)
+        .eq('date', searchDate)
+        .eq('time', searchTime)
+        .select();
       console.error('❌ ERREUR TRAITEMENT WEBHOOK:', error);
       
       // Déclencher quand même un rafraîchissement en cas d'erreur
@@ -215,5 +216,9 @@ export class StripeWebhookHandler {
     
     console.log('🔄 Synchronisation paiements Stripe pour', bookings.length, 'réservations');
     return bookings; // Retourner tel quel, la sync se fait via webhook
-  }
+        console.error('❌ AUCUNE LIGNE MISE À JOUR');
+        console.log('🔍 TENTATIVE AVEC CRITÈRES MULTIPLES...');
 }
+      const { data: updateResult, error: updateError } = await supabase
+        .from('bookings')
+        .update({
