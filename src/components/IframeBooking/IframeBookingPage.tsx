@@ -6,7 +6,6 @@ import { supabase, isSupabaseConfigured } from '../../lib/supabase';
 import { getBusinessTimezone, getCurrentDateInTimezone, formatInBusinessTimezone } from '../../lib/timezone';
 import { validateBookingDateTime, getNextAvailableDateTime } from '../../lib/bookingValidation';
 import { DatePicker } from './DatePicker';
-import { ClientPaymentManager } from '../../lib/clientPayments';
 
 interface PublicBookingData {
   user: any;
@@ -118,98 +117,41 @@ export function IframeBookingPage() {
         return;
       }
 
-      // Charger les données directement depuis Supabase
-      console.log('🔄 Chargement données publiques côté client...');
-      
-      // Récupérer l'utilisateur
-      const { data: userData, error: userError } = await supabase
-        .from('users')
-        .select('id, email, full_name')
-        .eq('id', userId)
-        .single();
-
-      if (userError || !userData) {
-        throw new Error('Utilisateur non trouvé');
-      }
-
-      // Récupérer les services
-      const { data: servicesData, error: servicesError } = await supabase
-        .from('services')
-        .select('*')
-        .eq('user_id', userId)
-        .order('created_at', { ascending: true });
-
-      if (servicesError) {
-        throw new Error(`Erreur services: ${servicesError.message}`);
-      }
-
-      // Récupérer les paramètres
-      const { data: settingsData, error: settingsError } = await supabase
-        .from('business_settings')
-        .select('*')
-        .eq('user_id', userId)
-        .single();
-
-      if (settingsError) {
-        console.warn('⚠️ Paramètres non trouvés, utilisation des valeurs par défaut');
-      }
-
-      // Récupérer les réservations existantes
-      const { data: bookingsData, error: bookingsError } = await supabase
-        .from('bookings')
-        .select('date, time, duration_minutes, service_id, booking_status')
-        .eq('user_id', userId)
-        .in('booking_status', ['pending', 'confirmed']);
-
-      if (bookingsError) {
-        console.warn('⚠️ Erreur chargement réservations:', bookingsError);
-      }
-
-      const result = {
-        user: userData,
-        services: servicesData || [],
-        settings: settingsData || {
-          business_name: 'BookingFast',
-          primary_color: '#3B82F6',
-          secondary_color: '#8B5CF6',
-          opening_hours: {
-            monday: { ranges: [{ start: '08:00', end: '18:00' }], closed: false },
-            tuesday: { ranges: [{ start: '08:00', end: '18:00' }], closed: false },
-            wednesday: { ranges: [{ start: '08:00', end: '18:00' }], closed: false },
-            thursday: { ranges: [{ start: '08:00', end: '18:00' }], closed: false },
-            friday: { ranges: [{ start: '08:00', end: '18:00' }], closed: false },
-            saturday: { ranges: [{ start: '09:00', end: '17:00' }], closed: false },
-            sunday: { ranges: [{ start: '10:00', end: '16:00' }], closed: true }
-          },
-          buffer_minutes: 15,
-          default_deposit_percentage: 30,
-          minimum_booking_delay_hours: 24,
-          payment_link_expiry_minutes: 30,
-          deposit_type: 'percentage',
-          deposit_fixed_amount: 20,
-          email_notifications: true,
-          brevo_enabled: false,
-          stripe_enabled: false,
-          timezone: 'Europe/Paris'
+      const supabaseUrl = import.meta.env.VITE_SUPABASE_URL;
+      const response = await fetch(`${supabaseUrl}/functions/v1/public-booking-data?user_id=${userId}`, {
+        method: 'GET',
+        headers: {
+          'Content-Type': 'application/json',
+          'Authorization': `Bearer ${import.meta.env.VITE_SUPABASE_ANON_KEY}`,
         },
-        bookings: bookingsData || []
-      };
+      });
+
+      if (!response.ok) {
+        console.warn(`⚠️ Erreur HTTP ${response.status} - utilisation des données par défaut`);
+        throw new Error(`HTTP ${response.status}`);
+      }
+
+      const result = await response.json();
+      
+      if (!result.success) {
+        throw new Error(result.error || 'Erreur lors de la récupération des données');
+      }
 
       // Filtrer les services selon la configuration iframe
-      let filteredServices = result.services;
+      let filteredServices = result.services || [];
       
       if (allowedServices.length > 0) {
         // Si des services spécifiques sont demandés via l'URL
         filteredServices = filteredServices.filter(service => 
           allowedServices.includes(service.id)
         );
-        console.log('🎯 Services filtrés par URL:', filteredServices.length, 'sur', result.services.length);
+        console.log('🎯 Services filtrés par URL:', filteredServices.length, 'sur', result.services?.length || 0);
       } else if (result.settings?.iframe_services && result.settings.iframe_services.length > 0) {
         // Si des services sont configurés dans les paramètres
         filteredServices = filteredServices.filter(service => 
           result.settings.iframe_services.includes(service.id)
         );
-        console.log('⚙️ Services filtrés par paramètres:', filteredServices.length, 'sur', result.services.length);
+        console.log('⚙️ Services filtrés par paramètres:', filteredServices.length, 'sur', result.services?.length || 0);
       }
       // Sinon, afficher tous les services
       
@@ -219,7 +161,7 @@ export function IframeBookingPage() {
       });
     } catch (err) {
       console.error('❌ Erreur chargement données publiques:', err);
-      setError(`Impossible de charger les données: ${err instanceof Error ? err.message : 'Erreur inconnue'}`);
+      setError('Impossible de charger les données');
     } finally {
       setLoading(false);
     }
@@ -405,44 +347,63 @@ export function IframeBookingPage() {
         
         console.log('🆔 ID tentative UNIQUE:', attemptId);
         
-        // Utiliser le gestionnaire de paiements côté client
-        await ClientPaymentManager.createCheckoutSession({
-          amount: depositAmount,
-          serviceName: `Acompte - ${selectedService.name}`,
-          customerEmail: clientData.email,
-          metadata: {
-            // 🔑 Données pour créer la réservation APRÈS paiement UNIQUEMENT
-            reservation_attempt_id: attemptId,
-            unique_key: uniqueKey,
-            user_id: userId!,
-            service_id: selectedService.id,
-            service_name: selectedService.name,
-            date: selectedDate,
-            time: selectedTime,
-            duration_minutes: selectedService.duration_minutes.toString(),
-            quantity: quantity.toString(),
-            client_name: clientData.lastname,
-            client_firstname: clientData.firstname,
-            client: `${clientData.firstname} ${clientData.lastname}`,
-            email: clientData.email,
-            phone: clientData.phone,
-            booking_date: selectedDate,
-            booking_time: selectedTime,
-            is_deposit: 'true',
-            total_amount: totalAmount.toString(),
-            deposit_amount: depositAmount.toString(),
-            create_booking_after_payment: 'true',
-            attempt_timestamp: Date.now().toString(),
-            prevent_duplicates: 'true'
+        const supabaseUrl = import.meta.env.VITE_SUPABASE_URL;
+        const response = await fetch(`${supabaseUrl}/functions/v1/stripe-checkout`, {
+          method: 'POST',
+          headers: {
+            'Content-Type': 'application/json',
+            'Authorization': `Bearer ${import.meta.env.VITE_SUPABASE_ANON_KEY}`,
           },
-          settings: data.settings
+          body: JSON.stringify({
+            amount: depositAmount,
+            service_name: `Acompte - ${selectedService.name}`,
+            customer_email: clientData.email,
+            success_url: `${window.location.origin}/payment-success`,
+            cancel_url: `${window.location.origin}/payment-cancel`,
+            metadata: {
+              // 🔑 Données pour créer la réservation APRÈS paiement UNIQUEMENT
+              reservation_attempt_id: attemptId,
+              unique_key: uniqueKey,
+              user_id: userId,
+              service_id: selectedService.id,
+              service_name: selectedService.name,
+              date: selectedDate,
+              time: selectedTime,
+              duration_minutes: selectedService.duration_minutes.toString(),
+              quantity: quantity.toString(),
+              client_name: clientData.lastname,
+              client_firstname: clientData.firstname,
+              client: `${clientData.firstname} ${clientData.lastname}`,
+              email: clientData.email,
+              phone: clientData.phone,
+              booking_date: selectedDate,
+              booking_time: selectedTime,
+              is_deposit: 'true',
+              total_amount: totalAmount.toString(),
+              deposit_amount: depositAmount.toString(),
+              create_booking_after_payment: 'true',
+              attempt_timestamp: Date.now().toString(),
+              prevent_duplicates: 'true'
+            },
+          }),
         });
-        
-        // 🏷️ Marquer cette tentative comme envoyée à Stripe
-        sessionStorage.setItem(attemptKey, 'sent_to_stripe');
-        
-        console.log('🔄 REDIRECTION UNIQUE vers Stripe - réservation créée APRÈS paiement UNIQUEMENT');
-        return;
+
+        if (response.ok) {
+          const { url } = await response.json();
+          if (url) {
+            console.log('🔄 REDIRECTION UNIQUE vers Stripe - réservation créée APRÈS paiement UNIQUEMENT');
+            
+            // 🏷️ Marquer cette tentative comme envoyée à Stripe
+            sessionStorage.setItem(attemptKey, 'sent_to_stripe');
+            
+            // 🚀 Ouvrir Stripe dans nouvel onglet
+            window.open(url, '_blank');
+            return;
+          }
+        } else {
+          const errorData = await response.json();
+          throw new Error(errorData.error || 'Erreur lors de la création de la session de paiement');
+        }
       } else {
         // 🎭 Mode démo - simuler la redirection Stripe
         console.log('🎭 Mode démo - simulation paiement unique...');

@@ -191,7 +191,6 @@ export function BookingModal({
       paymentUrl.searchParams.set('date', date);
       paymentUrl.searchParams.set('time', time);
       paymentUrl.searchParams.set('expires', expiresAt.toString());
-      paymentUrl.searchParams.set('ownerId', user?.id || '');
 
       console.log('✅ URL de paiement générée:', paymentUrl.toString());
 
@@ -212,7 +211,7 @@ export function BookingModal({
 
       // Préparer les données de réservation pour le workflow
       const bookingDataForWorkflow = {
-        id: editingBooking?.id || `temp-${crypto.randomUUID()}`,
+        id: editingBooking?.id || crypto.randomUUID(),
         service_id: isCustomService ? 'custom' : selectedService.id,
         date,
         time,
@@ -761,7 +760,6 @@ export function BookingModal({
                   serviceName={isCustomService ? customServiceData.name : selectedService?.name || ''}
                   bookingDate={date}
                   bookingTime={time}
-                  editingBooking={editingBooking}
                 />
               )}
             </div>

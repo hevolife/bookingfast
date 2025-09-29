@@ -2,7 +2,6 @@ import React, { useState, useEffect } from 'react';
 import { useSearchParams, useNavigate } from 'react-router-dom';
 import { CreditCard, Clock, User, Mail, Calendar, AlertTriangle, XCircle, Timer } from 'lucide-react';
 import { supabase, isSupabaseConfigured } from '../../lib/supabase';
-import { ClientPaymentManager } from '../../lib/clientPayments';
 
 export function PaymentPage() {
   const [searchParams] = useSearchParams();
@@ -21,7 +20,6 @@ export function PaymentPage() {
   const date = searchParams.get('date');
   const time = searchParams.get('time');
   const expiresAt = searchParams.get('expires');
-  const ownerId = searchParams.get('ownerId');
 
   // Vérifier si le lien de paiement existe encore
   useEffect(() => {
@@ -223,43 +221,45 @@ export function PaymentPage() {
           email: email,
           date: date,
           time: time,
-          booking_date: date,
-          booking_time: time,
-          owner_id: ownerId || ''
         }
       });
 
       if (isSupabaseConfigured()) {
-        // Récupérer les paramètres Stripe depuis la base
-        let query = supabase
-          .from('business_settings')
-          .select('stripe_enabled, stripe_public_key, stripe_secret_key');
-        
-        if (ownerId) {
-          query = query.eq('user_id', ownerId);
-        }
-        
-        const { data: settings, error: settingsError } = await query
-          .limit(1)
-          .single();
-
-        if (settingsError || !settings?.stripe_enabled) {
-          throw new Error('Configuration Stripe non trouvée');
-        }
-
-        // Utiliser le gestionnaire de paiements côté client
-        await ClientPaymentManager.createCheckoutSession({
-          amount: parseFloat(amount),
-          serviceName: service,
-          customerEmail: email,
-          metadata: {
-            client: client,
-            email: email,
-            date: date,
-            time: time,
+        // Appel à la fonction Supabase Edge Function
+        const supabaseUrl = import.meta.env.VITE_SUPABASE_URL;
+        const response = await fetch(`${supabaseUrl}/functions/v1/stripe-checkout`, {
+          method: 'POST',
+          headers: {
+            'Content-Type': 'application/json',
+            'Authorization': `Bearer ${import.meta.env.VITE_SUPABASE_ANON_KEY}`,
           },
-          settings
+          body: JSON.stringify({
+            amount: parseFloat(amount),
+            service_name: service,
+            customer_email: email,
+            success_url: `${window.location.origin}/payment-success`,
+            cancel_url: `${window.location.origin}/payment-cancel`,
+            metadata: {
+              client: client,
+              email: email,
+              date: date,
+              time: time,
+            },
+          }),
         });
+
+        if (response.ok) {
+          const { url } = await response.json();
+          if (url) {
+            window.location.href = url;
+            return;
+          } else {
+            throw new Error('Aucune URL de paiement reçue');
+          }
+        } else {
+          const errorData = await response.json();
+          throw new Error(errorData.error || 'Erreur lors de la création de la session de paiement');
+        }
       } else {
         // Mode démo - simuler le paiement
         console.log('🎭 Mode démo - simulation du paiement');

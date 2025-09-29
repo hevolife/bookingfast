@@ -11,7 +11,7 @@ import { ServicesPage } from './components/Services/ServicesPage';
 import { AdminPage } from './components/Admin/AdminPage';
 import { EmailWorkflowPage } from './components/EmailWorkflow/EmailWorkflowPage';
 import { PaymentPage } from './components/PaymentPage/PaymentPage';
-import PaymentSuccess from './components/PaymentPage/PaymentSuccess';
+import { PaymentSuccess } from './components/PaymentPage/PaymentSuccess';
 import { PaymentCancel } from './components/PaymentPage/PaymentCancel';
 import { LandingPage } from './components/Landing/LandingPage';
 import { IframeBookingPage } from './components/IframeBooking/IframeBookingPage';

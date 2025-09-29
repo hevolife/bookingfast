@@ -2,7 +2,7 @@ import React, { useState } from 'react';
 import { CreditCard, Plus, Trash2, Link, Euro, Calculator, Send, Clock, Copy, User, Mail, Package, Calendar, ChevronDown, ChevronUp, X, ExternalLink } from 'lucide-react';
 import { Transaction } from '../../types';
 import { useBusinessSettings } from '../../hooks/useBusinessSettings';
-import { ClientEmailManager } from '../../lib/clientEmails';
+import { sendPaymentLinkEmail } from '../../lib/workflowEngine';
 import { useAuth } from '../../contexts/AuthContext';
 
 interface PaymentSectionProps {
@@ -16,7 +16,6 @@ interface PaymentSectionProps {
   serviceName: string;
   bookingDate: string;
   bookingTime: string;
-  editingBooking?: Booking | null;
 }
 
 // Composant Timer pour les liens de paiement
@@ -78,8 +77,7 @@ export function PaymentSection({
   clientEmail,
   serviceName,
   bookingDate,
-  bookingTime,
-  editingBooking
+  bookingTime
 }: PaymentSectionProps) {
   const { settings } = useBusinessSettings();
   const { user } = useAuth();
@@ -183,14 +181,6 @@ export function PaymentSection({
       paymentUrl.searchParams.set('date', bookingDate);
       paymentUrl.searchParams.set('time', bookingTime);
       paymentUrl.searchParams.set('expires', expiresAt.toString());
-      paymentUrl.searchParams.set('ownerId', user?.id || '');
-      
-      // Ajouter un identifiant unique pour tracer le paiement
-      const paymentId = crypto.randomUUID();
-      paymentUrl.searchParams.set('payment_id', paymentId);
-      if (editingBooking?.id) {
-        paymentUrl.searchParams.set('booking_id', editingBooking.id);
-      }
       
       await navigator.clipboard.writeText(paymentUrl.toString());
       alert('Lien de paiement copié dans le presse-papiers !');

@@ -1,95 +1,22 @@
 import React from 'react';
 import { CheckCircle, Calendar, ArrowLeft } from 'lucide-react';
 import { useSearchParams } from 'react-router-dom';
-import { StripeWebhookHandler } from '../../lib/stripeWebhookHandler';
 
-export default function PaymentSuccess() {
+export function PaymentSuccess() {
   const [searchParams] = useSearchParams();
-  const sessionId = searchParams.get('session_id');
   const bookingId = searchParams.get('booking_id');
   
-  React.useEffect(() => {
-    let processed = false;
-    
-    if (sessionId && !processed) {
-      (async () => {
-        console.log('💳 TRAITEMENT PAIEMENT SIMPLE - SESSION:', sessionId);
-        
-        processed = true; // Marquer comme traité immédiatement
-        
-        try {
-          console.log('📊 Paramètres URL:', {
-            sessionId,
-            amount: searchParams.get('amount'),
-            email: searchParams.get('email'),
-            date: searchParams.get('date'),
-            time: searchParams.get('time'),
-            booking_id: bookingId
-          });
-          
-          // Préparer les données de session pour le traitement
-          const sessionData = {
-            id: sessionId,
-            payment_status: 'paid',
-            amount_total: parseFloat(searchParams.get('amount') || '0') * 100, // Convertir en centimes
-            customer_details: {
-              email: searchParams.get('email')
-            },
-            metadata: {
-              date: searchParams.get('date'),
-              time: searchParams.get('time'),
-              booking_date: searchParams.get('date'),
-              booking_time: searchParams.get('time'),
-              booking_id: bookingId || 'unknown'
-            }
-          };
-          
-          console.log('📊 DONNÉES SESSION PRÉPARÉES:', sessionData);
-          
-          await StripeWebhookHandler.processStripeWebhook(sessionData);
-          console.log('✅ PAIEMENT TRAITÉ AVEC SUCCÈS');
-          
-          // Déclencher rafraîchissements multiples
-          setTimeout(() => {
-            console.log('🔄 RAFRAÎCHISSEMENT 1/3');
-            window.dispatchEvent(new CustomEvent('refreshBookings'));
-          }, 500);
-          
-          setTimeout(() => {
-            console.log('🔄 RAFRAÎCHISSEMENT 2/3');
-            window.dispatchEvent(new CustomEvent('refreshBookings'));
-          }, 1500);
-          
-          setTimeout(() => {
-            console.log('🔄 RAFRAÎCHISSEMENT 3/3');
-            window.dispatchEvent(new CustomEvent('refreshBookings'));
-          }, 3000);
-          
-        } catch (error) {
-          // Rafraîchissement simple
-          console.error('❌ ERREUR TRAITEMENT PAIEMENT:', error);
-          // Rafraîchissement de secours
-          setTimeout(() => {
-            window.dispatchEvent(new CustomEvent('refreshBookings'));
-          }, 1000);
-        }
-      })();
-    }
-  }, [sessionId, searchParams, bookingId]);
-
   const handleBackToHome = () => {
     // Fermer la fenêtre ou rediriger vers une page de confirmation
-    try {
-      if (window.opener) {
-        window.close();
-      } else {
+    // Fermer l'onglet de paiement et retourner à la page de réservation
+    window.close();
+    
+    // Si la fermeture échoue (bloquée par le navigateur), rediriger
+    setTimeout(() => {
+      if (!window.closed) {
         window.location.href = '/';
       }
-    } catch (error) {
-      setTimeout(() => {
-        console.error('❌ Erreur paiement:', error);
-      }, 100);
-    }
+    }, 100);
   };
 
   return (
@@ -100,7 +27,8 @@ export default function PaymentSuccess() {
           <CheckCircle className="w-12 h-12 text-white" />
         </div>
 
-        <h1 className="text-3xl font-bold text-gray-800 mb-4">
+        {/* Success Message */}
+        <h1 className="text-3xl font-bold text-gray-900 mb-4">
           Paiement réussi !
         </h1>
         

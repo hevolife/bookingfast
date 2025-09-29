@@ -139,7 +139,6 @@ export function CalendarGrid({ currentDate, onTimeSlotClick, onBookingClick, boo
       setTimeout(() => {
         window.dispatchEvent(new CustomEvent('refreshBookings'));
       }, 100);
-      
     };
 
     bookingEvents.on('bookingCreated', handleBookingChange);
