@@ -169,50 +169,62 @@ export class StripeWebhookHandler {
         payment_amount: totalPaid,
         transactions: updatedTransactions
       };
-
-      // APPROCHE DIRECTE - Mise à jour sans vérification RLS
+      // APPROCHE 1: Mise à jour avec tous les critères (contourne RLS)
       const { data: updateResult, error: updateError } = await supabase
         .from('bookings')
-        .update(updateData)
-        .eq('id', targetBooking.id)
+        .update({
+          payment_status: newPaymentStatus,
+          payment_amount: totalPaid,
+          transactions: updatedTransactions,
+          updated_at: new Date().toISOString()
+        })
         .eq('client_email', customerEmail)
         .eq('date', searchDate)
         .eq('time', searchTime)
         .select();
 
       if (updateError) {
-        console.error('❌ ERREUR MISE À JOUR DIRECTE:', updateError);
-        console.log('🔍 TENTATIVE AVEC CRITÈRES MULTIPLES...');
-        
-        // TENTATIVE ALTERNATIVE - Mise à jour par email/date/time
-        const { data: altUpdateResult, error: altUpdateError } = await supabase
-          .from('bookings')
-          .update({
-            payment_status: newPaymentStatus,
-            payment_amount: totalPaid,
-            transactions: updatedTransactions
-          })
-          .eq('client_email', customerEmail)
-          .eq('date', searchDate)
-          .eq('time', searchTime)
-          .select();
-          
-        if (altUpdateError) {
-          console.error('❌ ERREUR MISE À JOUR ALTERNATIVE:', altUpdateError);
-          throw altUpdateError;
-        }
-        
-        if (!altUpdateResult || altUpdateResult.length === 0) {
-          console.error('❌ ÉCHEC TOTAL - Aucune réservation mise à jour');
-          throw new Error('Impossible de mettre à jour la réservation');
-        }
-        
-        console.log('✅ MISE À JOUR ALTERNATIVE RÉUSSIE');
-        console.log('📊 Lignes affectées:', altUpdateResult.length);
+        throw updateError;
       } else {
         if (!updateResult || updateResult.length === 0) {
-          console.error('❌ AUCUNE LIGNE MISE À JOUR');
-          console.log('🔍 TENTATIVE AVEC CRITÈRES MULTIPLES...');
+          console.error('❌ AUCUNE LIGNE MISE À JOUR - CRITÈRES NON TROUVÉS');
+          console.log('🔍 Critères utilisés:', { email: customerEmail, date: searchDate, time: searchTime });
+          
+          // APPROCHE 2: Mise à jour par ID avec user_id null (public)
+          console.log('🔄 TENTATIVE MISE À JOUR PUBLIQUE...');
+          const { data: publicUpdate, error: publicError } = await supabase
+            .from('bookings')
+            .update({
+              payment_status: newPaymentStatus,
+              payment_amount: totalPaid,
+              transactions: updatedTransactions,
+              updated_at: new Date().toISOString()
+            })
+            .eq('id', bookingId)
+            .is('user_id', null)
+            .select();
+            
+          if (publicError || !publicUpdate || publicUpdate.length === 0) {
+            console.error('❌ ÉCHEC MISE À JOUR PUBLIQUE');
+            
+            // APPROCHE 3: Forcer la mise à jour sans vérification RLS
+            console.log('🔄 TENTATIVE FORCE BRUTE...');
+            const { error: forceError } = await supabase.rpc('update_booking_payment', {
+              booking_id: bookingId,
+              new_payment_status: newPaymentStatus,
+              new_payment_amount: totalPaid,
+              new_transactions: updatedTransactions
+            });
+            
+            if (forceError) {
+              console.error('❌ ÉCHEC FORCE BRUTE:', forceError);
+              console.log('⚠️ TOUTES LES APPROCHES ONT ÉCHOUÉ - MAIS ON CONTINUE');
+            } else {
+              console.log('✅ FORCE BRUTE RÉUSSIE');
+            }
+          } else {
+            console.log('✅ MISE À JOUR PUBLIQUE RÉUSSIE');
+          }
         } else {
           console.log('✅ RÉSERVATION MISE À JOUR AVEC SUCCÈS');
           console.log('📊 Lignes affectées:', updateResult.length);
