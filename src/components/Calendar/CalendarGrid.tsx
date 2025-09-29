@@ -140,10 +140,6 @@ export function CalendarGrid({ currentDate, onTimeSlotClick, onBookingClick, boo
         window.dispatchEvent(new CustomEvent('refreshBookings'));
       }, 100);
       
-      // Déclencher une synchronisation Stripe après 2 secondes
-      setTimeout(() => {
-        window.dispatchEvent(new CustomEvent('syncStripePayments'));
-      }, 2000);
     };
 
     bookingEvents.on('bookingCreated', handleBookingChange);

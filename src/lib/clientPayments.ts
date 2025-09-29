@@ -59,7 +59,7 @@ export class ClientPaymentManager {
           'success_url': `${window.location.origin}/payment-success`,
           'cancel_url': `${window.location.origin}/payment-cancel`,
           'customer_email': customerEmail,
-          'success_url': `${window.location.origin}/payment-success?session_id={CHECKOUT_SESSION_ID}&amount=${amount}&email=${customerEmail}&date=${metadata.date}&time=${metadata.time}`,
+          'success_url': `${window.location.origin}/payment-success?session_id={CHECKOUT_SESSION_ID}&amount=${amount}&email=${customerEmail}&date=${metadata.booking_date}&time=${metadata.booking_time}`,
           ...Object.entries(metadata).reduce((acc, [key, value]) => {
             acc[`metadata[${key}]`] = value;
             return acc;
@@ -89,100 +89,6 @@ export class ClientPaymentManager {
     }
   }
 
-  static async handleWebhookLocally(sessionData: any) {
-    if (!isSupabaseConfigured()) return;
-
-    try {
-      const { customer_details, metadata, amount_total, id: sessionId } = sessionData;
-      const customerEmail = customer_details?.email;
-      const amountPaid = amount_total / 100;
-
-      if (!customerEmail || !metadata) return;
-
-      // Traitement selon le type de paiement
-      if (metadata.create_booking_after_payment === 'true') {
-        // Créer une nouvelle réservation
-        const bookingData = {
-          user_id: metadata.user_id,
-          service_id: metadata.service_id,
-          date: metadata.date,
-          time: metadata.time,
-          duration_minutes: parseInt(metadata.duration_minutes),
-          quantity: parseInt(metadata.quantity),
-          client_name: metadata.client_name,
-          client_firstname: metadata.client_firstname,
-          client_email: customerEmail,
-          client_phone: metadata.phone,
-          total_amount: parseFloat(metadata.total_amount),
-          payment_status: 'partial',
-          payment_amount: amountPaid,
-          booking_status: 'confirmed',
-          transactions: [{
-            id: crypto.randomUUID(),
-            amount: amountPaid,
-            method: 'stripe',
-            status: 'completed',
-            note: `Acompte payé via Stripe (${amountPaid.toFixed(2)}€) - Session: ${sessionId}`,
-            created_at: new Date().toISOString()
-          }]
-        };
-
-        const { error } = await supabase
-          .from('bookings')
-          .insert([bookingData]);
-
-        if (error) throw error;
-      } else {
-        // Mettre à jour une réservation existante
-        const { data: booking, error: findError } = await supabase
-          .from('bookings')
-          .select('*')
-          .eq('client_email', customerEmail)
-          .eq('date', metadata.booking_date)
-          .eq('time', metadata.booking_time)
-          .single();
-
-        if (findError || !booking) return;
-
-        const existingTransactions = booking.transactions || [];
-        const newTransaction = {
-          id: crypto.randomUUID(),
-          amount: amountPaid,
-          method: 'stripe',
-          status: 'completed',
-          note: `Paiement Stripe (${amountPaid.toFixed(2)}€) - Session: ${sessionId}`,
-          created_at: new Date().toISOString()
-        };
-
-        const finalTransactions = [...existingTransactions, newTransaction];
-        const newTotalPaid = amountPaid + (booking.payment_amount || 0);
-        
-        let newPaymentStatus = 'pending';
-        if (newTotalPaid >= booking.total_amount) {
-          newPaymentStatus = 'completed';
-        } else if (newTotalPaid > 0) {
-          newPaymentStatus = 'partial';
-        }
-
-        const { error: updateError } = await supabase
-          .from('bookings')
-          .update({
-            payment_amount: newTotalPaid,
-            payment_status: newPaymentStatus,
-            booking_status: 'confirmed',
-            transactions: finalTransactions,
-            updated_at: new Date().toISOString()
-          })
-          .eq('id', booking.id);
-
-        if (updateError) throw updateError;
-      }
-
-      console.log('✅ Paiement traité côté client');
-    } catch (error) {
-      console.error('❌ Erreur traitement paiement:', error);
-    }
-  }
 }
 
 // Déclaration TypeScript pour Stripe

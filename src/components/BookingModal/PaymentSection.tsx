@@ -186,6 +186,7 @@ export function PaymentSection({
       // Ajouter un identifiant unique pour tracer le paiement
       const paymentId = crypto.randomUUID();
       paymentUrl.searchParams.set('payment_id', paymentId);
+      paymentUrl.searchParams.set('booking_id', editingBooking?.id || crypto.randomUUID());
       
       await navigator.clipboard.writeText(paymentUrl.toString());
       alert('Lien de paiement copié dans le presse-papiers !');

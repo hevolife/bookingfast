@@ -34,6 +34,11 @@ export function PaymentSuccess() {
           await StripeWebhookHandler.processStripeWebhook(mockSessionData);
           console.log('✅ Paiement traité avec succès');
           
+          // Déclencher un rafraîchissement des réservations
+          setTimeout(() => {
+            window.dispatchEvent(new CustomEvent('refreshBookings'));
+          }, 1000);
+          
         } catch (error) {
           console.error('❌ Erreur traitement paiement réussi:', error);
         }

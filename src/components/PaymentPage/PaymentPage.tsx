@@ -223,6 +223,9 @@ export function PaymentPage() {
           email: email,
           date: date,
           time: time,
+          booking_date: date,
+          booking_time: time,
+          owner_id: ownerId || ''
         }
       });
 
