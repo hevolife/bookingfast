@@ -62,59 +62,31 @@ export class StripeWebhookHandler {
         console.warn('⚠️ Plusieurs réservations trouvées, utilisation de la première');
       }
 
-      const booking = foundBookings[0];
-      console.log('✅ RÉSERVATION TROUVÉE:', booking.id);
+      const targetBooking = foundBookings[0];
+      console.log('✅ RÉSERVATION TROUVÉE:', targetBooking.id);
 
       // ÉTAPE 2: Vérifier que la réservation existe vraiment en base
       console.log('🔍 VÉRIFICATION EXISTENCE RÉSERVATION...');
-      const { data: verifyBooking, error: verifyError } = await supabase
+      const { data: bookingCheck, error: checkError } = await supabase
         .from('bookings')
         .select('id, total_amount, transactions')
-        .eq('id', booking.id)
+        .eq('id', targetBooking.id)
         .maybeSingle();
 
-      if (verifyError) {
-        console.error('❌ Erreur vérification existence:', verifyError);
+      if (checkError) {
+        console.error('❌ Erreur vérification existence:', checkError);
         return;
       }
 
-      if (!verifyBooking) {
-        console.error('❌ RÉSERVATION INEXISTANTE EN BASE:', booking.id);
-        console.log('🔍 Tentative de recherche alternative...');
-        
-        // Recherche alternative sans limite
-        const { data: alternativeBookings, error: altError } = await supabase
-          .from('bookings')
-          .select('id, client_email, date, time, total_amount, transactions')
-          .eq('client_email', customerEmail)
-          .eq('date', searchDate)
-          .eq('time', searchTime);
-
-        console.log('📊 Recherche alternative résultats:', alternativeBookings?.length || 0);
-        if (alternativeBookings && alternativeBookings.length > 0) {
-          console.log('📋 Réservations alternatives trouvées:', alternativeBookings.map(b => ({
-            id: b.id,
-            email: b.client_email,
-            date: b.date,
-            time: b.time
-          })));
-          
-          // Utiliser la première réservation trouvée
-          const realBooking = alternativeBookings[0];
-          console.log('✅ UTILISATION RÉSERVATION ALTERNATIVE:', realBooking.id);
-          
-          // Continuer avec cette réservation
-          booking = realBooking;
-        } else {
-          console.error('❌ AUCUNE RÉSERVATION ALTERNATIVE TROUVÉE');
-          return;
-        }
-      } else {
-        console.log('✅ RÉSERVATION CONFIRMÉE EN BASE:', verifyBooking.id);
+      if (!bookingCheck) {
+        console.error('❌ RÉSERVATION INEXISTANTE EN BASE:', targetBooking.id);
+        return;
       }
 
-      // ÉTAPE 2: Vérifier si déjà traité
-      const existingTransactions = verifyBooking.transactions || [];
+      console.log('✅ RÉSERVATION CONFIRMÉE EN BASE:', bookingCheck.id);
+
+      // ÉTAPE 3: Vérifier si déjà traité
+      const existingTransactions = bookingCheck.transactions || [];
       const alreadyProcessed = existingTransactions.some((t: any) => 
         t.method === 'stripe' && 
         t.status === 'completed' &&
@@ -126,7 +98,7 @@ export class StripeWebhookHandler {
         return;
       }
 
-      // ÉTAPE 3: Créer ou mettre à jour la transaction
+      // ÉTAPE 4: Créer ou mettre à jour la transaction
       const updatedTransactions = [...existingTransactions];
       let transactionUpdated = false;
 
@@ -161,13 +133,13 @@ export class StripeWebhookHandler {
         });
       }
 
-      // ÉTAPE 4: Calculer les nouveaux totaux
+      // ÉTAPE 5: Calculer les nouveaux totaux
       const totalPaid = updatedTransactions
         .filter((t: any) => t.status === 'completed')
         .reduce((sum: number, t: any) => sum + t.amount, 0);
       
       let newPaymentStatus: 'pending' | 'partial' | 'completed' = 'pending';
-      if (totalPaid >= verifiedBooking.total_amount) {
+      if (totalPaid >= bookingCheck.total_amount) {
         newPaymentStatus = 'completed';
       } else if (totalPaid > 0) {
         newPaymentStatus = 'partial';
@@ -175,11 +147,11 @@ export class StripeWebhookHandler {
 
       console.log('💰 CALCULS:', {
         totalPaid: totalPaid.toFixed(2),
-        totalAmount: verifyBooking.total_amount.toFixed(2),
+        totalAmount: bookingCheck.total_amount.toFixed(2),
         newPaymentStatus
       });
 
-      // ÉTAPE 5: Mise à jour SIMPLE en base
+      // ÉTAPE 6: Mise à jour SIMPLE en base
       console.log('🔄 MISE À JOUR SIMPLE EN BASE...');
       
       const { error: updateError } = await supabase
@@ -191,7 +163,7 @@ export class StripeWebhookHandler {
           booking_status: 'confirmed',
           updated_at: new Date().toISOString()
         })
-        .eq('id', verifyBooking.id);
+        .eq('id', bookingCheck.id);
 
       if (updateError) {
         console.error('❌ Erreur mise à jour:', updateError);
@@ -200,13 +172,13 @@ export class StripeWebhookHandler {
 
       console.log('✅ RÉSERVATION MISE À JOUR AVEC SUCCÈS');
       console.log('📊 Nouveau statut:', {
-        id: verifyBooking.id,
+        id: bookingCheck.id,
         payment_status: newPaymentStatus,
         payment_amount: totalPaid,
         transactions_count: updatedTransactions.length
       });
 
-      // ÉTAPE 6: Déclencher rafraîchissement
+      // ÉTAPE 7: Déclencher rafraîchissement
       setTimeout(() => {
         console.log('🔄 Déclenchement rafraîchissement interface');
         window.dispatchEvent(new CustomEvent('refreshBookings'));
