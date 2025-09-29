@@ -187,8 +187,7 @@ export function useTeam() {
         throw new Error('Session non trouvée');
       }
 
-      const supabaseUrl = import.meta.env.VITE_SUPABASE_URL;
-      const response = await fetch(`${supabaseUrl}/functions/v1/invite-team-member`, {
+      const response = await fetch('/api/invite-team-member', {
         method: 'POST',
         headers: {
           'Content-Type': 'application/json',

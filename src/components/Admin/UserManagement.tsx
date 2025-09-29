@@ -368,15 +368,9 @@ export function UserManagement() {
         throw new Error('Session non trouvée');
       }
 
-      const supabaseUrl = import.meta.env.VITE_SUPABASE_URL;
-      
-      if (!supabaseUrl || supabaseUrl === 'https://placeholder.supabase.co') {
-        throw new Error('URL Supabase non configurée');
-      }
 
-      // Appeler la fonction Edge pour supprimer l'utilisateur de manière sécurisée
-      const response = await fetch(`${supabaseUrl}/functions/v1/delete-app-user`, {
-        method: 'DELETE',
+      const response = await fetch('/api/delete-app-user', {
+        method: 'POST',
         headers: {
           'Content-Type': 'application/json',
           'Authorization': `Bearer ${session.access_token}`,

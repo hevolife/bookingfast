@@ -8,6 +8,8 @@
     "build": "vite build",
     "lint": "eslint .",
     "preview": "vite preview",
+    "server": "node server.js",
+    "start": "npm run build && npm run server",
     "build:clean": "rm -rf dist && vite build",
     "build:prod": "NODE_ENV=production vite build --mode production",
     "build:analyze": "npm run build && npx vite-bundle-analyzer dist/stats.html",
@@ -17,10 +19,15 @@
   "dependencies": {
     "@supabase/supabase-js": "^2.57.4",
     "@types/react-router-dom": "^5.3.3",
+    "cors": "^2.8.5",
+    "dotenv": "^16.4.5",
+    "express": "^4.21.2",
     "lucide-react": "^0.344.0",
+    "node-fetch": "^3.3.2",
     "react": "^18.3.1",
     "react-dom": "^18.3.1",
-    "react-router-dom": "^7.9.1"
+    "react-router-dom": "^7.9.1",
+    "stripe": "^17.7.0"
   },
   "devDependencies": {
     "@eslint/js": "^9.9.1",

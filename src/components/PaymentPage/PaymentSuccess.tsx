@@ -56,6 +56,7 @@ export function PaymentSuccess() {
             <div>Le solde restant sera à régler lors de votre rendez-vous</div>
           </div>
         </div>
+        
         {/* Back Button */}
         <button
           onClick={handleBackToHome}
@@ -68,3 +69,5 @@ export function PaymentSuccess() {
     </div>
   );
 }
+
+export default PaymentSuccess;

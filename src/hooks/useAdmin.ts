@@ -44,13 +44,7 @@ export function useAdmin() {
         throw new Error('Session non trouvée');
       }
 
-      const supabaseUrl = import.meta.env.VITE_SUPABASE_URL;
-      
-      if (!supabaseUrl || supabaseUrl === 'https://placeholder.supabase.co') {
-        throw new Error('URL Supabase non configurée');
-      }
-      
-      const response = await fetch(`${supabaseUrl}/functions/v1/list-users`, {
+      const response = await fetch('/api/list-users', {
         method: 'GET',
         headers: {
           'Content-Type': 'application/json',
@@ -465,13 +459,7 @@ export function useAdmin() {
         throw new Error('Session non trouvée');
       }
 
-      const supabaseUrl = import.meta.env.VITE_SUPABASE_URL;
-      
-      if (!supabaseUrl || supabaseUrl === 'https://placeholder.supabase.co') {
-        throw new Error('URL Supabase non configurée');
-      }
-      
-      const response = await fetch(`${supabaseUrl}/functions/v1/delete-app-user`, {
+      const response = await fetch('/api/delete-app-user', {
         method: 'POST',
         headers: {
           'Content-Type': 'application/json',

@@ -347,12 +347,10 @@ export function IframeBookingPage() {
         
         console.log('🆔 ID tentative UNIQUE:', attemptId);
         
-        const supabaseUrl = import.meta.env.VITE_SUPABASE_URL;
-        const response = await fetch(`${supabaseUrl}/functions/v1/stripe-checkout`, {
+        const response = await fetch('/api/stripe-checkout', {
           method: 'POST',
           headers: {
             'Content-Type': 'application/json',
-            'Authorization': `Bearer ${import.meta.env.VITE_SUPABASE_ANON_KEY}`,
           },
           body: JSON.stringify({
             amount: depositAmount,
