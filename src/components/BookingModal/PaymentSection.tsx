@@ -2,7 +2,7 @@ import React, { useState } from 'react';
 import { CreditCard, Plus, Trash2, Link, Euro, Calculator, Send, Clock, Copy, User, Mail, Package, Calendar, ChevronDown, ChevronUp, X, ExternalLink } from 'lucide-react';
 import { Transaction } from '../../types';
 import { useBusinessSettings } from '../../hooks/useBusinessSettings';
-import { sendPaymentLinkEmail } from '../../lib/workflowEngine';
+import { ClientEmailManager } from '../../lib/clientEmails';
 import { useAuth } from '../../contexts/AuthContext';
 
 interface PaymentSectionProps {

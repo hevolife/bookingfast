@@ -38,45 +38,15 @@ export function useAdmin() {
         throw new Error('Supabase non configuré');
       }
       
-      // Utiliser l'Edge Function pour récupérer tous les utilisateurs
-      const { data: { session } } = await supabase.auth.getSession();
-      if (!session) {
-        throw new Error('Session non trouvée');
-      }
+      // Charger directement depuis la table users
+      const { data: users, error } = await supabase
+        .from('users')
+        .select('*')
+        .order('created_at', { ascending: false });
 
-      const supabaseUrl = import.meta.env.VITE_SUPABASE_URL;
-      
-      if (!supabaseUrl || supabaseUrl === 'https://placeholder.supabase.co') {
-        throw new Error('URL Supabase non configurée');
+      if (error) {
+        throw new Error(`Erreur chargement utilisateurs: ${error.message}`);
       }
-      
-      const response = await fetch(`${supabaseUrl}/functions/v1/list-users`, {
-        method: 'GET',
-        headers: {
-          'Content-Type': 'application/json',
-          'Authorization': `Bearer ${session.access_token}`,
-        },
-      });
-
-      if (!response.ok) {
-        let errorData;
-        try {
-          errorData = await response.json();
-          console.error('❌ Erreur détaillée:', errorData);
-        } catch (parseError) {
-          console.error('❌ Erreur parsing réponse d\'erreur:', parseError);
-          throw new Error(`Erreur HTTP ${response.status}: ${response.statusText}`);
-        }
-        throw new Error(errorData.error || `Erreur ${response.status}: ${response.statusText}`);
-      }
-
-      const result = await response.json();
-      
-      if (!result.success) {
-        throw new Error(result.error || 'Erreur lors de la récupération des utilisateurs');
-      }
-
-      const users = result.users || [];
       
       console.log('✅ Utilisateurs chargés:', users.length);
       console.log('📋 Liste des utilisateurs:', users.map(u => ({ 
@@ -460,41 +430,9 @@ export function useAdmin() {
     if (!isSupabaseConfigured()) throw new Error('Supabase non configuré');
     
     try {
-      const { data: { session } } = await supabase.auth.getSession();
-      if (!session) {
-        throw new Error('Session non trouvée');
-      }
-
-      const supabaseUrl = import.meta.env.VITE_SUPABASE_URL;
-      
-      if (!supabaseUrl || supabaseUrl === 'https://placeholder.supabase.co') {
-        throw new Error('URL Supabase non configurée');
-      }
-      
-      const response = await fetch(`${supabaseUrl}/functions/v1/delete-app-user`, {
-        method: 'POST',
-        headers: {
-          'Content-Type': 'application/json',
-          'Authorization': `Bearer ${session.access_token}`,
-        },
-        body: JSON.stringify({ user_id: userId })
-      });
-
-      if (!response.ok) {
-        let errorData;
-        try {
-          errorData = await response.json();
-        } catch (parseError) {
-          throw new Error(`Erreur HTTP ${response.status}: ${response.statusText}`);
-        }
-        throw new Error(errorData.error || `Erreur ${response.status}: ${response.statusText}`);
-      }
-
-      const result = await response.json();
-      
-      if (!result.success) {
-        throw new Error(result.error || 'Erreur lors de la suppression de l\'utilisateur');
-      }
+      // Utiliser le gestionnaire côté client
+      const { ClientAuthManager } = await import('../lib/clientAuth');
+      await ClientAuthManager.deleteUser(userId);
     
       setUsers(prev => prev.filter(u => u.id !== userId));
       console.log('✅ Utilisateur supprimé avec succès');

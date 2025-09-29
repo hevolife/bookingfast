@@ -182,41 +182,20 @@ export function useTeam() {
     try {
       console.log('📧 useTeam: Invitation membre:', memberData.email, 'Rôle:', memberData.role_name);
       
-      const { data: { session } } = await supabase.auth.getSession();
-      if (!session) {
-        throw new Error('Session non trouvée');
-      }
-
-      const supabaseUrl = import.meta.env.VITE_SUPABASE_URL;
-      const response = await fetch(`${supabaseUrl}/functions/v1/invite-team-member`, {
-        method: 'POST',
-        headers: {
-          'Content-Type': 'application/json',
-          'Authorization': `Bearer ${session.access_token}`,
-        },
-        body: JSON.stringify({
-          owner_id: user.id,
-          email: memberData.email,
-          password: memberData.password,
-          full_name: memberData.full_name,
-          role_name: memberData.role_name,
-          permissions: memberData.permissions
-        }),
+      // Utiliser le gestionnaire côté client
+      const { ClientTeamManager } = await import('../lib/clientTeam');
+      const result = await ClientTeamManager.inviteTeamMember({
+        ownerEmail: user.email!,
+        email: memberData.email,
+        password: memberData.password,
+        fullName: memberData.full_name,
+        roleName: memberData.role_name,
+        permissions: memberData.permissions
       });
-
-      if (!response.ok) {
-        const errorData = await response.json();
-        throw new Error(errorData.error || 'Erreur lors de l\'invitation');
-      }
-
-      const result = await response.json();
-      if (!result.success) {
-        throw new Error(result.error || 'Erreur lors de l\'invitation');
-      }
 
       // Recharger les données
       await fetchTeamData();
-      return result.member;
+      return result;
 
     } catch (error) {
       console.error('❌ useTeam: Erreur invitation membre:', error);

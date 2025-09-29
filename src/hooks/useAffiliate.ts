@@ -185,23 +185,10 @@ export function useAffiliate() {
     }
 
     try {
-      const apiUrl = `${import.meta.env.VITE_SUPABASE_URL}/functions/v1/create-affiliate-account`;
+      // Utiliser le gestionnaire côté client
+      const { ClientTeamManager } = await import('../lib/clientTeam');
+      const data = await ClientTeamManager.createAffiliateAccount(user.id);
       
-      const response = await fetch(apiUrl, {
-        method: 'POST',
-        headers: {
-          'Authorization': `Bearer ${session.access_token}`,
-          'Content-Type': 'application/json',
-        },
-        body: JSON.stringify({ user_id: user.id })
-      });
-
-      if (!response.ok) {
-        const errorData = await response.json();
-        throw new Error(errorData.error || 'Erreur création compte affiliation');
-      }
-
-      const data = await response.json();
       await fetchAffiliateData();
       return data;
     } catch (err) {
