@@ -1,5 +1,5 @@
 import React, { useState, useEffect } from 'react';
-import { Users, Plus, Edit, Trash2, Shield, Crown, Mail, Phone, Calendar, Search, Eye, EyeOff, X, Save, AlertTriangle } from 'lucide-react';
+import { Users, Plus, CreditCard as Edit, Trash2, Shield, Crown, Mail, Phone, Calendar, Search, Eye, EyeOff, X, Save, AlertTriangle } from 'lucide-react';
 import { supabase, isSupabaseConfigured } from '../../lib/supabase';
 import { useAuth } from '../../contexts/AuthContext';
 import { Role, UserRole, AVAILABLE_PERMISSIONS, DEFAULT_ROLES } from '../../types/permissions';
@@ -249,13 +249,7 @@ export function UserManagement() {
         throw new Error('Session non trouvée');
       }
 
-      const supabaseUrl = import.meta.env.VITE_SUPABASE_URL;
-      
-      if (!supabaseUrl || supabaseUrl === 'https://placeholder.supabase.co') {
-        throw new Error('URL Supabase non configurée');
-      }
-      
-      const response = await fetch(`${supabaseUrl}/functions/v1/create-app-user`, {
+      const response = await fetch('/api/create-app-user', {
         method: 'POST',
         headers: {
           'Content-Type': 'application/json',
@@ -368,9 +362,15 @@ export function UserManagement() {
         throw new Error('Session non trouvée');
       }
 
+      const supabaseUrl = import.meta.env.VITE_SUPABASE_URL;
+      
+      if (!supabaseUrl || supabaseUrl === 'https://placeholder.supabase.co') {
+        throw new Error('URL Supabase non configurée');
+      }
 
-      const response = await fetch('/api/delete-app-user', {
-        method: 'POST',
+      // Appeler la fonction Edge pour supprimer l'utilisateur de manière sécurisée
+      const response = await fetch(`${supabaseUrl}/functions/v1/delete-app-user`, {
+        method: 'DELETE',
         headers: {
           'Content-Type': 'application/json',
           'Authorization': `Bearer ${session.access_token}`,
