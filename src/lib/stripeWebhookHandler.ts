@@ -66,8 +66,32 @@ export class StripeWebhookHandler {
       console.log('💰 Nouveau total payé:', totalPaid, '€');
       console.log('📊 Nouveau statut:', newPaymentStatus);
 
-      // Mise à jour SANS VÉRIFICATION RLS
-      const { error: updateError } = await supabase
+      // MISE À JOUR RÉELLE EN BASE DE DONNÉES
+      const { data: updateResult, error: updateError } = await supabase
+        .from('bookings')
+        .update({
+          payment_status: newPaymentStatus,
+          payment_amount: totalPaid,
+          transactions: updatedTransactions,
+          updated_at: new Date().toISOString()
+        })
+        .eq('client_email', customerEmail)
+        .eq('date', searchDate)
+        .eq('time', searchTime)
+        .select();
+
+      if (updateError) {
+        console.error('❌ ERREUR MISE À JOUR BASE:', updateError);
+        throw new Error(`Erreur mise à jour: ${updateError.message}`);
+      }
+
+      if (!updateResult || updateResult.length === 0) {
+        console.error('❌ AUCUNE LIGNE MISE À JOUR');
+        throw new Error('Aucune réservation mise à jour');
+      }
+
+      console.log('✅ PAIEMENT TRAITÉ ET SAUVÉ EN BASE !');
+      console.log('📊 Lignes mises à jour:', updateResult.length);
         .from('bookings')
         .update({
           payment_status: newPaymentStatus,
