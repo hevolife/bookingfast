@@ -62,7 +62,9 @@ export class ClientPaymentManager {
           ...Object.entries(metadata).reduce((acc, [key, value]) => {
             acc[`metadata[${key}]`] = value;
             return acc;
-          }, {} as Record<string, string>)
+          }, {} as Record<string, string>),
+          // Ajouter l'ID de réservation si disponible
+          ...(metadata.booking_id ? { 'metadata[booking_id]': metadata.booking_id } : {})
         })
       });
 

@@ -212,7 +212,7 @@ export function BookingModal({
 
       // Préparer les données de réservation pour le workflow
       const bookingDataForWorkflow = {
-        id: editingBooking?.id || crypto.randomUUID(),
+        id: editingBooking?.id || `temp-${crypto.randomUUID()}`,
         service_id: isCustomService ? 'custom' : selectedService.id,
         date,
         time,
