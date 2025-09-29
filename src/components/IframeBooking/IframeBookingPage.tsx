@@ -338,9 +338,14 @@ export function IframeBookingPage() {
         : (totalAmount * depositPercentage) / 100;
       
       if (isSupabaseConfigured()) {
-        // Vérifier d'abord si Stripe est configuré
-        const checkResponse = await fetch(`/api/public-booking-data?user_id=${userId}`);
-        if (!checkResponse.ok) {
+        const response = await fetch(`/api/public-booking-data?user_id=${userId}`, {
+          method: 'GET',
+          headers: {
+            'Content-Type': 'application/json',
+          },
+        });
+        
+        if (!response.ok) {
           throw new Error('Le paiement en ligne n\'est pas configuré. Contactez l\'établissement.');
         }
         
@@ -349,7 +354,7 @@ export function IframeBookingPage() {
         console.log('🆔 ID tentative UNIQUE:', attemptId);
         
         const supabaseUrl = import.meta.env.VITE_SUPABASE_URL;
-        const response = await fetch(`${supabaseUrl}/functions/v1/stripe-checkout`, {
+        const stripeResponse = await fetch(`${supabaseUrl}/functions/v1/stripe-checkout`, {
           method: 'POST',
           headers: {
             'Content-Type': 'application/json',
@@ -389,8 +394,8 @@ export function IframeBookingPage() {
           }),
         });
 
-        if (response.ok) {
-          const { url } = await response.json();
+        if (stripeResponse.ok) {
+          const { url } = await stripeResponse.json();
           if (url) {
             console.log('🔄 REDIRECTION UNIQUE vers Stripe - réservation créée APRÈS paiement UNIQUEMENT');
             
@@ -402,7 +407,7 @@ export function IframeBookingPage() {
             return;
           }
         } else {
-          const errorData = await response.json();
+          const errorData = await stripeResponse.json();
           throw new Error(errorData.error || 'Erreur lors de la création de la session de paiement');
         }
       } else {
