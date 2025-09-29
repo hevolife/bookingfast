@@ -191,6 +191,7 @@ export function BookingModal({
       paymentUrl.searchParams.set('date', date);
       paymentUrl.searchParams.set('time', time);
       paymentUrl.searchParams.set('expires', expiresAt.toString());
+      paymentUrl.searchParams.set('ownerId', user?.id || '');
 
       console.log('✅ URL de paiement générée:', paymentUrl.toString());
 

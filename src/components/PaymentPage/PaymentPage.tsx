@@ -21,6 +21,7 @@ export function PaymentPage() {
   const date = searchParams.get('date');
   const time = searchParams.get('time');
   const expiresAt = searchParams.get('expires');
+  const ownerId = searchParams.get('ownerId');
 
   // Vérifier si le lien de paiement existe encore
   useEffect(() => {
@@ -227,9 +228,15 @@ export function PaymentPage() {
 
       if (isSupabaseConfigured()) {
         // Récupérer les paramètres Stripe depuis la base
-        const { data: settings, error: settingsError } = await supabase
+        let query = supabase
           .from('business_settings')
-          .select('stripe_enabled, stripe_public_key, stripe_secret_key')
+          .select('stripe_enabled, stripe_public_key, stripe_secret_key');
+        
+        if (ownerId) {
+          query = query.eq('user_id', ownerId);
+        }
+        
+        const { data: settings, error: settingsError } = await query
           .limit(1)
           .single();
 
