@@ -31,6 +31,8 @@ export function PaymentSuccess() {
             }
           };
           
+          console.log('📊 Données session pour traitement:', mockSessionData);
+          
           await StripeWebhookHandler.processStripeWebhook(mockSessionData);
           console.log('✅ Paiement traité avec succès');
           

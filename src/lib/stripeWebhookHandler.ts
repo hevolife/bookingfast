@@ -197,6 +197,11 @@ export class StripeWebhookHandler {
 
   // Traiter un webhook Stripe manuellement
   static async processStripeWebhook(sessionData: any): Promise<void> {
+    if (!isSupabaseConfigured()) {
+      console.log('📧 MODE DÉMO - Simulation traitement webhook');
+      return;
+    }
+
     try {
       const { customer_details, metadata, amount_total, id: sessionId } = sessionData;
       const customerEmail = customer_details?.email;
