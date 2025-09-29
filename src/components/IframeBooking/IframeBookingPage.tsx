@@ -338,7 +338,9 @@ export function IframeBookingPage() {
         : (totalAmount * depositPercentage) / 100;
       
       if (isSupabaseConfigured()) {
-        const response = await fetch(`/api/public-booking-data?user_id=${userId}`, {
+        // Vérifier d'abord si Stripe est configuré
+        const checkResponse = await fetch(`/api/public-booking-data?user_id=${userId}`);
+        if (!checkResponse.ok) {
           throw new Error('Le paiement en ligne n\'est pas configuré. Contactez l\'établissement.');
         }
         
