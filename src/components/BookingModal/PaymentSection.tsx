@@ -181,9 +181,6 @@ export function PaymentSection({
       paymentUrl.searchParams.set('date', bookingDate);
       paymentUrl.searchParams.set('time', bookingTime);
       paymentUrl.searchParams.set('expires', expiresAt.toString());
-      if (user?.id) {
-        paymentUrl.searchParams.set('user_id', user.id);
-      }
       
       await navigator.clipboard.writeText(paymentUrl.toString());
       alert('Lien de paiement copié dans le presse-papiers !');
