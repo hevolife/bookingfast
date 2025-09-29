@@ -158,7 +158,7 @@ export class StripeWebhookHandler {
 
       // Mettre à jour la réservation en base
       console.log('🔄 Mise à jour réservation en base...');
-      const { data: updatedBooking, error: updateError } = await supabase
+      const { data: updatedBookings, error: updateError } = await supabase
         .from('bookings')
         .update({
           transactions: updatedTransactions,
@@ -168,15 +168,15 @@ export class StripeWebhookHandler {
           updated_at: new Date().toISOString()
         })
         .eq('id', booking.id)
-        .select()
-        .maybeSingle();
+        .select();
 
       if (updateError) {
         console.error('❌ Erreur mise à jour réservation:', updateError);
         throw updateError;
       }
 
-      if (updatedBooking) {
+      if (updatedBookings && updatedBookings.length > 0) {
+        const updatedBooking = updatedBookings[0];
         console.log('✅ Réservation mise à jour avec succès:', {
           id: updatedBooking.id,
           payment_status: updatedBooking.payment_status,
@@ -184,7 +184,7 @@ export class StripeWebhookHandler {
           transactions_count: updatedBooking.transactions?.length || 0
         });
       } else {
-        console.warn('⚠️ Aucune réservation retournée après mise à jour');
+        console.warn('⚠️ Aucune réservation mise à jour - ID introuvable:', booking.id);
       }
 
       // Déclencher un rafraîchissement de l'interface
