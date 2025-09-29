@@ -235,7 +235,7 @@ export class StripeWebhookHandler {
       let booking, findError;
       
       // Priorité 1: Chercher par booking_id si disponible
-      if (metadata.booking_id) {
+      if (metadata.booking_id && metadata.booking_id.trim() !== '') {
         console.log('🔍 Recherche par booking_id:', metadata.booking_id);
         const result = await supabaseServiceClient
           .from('bookings')
