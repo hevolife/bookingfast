@@ -227,8 +227,6 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
           throw new Error('Veuillez confirmer votre email avant de vous connecter.');
         } else if (error.message.includes('Too many requests')) {
           throw new Error('Trop de tentatives. Veuillez patienter quelques minutes.');
-        } else if (error.message.includes('fetch')) {
-          throw new Error('Impossible de se connecter au serveur. Vérifiez votre connexion internet et la configuration Supabase.');
         } else {
           throw new Error(`Erreur d'authentification: ${error.message}`);
         }
@@ -238,11 +236,13 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
     } catch (networkError: any) {
       console.error('❌ Erreur réseau lors de la connexion:', networkError);
       
-      if (networkError.message && !networkError.message.includes('Erreur d\'authentification:')) {
-        throw new Error('Impossible de se connecter au serveur Supabase. Vérifiez que votre instance self-hosted est accessible.');
+      // Si c'est déjà une erreur d'authentification formatée, on la relance
+      if (networkError.message && networkError.message.includes('Erreur d\'authentification:')) {
+        throw networkError;
       }
       
-      throw networkError;
+      // Pour les autres erreurs (réseau, etc.), message générique
+      throw new Error('Impossible de se connecter au serveur. Vérifiez votre connexion internet et la configuration Supabase.');
     }
   };
 
