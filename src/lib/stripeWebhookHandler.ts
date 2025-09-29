@@ -65,6 +65,55 @@ export class StripeWebhookHandler {
       const booking = foundBookings[0];
       console.log('✅ RÉSERVATION TROUVÉE:', booking.id);
 
+      // ÉTAPE 2: Vérifier que la réservation existe vraiment en base
+      console.log('🔍 VÉRIFICATION EXISTENCE RÉSERVATION...');
+      const { data: verifyBooking, error: verifyError } = await supabase
+        .from('bookings')
+        .select('id, total_amount, transactions')
+        .eq('id', booking.id)
+        .maybeSingle();
+
+      if (verifyError) {
+        console.error('❌ Erreur vérification existence:', verifyError);
+        return;
+      }
+
+      if (!verifyBooking) {
+        console.error('❌ RÉSERVATION INEXISTANTE EN BASE:', booking.id);
+        console.log('🔍 Tentative de recherche alternative...');
+        
+        // Recherche alternative sans limite
+        const { data: alternativeBookings, error: altError } = await supabase
+          .from('bookings')
+          .select('id, client_email, date, time, total_amount, transactions')
+          .eq('client_email', customerEmail)
+          .eq('date', searchDate)
+          .eq('time', searchTime);
+
+        console.log('📊 Recherche alternative résultats:', alternativeBookings?.length || 0);
+        if (alternativeBookings && alternativeBookings.length > 0) {
+          console.log('📋 Réservations alternatives trouvées:', alternativeBookings.map(b => ({
+            id: b.id,
+            email: b.client_email,
+            date: b.date,
+            time: b.time
+          })));
+          
+          // Utiliser la première réservation trouvée
+          const realBooking = alternativeBookings[0];
+          console.log('✅ UTILISATION RÉSERVATION ALTERNATIVE:', realBooking.id);
+          
+          // Continuer avec cette réservation
+          booking = realBooking;
+        } else {
+          console.error('❌ AUCUNE RÉSERVATION ALTERNATIVE TROUVÉE');
+          return;
+        }
+      } else {
+        console.log('✅ RÉSERVATION CONFIRMÉE EN BASE:', verifyBooking.id);
+        booking = verifyBooking;
+      }
+
       // ÉTAPE 2: Vérifier si déjà traité
       const existingTransactions = booking.transactions || [];
       const alreadyProcessed = existingTransactions.some((t: any) => 
