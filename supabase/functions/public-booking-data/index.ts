@@ -1,3 +1,4 @@
+import { serve } from "https://deno.land/std@0.168.0/http/server.ts"
 import { createClient } from 'https://esm.sh/@supabase/supabase-js@2'
 
 const corsHeaders = {
@@ -6,7 +7,7 @@ const corsHeaders = {
   'Access-Control-Allow-Methods': 'GET, OPTIONS',
 }
 
-Deno.serve(async (req) => {
+serve(async (req) => {
   if (req.method === 'OPTIONS') {
     return new Response('ok', { headers: corsHeaders })
   }
@@ -19,25 +20,6 @@ Deno.serve(async (req) => {
       Deno.env.get('SUPABASE_URL') ?? '',
       Deno.env.get('SUPABASE_SERVICE_ROLE_KEY') ?? ''
     )
-    
-    // Vérifier que les variables d'environnement sont configurées
-    if (!Deno.env.get('SUPABASE_URL')) {
-      console.error('❌ SUPABASE_URL manquant')
-      return new Response(
-        JSON.stringify({ error: 'SUPABASE_URL environment variable is missing' }),
-        { status: 500, headers: corsHeaders }
-      )
-    }
-    
-    if (!Deno.env.get('SUPABASE_SERVICE_ROLE_KEY')) {
-      console.error('❌ SUPABASE_SERVICE_ROLE_KEY manquant')
-      return new Response(
-        JSON.stringify({ error: 'SUPABASE_SERVICE_ROLE_KEY environment variable is missing' }),
-        { status: 500, headers: corsHeaders }
-      )
-    }
-    
-    console.log('✅ Configuration Supabase:', Deno.env.get('SUPABASE_URL'))
 
     // Récupérer l'userId depuis l'URL
     const url = new URL(req.url)
@@ -64,7 +46,7 @@ Deno.serve(async (req) => {
       console.error('❌ Erreur vérification utilisateur:', userError)
       return new Response(
         JSON.stringify({ error: 'User verification failed', details: userError.message }),
-        { status: 500, headers: corsHeaders }
+        { status: 404, headers: corsHeaders }
       )
     }
 
@@ -103,11 +85,7 @@ Deno.serve(async (req) => {
       .maybeSingle()
 
     if (settingsError) {
-      console.error('❌ Erreur chargement paramètres:', settingsError)
-      return new Response(
-        JSON.stringify({ error: 'Failed to load business settings', details: settingsError.message }),
-        { status: 500, headers: corsHeaders }
-      )
+      console.warn('⚠️ Erreur chargement paramètres:', settingsError)
     }
 
     console.log('✅ Paramètres récupérés:', !!settingsData)
@@ -120,11 +98,7 @@ Deno.serve(async (req) => {
       .in('booking_status', ['pending', 'confirmed'])
 
     if (bookingsError) {
-      console.error('❌ Erreur chargement réservations:', bookingsError)
-      return new Response(
-        JSON.stringify({ error: 'Failed to load bookings', details: bookingsError.message }),
-        { status: 500, headers: corsHeaders }
-      )
+      console.warn('⚠️ Erreur chargement réservations:', bookingsError)
     }
 
     console.log('✅ Réservations récupérées:', bookingsData?.length || 0)
