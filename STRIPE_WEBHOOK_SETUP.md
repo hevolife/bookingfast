@@ -18,12 +18,13 @@
 
 **URL du webhook :**
 ```
-https://[VOTRE-PROJET-SUPABASE].supabase.co/functions/v1/stripe-webhook
+https://bookingfast.app/functions/v1/stripe-webhook
 ```
 
-**Remplacez `[VOTRE-PROJET-SUPABASE]` par l'URL de votre projet Supabase**
-
-Exemple : `https://abcdefghijklmnop.supabase.co/functions/v1/stripe-webhook`
+**OU si vous utilisez Supabase self-hosting :**
+```
+https://api.votre-domaine.com/functions/v1/stripe-webhook
+```
 
 ### 4. 🎪 Événements à écouter
 
