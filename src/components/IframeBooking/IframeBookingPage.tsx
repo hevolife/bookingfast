@@ -392,13 +392,11 @@ export function IframeBookingPage() {
           const { url } = await response.json();
           if (url) {
             console.log('🔄 REDIRECTION UNIQUE vers Stripe - réservation créée APRÈS paiement UNIQUEMENT');
-            
+            window.open(url, '_blank');
             // 🏷️ Marquer cette tentative comme envoyée à Stripe
             sessionStorage.setItem(attemptKey, 'sent_to_stripe');
             
             // 🚀 Ouvrir Stripe dans nouvel onglet
-            window.open(url, '_blank');
-            return;
           }
         } else {
           const errorData = await response.json();
