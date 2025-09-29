@@ -51,7 +51,7 @@ export const isSupabaseConfigured = () => {
     supabaseAnonKey && 
     supabaseUrl !== 'https://placeholder.supabase.co' && 
     supabaseAnonKey !== 'placeholder-key' &&
-    (supabaseUrl.includes('.supabase.co') || supabaseUrl.includes('localhost')) &&
+    (supabaseUrl.includes('.supabase.co') || supabaseUrl.includes('localhost') || supabaseUrl.includes('sslip.io') || supabaseUrl.includes('hevolife.fr') || /^\d+\.\d+\.\d+\.\d+/.test(supabaseUrl) || supabaseUrl.includes('api.')) &&
     supabaseAnonKey.length > 20
   );
   
@@ -59,8 +59,16 @@ export const isSupabaseConfigured = () => {
     console.warn('⚠️ Supabase non configuré:', {
       hasUrl: !!supabaseUrl,
       hasKey: !!supabaseAnonKey,
-      urlValid: supabaseUrl?.includes('.supabase.co') || supabaseUrl?.includes('localhost'),
+      urlValid: supabaseUrl?.includes('.supabase.co') || supabaseUrl?.includes('localhost') || supabaseUrl?.includes('sslip.io') || supabaseUrl?.includes('hevolife.fr') || /^\d+\.\d+\.\d+\.\d+/.test(supabaseUrl || '') || supabaseUrl?.includes('api.'),
       keyLength: supabaseAnonKey?.length
+    });
+  }
+  
+  if (isConfigured) {
+    console.log('🔍 Configuration Supabase détectée:', {
+      url: supabaseUrl?.replace(/\/+$/, ''), // Nettoyer les slashes finaux
+      hasAnonKey: !!supabaseAnonKey,
+      isConfigured
     });
   }
   
@@ -70,16 +78,26 @@ export const isSupabaseConfigured = () => {
 let supabaseClient: any = null;
 
 if (isSupabaseConfigured()) {
-  supabaseClient = createClient(supabaseUrl, supabaseAnonKey, {
+  // Nettoyer l'URL en supprimant les slashes finaux
+  const cleanUrl = supabaseUrl.replace(/\/+$/, '');
+  
+  console.log('🚀 Initialisation client Supabase:', {
+    url: cleanUrl,
+    keyLength: supabaseAnonKey.length
+  });
+  
+  supabaseClient = createClient(cleanUrl, supabaseAnonKey, {
     auth: {
       persistSession: true,
       autoRefreshToken: true,
-      detectSessionInUrl: false
+      detectSessionInUrl: false,
+      flowType: 'pkce'
     },
     global: {
       headers: {
         'x-application-name': 'BookingFast',
-        'x-application-version': '1.0.0'
+        'x-application-version': '1.0.0',
+        'apikey': supabaseAnonKey
       }
     },
     db: {

@@ -338,9 +338,8 @@ export function IframeBookingPage() {
         : (totalAmount * depositPercentage) / 100;
       
       if (isSupabaseConfigured()) {
-        // Vérifier d'abord si Stripe est configuré
-        const checkResponse = await fetch(`/api/public-booking-data?user_id=${userId}`);
-        if (!checkResponse.ok) {
+        // Vérifier que Stripe est configuré
+        if (!data.settings?.stripe_enabled || !data.settings?.stripe_public_key || !data.settings?.stripe_secret_key) {
           throw new Error('Le paiement en ligne n\'est pas configuré. Contactez l\'établissement.');
         }
         
@@ -385,8 +384,8 @@ export function IframeBookingPage() {
               create_booking_after_payment: 'true',
               attempt_timestamp: Date.now().toString(),
               prevent_duplicates: 'true'
-            }
-          })
+            },
+          }),
         });
 
         if (response.ok) {

@@ -124,10 +124,12 @@ const sendEmail = async (
     
     const supabaseUrl = import.meta.env.VITE_SUPABASE_URL;
     console.log('🔗 URL Supabase:', supabaseUrl);
-    const response = await fetch('/api/send-brevo-email', {
+    
+    const response = await fetch(`${supabaseUrl}/functions/v1/send-brevo-email`, {
       method: 'POST',
       headers: {
         'Content-Type': 'application/json',
+        'Authorization': `Bearer ${import.meta.env.VITE_SUPABASE_ANON_KEY}`,
       },
       body: JSON.stringify({
         user_id: userId,
@@ -331,10 +333,12 @@ export const sendManualEmail = async (
   }
 
   try {
-    const response = await fetch('/api/send-brevo-email', {
+    const supabaseUrl = import.meta.env.VITE_SUPABASE_URL;
+    const response = await fetch(`${supabaseUrl}/functions/v1/send-brevo-email`, {
       method: 'POST',
       headers: {
         'Content-Type': 'application/json',
+        'Authorization': `Bearer ${import.meta.env.VITE_SUPABASE_ANON_KEY}`,
       },
       body: JSON.stringify({
         user_id: userId,

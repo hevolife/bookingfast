@@ -225,11 +225,13 @@ export function PaymentPage() {
       });
 
       if (isSupabaseConfigured()) {
-        // Appel à l'API Node.js
-        const response = await fetch('/api/stripe-checkout', {
+        // Appel à la fonction Supabase Edge Function
+        const supabaseUrl = import.meta.env.VITE_SUPABASE_URL;
+        const response = await fetch(`${supabaseUrl}/functions/v1/stripe-checkout`, {
           method: 'POST',
           headers: {
             'Content-Type': 'application/json',
+            'Authorization': `Bearer ${import.meta.env.VITE_SUPABASE_ANON_KEY}`,
           },
           body: JSON.stringify({
             amount: parseFloat(amount),

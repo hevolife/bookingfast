@@ -102,7 +102,9 @@ export function useAffiliate() {
 
       if (affiliateError && affiliateError.code === 'PGRST116') {
         // Créer un nouveau compte d'affiliation via Edge Function
-        const response = await fetch('/api/create-affiliate-account', {
+        const apiUrl = `${import.meta.env.VITE_SUPABASE_URL}/functions/v1/create-affiliate-account`;
+        
+        const response = await fetch(apiUrl, {
           method: 'POST',
           headers: {
             'Authorization': `Bearer ${session.access_token}`,
@@ -183,7 +185,9 @@ export function useAffiliate() {
     }
 
     try {
-      const response = await fetch('/api/create-affiliate-account', {
+      const apiUrl = `${import.meta.env.VITE_SUPABASE_URL}/functions/v1/create-affiliate-account`;
+      
+      const response = await fetch(apiUrl, {
         method: 'POST',
         headers: {
           'Authorization': `Bearer ${session.access_token}`,
