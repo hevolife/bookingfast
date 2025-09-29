@@ -5,19 +5,6 @@ import { useBusinessSettings } from '../../hooks/useBusinessSettings';
 import { sendPaymentLinkEmail } from '../../lib/workflowEngine';
 import { useAuth } from '../../contexts/AuthContext';
 
-// Fonction pour vérifier le statut d'un paiement Stripe
-const checkPaymentStatus = async (sessionId: string) => {
-  try {
-    // Simuler une vérification de statut
-    // En production, vous pourriez appeler une Edge Function pour vérifier le statut
-    console.log('🔍 Vérification statut paiement session:', sessionId);
-    return 'pending'; // ou 'completed'
-  } catch (error) {
-    console.error('Erreur vérification statut:', error);
-    return 'pending';
-  }
-};
-
 interface PaymentSectionProps {
   totalAmount: number;
   currentPaid: number;
@@ -35,6 +22,7 @@ interface PaymentSectionProps {
 function PaymentLinkTimer({ createdAt, expiryMinutes = 30 }: { createdAt: string; expiryMinutes?: number }) {
   const [timeLeft, setTimeLeft] = React.useState<number>(0);
   const [isExpired, setIsExpired] = React.useState(false);
+  const [checkingPayment, setCheckingPayment] = React.useState(false);
 
   React.useEffect(() => {
     const updateTimer = () => {
@@ -45,13 +33,26 @@ function PaymentLinkTimer({ createdAt, expiryMinutes = 30 }: { createdAt: string
       
       setTimeLeft(remaining);
       setIsExpired(remaining === 0);
+      
+      // Vérifier le statut du paiement toutes les 30 secondes
+      if (remaining > 0 && !checkingPayment) {
+        const timeSinceCreation = now - createdTime;
+        if (timeSinceCreation > 30000 && timeSinceCreation % 30000 < 1000) {
+          setCheckingPayment(true);
+          // Déclencher un refresh des données
+          setTimeout(() => {
+            window.dispatchEvent(new CustomEvent('refreshBookings'));
+            setCheckingPayment(false);
+          }, 1000);
+        }
+      }
     };
 
     updateTimer();
     const interval = setInterval(updateTimer, 1000);
 
     return () => clearInterval(interval);
-  }, [createdAt, expiryMinutes]);
+  }, [createdAt, expiryMinutes, checkingPayment]);
 
   const formatTimeLeft = (ms: number) => {
     const minutes = Math.floor(ms / 60000);
@@ -73,9 +74,10 @@ function PaymentLinkTimer({ createdAt, expiryMinutes = 30 }: { createdAt: string
   return (
     <div className={`flex items-center gap-1 text-xs font-bold ${
       isWarning ? 'text-orange-600 animate-pulse' : 'text-blue-600'
-    }`}>
+    } ${checkingPayment ? 'opacity-50' : ''}`}>
       <Clock className="w-3 h-3" />
       <span>{formatTimeLeft(timeLeft)}</span>
+      {checkingPayment && <span className="ml-1">🔄</span>}
     </div>
   );
 }

@@ -7,6 +7,14 @@ export function PaymentSuccess() {
   const bookingId = searchParams.get('booking_id');
   
   const handleBackToHome = () => {
+    // Déclencher un événement pour rafraîchir les données
+    try {
+      window.opener?.postMessage({ type: 'PAYMENT_COMPLETED' }, window.location.origin);
+      console.log('✅ Message de paiement complété envoyé à la fenêtre parent');
+    } catch (error) {
+      console.warn('⚠️ Impossible d\'envoyer le message à la fenêtre parent:', error);
+    }
+    
     // Fermer la fenêtre ou rediriger vers une page de confirmation
     // Fermer l'onglet de paiement et retourner à la page de réservation
     window.close();
@@ -18,6 +26,15 @@ export function PaymentSuccess() {
       }
     }, 100);
   };
+
+  // Déclencher automatiquement le rafraîchissement après 2 secondes
+  React.useEffect(() => {
+    const timer = setTimeout(() => {
+      handleBackToHome();
+    }, 2000);
+    
+    return () => clearTimeout(timer);
+  }, []);
 
   return (
     <div className="min-h-screen bg-gradient-to-br from-green-50 to-emerald-50 flex items-center justify-center p-4">

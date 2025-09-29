@@ -133,6 +133,17 @@ export function Navbar({ currentPage, onPageChange }: NavbarProps) {
       }
     };
 
+    const handlePaymentMessage = (event: MessageEvent) => {
+      if (event.origin !== window.location.origin) return;
+      
+      if (event.data?.type === 'PAYMENT_COMPLETED') {
+        console.log('💰 Paiement complété reçu via message');
+        // Déclencher un refresh des données
+        window.dispatchEvent(new CustomEvent('paymentCompleted'));
+        window.dispatchEvent(new CustomEvent('refreshBookings'));
+      }
+    };
+
     if (isMobileMenuOpen) {
       document.addEventListener('keydown', handleEscape);
       // Empêcher le scroll du body quand le menu est ouvert
@@ -140,10 +151,12 @@ export function Navbar({ currentPage, onPageChange }: NavbarProps) {
     } else {
       document.body.style.overflow = 'unset';
     }
+    window.addEventListener('message', handlePaymentMessage);
 
     return () => {
       document.removeEventListener('keydown', handleEscape);
       document.body.style.overflow = 'unset';
+      window.removeEventListener('message', handlePaymentMessage);
     };
   }, [isMobileMenuOpen]);
 
