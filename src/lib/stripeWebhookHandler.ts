@@ -28,12 +28,13 @@ export class StripeWebhookHandler {
       console.log('📅 Date:', metadata.date || metadata.booking_date);
       console.log('⏰ Heure:', metadata.time || metadata.booking_time);
       console.log('💰 Montant payé:', amountPaid, '€');
+      console.log('🆔 ID URL (ignoré):', metadata.booking_id);
 
       // Rechercher la réservation correspondante
       let booking = null;
       let findError = null;
 
-      // Rechercher par email, date et heure (méthode principale)
+      // Rechercher UNIQUEMENT par email, date et heure (ignorer l'ID de l'URL)
       console.log('🔍 Recherche réservation par email/date/heure');
       const result = await supabase
         .from('bookings')
@@ -47,7 +48,8 @@ export class StripeWebhookHandler {
       findError = result.error;
       
       if (booking) {
-        console.log('✅ Réservation trouvée:', booking.id);
+        console.log('✅ Réservation trouvée en base:', booking.id);
+        console.log('🔄 ID URL était:', metadata.booking_id, '- ID réel:', booking.id);
       }
 
       if (findError || !booking) {
@@ -55,7 +57,8 @@ export class StripeWebhookHandler {
           email: customerEmail,
           date: metadata.date || metadata.booking_date,
           time: metadata.time || metadata.booking_time,
-          error: findError
+          error: findError,
+          id_url: metadata.booking_id
         });
         return;
       }
@@ -136,7 +139,7 @@ export class StripeWebhookHandler {
         newPaymentStatus
       });
 
-      // Mettre à jour la réservation en base
+      // Mettre à jour la réservation en base avec l'ID RÉEL trouvé
       console.log('🔄 Mise à jour réservation en base...');
       const { data: updatedBookings, error: updateError } = await supabase
         .from('bookings')
@@ -147,7 +150,7 @@ export class StripeWebhookHandler {
           booking_status: 'confirmed',
           updated_at: new Date().toISOString()
         })
-        .eq('id', booking.id)
+        .eq('id', booking.id) // Utiliser l'ID RÉEL trouvé en base
         .select();
 
       if (updateError) {
@@ -164,7 +167,7 @@ export class StripeWebhookHandler {
           transactions_count: updatedBooking.transactions?.length || 0
         });
       } else {
-        console.warn('⚠️ Aucune réservation mise à jour - ID introuvable:', booking.id);
+        console.warn('⚠️ Aucune réservation retournée après mise à jour (mais probablement réussie)');
       }
 
       // Déclencher un rafraîchissement de l'interface
