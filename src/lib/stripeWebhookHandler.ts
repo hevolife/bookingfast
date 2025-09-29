@@ -163,14 +163,22 @@ export class StripeWebhookHandler {
           booking_status: 'confirmed',
           updated_at: new Date().toISOString()
         })
-        .eq('id', bookingCheck.id);
+        .eq('id', bookingCheck.id)
+        .select('id, payment_status, payment_amount, transactions');
 
       if (updateError) {
         console.error('❌ Erreur mise à jour:', updateError);
+        console.error('❌ Détails erreur:', JSON.stringify(updateError, null, 2));
         throw updateError;
       }
 
+      if (!updateResult || updateResult.length === 0) {
+        console.error('❌ AUCUNE LIGNE MISE À JOUR - ID INEXISTANT:', bookingCheck.id);
+        throw new Error(`Réservation ${bookingCheck.id} non trouvée pour mise à jour`);
+      }
+
       console.log('✅ RÉSERVATION MISE À JOUR AVEC SUCCÈS');
+      console.log('📊 Données mises à jour retournées:', updateResult[0]);
       console.log('📊 Nouveau statut:', {
         id: bookingCheck.id,
         payment_status: newPaymentStatus,
