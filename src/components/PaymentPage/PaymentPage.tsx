@@ -227,11 +227,6 @@ export function PaymentPage() {
       if (isSupabaseConfigured()) {
         // Appel à la fonction Supabase Edge Function
         const supabaseUrl = import.meta.env.VITE_SUPABASE_URL;
-        
-        if (!supabaseUrl || supabaseUrl === 'https://placeholder.supabase.co') {
-          throw new Error('Configuration Supabase manquante. Veuillez configurer VITE_SUPABASE_URL.');
-        }
-        
         const response = await fetch(`${supabaseUrl}/functions/v1/stripe-checkout`, {
           method: 'POST',
           headers: {
@@ -262,20 +257,8 @@ export function PaymentPage() {
             throw new Error('Aucune URL de paiement reçue');
           }
         } else {
-          let errorMessage = 'Erreur lors de la création de la session de paiement';
-          try {
-            const errorData = await response.json();
-            errorMessage = errorData.error || errorMessage;
-            console.error('❌ Erreur détaillée Stripe:', {
-              status: response.status,
-              statusText: response.statusText,
-              error: errorData
-            });
-          } catch (parseError) {
-            console.error('❌ Erreur parsing réponse:', parseError);
-            errorMessage = `Erreur HTTP ${response.status}: ${response.statusText}`;
-          }
-          throw new Error(errorMessage);
+          const errorData = await response.json();
+          throw new Error(errorData.error || 'Erreur lors de la création de la session de paiement');
         }
       } else {
         // Mode démo - simuler le paiement

@@ -132,10 +132,8 @@ export function PaymentSection({
       isStripeConfigured
     });
     
-    // Vérifier la configuration Stripe avant de continuer
     if (!isStripeConfigured) {
-      alert('❌ Stripe n\'est pas configuré. Veuillez configurer Stripe dans les paramètres admin avant de générer des liens de paiement.');
-      return;
+      console.warn('⚠️ Stripe non configuré - génération du lien quand même');
     }
     
     // Appeler la fonction de génération de lien qui gère le workflow
