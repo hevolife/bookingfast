@@ -1,12 +1,12 @@
-// Gestionnaire de webhook Stripe côté client - Version complètement refaite
+// Gestionnaire de webhook Stripe côté client - Version simplifiée et robuste
 import { supabase, isSupabaseConfigured } from './supabase';
 import { Booking } from '../types';
 
 export class StripeWebhookHandler {
-  // Traiter un paiement Stripe réussi
+  // Traiter un paiement Stripe réussi - VERSION SIMPLIFIÉE
   static async processStripeWebhook(sessionData: any): Promise<void> {
-    console.log('🔄 DÉBUT TRAITEMENT PAIEMENT STRIPE');
-    console.log('📊 Session data reçue:', sessionData);
+    console.log('🔄 DÉBUT TRAITEMENT PAIEMENT STRIPE - VERSION SIMPLIFIÉE');
+    console.log('📊 Session data:', sessionData);
     
     if (!isSupabaseConfigured()) {
       console.log('📧 MODE DÉMO - Simulation traitement webhook');
@@ -23,55 +23,49 @@ export class StripeWebhookHandler {
         return;
       }
 
-      console.log('🔍 Recherche de la réservation...');
-      console.log('📧 Email client:', customerEmail);
+      console.log('🔍 RECHERCHE RÉSERVATION SIMPLE');
+      console.log('📧 Email:', customerEmail);
       console.log('📅 Date:', metadata.date || metadata.booking_date);
       console.log('⏰ Heure:', metadata.time || metadata.booking_time);
-      console.log('💰 Montant payé:', amountPaid, '€');
-      console.log('🆔 ID URL (ignoré):', metadata.booking_id);
+      console.log('💰 Montant:', amountPaid, '€');
 
-      // Rechercher la réservation correspondante
-      let booking = null;
-      let findError = null;
-
-      // Rechercher UNIQUEMENT par email, date et heure (ignorer l'ID de l'URL)
-      console.log('🔍 Recherche réservation par email/date/heure');
-      const result = await supabase
-        .from('bookings')
-        .select('*')
-        .eq('client_email', customerEmail)
-        .eq('date', metadata.date || metadata.booking_date)
-        .eq('time', metadata.time || metadata.booking_time)
-        .maybeSingle();
+      // ÉTAPE 1: Rechercher la réservation par email/date/heure UNIQUEMENT
+      const searchDate = metadata.date || metadata.booking_date;
+      const searchTime = metadata.time || metadata.booking_time;
       
-      booking = result.data;
-      findError = result.error;
-      
-      if (booking) {
-        console.log('✅ Réservation trouvée en base:', booking.id);
-        console.log('🔄 ID URL était:', metadata.booking_id, '- ID réel:', booking.id);
-      }
-
-      if (findError || !booking) {
-        console.error('❌ Réservation non trouvée:', {
-          email: customerEmail,
-          date: metadata.date || metadata.booking_date,
-          time: metadata.time || metadata.booking_time,
-          error: findError,
-          id_url: metadata.booking_id
-        });
+      if (!searchDate || !searchTime) {
+        console.error('❌ Date ou heure manquante dans les métadonnées');
         return;
       }
 
-      console.log('📋 Réservation trouvée:', {
-        id: booking.id,
-        client: booking.client_email,
-        total_amount: booking.total_amount,
-        payment_amount: booking.payment_amount,
-        payment_status: booking.payment_status
-      });
+      console.log('🔍 Recherche avec:', { email: customerEmail, date: searchDate, time: searchTime });
 
-      // Vérifier si le paiement n'a pas déjà été traité
+      const { data: foundBookings, error: searchError } = await supabase
+        .from('bookings')
+        .select('*')
+        .eq('client_email', customerEmail)
+        .eq('date', searchDate)
+        .eq('time', searchTime);
+
+      if (searchError) {
+        console.error('❌ Erreur recherche réservation:', searchError);
+        return;
+      }
+
+      if (!foundBookings || foundBookings.length === 0) {
+        console.error('❌ AUCUNE RÉSERVATION TROUVÉE');
+        console.log('🔍 Critères de recherche:', { email: customerEmail, date: searchDate, time: searchTime });
+        return;
+      }
+
+      if (foundBookings.length > 1) {
+        console.warn('⚠️ Plusieurs réservations trouvées, utilisation de la première');
+      }
+
+      const booking = foundBookings[0];
+      console.log('✅ RÉSERVATION TROUVÉE:', booking.id);
+
+      // ÉTAPE 2: Vérifier si déjà traité
       const existingTransactions = booking.transactions || [];
       const alreadyProcessed = existingTransactions.some((t: any) => 
         t.method === 'stripe' && 
@@ -84,44 +78,42 @@ export class StripeWebhookHandler {
         return;
       }
 
-      console.log('📋 Transactions actuelles:', existingTransactions.length);
+      // ÉTAPE 3: Créer ou mettre à jour la transaction
+      const updatedTransactions = [...existingTransactions];
+      let transactionUpdated = false;
 
-      // Mettre à jour la transaction Stripe correspondante
-      const updatedTransactions = existingTransactions.map((transaction: any) => {
-        // Trouver la transaction Stripe en attente avec le bon montant
+      // Chercher une transaction en attente avec le bon montant
+      for (let i = 0; i < updatedTransactions.length; i++) {
+        const transaction = updatedTransactions[i];
         if (transaction.method === 'stripe' && 
             transaction.status === 'pending' &&
             Math.abs(transaction.amount - amountPaid) < 0.01) {
           
-          console.log('🔄 Mise à jour transaction:', transaction.id);
-          console.log('💰 Montant transaction:', transaction.amount, '€');
-          console.log('💰 Montant payé:', amountPaid, '€');
-          
-          return {
+          console.log('🔄 Mise à jour transaction existante:', transaction.id);
+          updatedTransactions[i] = {
             ...transaction,
             status: 'completed',
-            note: `Payé via Stripe (${amountPaid.toFixed(2)}€) - Session: ${sessionId}`
+            note: `Payé via Stripe - Session: ${sessionId}`
           };
+          transactionUpdated = true;
+          break;
         }
-        return transaction;
-      });
+      }
 
-      // Si aucune transaction en attente trouvée, créer une nouvelle transaction
-      if (updatedTransactions.length === existingTransactions.length) {
-        console.log('➕ Création nouvelle transaction Stripe');
+      // Si aucune transaction trouvée, en créer une nouvelle
+      if (!transactionUpdated) {
+        console.log('➕ Création nouvelle transaction');
         updatedTransactions.push({
           id: crypto.randomUUID(),
           amount: amountPaid,
           method: 'stripe',
           status: 'completed',
-          note: `Payé via Stripe (${amountPaid.toFixed(2)}€) - Session: ${sessionId}`,
+          note: `Payé via Stripe - Session: ${sessionId}`,
           created_at: new Date().toISOString()
         });
       }
 
-      console.log('📋 Transactions après mise à jour:', updatedTransactions.length);
-
-      // Calculer les nouveaux totaux
+      // ÉTAPE 4: Calculer les nouveaux totaux
       const totalPaid = updatedTransactions
         .filter((t: any) => t.status === 'completed')
         .reduce((sum: number, t: any) => sum + t.amount, 0);
@@ -133,15 +125,16 @@ export class StripeWebhookHandler {
         newPaymentStatus = 'partial';
       }
 
-      console.log('💰 Calculs finaux:', {
+      console.log('💰 CALCULS:', {
         totalPaid: totalPaid.toFixed(2),
         totalAmount: booking.total_amount.toFixed(2),
         newPaymentStatus
       });
 
-      // Mettre à jour la réservation en base avec l'ID RÉEL trouvé
-      console.log('🔄 Mise à jour réservation en base...');
-      const { data: updatedBookings, error: updateError } = await supabase
+      // ÉTAPE 5: Mise à jour SIMPLE en base
+      console.log('🔄 MISE À JOUR SIMPLE EN BASE...');
+      
+      const { error: updateError } = await supabase
         .from('bookings')
         .update({
           transactions: updatedTransactions,
@@ -150,34 +143,36 @@ export class StripeWebhookHandler {
           booking_status: 'confirmed',
           updated_at: new Date().toISOString()
         })
-        .eq('id', booking.id) // Utiliser l'ID RÉEL trouvé en base
-        .select();
+        .eq('id', booking.id);
 
       if (updateError) {
-        console.error('❌ Erreur mise à jour réservation:', updateError);
+        console.error('❌ Erreur mise à jour:', updateError);
         throw updateError;
       }
 
-      if (updatedBookings && updatedBookings.length > 0) {
-        const updatedBooking = updatedBookings[0];
-        console.log('✅ Réservation mise à jour avec succès:', {
-          id: updatedBooking.id,
-          payment_status: updatedBooking.payment_status,
-          payment_amount: updatedBooking.payment_amount,
-          transactions_count: updatedBooking.transactions?.length || 0
-        });
-      } else {
-        console.warn('⚠️ Aucune réservation retournée après mise à jour (mais probablement réussie)');
-      }
+      console.log('✅ RÉSERVATION MISE À JOUR AVEC SUCCÈS');
+      console.log('📊 Nouveau statut:', {
+        id: booking.id,
+        payment_status: newPaymentStatus,
+        payment_amount: totalPaid,
+        transactions_count: updatedTransactions.length
+      });
 
-      // Déclencher un rafraîchissement de l'interface
+      // ÉTAPE 6: Déclencher rafraîchissement
       setTimeout(() => {
         console.log('🔄 Déclenchement rafraîchissement interface');
         window.dispatchEvent(new CustomEvent('refreshBookings'));
       }, 500);
 
     } catch (error) {
-      console.error('❌ Erreur traitement webhook Stripe:', error);
+      console.error('❌ ERREUR TRAITEMENT WEBHOOK:', error);
+      
+      // Déclencher quand même un rafraîchissement en cas d'erreur
+      setTimeout(() => {
+        console.log('🔄 Rafraîchissement de secours après erreur');
+        window.dispatchEvent(new CustomEvent('refreshBookings'));
+      }, 1000);
+      
       throw error;
     }
   }
@@ -185,11 +180,8 @@ export class StripeWebhookHandler {
   // Synchroniser les paiements Stripe (version simplifiée)
   static async syncStripePayments(bookings: Booking[]): Promise<Booking[]> {
     if (!isSupabaseConfigured()) return bookings;
-
-    console.log('🔄 Synchronisation paiements Stripe pour', bookings.length, 'réservations');
     
-    // Pour l'instant, retourner les réservations telles quelles
-    // La synchronisation se fait via le webhook
-    return bookings;
+    console.log('🔄 Synchronisation paiements Stripe pour', bookings.length, 'réservations');
+    return bookings; // Retourner tel quel, la sync se fait via webhook
   }
 }

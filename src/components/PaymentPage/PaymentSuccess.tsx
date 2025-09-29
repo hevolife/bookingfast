@@ -13,7 +13,15 @@ export function PaymentSuccess() {
     const processSuccessfulPayment = async () => {
       if (sessionId) {
         try {
-          console.log('🔄 Traitement paiement réussi, session:', sessionId);
+          console.log('🔄 TRAITEMENT PAIEMENT RÉUSSI - SESSION:', sessionId);
+          console.log('📊 Paramètres URL:', {
+            sessionId,
+            amount: searchParams.get('amount'),
+            email: searchParams.get('email'),
+            date: searchParams.get('date'),
+            time: searchParams.get('time'),
+            bookingId: bookingId
+          });
           
           // Préparer les données de session pour le traitement
           const sessionData = {
@@ -28,37 +36,37 @@ export function PaymentSuccess() {
               time: searchParams.get('time'),
               booking_date: searchParams.get('date'),
               booking_time: searchParams.get('time'),
-              booking_id: bookingId
+              booking_id: bookingId || 'unknown'
             }
           };
           
-          console.log('📊 Données session pour traitement:', sessionData);
+          console.log('📊 DONNÉES SESSION PRÉPARÉES:', sessionData);
           
           await StripeWebhookHandler.processStripeWebhook(sessionData);
-          console.log('✅ Paiement traité avec succès');
+          console.log('✅ PAIEMENT TRAITÉ AVEC SUCCÈS');
           
-          // Déclencher plusieurs rafraîchissements pour s'assurer de la mise à jour
+          // Déclencher rafraîchissements multiples
           setTimeout(() => {
-            console.log('🔄 Déclenchement rafraîchissement 1/3');
+            console.log('🔄 RAFRAÎCHISSEMENT 1/3');
             window.dispatchEvent(new CustomEvent('refreshBookings'));
           }, 500);
           
           setTimeout(() => {
-            console.log('🔄 Déclenchement rafraîchissement 2/3');
+            console.log('🔄 RAFRAÎCHISSEMENT 2/3');
             window.dispatchEvent(new CustomEvent('refreshBookings'));
           }, 1500);
           
           setTimeout(() => {
-            console.log('🔄 Déclenchement rafraîchissement 3/3');
+            console.log('🔄 RAFRAÎCHISSEMENT 3/3');
             window.dispatchEvent(new CustomEvent('refreshBookings'));
           }, 3000);
           
         } catch (error) {
-          console.error('❌ Erreur traitement paiement réussi:', error);
+          console.error('❌ ERREUR TRAITEMENT PAIEMENT:', error);
           
-          // En cas d'erreur, essayer quand même de déclencher un rafraîchissement
+          // Rafraîchissement de secours
           setTimeout(() => {
-            console.log('🔄 Rafraîchissement de secours après erreur');
+            console.log('🔄 RAFRAÎCHISSEMENT DE SECOURS');
             window.dispatchEvent(new CustomEvent('refreshBookings'));
           }, 1000);
         }
