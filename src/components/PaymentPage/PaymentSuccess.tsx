@@ -27,7 +27,8 @@ export function PaymentSuccess() {
               date: searchParams.get('date'),
               time: searchParams.get('time'),
               booking_date: searchParams.get('date'),
-              booking_time: searchParams.get('time')
+              booking_time: searchParams.get('time'),
+              booking_id: bookingId
             }
           };
           

@@ -232,19 +232,42 @@ export class StripeWebhookHandler {
       console.log('🔍 Recherche réservation avec client service...');
       
       // Trouver la réservation correspondante avec le client service
-      const { data: booking, error: findError } = await supabaseServiceClient
-        .from('bookings')
-        .select('*')
-        .eq('client_email', customerEmail)
-        .eq('date', metadata.date || metadata.booking_date)
-        .eq('time', metadata.time || metadata.booking_time)
-        .single();
+      let booking, findError;
+      
+      // Priorité 1: Chercher par booking_id si disponible
+      if (metadata.booking_id) {
+        console.log('🔍 Recherche par booking_id:', metadata.booking_id);
+        const result = await supabaseServiceClient
+          .from('bookings')
+          .select('*')
+          .eq('id', metadata.booking_id)
+          .maybeSingle();
+        
+        booking = result.data;
+        findError = result.error;
+      }
+      
+      // Priorité 2: Chercher par email, date et heure si pas trouvé par ID
+      if (!booking && !findError) {
+        console.log('🔍 Recherche par email/date/heure');
+        const result = await supabaseServiceClient
+          .from('bookings')
+          .select('*')
+          .eq('client_email', customerEmail)
+          .eq('date', metadata.date || metadata.booking_date)
+          .eq('time', metadata.time || metadata.booking_time)
+          .maybeSingle();
+        
+        booking = result.data;
+        findError = result.error;
+      }
 
       if (findError || !booking) {
         console.error('❌ Réservation non trouvée pour le webhook:', {
           email: customerEmail,
           date: metadata.date || metadata.booking_date,
           time: metadata.time || metadata.booking_time,
+          booking_id: metadata.booking_id,
           error: findError
         });
         return;
@@ -300,7 +323,7 @@ export class StripeWebhookHandler {
       });
       // Mettre à jour la réservation
       console.log('🔄 Mise à jour réservation en base...');
-      const { data: updatedBooking, error: updateError } = await supabaseServiceClient
+      const { error: updateError } = await supabaseServiceClient
         .from('bookings')
         .update({
           transactions: updatedTransactions,
@@ -310,15 +333,13 @@ export class StripeWebhookHandler {
           updated_at: new Date().toISOString()
         })
         .eq('id', booking.id)
-        .select()
-        .single();
+        .maybeSingle();
 
       if (updateError) {
         console.error('❌ Erreur mise à jour réservation:', updateError);
         return;
       }
 
-      console.log('✅ Réservation mise à jour en base:', updatedBooking);
       console.log('✅ Paiement Stripe traité avec succès:', {
         bookingId: booking.id,
         amountPaid,
