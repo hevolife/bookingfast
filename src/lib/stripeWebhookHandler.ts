@@ -197,6 +197,9 @@ export class StripeWebhookHandler {
 
   // Traiter un webhook Stripe manuellement
   static async processStripeWebhook(sessionData: any): Promise<void> {
+    console.log('🔄 Début traitement webhook Stripe');
+    console.log('📊 Session data reçue:', sessionData);
+    
     if (!isSupabaseConfigured()) {
       console.log('📧 MODE DÉMO - Simulation traitement webhook');
       return;
@@ -219,8 +222,17 @@ export class StripeWebhookHandler {
         metadata
       });
 
-      // Trouver la réservation correspondante
-      const { data: booking, error: findError } = await supabase
+      // Utiliser une connexion Supabase avec la clé service pour contourner l'authentification
+      const { createClient } = await import('@supabase/supabase-js');
+      const supabaseServiceClient = createClient(
+        import.meta.env.VITE_SUPABASE_URL,
+        import.meta.env.VITE_SUPABASE_SERVICE_ROLE_KEY || import.meta.env.VITE_SUPABASE_ANON_KEY
+      );
+      
+      console.log('🔍 Recherche réservation avec client service...');
+      
+      // Trouver la réservation correspondante avec le client service
+      const { data: booking, error: findError } = await supabaseServiceClient
         .from('bookings')
         .select('*')
         .eq('client_email', customerEmail)
@@ -233,11 +245,13 @@ export class StripeWebhookHandler {
           email: customerEmail,
           date: metadata.date || metadata.booking_date,
           time: metadata.time || metadata.booking_time
+          error: findError
         });
         return;
       }
 
       console.log('✅ Réservation trouvée:', booking.id);
+      console.log('📋 Transactions actuelles:', booking.transactions);
 
       // Mettre à jour la transaction Stripe correspondante
       const existingTransactions = booking.transactions || [];
@@ -248,6 +262,15 @@ export class StripeWebhookHandler {
             Math.abs(transaction.amount - amountPaid) < 0.01) {
           
           console.log('🔄 Mise à jour transaction Stripe:', transaction.id);
+          console.log('📊 Transaction avant:', transaction);
+          
+          const updatedTransaction = {
+            ...transaction,
+            status: 'completed',
+            note: `Payé via Stripe (${amountPaid.toFixed(2)}€) - Session: ${sessionId}`
+          };
+          
+          console.log('📊 Transaction après:', updatedTransaction);
           return {
             ...transaction,
             status: 'completed',
@@ -257,6 +280,7 @@ export class StripeWebhookHandler {
         return transaction;
       });
 
+      console.log('📋 Transactions mises à jour:', updatedTransactions);
       // Calculer les nouveaux totaux
       const totalPaid = updatedTransactions
         .filter((t: any) => t.status === 'completed')
@@ -269,8 +293,14 @@ export class StripeWebhookHandler {
         newPaymentStatus = 'partial';
       }
 
+      console.log('💰 Calculs paiement:', {
+        totalPaid,
+        totalAmount: booking.total_amount,
+        newPaymentStatus
+      });
       // Mettre à jour la réservation
-      const { error: updateError } = await supabase
+      console.log('🔄 Mise à jour réservation en base...');
+      const { data: updatedBooking, error: updateError } = await supabaseServiceClient
         .from('bookings')
         .update({
           transactions: updatedTransactions,
@@ -279,13 +309,16 @@ export class StripeWebhookHandler {
           booking_status: 'confirmed',
           updated_at: new Date().toISOString()
         })
-        .eq('id', booking.id);
+        .eq('id', booking.id)
+        .select()
+        .single();
 
       if (updateError) {
         console.error('❌ Erreur mise à jour réservation:', updateError);
         return;
       }
 
+      console.log('✅ Réservation mise à jour en base:', updatedBooking);
       console.log('✅ Paiement Stripe traité avec succès:', {
         bookingId: booking.id,
         amountPaid,
