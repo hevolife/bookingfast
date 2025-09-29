@@ -1,10 +1,47 @@
 import React from 'react';
 import { CheckCircle, Calendar, ArrowLeft } from 'lucide-react';
 import { useSearchParams } from 'react-router-dom';
+import { StripeWebhookHandler } from '../../lib/stripeWebhookHandler';
 
 export function PaymentSuccess() {
   const [searchParams] = useSearchParams();
   const bookingId = searchParams.get('booking_id');
+  const sessionId = searchParams.get('session_id');
+  
+  // Traiter le paiement réussi au chargement de la page
+  React.useEffect(() => {
+    const processSuccessfulPayment = async () => {
+      if (sessionId) {
+        try {
+          console.log('🔄 Traitement paiement réussi, session:', sessionId);
+          
+          // Simuler les données de session Stripe pour le traitement
+          const mockSessionData = {
+            id: sessionId,
+            payment_status: 'paid',
+            amount_total: parseFloat(searchParams.get('amount') || '0') * 100, // Convertir en centimes
+            customer_details: {
+              email: searchParams.get('email')
+            },
+            metadata: {
+              date: searchParams.get('date'),
+              time: searchParams.get('time'),
+              booking_date: searchParams.get('date'),
+              booking_time: searchParams.get('time')
+            }
+          };
+          
+          await StripeWebhookHandler.processStripeWebhook(mockSessionData);
+          console.log('✅ Paiement traité avec succès');
+          
+        } catch (error) {
+          console.error('❌ Erreur traitement paiement réussi:', error);
+        }
+      }
+    };
+    
+    processSuccessfulPayment();
+  }, [sessionId, searchParams]);
   
   const handleBackToHome = () => {
     // Fermer la fenêtre ou rediriger vers une page de confirmation
