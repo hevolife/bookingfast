@@ -524,14 +524,15 @@ serve(async (req) => {
       }
       
       // Recherche par email et métadonnées (fallback)
-      if (!booking && metadata.client && metadata.booking_date && metadata.booking_time) {
-        console.log('🔍 Recherche par métadonnées:', { email: customerEmail, date: metadata.booking_date, time: metadata.booking_time })
+      if (!booking) {
+        console.log('🔍 Recherche par email et métadonnées...')
         const { data: bookingData, error: bookingError } = await supabaseClient
           .from('bookings')
           .select('*')
           .eq('client_email', customerEmail)
-          .eq('date', metadata.booking_date)
-          .eq('time', metadata.booking_time)
+          .eq('date', metadata.date || metadata.booking_date)
+          .eq('time', metadata.time || metadata.booking_time)
+          .in('booking_status', ['pending', 'confirmed']) // Exclure les annulées
           .maybeSingle()
 
         if (bookingData && !bookingError) {
@@ -541,12 +542,20 @@ serve(async (req) => {
       }
 
       if (!booking) {
-        console.error('❌ Aucune réservation trouvée pour:', customerEmail)
+        console.log('❌ Réservation non trouvée')
+        console.log('🔍 Critères de recherche utilisés:')
+        console.log('  - Email:', customerEmail)
+        console.log('  - Date:', metadata.date || metadata.booking_date)
+        console.log('  - Heure:', metadata.time || metadata.booking_time)
+        console.log('  - Booking ID:', metadata.booking_id)
+        
         processedSessions.delete(sessionId)
         return new Response('Réservation non trouvée', { status: 404, headers: corsHeaders })
       }
 
-      // Mettre à jour la réservation existante
+      console.log('💰 Mise à jour du paiement de la réservation existante...')
+      
+      // Récupérer les transactions existantes
       const existingTransactions = booking.transactions || []
       
       // Vérifier si cette session n'a pas déjà été traitée
