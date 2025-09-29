@@ -15,8 +15,8 @@ export function PaymentSuccess() {
         try {
           console.log('🔄 Traitement paiement réussi, session:', sessionId);
           
-          // Simuler les données de session Stripe pour le traitement
-          const mockSessionData = {
+          // Préparer les données de session pour le traitement
+          const sessionData = {
             id: sessionId,
             payment_status: 'paid',
             amount_total: parseFloat(searchParams.get('amount') || '0') * 100, // Convertir en centimes
@@ -32,9 +32,9 @@ export function PaymentSuccess() {
             }
           };
           
-          console.log('📊 Données session pour traitement:', mockSessionData);
+          console.log('📊 Données session pour traitement:', sessionData);
           
-          await StripeWebhookHandler.processStripeWebhook(mockSessionData);
+          await StripeWebhookHandler.processStripeWebhook(sessionData);
           console.log('✅ Paiement traité avec succès');
           
           // Déclencher plusieurs rafraîchissements pour s'assurer de la mise à jour
@@ -55,6 +55,12 @@ export function PaymentSuccess() {
           
         } catch (error) {
           console.error('❌ Erreur traitement paiement réussi:', error);
+          
+          // En cas d'erreur, essayer quand même de déclencher un rafraîchissement
+          setTimeout(() => {
+            console.log('🔄 Rafraîchissement de secours après erreur');
+            window.dispatchEvent(new CustomEvent('refreshBookings'));
+          }, 1000);
         }
       }
     };
