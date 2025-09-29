@@ -111,12 +111,10 @@ export class StripeWebhookHandler {
         }
       } else {
         console.log('✅ RÉSERVATION CONFIRMÉE EN BASE:', verifyBooking.id);
-        // Utiliser les données vérifiées
-        const verifiedBooking = verifyBooking;
       }
 
       // ÉTAPE 2: Vérifier si déjà traité
-      const existingTransactions = verifiedBooking.transactions || [];
+      const existingTransactions = verifyBooking.transactions || [];
       const alreadyProcessed = existingTransactions.some((t: any) => 
         t.method === 'stripe' && 
         t.status === 'completed' &&
@@ -177,7 +175,7 @@ export class StripeWebhookHandler {
 
       console.log('💰 CALCULS:', {
         totalPaid: totalPaid.toFixed(2),
-        totalAmount: verifiedBooking.total_amount.toFixed(2),
+        totalAmount: verifyBooking.total_amount.toFixed(2),
         newPaymentStatus
       });
 
@@ -193,7 +191,7 @@ export class StripeWebhookHandler {
           booking_status: 'confirmed',
           updated_at: new Date().toISOString()
         })
-        .eq('id', verifiedBooking.id);
+        .eq('id', verifyBooking.id);
 
       if (updateError) {
         console.error('❌ Erreur mise à jour:', updateError);
@@ -202,7 +200,7 @@ export class StripeWebhookHandler {
 
       console.log('✅ RÉSERVATION MISE À JOUR AVEC SUCCÈS');
       console.log('📊 Nouveau statut:', {
-        id: verifiedBooking.id,
+        id: verifyBooking.id,
         payment_status: newPaymentStatus,
         payment_amount: totalPaid,
         transactions_count: updatedTransactions.length
