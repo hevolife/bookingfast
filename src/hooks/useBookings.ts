@@ -6,7 +6,6 @@ import { useBusinessSettings } from './useBusinessSettings';
 import { bookingEvents } from '../lib/bookingEvents';
 import { notificationEvents } from '../lib/notificationEvents';
 import { triggerWorkflow } from '../lib/workflowEngine';
-import { StripeWebhookHandler } from '../lib/stripeWebhookHandler';
 
 const checkAndUpdateExpiredPaymentLinks = async (bookings: Booking[], settings?: any): Promise<Booking[]> => {
   if (!isSupabaseConfigured()) return bookings;
@@ -191,10 +190,7 @@ export function useBookings(date?: string) {
         assigned_user_id: b.assigned_user_id
       })));
 
-      // Synchroniser les paiements Stripe avant de vérifier les liens expirés
-      let syncedBookings = await StripeWebhookHandler.syncStripePayments(data || []);
-      const updatedBookings = await checkAndUpdateExpiredPaymentLinks(syncedBookings, settings);
-      
+      const updatedBookings = await checkAndUpdateExpiredPaymentLinks(data || [], settings);
       setBookings(updatedBookings);
       console.log('✅ Réservations finales après vérification:', updatedBookings.length);
     } catch (err) {
