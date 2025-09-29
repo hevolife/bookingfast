@@ -761,6 +761,7 @@ export function BookingModal({
                   serviceName={isCustomService ? customServiceData.name : selectedService?.name || ''}
                   bookingDate={date}
                   bookingTime={time}
+                  editingBooking={editingBooking}
                 />
               )}
             </div>
