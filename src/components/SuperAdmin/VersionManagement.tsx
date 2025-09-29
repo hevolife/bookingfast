@@ -1,5 +1,5 @@
 import React, { useState, useEffect } from 'react';
-import { Settings, Plus, Edit, Trash2, CheckCircle, Clock, Save, X, AlertTriangle } from 'lucide-react';
+import { Settings, Plus, CreditCard as Edit, Trash2, CheckCircle, Clock, Save, X, AlertTriangle } from 'lucide-react';
 import { supabase, isSupabaseConfigured } from '../../lib/supabase';
 import { Modal } from '../UI/Modal';
 import { Button } from '../UI/Button';
