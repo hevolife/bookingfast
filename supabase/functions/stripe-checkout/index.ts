@@ -2,78 +2,42 @@ import 'jsr:@supabase/functions-js/edge-runtime.d.ts';
 import Stripe from 'npm:stripe@17.7.0';
 import { createClient } from 'npm:@supabase/supabase-js@2.49.1';
 
-const supabase = createClient(Deno.env.get('SUPABASE_URL') ?? '', Deno.env.get('SUPABASE_SERVICE_ROLE_KEY') ?? '');
-
-// Vérifier que la clé Stripe est configurée
-const stripeSecret = Deno.env.get('STRIPE_SECRET_KEY');
-if (!stripeSecret) {
-  console.error('❌ STRIPE_SECRET_KEY non configuré dans les variables d\'environnement');
-  throw new Error('STRIPE_SECRET_KEY environment variable is required');
-}
-
-console.log('✅ STRIPE_SECRET_KEY trouvé:', stripeSecret.substring(0, 7) + '...');
-
-const stripe = new Stripe(stripeSecret, {
-  appInfo: {
-    name: 'Bolt Integration',
-    version: '1.0.0',
-  },
-});
-
-// Helper function to create responses with CORS headers
-function corsResponse(body: string | object | null, status = 200) {
-  const headers = {
-    'Access-Control-Allow-Origin': '*',
-    'Access-Control-Allow-Methods': 'POST, OPTIONS',
-    'Access-Control-Allow-Headers': '*',
-  };
-
-  // For 204 No Content, don't include Content-Type or body
-  if (status === 204) {
-    return new Response(null, { status, headers });
-  }
-
-  return new Response(JSON.stringify(body), {
-    status,
-    headers: {
-      ...headers,
-      'Content-Type': 'application/json',
-    },
-  });
+const corsHeaders = {
+  'Access-Control-Allow-Origin': '*',
+  'Access-Control-Allow-Headers': 'authorization, x-client-info, apikey, content-type',
+  'Access-Control-Allow-Methods': 'POST, OPTIONS',
 }
 
 Deno.serve(async (req) => {
-  try {
-    console.log('🔄 Début traitement stripe-checkout...');
-    console.log('🔑 Variables d\'environnement disponibles:', {
-      STRIPE_SECRET_KEY: !!Deno.env.get('STRIPE_SECRET_KEY'),
-      SUPABASE_URL: !!Deno.env.get('SUPABASE_URL'),
-      SUPABASE_SERVICE_ROLE_KEY: !!Deno.env.get('SUPABASE_SERVICE_ROLE_KEY')
-    });
+  if (req.method === 'OPTIONS') {
+    return new Response('ok', { headers: corsHeaders })
+  }
 
-    if (req.method === 'OPTIONS') {
-      return corsResponse({}, 204);
-    }
+  try {
+    console.log('🔄 Début traitement stripe-checkout...')
+    
+    // Créer le client Supabase
+    const supabaseClient = createClient(
+      Deno.env.get('SUPABASE_URL') ?? '',
+      Deno.env.get('SUPABASE_SERVICE_ROLE_KEY') ?? ''
+    )
 
     if (req.method !== 'POST') {
-      return corsResponse({ error: 'Method not allowed' }, 405);
+      return new Response(
+        JSON.stringify({ error: 'Method not allowed' }),
+        { status: 405, headers: corsHeaders }
+      )
     }
 
-    const { amount, currency = 'eur', success_url, cancel_url, customer_email, metadata, service_name } = await req.json();
+    const { amount, currency = 'eur', success_url, cancel_url, customer_email, metadata, service_name } = await req.json()
 
-    const error = validateParameters(
-      { amount, success_url, cancel_url, customer_email, service_name },
-      {
-        amount: 'number',
-        cancel_url: 'string',
-        success_url: 'string',
-        customer_email: 'string',
-        service_name: 'string',
-      },
-    );
-
-    if (error) {
-      return corsResponse({ error }, 400);
+    // Validation des paramètres
+    if (!amount || !success_url || !cancel_url || !customer_email || !service_name) {
+      console.error('❌ Paramètres manquants:', { amount, success_url, cancel_url, customer_email, service_name })
+      return new Response(
+        JSON.stringify({ error: 'Paramètres requis manquants: amount, success_url, cancel_url, customer_email, service_name' }),
+        { status: 400, headers: corsHeaders }
+      )
     }
 
     console.log('📊 Données reçues:', {
@@ -81,104 +45,166 @@ Deno.serve(async (req) => {
       currency,
       customer_email,
       service_name,
-      has_metadata: !!metadata
-    });
+      user_id: metadata?.user_id
+    })
 
-    // Créer ou récupérer le client Stripe par email
-    let customerId;
+    // ÉTAPE 1: Récupérer les paramètres Stripe de l'utilisateur depuis business_settings
+    const userId = metadata?.user_id
+    if (!userId) {
+      console.error('❌ user_id manquant dans metadata')
+      return new Response(
+        JSON.stringify({ error: 'user_id requis dans metadata pour récupérer la configuration Stripe' }),
+        { status: 400, headers: corsHeaders }
+      )
+    }
+
+    console.log('🔍 Récupération configuration Stripe pour utilisateur:', userId)
+
+    const { data: settings, error: settingsError } = await supabaseClient
+      .from('business_settings')
+      .select('stripe_enabled, stripe_secret_key, stripe_public_key')
+      .eq('user_id', userId)
+      .single()
+
+    if (settingsError || !settings) {
+      console.error('❌ Erreur récupération paramètres:', settingsError)
+      return new Response(
+        JSON.stringify({ error: 'Configuration utilisateur non trouvée' }),
+        { status: 404, headers: corsHeaders }
+      )
+    }
+
+    console.log('✅ Paramètres récupérés:', {
+      stripe_enabled: settings.stripe_enabled,
+      has_secret_key: !!settings.stripe_secret_key,
+      has_public_key: !!settings.stripe_public_key
+    })
+
+    // Vérifier que Stripe est activé et configuré
+    if (!settings.stripe_enabled) {
+      console.error('❌ Stripe non activé pour cet utilisateur')
+      return new Response(
+        JSON.stringify({ error: 'Stripe non activé. Activez Stripe dans vos paramètres.' }),
+        { status: 400, headers: corsHeaders }
+      )
+    }
+
+    if (!settings.stripe_secret_key) {
+      console.error('❌ Clé secrète Stripe manquante')
+      return new Response(
+        JSON.stringify({ error: 'Clé secrète Stripe non configurée. Ajoutez votre clé secrète dans les paramètres.' }),
+        { status: 400, headers: corsHeaders }
+      )
+    }
+
+    // ÉTAPE 2: Initialiser Stripe avec la clé de l'utilisateur
+    console.log('🔑 Initialisation Stripe avec clé utilisateur...')
+    const stripe = new Stripe(settings.stripe_secret_key, {
+      appInfo: {
+        name: 'BookingFast',
+        version: '1.0.0',
+      },
+    })
+
+    console.log('✅ Stripe initialisé avec succès')
+
+    // ÉTAPE 3: Créer ou récupérer le client Stripe
+    let customerId
     
-    // Chercher un client existant par email
-    const existingCustomers = await stripe.customers.list({
-      email: customer_email,
-      limit: 1,
-    });
-    
-    if (existingCustomers.data.length > 0) {
-      customerId = existingCustomers.data[0].id;
-    } else {
-      // Créer un nouveau client
-      const newCustomer = await stripe.customers.create({
+    try {
+      const existingCustomers = await stripe.customers.list({
         email: customer_email,
-        metadata: metadata || {},
-      });
-      customerId = newCustomer.id;
+        limit: 1,
+      })
+      
+      if (existingCustomers.data.length > 0) {
+        customerId = existingCustomers.data[0].id
+        console.log('✅ Client Stripe existant trouvé:', customerId)
+      } else {
+        const newCustomer = await stripe.customers.create({
+          email: customer_email,
+          metadata: metadata || {},
+        })
+        customerId = newCustomer.id
+        console.log('✅ Nouveau client Stripe créé:', customerId)
+      }
+    } catch (customerError) {
+      console.error('❌ Erreur gestion client Stripe:', customerError)
+      return new Response(
+        JSON.stringify({ error: 'Erreur lors de la création du client Stripe' }),
+        { status: 500, headers: corsHeaders }
+      )
     }
 
-    // Créer la session de checkout
-    const session = await stripe.checkout.sessions.create({
-      customer: customerId,
-      payment_method_types: ['card'],
-      line_items: [
-        {
-          price_data: {
-            currency: currency,
-            product_data: {
-              name: service_name,
-              description: `Réservation - ${service_name}`,
+    // ÉTAPE 4: Créer la session de checkout
+    console.log('💳 Création session checkout...')
+    
+    try {
+      const session = await stripe.checkout.sessions.create({
+        customer: customerId,
+        payment_method_types: ['card'],
+        line_items: [
+          {
+            price_data: {
+              currency: currency,
+              product_data: {
+                name: service_name,
+                description: `Réservation - ${service_name}`,
+              },
+              unit_amount: Math.round(amount * 100), // Convertir en centimes
             },
-            unit_amount: Math.round(amount * 100), // Convertir en centimes
+            quantity: 1,
           },
-          quantity: 1,
-        },
-      ],
-      mode: 'payment',
-      success_url,
-      cancel_url,
-      metadata: metadata || {},
-    });
+        ],
+        mode: 'payment',
+        success_url,
+        cancel_url,
+        metadata: metadata || {},
+      })
 
-    console.log(`Created checkout session ${session.id} for customer ${customerId}`);
-    console.log(`Session URL: ${session.url}`);
+      console.log('✅ Session checkout créée:', session.id)
+      console.log('🔗 URL session:', session.url)
 
-    return corsResponse({ 
-      sessionId: session.id, 
-      url: session.url,
-      success: true 
-    });
-  } catch (error: any) {
-    console.error(`❌ Erreur stripe-checkout: ${error.message}`);
-    console.error(`❌ Stack trace:`, error.stack);
-    
-    // Erreur spécifique pour clé Stripe manquante
-    if (error.message.includes('apiKey') || error.message.includes('authenticator')) {
-      return corsResponse({ 
-        error: 'Configuration Stripe manquante. Vérifiez que STRIPE_SECRET_KEY est configuré dans les variables d\'environnement Supabase.',
-        details: 'STRIPE_SECRET_KEY environment variable is required'
-      }, 500);
+      return new Response(
+        JSON.stringify({ 
+          sessionId: session.id, 
+          url: session.url,
+          success: true 
+        }),
+        { headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
+      )
+
+    } catch (stripeError) {
+      console.error('❌ Erreur création session Stripe:', stripeError)
+      
+      // Messages d'erreur plus spécifiques
+      let errorMessage = 'Erreur lors de la création de la session de paiement'
+      
+      if (stripeError.message.includes('Invalid API Key')) {
+        errorMessage = 'Clé API Stripe invalide. Vérifiez votre clé secrète dans les paramètres.'
+      } else if (stripeError.message.includes('No such customer')) {
+        errorMessage = 'Erreur client Stripe. Veuillez réessayer.'
+      } else if (stripeError.message.includes('amount')) {
+        errorMessage = 'Montant invalide. Le montant doit être supérieur à 0.'
+      }
+      
+      return new Response(
+        JSON.stringify({ 
+          error: errorMessage,
+          details: stripeError.message 
+        }),
+        { status: 500, headers: corsHeaders }
+      )
     }
-    
-    return corsResponse({ error: error.message }, 500);
+
+  } catch (error) {
+    console.error('❌ Erreur générale stripe-checkout:', error)
+    return new Response(
+      JSON.stringify({ 
+        error: 'Erreur interne du serveur',
+        details: error.message 
+      }),
+      { status: 500, headers: corsHeaders }
+    )
   }
-});
-
-type ExpectedType = 'string' | 'number' | { values: string[] };
-type Expectations<T> = { [K in keyof T]: ExpectedType };
-
-function validateParameters<T extends Record<string, any>>(values: T, expected: Expectations<T>): string | undefined {
-  for (const parameter in values) {
-    const expectation = expected[parameter];
-    const value = values[parameter];
-
-    if (expectation === 'string') {
-      if (value == null) {
-        return `Missing required parameter ${parameter}`;
-      }
-      if (typeof value !== 'string') {
-        return `Expected parameter ${parameter} to be a string got ${JSON.stringify(value)}`;
-      }
-    } else if (expectation === 'number') {
-      if (value == null) {
-        return `Missing required parameter ${parameter}`;
-      }
-      if (typeof value !== 'number') {
-        return `Expected parameter ${parameter} to be a number got ${JSON.stringify(value)}`;
-      }
-    } else {
-      if (!expectation.values.includes(value)) {
-        return `Expected parameter ${parameter} to be one of ${expectation.values.join(', ')}`;
-      }
-    }
-  }
-
-  return undefined;
-}
+})
