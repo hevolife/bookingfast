@@ -10,8 +10,12 @@ export function PaymentSuccess() {
   
   // Traiter le paiement réussi au chargement de la page
   React.useEffect(() => {
+    let processed = false; // Flag pour éviter les traitements multiples
+    
     const processSuccessfulPayment = async () => {
-      if (sessionId) {
+      if (sessionId && !processed) {
+        processed = true; // Marquer comme traité immédiatement
+        
         try {
           console.log('🔄 TRAITEMENT PAIEMENT RÉUSSI - SESSION:', sessionId);
           console.log('📊 Paramètres URL:', {

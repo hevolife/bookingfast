@@ -87,14 +87,24 @@ export class StripeWebhookHandler {
 
       // ÉTAPE 3: Vérifier si déjà traité
       const existingTransactions = bookingCheck.transactions || [];
+      
+      // Vérifier si ce sessionId a déjà été traité
       const alreadyProcessed = existingTransactions.some((t: any) => 
         t.method === 'stripe' && 
         t.status === 'completed' &&
-        t.note && t.note.includes(sessionId)
+        t.note && (
+          t.note.includes(sessionId) || 
+          t.note.includes(`Session: ${sessionId}`) ||
+          t.note.includes(`cs_${sessionId.split('_')[1]}`) // Partie unique de la session
+        )
       );
 
       if (alreadyProcessed) {
         console.log('⚠️ Paiement déjà traité pour cette session:', sessionId);
+        console.log('🔄 Rafraîchissement simple car déjà traité');
+        setTimeout(() => {
+          window.dispatchEvent(new CustomEvent('refreshBookings'));
+        }, 500);
         return;
       }
 
