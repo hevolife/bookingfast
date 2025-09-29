@@ -244,7 +244,7 @@ export class StripeWebhookHandler {
         console.error('❌ Réservation non trouvée pour le webhook:', {
           email: customerEmail,
           date: metadata.date || metadata.booking_date,
-          time: metadata.time || metadata.booking_time
+          time: metadata.time || metadata.booking_time,
           error: findError
         });
         return;
