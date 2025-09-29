@@ -520,42 +520,53 @@ serve(async (req) => {
         if (bookingData && !bookingError) {
           booking = bookingData
           console.log('✅ Réservation trouvée par ID:', booking.id)
+        } else {
+          console.log('❌ Réservation non trouvée par ID:', bookingError?.message)
         }
       }
       
       // Recherche par email et métadonnées (fallback)
-      if (!booking) {
-        console.log('🔍 Recherche par email et métadonnées...')
+      if (!booking && metadata.client && metadata.booking_date && metadata.booking_time) {
+        console.log('🔍 Recherche par métadonnées:', { email: customerEmail, date: metadata.booking_date, time: metadata.booking_time })
         const { data: bookingData, error: bookingError } = await supabaseClient
           .from('bookings')
           .select('*')
           .eq('client_email', customerEmail)
-          .eq('date', metadata.date || metadata.booking_date)
-          .eq('time', metadata.time || metadata.booking_time)
-          .in('booking_status', ['pending', 'confirmed']) // Exclure les annulées
+          .eq('date', metadata.booking_date)
+          .eq('time', metadata.booking_time)
           .maybeSingle()
 
         if (bookingData && !bookingError) {
           booking = bookingData
           console.log('✅ Réservation trouvée par métadonnées:', booking.id)
+        } else {
+          console.log('❌ Réservation non trouvée par métadonnées:', bookingError?.message)
         }
       }
 
       if (!booking) {
-        console.log('❌ Réservation non trouvée')
-        console.log('🔍 Critères de recherche utilisés:')
-        console.log('  - Email:', customerEmail)
-        console.log('  - Date:', metadata.date || metadata.booking_date)
-        console.log('  - Heure:', metadata.time || metadata.booking_time)
-        console.log('  - Booking ID:', metadata.booking_id)
-        
+        console.log('🔍 Recherche par email seulement:', customerEmail)
+        const { data: bookingData, error: bookingError } = await supabaseClient
+          .from('bookings')
+          .select('*')
+          .eq('client_email', customerEmail)
+          .maybeSingle()
+
+        if (bookingData && !bookingError) {
+          booking = bookingData
+          console.log('✅ Réservation trouvée par email:', booking.id)
+        } else {
+          console.log('❌ Aucune réservation trouvée par email:', bookingError?.message)
+        }
+      }
+
+      if (!booking) {
+        console.error('❌ Aucune réservation trouvée pour:', customerEmail)
         processedSessions.delete(sessionId)
         return new Response('Réservation non trouvée', { status: 404, headers: corsHeaders })
       }
 
-      console.log('💰 Mise à jour du paiement de la réservation existante...')
-      
-      // Récupérer les transactions existantes
+      // Mettre à jour la réservation existante
       const existingTransactions = booking.transactions || []
       
       // Vérifier si cette session n'a pas déjà été traitée
@@ -576,6 +587,7 @@ serve(async (req) => {
         }
         
         processedSessions.set(sessionId, { timestamp: Date.now(), result })
+        console.log('🔍 Métadonnées reçues:', metadata)
         
         return new Response(JSON.stringify(result), {
           headers: { ...corsHeaders, 'Content-Type': 'application/json' }
@@ -589,8 +601,8 @@ serve(async (req) => {
         method: 'stripe',
         status: 'completed',
         note: metadata.is_deposit === 'true' 
-          ? `Acompte payé via Stripe (${amountPaid.toFixed(2)}€) - Session: ${sessionId}`
-          : `Paiement Stripe (${amountPaid.toFixed(2)}€) - Session: ${sessionId}`,
+          ? `Acompte payé via Stripe (${amountPaid.toFixed(2)}€)`
+          : `Paiement Stripe (${amountPaid.toFixed(2)}€)`,
         created_at: new Date().toISOString()
       }
       
