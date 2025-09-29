@@ -7,10 +7,9 @@ import { SubscriptionManagement } from './SubscriptionManagement';
 import { AccessCodeManagement } from './AccessCodeManagement';
 import { AdminStats } from './AdminStats';
 import { AffiliateAdminPanel } from './AffiliateAdminPanel';
-import { VersionManagement } from './VersionManagement';
 import { LoadingSpinner } from '../UI/LoadingSpinner';
 
-type AdminTab = 'stats' | 'users' | 'subscriptions' | 'codes' | 'affiliates' | 'versions';
+type AdminTab = 'stats' | 'users' | 'subscriptions' | 'codes' | 'affiliates';
 
 export function SuperAdminPage() {
   const [activeTab, setActiveTab] = useState<AdminTab>('stats');
@@ -68,8 +67,7 @@ export function SuperAdminPage() {
     { id: 'users', label: 'Utilisateurs', icon: Users, description: 'Gestion des comptes' },
     { id: 'subscriptions', label: 'Abonnements', icon: CreditCard, description: 'Gestion Stripe' },
     { id: 'codes', label: 'Codes d\'accès', icon: Key, description: 'Codes secrets' },
-    { id: 'affiliates', label: 'Affiliations', icon: Share2, description: 'Programme de parrainage' },
-    { id: 'versions', label: 'Versions', icon: Settings, description: 'Gestion des versions' }
+    { id: 'affiliates', label: 'Affiliations', icon: Share2, description: 'Programme de parrainage' }
   ];
 
   const renderContent = () => {
@@ -84,8 +82,6 @@ export function SuperAdminPage() {
         return <AccessCodeManagement />;
       case 'affiliates':
         return <AffiliateAdminPanel />;
-      case 'versions':
-        return <VersionManagement />;
       default:
         return <AdminStats />;
     }
