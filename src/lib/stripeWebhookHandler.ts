@@ -154,15 +154,20 @@ export class StripeWebhookHandler {
       // ÉTAPE 6: Mise à jour SIMPLE en base
       console.log('🔄 MISE À JOUR SIMPLE EN BASE...');
       
-      const { error: updateError } = await supabase
+      const { data: updateResult, error: updateError } = await supabase
         .from('bookings')
         .update({
-          transactions: newTransactions,
+          transactions: updatedTransactions,
           payment_status: newPaymentStatus,
           payment_amount: totalPaid,
           booking_status: 'confirmed',
           updated_at: new Date().toISOString()
         })
+        .eq('id', bookingCheck.id)
+        .select();
+
+      if (updateError) {
+        console.error('❌ ERREUR MISE À JOUR:', updateError);
         throw updateError;
       }
 
@@ -207,6 +212,3 @@ export class StripeWebhookHandler {
     return bookings; // Retourner tel quel, la sync se fait via webhook
   }
 }
-      const { data: updateResult, error: updateError } = await supabase
-        .from('bookings')
-        .update({
