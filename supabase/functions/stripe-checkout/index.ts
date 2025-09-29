@@ -3,7 +3,16 @@ import Stripe from 'npm:stripe@17.7.0';
 import { createClient } from 'npm:@supabase/supabase-js@2.49.1';
 
 const supabase = createClient(Deno.env.get('SUPABASE_URL') ?? '', Deno.env.get('SUPABASE_SERVICE_ROLE_KEY') ?? '');
-const stripeSecret = Deno.env.get('STRIPE_SECRET_KEY')!;
+
+// Vérifier que la clé Stripe est configurée
+const stripeSecret = Deno.env.get('STRIPE_SECRET_KEY');
+if (!stripeSecret) {
+  console.error('❌ STRIPE_SECRET_KEY non configuré dans les variables d\'environnement');
+  throw new Error('STRIPE_SECRET_KEY environment variable is required');
+}
+
+console.log('✅ STRIPE_SECRET_KEY trouvé:', stripeSecret.substring(0, 7) + '...');
+
 const stripe = new Stripe(stripeSecret, {
   appInfo: {
     name: 'Bolt Integration',
@@ -35,6 +44,13 @@ function corsResponse(body: string | object | null, status = 200) {
 
 Deno.serve(async (req) => {
   try {
+    console.log('🔄 Début traitement stripe-checkout...');
+    console.log('🔑 Variables d\'environnement disponibles:', {
+      STRIPE_SECRET_KEY: !!Deno.env.get('STRIPE_SECRET_KEY'),
+      SUPABASE_URL: !!Deno.env.get('SUPABASE_URL'),
+      SUPABASE_SERVICE_ROLE_KEY: !!Deno.env.get('SUPABASE_SERVICE_ROLE_KEY')
+    });
+
     if (req.method === 'OPTIONS') {
       return corsResponse({}, 204);
     }
@@ -59,6 +75,14 @@ Deno.serve(async (req) => {
     if (error) {
       return corsResponse({ error }, 400);
     }
+
+    console.log('📊 Données reçues:', {
+      amount,
+      currency,
+      customer_email,
+      service_name,
+      has_metadata: !!metadata
+    });
 
     // Créer ou récupérer le client Stripe par email
     let customerId;
@@ -105,7 +129,6 @@ Deno.serve(async (req) => {
 
     console.log(`Created checkout session ${session.id} for customer ${customerId}`);
     console.log(`Session URL: ${session.url}`);
-    console.log(`Full session object:`, JSON.stringify(session, null, 2));
 
     return corsResponse({ 
       sessionId: session.id, 
@@ -113,8 +136,17 @@ Deno.serve(async (req) => {
       success: true 
     });
   } catch (error: any) {
-    console.error(`Checkout error: ${error.message}`);
-    console.error(`Full error:`, error);
+    console.error(`❌ Erreur stripe-checkout: ${error.message}`);
+    console.error(`❌ Stack trace:`, error.stack);
+    
+    // Erreur spécifique pour clé Stripe manquante
+    if (error.message.includes('apiKey') || error.message.includes('authenticator')) {
+      return corsResponse({ 
+        error: 'Configuration Stripe manquante. Vérifiez que STRIPE_SECRET_KEY est configuré dans les variables d\'environnement Supabase.',
+        details: 'STRIPE_SECRET_KEY environment variable is required'
+      }, 500);
+    }
+    
     return corsResponse({ error: error.message }, 500);
   }
 });
