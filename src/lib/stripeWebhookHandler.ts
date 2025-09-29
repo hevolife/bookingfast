@@ -33,40 +33,21 @@ export class StripeWebhookHandler {
       let booking = null;
       let findError = null;
 
-      // Priorité 1: Chercher par booking_id si disponible
-      if (metadata.booking_id && metadata.booking_id.trim() !== '') {
-        console.log('🔍 Recherche par booking_id:', metadata.booking_id);
-        const result = await supabase
-          .from('bookings')
-          .select('*')
-          .eq('id', metadata.booking_id.trim())
-          .maybeSingle();
-        
-        booking = result.data;
-        findError = result.error;
-        
-        if (booking) {
-          console.log('✅ Réservation trouvée par ID:', booking.id);
-        }
-      }
+      // Rechercher par email, date et heure (méthode principale)
+      console.log('🔍 Recherche réservation par email/date/heure');
+      const result = await supabase
+        .from('bookings')
+        .select('*')
+        .eq('client_email', customerEmail)
+        .eq('date', metadata.date || metadata.booking_date)
+        .eq('time', metadata.time || metadata.booking_time)
+        .maybeSingle();
       
-      // Priorité 2: Chercher par email, date et heure si pas trouvé par ID
-      if (!booking && !findError) {
-        console.log('🔍 Recherche par email/date/heure');
-        const result = await supabase
-          .from('bookings')
-          .select('*')
-          .eq('client_email', customerEmail)
-          .eq('date', metadata.date || metadata.booking_date)
-          .eq('time', metadata.time || metadata.booking_time)
-          .maybeSingle();
-        
-        booking = result.data;
-        findError = result.error;
-        
-        if (booking) {
-          console.log('✅ Réservation trouvée par email/date/heure:', booking.id);
-        }
+      booking = result.data;
+      findError = result.error;
+      
+      if (booking) {
+        console.log('✅ Réservation trouvée:', booking.id);
       }
 
       if (findError || !booking) {
@@ -74,7 +55,6 @@ export class StripeWebhookHandler {
           email: customerEmail,
           date: metadata.date || metadata.booking_date,
           time: metadata.time || metadata.booking_time,
-          booking_id: metadata.booking_id,
           error: findError
         });
         return;
