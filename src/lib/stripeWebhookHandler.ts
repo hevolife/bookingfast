@@ -72,7 +72,7 @@ export class StripeWebhookHandler {
         .update({
           payment_status: newPaymentStatus,
           payment_amount: totalPaid,
-          transactions: updatedTransactions,
+          transactions: newTransactions,
           updated_at: new Date().toISOString()
         })
         .eq('client_email', customerEmail)
@@ -92,16 +92,6 @@ export class StripeWebhookHandler {
 
       console.log('✅ PAIEMENT TRAITÉ ET SAUVÉ EN BASE !');
       console.log('📊 Lignes mises à jour:', updateResult.length);
-        .from('bookings')
-        .update({
-          payment_status: newPaymentStatus,
-          payment_amount: totalPaid,
-          transactions: newTransactions,
-          updated_at: new Date().toISOString()
-        })
-        .eq('client_email', customerEmail)
-        .eq('date', searchDate)
-        .eq('time', searchTime);
 
       if (updateError) {
         console.error('❌ Erreur mise à jour:', updateError);
