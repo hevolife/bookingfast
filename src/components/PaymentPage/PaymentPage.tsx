@@ -20,6 +20,7 @@ export function PaymentPage() {
   const date = searchParams.get('date');
   const time = searchParams.get('time');
   const expiresAt = searchParams.get('expires');
+  const userId = searchParams.get('user_id');
 
   // Vérifier si le lien de paiement existe encore
   useEffect(() => {
@@ -244,6 +245,7 @@ export function PaymentPage() {
               email: email,
               date: date,
               time: time,
+              user_id: userId,
             },
           }),
         });
