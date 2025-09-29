@@ -383,17 +383,9 @@ export function IframeBookingPage() {
               total_amount: totalAmount.toString(),
               deposit_amount: depositAmount.toString(),
               create_booking_after_payment: 'true',
-              attempt_timestamp: Date.now().toString(
-            }
-          }
-          )
-        }
-        )
-      }
-    }
-  }
-}),
+              attempt_timestamp: Date.now().toString(),
               prevent_duplicates: 'true'
+            }
           }),
         });
 
