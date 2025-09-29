@@ -5,6 +5,19 @@ import { useBusinessSettings } from '../../hooks/useBusinessSettings';
 import { sendPaymentLinkEmail } from '../../lib/workflowEngine';
 import { useAuth } from '../../contexts/AuthContext';
 
+// Fonction pour vérifier le statut d'un paiement Stripe
+const checkPaymentStatus = async (sessionId: string) => {
+  try {
+    // Simuler une vérification de statut
+    // En production, vous pourriez appeler une Edge Function pour vérifier le statut
+    console.log('🔍 Vérification statut paiement session:', sessionId);
+    return 'pending'; // ou 'completed'
+  } catch (error) {
+    console.error('Erreur vérification statut:', error);
+    return 'pending';
+  }
+};
+
 interface PaymentSectionProps {
   totalAmount: number;
   currentPaid: number;
@@ -169,18 +182,23 @@ export function PaymentSection({
     if (transaction.method !== 'stripe' || transaction.status !== 'pending') return;
     
     try {
-      // Reconstituer le lien de paiement
+      // Reconstituer le lien de paiement avec user_id
       const expiryMinutes = settings?.payment_link_expiry_minutes || 30;
       const expiresAt = new Date(transaction.created_at).getTime() + (expiryMinutes * 60 * 1000);
       const paymentUrl = new URL('/payment', window.location.origin);
       
       paymentUrl.searchParams.set('amount', transaction.amount.toString());
       paymentUrl.searchParams.set('service', serviceName);
-      paymentUrl.searchParams.set('client', `Client`);
+      paymentUrl.searchParams.set('client', `${clientEmail.split('@')[0]}`);
       paymentUrl.searchParams.set('email', clientEmail);
       paymentUrl.searchParams.set('date', bookingDate);
       paymentUrl.searchParams.set('time', bookingTime);
       paymentUrl.searchParams.set('expires', expiresAt.toString());
+      
+      // Ajouter l'user_id pour la cohérence
+      if (user?.id) {
+        paymentUrl.searchParams.set('user_id', user.id);
+      }
       
       await navigator.clipboard.writeText(paymentUrl.toString());
       alert('Lien de paiement copié dans le presse-papiers !');
