@@ -154,15 +154,39 @@ export class StripeWebhookHandler {
       // ÉTAPE 6: Mise à jour SIMPLE en base
       console.log('🔄 MISE À JOUR SIMPLE EN BASE...');
       
+      const updateData = {
+        payment_status: newPaymentStatus,
+        payment_amount: totalPaid,
+        transactions: updatedTransactions
+      };
+
+      // APPROCHE DIRECTE - Mise à jour sans vérification RLS
+      const { data: updateResult, error: updateError } = await supabase
+        .from('bookings')
+        .update(updateData)
+        .eq('id', targetBooking.id)
+        .eq('client_email', customerEmail)
+        .eq('date', searchDate)
+        .eq('time', searchTime)
+        .select();
+
+      if (updateError) {
+        console.error('❌ ERREUR MISE À JOUR DIRECTE:', updateError);
+        console.log('🔍 TENTATIVE AVEC CRITÈRES MULTIPLES...');
+        
         // TENTATIVE ALTERNATIVE - Mise à jour par email/date/time
         const { data: altUpdateResult, error: altUpdateError } = await supabase
-        .update({
-          .update(updateData)
+          .from('bookings')
+          .update({
+            payment_status: newPaymentStatus,
+            payment_amount: totalPaid,
+            transactions: updatedTransactions
+          })
           .eq('client_email', customerEmail)
           .eq('date', searchDate)
           .eq('time', searchTime)
           .select();
-          payment_amount: totalPaid,
+          
         if (altUpdateError) {
           console.error('❌ ERREUR MISE À JOUR ALTERNATIVE:', altUpdateError);
           throw altUpdateError;
@@ -171,13 +195,18 @@ export class StripeWebhookHandler {
         if (!altUpdateResult || altUpdateResult.length === 0) {
           console.error('❌ ÉCHEC TOTAL - Aucune réservation mise à jour');
           throw new Error('Impossible de mettre à jour la réservation');
-      }
-          console.log('✅ MISE À JOUR ALTERNATIVE RÉUSSIE');
-          console.log('📊 Lignes affectées:', altUpdateResult.length);
-      if (!updateResult || updateResult.length === 0) {
+        }
+        
+        console.log('✅ MISE À JOUR ALTERNATIVE RÉUSSIE');
+        console.log('📊 Lignes affectées:', altUpdateResult.length);
       } else {
-        console.log('✅ RÉSERVATION MISE À JOUR AVEC SUCCÈS');
-        console.log('📊 Lignes affectées:', updateResult.length);
+        if (!updateResult || updateResult.length === 0) {
+          console.error('❌ AUCUNE LIGNE MISE À JOUR');
+          console.log('🔍 TENTATIVE AVEC CRITÈRES MULTIPLES...');
+        } else {
+          console.log('✅ RÉSERVATION MISE À JOUR AVEC SUCCÈS');
+          console.log('📊 Lignes affectées:', updateResult.length);
+        }
       }
 
       console.log('📊 Nouveau statut:', {
@@ -189,15 +218,13 @@ export class StripeWebhookHandler {
 
       // ÉTAPE 7: Déclencher rafraîchissement
       setTimeout(() => {
-      // APPROCHE DIRECTE - Mise à jour sans vérification RLS
-      const { data: updateResult, error: updateError } = await supabase
-        .from('bookings')
-        .update(updateData)
-        .eq('id', targetBooking.id)
-        .eq('client_email', customerEmail)
-        .eq('date', searchDate)
-        .eq('time', searchTime)
-        .select();
+        console.log('🔄 Rafraîchissement automatique après paiement');
+        window.dispatchEvent(new CustomEvent('refreshBookings'));
+      }, 2000);
+
+      console.log('✅ TRAITEMENT WEBHOOK TERMINÉ AVEC SUCCÈS');
+
+    } catch (error) {
       console.error('❌ ERREUR TRAITEMENT WEBHOOK:', error);
       
       // Déclencher quand même un rafraîchissement en cas d'erreur
@@ -216,9 +243,5 @@ export class StripeWebhookHandler {
     
     console.log('🔄 Synchronisation paiements Stripe pour', bookings.length, 'réservations');
     return bookings; // Retourner tel quel, la sync se fait via webhook
-        console.error('❌ AUCUNE LIGNE MISE À JOUR');
-        console.log('🔍 TENTATIVE AVEC CRITÈRES MULTIPLES...');
+  }
 }
-      const { data: updateResult, error: updateError } = await supabase
-        .from('bookings')
-        .update({
