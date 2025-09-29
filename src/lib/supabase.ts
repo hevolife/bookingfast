@@ -51,7 +51,7 @@ export const isSupabaseConfigured = () => {
     supabaseAnonKey && 
     supabaseUrl !== 'https://placeholder.supabase.co' && 
     supabaseAnonKey !== 'placeholder-key' &&
-    (supabaseUrl.includes('.supabase.co') || supabaseUrl.includes('localhost') || supabaseUrl.includes('sslip.io') || supabaseUrl.includes('hevolife.fr') || /^\d+\.\d+\.\d+\.\d+/.test(supabaseUrl)) &&
+    (supabaseUrl.includes('.supabase.co') || supabaseUrl.includes('localhost') || supabaseUrl.includes('sslip.io') || supabaseUrl.includes('hevolife.fr') || supabaseUrl.includes('bookingfast.hevolife.fr') || /^\d+\.\d+\.\d+\.\d+/.test(supabaseUrl)) &&
     supabaseAnonKey.length > 20
   );
   
@@ -59,7 +59,7 @@ export const isSupabaseConfigured = () => {
     console.warn('⚠️ Supabase non configuré:', {
       hasUrl: !!supabaseUrl,
       hasKey: !!supabaseAnonKey,
-      urlValid: supabaseUrl?.includes('.supabase.co') || supabaseUrl?.includes('localhost') || supabaseUrl?.includes('sslip.io') || supabaseUrl?.includes('hevolife.fr') || /^\d+\.\d+\.\d+\.\d+/.test(supabaseUrl || ''),
+      urlValid: supabaseUrl?.includes('.supabase.co') || supabaseUrl?.includes('localhost') || supabaseUrl?.includes('sslip.io') || supabaseUrl?.includes('hevolife.fr') || supabaseUrl?.includes('bookingfast.hevolife.fr') || /^\d+\.\d+\.\d+\.\d+/.test(supabaseUrl || ''),
       keyLength: supabaseAnonKey?.length
     });
   }

@@ -340,7 +340,12 @@ export function IframeBookingPage() {
       if (isSupabaseConfigured()) {
         // Vérifier que Stripe est configuré
         if (!data.settings?.stripe_enabled || !data.settings?.stripe_public_key || !data.settings?.stripe_secret_key) {
-          throw new Error('Le paiement en ligne n\'est pas configuré. Contactez l\'établissement.');
+          console.error('❌ Configuration Stripe manquante:', {
+            stripe_enabled: data.settings?.stripe_enabled,
+            has_public_key: !!data.settings?.stripe_public_key,
+            has_secret_key: !!data.settings?.stripe_secret_key
+          });
+          throw new Error('Le paiement en ligne n\'est pas configuré. Contactez l\'établissement pour activer les paiements Stripe.');
         }
         
         console.log('💳 REDIRECTION UNIQUE vers Stripe pour paiement acompte...');
@@ -348,6 +353,11 @@ export function IframeBookingPage() {
         console.log('🆔 ID tentative UNIQUE:', attemptId);
         
         const supabaseUrl = import.meta.env.VITE_SUPABASE_URL;
+        
+        if (!supabaseUrl || supabaseUrl === 'https://placeholder.supabase.co') {
+          throw new Error('Configuration Supabase manquante. Veuillez configurer VITE_SUPABASE_URL.');
+        }
+        
         const response = await fetch(`${supabaseUrl}/functions/v1/stripe-checkout`, {
           method: 'POST',
           headers: {
@@ -401,8 +411,16 @@ export function IframeBookingPage() {
             return;
           }
         } else {
-          const errorData = await response.json();
-          throw new Error(errorData.error || 'Erreur lors de la création de la session de paiement');
+          let errorMessage = 'Erreur lors de la création de la session de paiement';
+          try {
+            const errorData = await response.json();
+            errorMessage = errorData.error || errorMessage;
+            console.error('❌ Erreur détaillée Stripe:', errorData);
+          } catch (parseError) {
+            console.error('❌ Erreur parsing réponse:', parseError);
+            errorMessage = `Erreur HTTP ${response.status}: ${response.statusText}`;
+          }
+          throw new Error(errorMessage);
         }
       } else {
         // 🎭 Mode démo - simuler la redirection Stripe
