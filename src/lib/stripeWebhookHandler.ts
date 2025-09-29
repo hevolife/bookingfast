@@ -106,6 +106,12 @@ export class StripeWebhookHandler {
             console.log('✅ Réservation mise à jour après paiement Stripe:', booking.id);
           } catch (error) {
             console.error('❌ Erreur mise à jour réservation:', error);
+          } finally {
+            // Forcer un rafraîchissement de l'interface après mise à jour
+            setTimeout(() => {
+              console.log('🔄 Déclenchement rafraîchissement post-sync Stripe');
+              window.dispatchEvent(new CustomEvent('refreshBookings'));
+            }, 100);
           }
         }
       }
