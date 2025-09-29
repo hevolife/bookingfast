@@ -244,6 +244,13 @@ export function PaymentPage() {
           throw new Error('Configuration Stripe non trouvée');
         }
 
+        // Stocker l'ID de session pour le traitement du succès
+        sessionStorage.setItem('stripe_session_id', session.id);
+        sessionStorage.setItem('payment_amount', amount);
+        sessionStorage.setItem('payment_email', email);
+        sessionStorage.setItem('payment_date', date);
+        sessionStorage.setItem('payment_time', time);
+
         // Utiliser le gestionnaire de paiements côté client
         await ClientPaymentManager.createCheckoutSession({
           amount: parseFloat(amount),

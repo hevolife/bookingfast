@@ -59,6 +59,7 @@ export class ClientPaymentManager {
           'success_url': `${window.location.origin}/payment-success`,
           'cancel_url': `${window.location.origin}/payment-cancel`,
           'customer_email': customerEmail,
+          'success_url': `${window.location.origin}/payment-success?session_id={CHECKOUT_SESSION_ID}&amount=${amount}&email=${customerEmail}&date=${metadata.date}&time=${metadata.time}`,
           ...Object.entries(metadata).reduce((acc, [key, value]) => {
             acc[`metadata[${key}]`] = value;
             return acc;
