@@ -3,30 +3,19 @@ import { CheckCircle, Calendar, ArrowLeft } from 'lucide-react';
 import { useSearchParams } from 'react-router-dom';
 import { StripeWebhookHandler } from '../../lib/stripeWebhookHandler';
 
-export function PaymentSuccess() {
-  const [searchParams] = useSearchParams();
-  const bookingId = searchParams.get('booking_id');
-  const sessionId = searchParams.get('session_id');
-  
-  // Traiter le paiement réussi au chargement de la page
-  React.useEffect(() => {
-    let processed = false; // Flag pour éviter les traitements multiples
-    
-    const processSuccessfulPayment = async () => {
-      if (sessionId && !processed) {
+        console.log('💳 TRAITEMENT PAIEMENT SIMPLE - SESSION:', sessionId);
+        
         processed = true; // Marquer comme traité immédiatement
         
         try {
-          console.log('🔄 TRAITEMENT PAIEMENT RÉUSSI - SESSION:', sessionId);
+          amount_total: parseFloat(searchParams.get('amount') || '0') * 100,
           console.log('📊 Paramètres URL:', {
             sessionId,
             amount: searchParams.get('amount'),
             email: searchParams.get('email'),
             date: searchParams.get('date'),
             time: searchParams.get('time'),
-            bookingId: bookingId
-          });
-          
+            booking_id: bookingId
           // Préparer les données de session pour le traitement
           const sessionData = {
             id: sessionId,
@@ -65,30 +54,13 @@ export function PaymentSuccess() {
             window.dispatchEvent(new CustomEvent('refreshBookings'));
           }, 3000);
           
-        } catch (error) {
+        // Rafraîchissement simple
           console.error('❌ ERREUR TRAITEMENT PAIEMENT:', error);
-          
           // Rafraîchissement de secours
-          setTimeout(() => {
-            console.log('🔄 RAFRAÎCHISSEMENT DE SECOURS');
-            window.dispatchEvent(new CustomEvent('refreshBookings'));
-          }, 1000);
-        }
-      }
-    };
-    
-    processSuccessfulPayment();
-  }, [sessionId, searchParams]);
-  
+        }, 1000);
   const handleBackToHome = () => {
     // Fermer la fenêtre ou rediriger vers une page de confirmation
-    // Fermer l'onglet de paiement et retourner à la page de réservation
-    window.close();
-    
-    // Si la fermeture échoue (bloquée par le navigateur), rediriger
-    setTimeout(() => {
-      if (!window.closed) {
-        window.location.href = '/';
+        console.error('❌ Erreur paiement:', error);
       }
     }, 100);
   };
@@ -101,10 +73,8 @@ export function PaymentSuccess() {
           <CheckCircle className="w-12 h-12 text-white" />
         </div>
 
-        {/* Success Message */}
-        <h1 className="text-3xl font-bold text-gray-900 mb-4">
           Paiement réussi !
-        </h1>
+        console.log('✅ PAIEMENT SIMPLE TRAITÉ');
         
         <p className="text-gray-600 text-lg mb-6">
           Votre acompte a été payé avec succès ! Votre réservation est maintenant confirmée.
