@@ -111,11 +111,12 @@ export class StripeWebhookHandler {
         }
       } else {
         console.log('✅ RÉSERVATION CONFIRMÉE EN BASE:', verifyBooking.id);
-        booking = verifyBooking;
+        // Utiliser les données vérifiées
+        const verifiedBooking = verifyBooking;
       }
 
       // ÉTAPE 2: Vérifier si déjà traité
-      const existingTransactions = booking.transactions || [];
+      const existingTransactions = verifiedBooking.transactions || [];
       const alreadyProcessed = existingTransactions.some((t: any) => 
         t.method === 'stripe' && 
         t.status === 'completed' &&
@@ -168,7 +169,7 @@ export class StripeWebhookHandler {
         .reduce((sum: number, t: any) => sum + t.amount, 0);
       
       let newPaymentStatus: 'pending' | 'partial' | 'completed' = 'pending';
-      if (totalPaid >= booking.total_amount) {
+      if (totalPaid >= verifiedBooking.total_amount) {
         newPaymentStatus = 'completed';
       } else if (totalPaid > 0) {
         newPaymentStatus = 'partial';
@@ -176,7 +177,7 @@ export class StripeWebhookHandler {
 
       console.log('💰 CALCULS:', {
         totalPaid: totalPaid.toFixed(2),
-        totalAmount: booking.total_amount.toFixed(2),
+        totalAmount: verifiedBooking.total_amount.toFixed(2),
         newPaymentStatus
       });
 
@@ -192,7 +193,7 @@ export class StripeWebhookHandler {
           booking_status: 'confirmed',
           updated_at: new Date().toISOString()
         })
-        .eq('id', booking.id);
+        .eq('id', verifiedBooking.id);
 
       if (updateError) {
         console.error('❌ Erreur mise à jour:', updateError);
@@ -201,7 +202,7 @@ export class StripeWebhookHandler {
 
       console.log('✅ RÉSERVATION MISE À JOUR AVEC SUCCÈS');
       console.log('📊 Nouveau statut:', {
-        id: booking.id,
+        id: verifiedBooking.id,
         payment_status: newPaymentStatus,
         payment_amount: totalPaid,
         transactions_count: updatedTransactions.length
