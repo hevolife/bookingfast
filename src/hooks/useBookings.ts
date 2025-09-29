@@ -416,6 +416,7 @@ export function useBookings(date?: string) {
   useEffect(() => {
     const handleRefreshBookings = () => {
       console.log('🔄 Rafraîchissement manuel des réservations demandé');
+      setLastInteraction(Date.now()); // Mettre à jour l'interaction pour éviter l'auto-refresh
       fetchBookings();
     };
 

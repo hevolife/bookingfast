@@ -34,10 +34,21 @@ export function PaymentSuccess() {
           await StripeWebhookHandler.processStripeWebhook(mockSessionData);
           console.log('✅ Paiement traité avec succès');
           
-          // Déclencher un rafraîchissement des réservations
+          // Déclencher plusieurs rafraîchissements pour s'assurer de la mise à jour
           setTimeout(() => {
+            console.log('🔄 Déclenchement rafraîchissement 1/3');
             window.dispatchEvent(new CustomEvent('refreshBookings'));
-          }, 1000);
+          }, 500);
+          
+          setTimeout(() => {
+            console.log('🔄 Déclenchement rafraîchissement 2/3');
+            window.dispatchEvent(new CustomEvent('refreshBookings'));
+          }, 1500);
+          
+          setTimeout(() => {
+            console.log('🔄 Déclenchement rafraîchissement 3/3');
+            window.dispatchEvent(new CustomEvent('refreshBookings'));
+          }, 3000);
           
         } catch (error) {
           console.error('❌ Erreur traitement paiement réussi:', error);
