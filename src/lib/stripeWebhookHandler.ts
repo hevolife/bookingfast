@@ -178,7 +178,7 @@ export class StripeWebhookHandler {
           transactions: updatedTransactions,
           updated_at: new Date().toISOString()
         })
-        .eq('client_email', customerEmail)
+        .eq('id', targetBooking.id)
         .eq('date', searchDate)
         .eq('time', searchTime)
         .select();
