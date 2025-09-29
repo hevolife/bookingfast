@@ -221,6 +221,8 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
         // Améliorer les messages d'erreur
         if (error.message.includes('Invalid login credentials')) {
           throw new Error('Email ou mot de passe incorrect. Vérifiez vos identifiants.');
+        } else if (error.message.includes('Invalid authentication credentials')) {
+          throw new Error('Email ou mot de passe incorrect. Vérifiez vos identifiants.');
         } else if (error.message.includes('Email not confirmed')) {
           throw new Error('Veuillez confirmer votre email avant de vous connecter.');
         } else if (error.message.includes('Too many requests')) {
