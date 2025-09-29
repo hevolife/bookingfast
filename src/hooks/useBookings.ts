@@ -420,8 +420,22 @@ export function useBookings(date?: string) {
       fetchBookings();
     };
 
+    const handleForceRefresh = () => {
+      console.log('🔄 RAFRAÎCHISSEMENT FORCÉ DÉTECTÉ');
+      setLastInteraction(Date.now());
+      // Forcer un rechargement immédiat
+      setTimeout(() => {
+        console.log('🔄 EXÉCUTION RAFRAÎCHISSEMENT FORCÉ');
+        fetchBookings();
+      }, 100);
+    };
     window.addEventListener('refreshBookings', handleRefreshBookings);
+    window.addEventListener('forceRefreshBookings', handleForceRefresh);
     return () => window.removeEventListener('refreshBookings', handleRefreshBookings);
+    return () => {
+      window.removeEventListener('refreshBookings', handleRefreshBookings);
+      window.removeEventListener('forceRefreshBookings', handleForceRefresh);
+    };
   }, []);
 
   // Mettre à jour lastInteraction lors des interactions utilisateur
