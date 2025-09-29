@@ -3,12 +3,21 @@ import { CheckCircle, Calendar, ArrowLeft } from 'lucide-react';
 import { useSearchParams } from 'react-router-dom';
 import { StripeWebhookHandler } from '../../lib/stripeWebhookHandler';
 
+export default function PaymentSuccess() {
+  const [searchParams] = useSearchParams();
+  const sessionId = searchParams.get('session_id');
+  const bookingId = searchParams.get('booking_id');
+  
+  React.useEffect(() => {
+    let processed = false;
+    
+    if (sessionId && !processed) {
+      (async () => {
         console.log('💳 TRAITEMENT PAIEMENT SIMPLE - SESSION:', sessionId);
         
         processed = true; // Marquer comme traité immédiatement
         
         try {
-          amount_total: parseFloat(searchParams.get('amount') || '0') * 100,
           console.log('📊 Paramètres URL:', {
             sessionId,
             amount: searchParams.get('amount'),
@@ -16,6 +25,8 @@ import { StripeWebhookHandler } from '../../lib/stripeWebhookHandler';
             date: searchParams.get('date'),
             time: searchParams.get('time'),
             booking_id: bookingId
+          });
+          
           // Préparer les données de session pour le traitement
           const sessionData = {
             id: sessionId,
@@ -54,15 +65,31 @@ import { StripeWebhookHandler } from '../../lib/stripeWebhookHandler';
             window.dispatchEvent(new CustomEvent('refreshBookings'));
           }, 3000);
           
-        // Rafraîchissement simple
+        } catch (error) {
+          // Rafraîchissement simple
           console.error('❌ ERREUR TRAITEMENT PAIEMENT:', error);
           // Rafraîchissement de secours
-        }, 1000);
+          setTimeout(() => {
+            window.dispatchEvent(new CustomEvent('refreshBookings'));
+          }, 1000);
+        }
+      })();
+    }
+  }, [sessionId, searchParams, bookingId]);
+
   const handleBackToHome = () => {
     // Fermer la fenêtre ou rediriger vers une page de confirmation
-        console.error('❌ Erreur paiement:', error);
+    try {
+      if (window.opener) {
+        window.close();
+      } else {
+        window.location.href = '/';
       }
-    }, 100);
+    } catch (error) {
+      setTimeout(() => {
+        console.error('❌ Erreur paiement:', error);
+      }, 100);
+    }
   };
 
   return (
@@ -73,8 +100,9 @@ import { StripeWebhookHandler } from '../../lib/stripeWebhookHandler';
           <CheckCircle className="w-12 h-12 text-white" />
         </div>
 
+        <h1 className="text-3xl font-bold text-gray-800 mb-4">
           Paiement réussi !
-        console.log('✅ PAIEMENT SIMPLE TRAITÉ');
+        </h1>
         
         <p className="text-gray-600 text-lg mb-6">
           Votre acompte a été payé avec succès ! Votre réservation est maintenant confirmée.
