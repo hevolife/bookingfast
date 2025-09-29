@@ -203,47 +203,18 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
     }
 
     console.log('🔑 Tentative de connexion pour:', email);
-    console.log('🔗 URL Supabase utilisée:', import.meta.env.VITE_SUPABASE_URL);
     
-    try {
-      const { data, error } = await supabase.auth.signInWithPassword({
-        email: email.trim().toLowerCase(),
-        password,
-      });
+    const { data, error } = await supabase.auth.signInWithPassword({
+      email: email.trim(),
+      password,
+    });
 
-      if (error) {
-        console.error('❌ Erreur de connexion détaillée:', {
-          message: error.message,
-          status: error.status,
-          details: error
-        });
-        
-        // Améliorer les messages d'erreur
-        if (error.message.includes('Invalid login credentials')) {
-          throw new Error('Email ou mot de passe incorrect. Vérifiez vos identifiants.');
-        } else if (error.message.includes('Invalid authentication credentials')) {
-          throw new Error('Email ou mot de passe incorrect. Vérifiez vos identifiants.');
-        } else if (error.message.includes('Email not confirmed')) {
-          throw new Error('Veuillez confirmer votre email avant de vous connecter.');
-        } else if (error.message.includes('Too many requests')) {
-          throw new Error('Trop de tentatives. Veuillez patienter quelques minutes.');
-        } else {
-          throw new Error(`Erreur d'authentification: ${error.message}`);
-        }
-      }
-
-      console.log('✅ Connexion réussie pour:', data.user?.email);
-    } catch (networkError: any) {
-      console.error('❌ Erreur réseau lors de la connexion:', networkError);
-      
-      // Si c'est déjà une erreur d'authentification formatée, on la relance
-      if (networkError.message && networkError.message.includes('Erreur d\'authentification:')) {
-        throw networkError;
-      }
-      
-      // Pour les autres erreurs (réseau, etc.), message générique
-      throw new Error('Impossible de se connecter au serveur. Vérifiez votre connexion internet et la configuration Supabase.');
+    if (error) {
+      console.error('❌ Erreur de connexion:', error);
+      throw error;
     }
+
+    console.log('✅ Connexion réussie pour:', data.user?.email);
   };
 
   const signUp = async (email: string, password: string) => {

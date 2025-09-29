@@ -56,19 +56,19 @@ export function LoginPage() {
         return;
       }
     } catch (err) {
-      let errorMessage = 'Une erreur est survenue lors de la connexion';
+      let errorMessage = 'Une erreur est survenue';
       
       if (err instanceof Error) {
-        errorMessage = err.message;
+        if (err.message.includes('Invalid login credentials')) {
+          errorMessage = 'Email ou mot de passe incorrect. Vérifiez vos identifiants.';
+        } else if (err.message.includes('Email not confirmed')) {
+          errorMessage = 'Veuillez confirmer votre email avant de vous connecter.';
+        } else if (err.message.includes('Too many requests')) {
+          errorMessage = 'Trop de tentatives. Veuillez patienter quelques minutes.';
+        } else {
+          errorMessage = err.message;
+        }
       }
-      
-      // Ajouter des informations de debug pour le self-hosting
-      console.error('🔍 Debug info pour self-hosting:', {
-        supabaseUrl: import.meta.env.VITE_SUPABASE_URL,
-        hasAnonKey: !!import.meta.env.VITE_SUPABASE_ANON_KEY,
-        email: email,
-        error: err
-      });
       
       setError(errorMessage);
     } finally {
