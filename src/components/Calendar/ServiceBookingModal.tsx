@@ -1,5 +1,5 @@
 import React from 'react';
-import { X, Clock, User, Mail, Phone, CreditCard, Edit, Trash2, Calendar } from 'lucide-react';
+import { X, Clock, User, Mail, Phone, CreditCard, CreditCard as Edit, Trash2, Calendar } from 'lucide-react';
 import { Booking } from '../../types';
 
 interface ServiceBookingModalProps {
@@ -37,7 +37,7 @@ export function ServiceBookingModal({
       case 'completed':
         return 'bg-gradient-to-r from-green-100 to-emerald-100 text-green-700 border-green-200';
       case 'partial':
-        return 'bg-gradient-to-r from-blue-100 to-cyan-100 text-blue-700 border-blue-200';
+        return 'bg-gradient-to-r from-orange-100 to-yellow-100 text-orange-700 border-orange-200';
       default:
         return 'bg-gradient-to-r from-red-100 to-pink-100 text-red-700 border-red-200';
     }
@@ -48,7 +48,7 @@ export function ServiceBookingModal({
       case 'completed':
         return '✅ Payé';
       case 'partial':
-        return '💵 Partiellement';
+        return '⏳ Acompte';
       default:
         return '❌ Non payé';
     }
