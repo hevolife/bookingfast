@@ -242,21 +242,9 @@ export function LoginPage() {
             <button
               type="button"
               onClick={toggleMode}
-              className="text-purple-600 hover:text-purple-800 font-bold text-lg hover:underline transition-all duration-300"
+              className="text-purple-600 hover:text-purple-800 font-bold text-lg hover:underline transition-all duration-300 text-center w-full"
             >
               {isLogin ? 'Créer un compte' : 'Se connecter'}
-            </button>
-          </div>
-
-          {/* Mode démo */}
-          <div className="mt-6 text-center">
-            <div className="text-gray-600 mb-3">Ou découvrez l'application</div>
-            <button
-              type="button"
-              onClick={() => navigate('/landing')}
-              className="text-blue-600 hover:text-blue-800 font-medium hover:underline transition-all duration-300"
-            >
-              Voir la page de présentation
             </button>
           </div>
 
