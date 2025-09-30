@@ -305,7 +305,13 @@ Deno.serve(async (req) => {
             finalTransactions.push(newTransaction)
           }
           
-          const newTotalPaid = amountPaid + (existingBooking.payment_amount || 0)
+          // Calculer le nouveau montant total payé depuis TOUTES les transactions finales
+          const newTotalPaid = finalTransactions
+            .filter(t => t.status === 'completed' || t.status === 'success')
+            .reduce((sum, t) => sum + t.amount, 0)
+          const newTotalPaid = finalTransactions
+            .filter(t => t.status === 'completed' || t.status === 'success')
+            .reduce((sum, t) => sum + t.amount, 0)
           const totalAmount = existingBooking.total_amount
 
           let newPaymentStatus = 'pending'
@@ -799,9 +805,10 @@ Deno.serve(async (req) => {
         finalTransactions.push(newTransaction)
       }
 
-      // Calculer le nouveau montant payé
-      const completedTransactions = finalTransactions.filter((t: any) => t.status === 'completed' || !t.status)
-      const newTotalPaid = completedTransactions.reduce((sum: number, t: any) => sum + t.amount, 0)
+      // Calculer le nouveau montant total payé depuis TOUTES les transactions finales
+      const newTotalPaid = finalTransactions
+        .filter((t: any) => t.status === 'completed' || t.status === 'success')
+        .reduce((sum: number, t: any) => sum + t.amount, 0)
       const totalAmount = parseFloat(booking.total_amount)
 
       // Déterminer le nouveau statut de paiement
