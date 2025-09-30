@@ -248,11 +248,23 @@ export function useBookings(date?: string) {
         
         console.log('✅ Nouvelle réservation créée:', data.id);
         
-        // Déclencher le workflow immédiatement après création réussie
+        // Déclencher le workflow seulement si pas de lien de paiement en attente
+        const hasPendingStripeTransaction = data.transactions?.some(t => 
+          t.method === 'stripe' && t.status === 'pending'
+        );
+        
+        if (!hasPendingStripeTransaction) {
+          console.log('✅ Réservation sans lien de paiement - déclenchement workflow');
+        } else {
+          console.log('⏳ Réservation avec lien de paiement - workflow en attente');
+        }
+        
         try {
-          console.log('🚀 Déclenchement workflow booking_created pour:', data.client_email);
-          await triggerWorkflow('booking_created', data, user.id);
-          console.log('✅ Workflow booking_created déclenché avec succès');
+          if (!hasPendingStripeTransaction) {
+            console.log('🚀 Déclenchement workflow booking_created pour:', data.client_email);
+            await triggerWorkflow('booking_created', data, user.id);
+            console.log('✅ Workflow booking_created déclenché avec succès');
+          }
         } catch (workflowError) {
           console.error('❌ Erreur déclenchement workflow:', workflowError);
         }

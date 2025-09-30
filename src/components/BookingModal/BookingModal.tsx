@@ -366,9 +366,21 @@ export function BookingModal({
       } else {
         const newBooking = await addBooking(bookingData);
         
-        // Émettre l'événement de création immédiatement
+        // Émettre l'événement de création seulement si pas de lien de paiement en attente
         if (newBooking) {
-          bookingEvents.emit('bookingCreated', newBooking);
+          // Vérifier s'il y a des transactions Stripe en attente
+          const hasPendingStripeTransaction = newBooking.transactions?.some(t => 
+            t.method === 'stripe' && t.status === 'pending'
+          );
+          
+          if (!hasPendingStripeTransaction) {
+            // Pas de lien de paiement en attente → déclencher le workflow immédiatement
+            console.log('✅ Réservation créée sans lien de paiement - déclenchement workflow immédiat');
+            bookingEvents.emit('bookingCreated', newBooking);
+          } else {
+            // Lien de paiement en attente → attendre le paiement
+            console.log('⏳ Réservation créée avec lien de paiement - workflow en attente du paiement');
+          }
         }
       }
 
