@@ -7,7 +7,6 @@ import { Button } from '../UI/Button';
 export function ResetPasswordPage() {
   const [searchParams] = useSearchParams();
   const navigate = useNavigate();
-  const [urlParams, setUrlParams] = useState<URLSearchParams | null>(null);
   const [password, setPassword] = useState('');
   const [confirmPassword, setConfirmPassword] = useState('');
   const [showPassword, setShowPassword] = useState(false);
@@ -15,47 +14,96 @@ export function ResetPasswordPage() {
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [success, setSuccess] = useState(false);
+  const [tokens, setTokens] = useState<{
+    accessToken: string | null;
+    refreshToken: string | null;
+    type: string | null;
+    urlError: string | null;
+    errorDescription: string | null;
+  }>({
+    accessToken: null,
+    refreshToken: null,
+    type: null,
+    urlError: null,
+    errorDescription: null
+  });
 
-  // Parse URL fragments (Supabase uses # instead of ?)
+  // Parse URL fragments au chargement
   useEffect(() => {
-    const hash = window.location.hash.substring(1); // Remove #
+    const hash = window.location.hash.substring(1); // Enlever le #
+    console.log('🔍 Hash URL détecté:', hash);
+    
     if (hash) {
       const params = new URLSearchParams(hash);
-      setUrlParams(params);
+      console.log('📋 Paramètres parsés depuis hash:', {
+        access_token: params.get('access_token')?.substring(0, 20) + '...',
+        refresh_token: params.get('refresh_token'),
+        type: params.get('type'),
+        error: params.get('error')
+      });
+      
+      setTokens({
+        accessToken: params.get('access_token'),
+        refreshToken: params.get('refresh_token'),
+        type: params.get('type'),
+        urlError: params.get('error'),
+        errorDescription: params.get('error_description')
+      });
     } else {
-      // Fallback to search params
-      setUrlParams(searchParams);
+      // Fallback vers les paramètres de requête classiques
+      console.log('📋 Fallback vers search params');
+      setTokens({
+        accessToken: searchParams.get('access_token'),
+        refreshToken: searchParams.get('refresh_token'),
+        type: searchParams.get('type'),
+        urlError: searchParams.get('error'),
+        errorDescription: searchParams.get('error_description')
+      });
     }
   }, [searchParams]);
 
-  // Récupérer les tokens depuis l'URL (fragments ou query params)
-  const accessToken = urlParams?.get('access_token') || searchParams.get('access_token');
-  const refreshToken = urlParams?.get('refresh_token') || searchParams.get('refresh_token');
-  const type = urlParams?.get('type') || searchParams.get('type');
-  const urlError = urlParams?.get('error') || searchParams.get('error');
-  const errorDescription = urlParams?.get('error_description') || searchParams.get('error_description');
-
+  // Vérifier et configurer la session quand les tokens sont disponibles
   useEffect(() => {
+    const { accessToken, refreshToken, type, urlError, errorDescription } = tokens;
+    
+    console.log('🔐 Vérification tokens:', {
+      hasAccessToken: !!accessToken,
+      hasRefreshToken: !!refreshToken,
+      type: type,
+      hasError: !!urlError
+    });
+    
     // Vérifier s'il y a une erreur dans l'URL
     if (urlError) {
+      console.error('❌ Erreur dans URL:', urlError, errorDescription);
       setError(`Erreur de redirection: ${errorDescription || urlError}`);
       return;
     }
     
     // Vérifier que c'est bien une demande de réinitialisation
     if (type !== 'recovery' || !accessToken || !refreshToken) {
+      console.error('❌ Tokens manquants ou type incorrect:', { type, hasAccessToken: !!accessToken, hasRefreshToken: !!refreshToken });
       setError('Lien de réinitialisation invalide ou expiré');
       return;
     }
 
+    console.log('✅ Tokens valides détectés, configuration de la session...');
+    
     // Définir la session avec les tokens reçus
     if (isSupabaseConfigured()) {
       supabase.auth.setSession({
         access_token: accessToken,
         refresh_token: refreshToken
+      }).then(({ error: sessionError }) => {
+        if (sessionError) {
+          console.error('❌ Erreur configuration session:', sessionError);
+          setError('Erreur lors de la configuration de la session');
+        } else {
+          console.log('✅ Session configurée avec succès');
+        }
       });
     }
-  }, [accessToken, refreshToken, type]);
+  }, [tokens]);
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
@@ -120,7 +168,7 @@ export function ResetPasswordPage() {
   };
 
   // Vérifier la validité du lien
-  if (type !== 'recovery' || !accessToken || !refreshToken) {
+  if (tokens.type !== 'recovery' || !tokens.accessToken || !tokens.refreshToken) {
     return (
       <div className="min-h-screen bg-gradient-to-br from-red-50 via-pink-50 to-orange-50 flex items-center justify-center p-4">
         <div className="bg-white rounded-3xl shadow-2xl p-8 max-w-md w-full text-center">
@@ -131,6 +179,15 @@ export function ResetPasswordPage() {
           <p className="text-gray-600 text-lg mb-6">
             Ce lien de réinitialisation n'est pas valide ou a expiré.
           </p>
+          <div className="bg-gray-50 border border-gray-200 rounded-xl p-4 mb-6 text-left">
+            <h4 className="font-bold text-gray-800 mb-2">🔍 Informations de debug :</h4>
+            <div className="text-gray-700 text-xs space-y-1">
+              <div>• Type: {tokens.type || 'manquant'}</div>
+              <div>• Access token: {tokens.accessToken ? 'présent' : 'manquant'}</div>
+              <div>• Refresh token: {tokens.refreshToken ? 'présent' : 'manquant'}</div>
+              <div>• URL Error: {tokens.urlError || 'aucune'}</div>
+            </div>
+          </div>
           <button
             onClick={() => navigate('/login')}
             className="w-full bg-gradient-to-r from-blue-600 to-purple-600 text-white py-3 px-6 rounded-2xl font-medium hover:from-blue-700 hover:to-purple-700 transition-all duration-300"
