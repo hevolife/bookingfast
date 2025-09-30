@@ -19,13 +19,13 @@ export function ResetPasswordPage() {
   const accessToken = searchParams.get('access_token');
   const refreshToken = searchParams.get('refresh_token');
   const type = searchParams.get('type');
-  const error = searchParams.get('error');
+  const urlError = searchParams.get('error');
   const errorDescription = searchParams.get('error_description');
 
   useEffect(() => {
     // Vérifier s'il y a une erreur dans l'URL
-    if (error) {
-      setError(`Erreur de redirection: ${errorDescription || error}`);
+    if (urlError) {
+      setError(`Erreur de redirection: ${errorDescription || urlError}`);
       return;
     }
     
