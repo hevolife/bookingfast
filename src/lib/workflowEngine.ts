@@ -190,6 +190,19 @@ export const triggerWorkflow = async (trigger: string, booking: Booking, userId?
     })));
     console.log('💳 Payment status:', booking.payment_status);
     console.log('💳 Payment amount:', booking.payment_amount);
+    
+    // Vérifier si on a bien une transaction Stripe complétée
+    const hasStripePayment = booking.transactions?.some(t => 
+      t.method === 'stripe' && 
+      t.status === 'completed'
+    );
+    
+    console.log('💳 A transaction Stripe complétée:', hasStripePayment);
+    
+    if (!hasStripePayment) {
+      console.log('⚠️ AUCUNE TRANSACTION STRIPE COMPLÉTÉE - Workflow payment_link_paid ignoré');
+      return;
+    }
   }
   
   if (!isSupabaseConfigured()) {
