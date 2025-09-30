@@ -282,23 +282,7 @@ Deno.serve(async (req) => {
             created_at: new Date().toISOString()
           }
           
-          // 🔄 MARQUER LES LIENS DE PAIEMENT COMME PAYÉS
-          const updatedTransactions = existingTransactions.map(t => {
-            // Si c'est un lien Stripe en attente pour le même montant, le marquer comme payé
-            if (t.method === 'stripe' && 
-                t.status === 'pending' && 
-                Math.abs(t.amount - amountPaid) < 0.01) {
-              console.log('🔄 Marquage lien de paiement comme payé:', t.amount)
-              return {
-                ...t,
-                status: 'completed',
-                note: t.note.replace('En attente', 'Payé').replace('(expire dans', '(payé le')
-              }
-            }
-            return t
-          })
-          
-          const finalTransactions = [...updatedTransactions, newTransaction]
+          const finalTransactions = [...existingTransactions, newTransaction]
           const newTotalPaid = amountPaid + (existingBooking.payment_amount || 0)
           const totalAmount = existingBooking.total_amount
 
@@ -315,7 +299,7 @@ Deno.serve(async (req) => {
               payment_amount: newTotalPaid,
               payment_status: newPaymentStatus,
               booking_status: 'confirmed',
-              transactions: updatedTransactions,
+              transactions: finalTransactions,
               updated_at: new Date().toISOString()
             })
             .eq('id', existingBooking.id)
@@ -330,33 +314,6 @@ Deno.serve(async (req) => {
           
           // 🚀 DÉCLENCHER LES WORKFLOWS APRÈS MISE À JOUR RÉUSSIE
           try {
-            // 🎯 DÉCLENCHER WORKFLOW BOOKING_CREATED SI C'EST LE PREMIER PAIEMENT
-            if (existingBooking.payment_amount === 0 && newTotalPaid > 0) {
-              console.log('🎯 Premier paiement détecté - déclenchement workflow booking_created')
-              
-              const bookingCreatedResponse = await fetch(`${Deno.env.get('SUPABASE_URL')}/functions/v1/trigger-workflow`, {
-                method: 'POST',
-                headers: {
-                  'Content-Type': 'application/json',
-                  'Authorization': `Bearer ${Deno.env.get('SUPABASE_SERVICE_ROLE_KEY')}`,
-                },
-                body: JSON.stringify({
-                  trigger: 'booking_created',
-                  booking_data: updatedBookingData,
-                  user_id: metadata.user_id || existingBooking.user_id
-                })
-              })
-              
-              if (bookingCreatedResponse.ok) {
-                console.log('✅ Workflow booking_created déclenché avec succès après premier paiement')
-              } else {
-                const bookingWorkflowError = await bookingCreatedResponse.text()
-                console.error('❌ Erreur déclenchement workflow booking_created:', bookingWorkflowError)
-              }
-            } else {
-              console.log('ℹ️ Pas le premier paiement - workflow booking_created non déclenché')
-            }
-            
             console.log('🚀 Déclenchement workflow payment_completed pour:', customerEmail)
             
             // Récupérer les données complètes de la réservation mise à jour
@@ -380,7 +337,7 @@ Deno.serve(async (req) => {
                 body: JSON.stringify({
                   trigger: 'payment_completed',
                   booking_data: updatedBookingData,
-                  user_id: metadata.user_id || existingBooking.user_id
+                  user_id: metadata.user_id
                 })
               })
               
@@ -390,8 +347,6 @@ Deno.serve(async (req) => {
                 const workflowError = await workflowResponse.text()
                 console.error('❌ Erreur déclenchement workflow:', workflowError)
               }
-            } else {
-              console.error('❌ Impossible de récupérer les données complètes de la réservation')
             }
           } catch (workflowError) {
             console.error('❌ Erreur déclenchement workflow payment_completed:', workflowError)
@@ -518,23 +473,7 @@ Deno.serve(async (req) => {
                 created_at: new Date().toISOString()
               }
               
-              // 🔄 MARQUER LES LIENS DE PAIEMENT COMME PAYÉS ET AJOUTER LA NOUVELLE TRANSACTION
-              const updatedTransactions = existingTransactions.map(t => {
-                // Si c'est un lien Stripe en attente pour le même montant, le marquer comme payé
-                if (t.method === 'stripe' && 
-                    t.status === 'pending' && 
-                    Math.abs(t.amount - amountPaid) < 0.01) {
-                  console.log('🔄 Marquage lien de paiement comme payé:', t.amount)
-                  return {
-                    ...t,
-                    status: 'completed',
-                    note: t.note.replace('En attente', 'Payé').replace('(expire dans', '(payé le')
-                  }
-                }
-                return t
-              })
-              
-              const finalTransactions = [...updatedTransactions, newTransaction]
+              const finalTransactions = [...existingTransactions, newTransaction]
               const newTotalPaid = amountPaid + (conflictBooking.payment_amount || 0)
               const totalAmount = conflictBooking.total_amount
 
@@ -561,34 +500,7 @@ Deno.serve(async (req) => {
                 
                 // 🚀 DÉCLENCHER LES WORKFLOWS APRÈS MISE À JOUR RÉUSSIE
                 try {
-                  // 🎯 DÉCLENCHER WORKFLOW BOOKING_CREATED SI C'EST LE PREMIER PAIEMENT
-                  if (conflictBooking.payment_amount === 0 && newTotalPaid > 0) {
-                    console.log('🎯 Premier paiement détecté - déclenchement workflow booking_created')
-                    
-                    const bookingCreatedResponse = await fetch(`${Deno.env.get('SUPABASE_URL')}/functions/v1/trigger-workflow`, {
-                      method: 'POST',
-                      headers: {
-                        'Content-Type': 'application/json',
-                        'Authorization': `Bearer ${Deno.env.get('SUPABASE_SERVICE_ROLE_KEY')}`,
-                      },
-                      body: JSON.stringify({
-                        trigger: 'booking_created',
-                        booking_data: updatedBookingData,
-                        user_id: metadata.user_id
-                      })
-                    })
-                    
-                    if (bookingCreatedResponse.ok) {
-                      console.log('✅ Workflow booking_created déclenché avec succès après premier paiement')
-                    } else {
-                      const bookingWorkflowError = await bookingCreatedResponse.text()
-                      console.error('❌ Erreur déclenchement workflow booking_created:', bookingWorkflowError)
-                    }
-                  } else {
-                    console.log('ℹ️ Pas le premier paiement - workflow booking_created non déclenché')
-                  }
-                  
-                  console.log('🚀 Déclenchement workflow payment_completed pour:', customerEmail)
+                  console.log('🚀 Déclenchement workflow booking_updated pour:', customerEmail)
                   
                   // Récupérer les données complètes de la réservation mise à jour
                   const { data: updatedBookingData, error: fetchError } = await supabaseClient
@@ -621,8 +533,6 @@ Deno.serve(async (req) => {
                       const workflowError = await workflowResponse.text()
                       console.error('❌ Erreur déclenchement workflow:', workflowError)
                     }
-                  } else {
-                    console.error('❌ Impossible de récupérer les données complètes de la réservation')
                   }
                 } catch (workflowError) {
                   console.error('❌ Erreur déclenchement workflow payment_completed:', workflowError)
@@ -658,7 +568,7 @@ Deno.serve(async (req) => {
         
         // 🚀 DÉCLENCHER LES WORKFLOWS APRÈS CRÉATION RÉUSSIE
         try {
-          console.log('🚀 Déclenchement workflows pour:', customerEmail)
+          console.log('🚀 Déclenchement workflow booking_created pour:', customerEmail)
           
           // Récupérer les données complètes de la réservation avec le service
           const { data: completeBookingData, error: fetchError } = await supabaseClient
@@ -671,7 +581,7 @@ Deno.serve(async (req) => {
             .single()
           
           if (!fetchError && completeBookingData) {
-            // 1. Déclencher le workflow payment_completed
+            // Appeler la fonction de workflow via Edge Function
             const workflowResponse = await fetch(`${Deno.env.get('SUPABASE_URL')}/functions/v1/trigger-workflow`, {
               method: 'POST',
               headers: {
@@ -690,27 +600,6 @@ Deno.serve(async (req) => {
             } else {
               const workflowError = await workflowResponse.text()
               console.error('❌ Erreur déclenchement workflow:', workflowError)
-            }
-            
-            // 2. Déclencher aussi le workflow payment_completed
-            const paymentWorkflowResponse = await fetch(`${Deno.env.get('SUPABASE_URL')}/functions/v1/trigger-workflow`, {
-              method: 'POST',
-              headers: {
-                'Content-Type': 'application/json',
-                'Authorization': `Bearer ${Deno.env.get('SUPABASE_SERVICE_ROLE_KEY')}`,
-              },
-              body: JSON.stringify({
-                trigger: 'payment_completed',
-                booking_data: completeBookingData,
-                user_id: metadata.user_id
-              })
-            })
-            
-            if (paymentWorkflowResponse.ok) {
-              console.log('✅ Workflow payment_completed déclenché avec succès')
-            } else {
-              const paymentWorkflowError = await paymentWorkflowResponse.text()
-              console.error('❌ Erreur déclenchement workflow payment_completed:', paymentWorkflowError)
             }
           } else {
             console.error('❌ Impossible de récupérer les données complètes de la réservation')
@@ -841,23 +730,7 @@ Deno.serve(async (req) => {
         created_at: new Date().toISOString()
       }
       
-      // 🔄 MARQUER LES LIENS DE PAIEMENT COMME PAYÉS ET AJOUTER LA NOUVELLE TRANSACTION
-      const updatedTransactions = existingTransactions.map(t => {
-        // Si c'est un lien Stripe en attente pour le même montant, le marquer comme payé
-        if (t.method === 'stripe' && 
-            t.status === 'pending' && 
-            Math.abs(t.amount - amountPaid) < 0.01) {
-          console.log('🔄 Marquage lien de paiement comme payé:', t.amount)
-          return {
-            ...t,
-            status: 'completed',
-            note: t.note.replace('En attente', 'Payé').replace('(expire dans', '(payé le')
-          }
-        }
-        return t
-      })
-      
-      const finalTransactions = [...updatedTransactions, newTransaction]
+      const finalTransactions = [...existingTransactions, newTransaction]
 
       // Calculer le nouveau montant payé
       const completedTransactions = finalTransactions.filter((t: any) => t.status === 'completed' || !t.status)
@@ -901,33 +774,6 @@ Deno.serve(async (req) => {
 
       // 🚀 DÉCLENCHER LES WORKFLOWS APRÈS MISE À JOUR RÉUSSIE
       try {
-        // 🎯 DÉCLENCHER WORKFLOW BOOKING_CREATED SI C'EST LE PREMIER PAIEMENT
-        if ((booking.payment_amount || 0) === 0 && newTotalPaid > 0) {
-          console.log('🎯 Premier paiement détecté - déclenchement workflow booking_created')
-          
-          const bookingCreatedResponse = await fetch(`${Deno.env.get('SUPABASE_URL')}/functions/v1/trigger-workflow`, {
-            method: 'POST',
-            headers: {
-              'Content-Type': 'application/json',
-              'Authorization': `Bearer ${Deno.env.get('SUPABASE_SERVICE_ROLE_KEY')}`,
-            },
-            body: JSON.stringify({
-              trigger: 'booking_created',
-              booking_data: updatedBookingData,
-              user_id: metadata.user_id || booking.user_id
-            })
-          })
-          
-          if (bookingCreatedResponse.ok) {
-            console.log('✅ Workflow booking_created déclenché avec succès après premier paiement')
-          } else {
-            const bookingWorkflowError = await bookingCreatedResponse.text()
-            console.error('❌ Erreur déclenchement workflow booking_created:', bookingWorkflowError)
-          }
-        } else {
-          console.log('ℹ️ Pas le premier paiement - workflow booking_created non déclenché')
-        }
-        
         console.log('🚀 Déclenchement workflow payment_completed pour:', customerEmail)
         
         // Récupérer les données complètes de la réservation mise à jour
@@ -961,8 +807,6 @@ Deno.serve(async (req) => {
             const workflowError = await workflowResponse.text()
             console.error('❌ Erreur déclenchement workflow:', workflowError)
           }
-        } else {
-          console.error('❌ Impossible de récupérer les données complètes de la réservation')
         }
       } catch (workflowError) {
         console.error('❌ Erreur déclenchement workflow payment_completed:', workflowError)
