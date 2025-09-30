@@ -336,7 +336,7 @@ Deno.serve(async (req) => {
           
           // 🚀 DÉCLENCHER LES WORKFLOWS APRÈS MISE À JOUR RÉUSSIE
           try {
-            console.log('🚀 Déclenchement workflow payment_completed pour:', customerEmail)
+            console.log('🚀 Déclenchement workflow payment_link_paid pour:', customerEmail)
             
             // Récupérer les données complètes de la réservation mise à jour
             const { data: updatedBookingData, error: fetchError } = await supabaseClient
@@ -350,7 +350,28 @@ Deno.serve(async (req) => {
             
             if (!fetchError && updatedBookingData) {
               // Appeler la fonction de workflow
-              const workflowResponse = await fetch(`${Deno.env.get('SUPABASE_URL')}/functions/v1/trigger-workflow`, {
+              const workflowResponse1 = await fetch(`${Deno.env.get('SUPABASE_URL')}/functions/v1/trigger-workflow`, {
+                method: 'POST',
+                headers: {
+                  'Content-Type': 'application/json',
+                  'Authorization': `Bearer ${Deno.env.get('SUPABASE_SERVICE_ROLE_KEY')}`,
+                },
+                body: JSON.stringify({
+                  trigger: 'payment_link_paid',
+                  booking_data: updatedBookingData,
+                  user_id: metadata.user_id
+                })
+              })
+              
+              if (workflowResponse1.ok) {
+                console.log('✅ Workflow payment_link_paid déclenché avec succès')
+              } else {
+                const workflowError = await workflowResponse1.text()
+                console.error('❌ Erreur déclenchement workflow payment_link_paid:', workflowError)
+              }
+              
+              // Déclencher aussi payment_completed
+              const workflowResponse2 = await fetch(`${Deno.env.get('SUPABASE_URL')}/functions/v1/trigger-workflow`, {
                 method: 'POST',
                 headers: {
                   'Content-Type': 'application/json',
@@ -363,11 +384,11 @@ Deno.serve(async (req) => {
                 })
               })
               
-              if (workflowResponse.ok) {
+              if (workflowResponse2.ok) {
                 console.log('✅ Workflow payment_completed déclenché avec succès')
               } else {
-                const workflowError = await workflowResponse.text()
-                console.error('❌ Erreur déclenchement workflow:', workflowError)
+                const workflowError2 = await workflowResponse2.text()
+                console.error('❌ Erreur déclenchement workflow payment_completed:', workflowError2)
               }
             }
           } catch (workflowError) {
@@ -558,7 +579,28 @@ Deno.serve(async (req) => {
                   
                   if (!fetchError && updatedBookingData) {
                     // Appeler la fonction de workflow
-                    const workflowResponse = await fetch(`${Deno.env.get('SUPABASE_URL')}/functions/v1/trigger-workflow`, {
+                    const workflowResponse1 = await fetch(`${Deno.env.get('SUPABASE_URL')}/functions/v1/trigger-workflow`, {
+                      method: 'POST',
+                      headers: {
+                        'Content-Type': 'application/json',
+                        'Authorization': `Bearer ${Deno.env.get('SUPABASE_SERVICE_ROLE_KEY')}`,
+                      },
+                      body: JSON.stringify({
+                        trigger: 'payment_link_paid',
+                        booking_data: updatedBookingData,
+                        user_id: metadata.user_id
+                      })
+                    })
+                    
+                    if (workflowResponse1.ok) {
+                      console.log('✅ Workflow payment_link_paid déclenché avec succès')
+                    } else {
+                      const workflowError = await workflowResponse1.text()
+                      console.error('❌ Erreur déclenchement workflow payment_link_paid:', workflowError)
+                    }
+                    
+                    // Déclencher aussi payment_completed
+                    const workflowResponse2 = await fetch(`${Deno.env.get('SUPABASE_URL')}/functions/v1/trigger-workflow`, {
                       method: 'POST',
                       headers: {
                         'Content-Type': 'application/json',
@@ -571,11 +613,11 @@ Deno.serve(async (req) => {
                       })
                     })
                     
-                    if (workflowResponse.ok) {
+                    if (workflowResponse2.ok) {
                       console.log('✅ Workflow payment_completed déclenché avec succès')
                     } else {
-                      const workflowError = await workflowResponse.text()
-                      console.error('❌ Erreur déclenchement workflow:', workflowError)
+                      const workflowError2 = await workflowResponse2.text()
+                      console.error('❌ Erreur déclenchement workflow payment_completed:', workflowError2)
                     }
                   }
                 } catch (workflowError) {
@@ -626,7 +668,7 @@ Deno.serve(async (req) => {
           
           if (!fetchError && completeBookingData) {
             // Appeler la fonction de workflow via Edge Function
-            const workflowResponse = await fetch(`${Deno.env.get('SUPABASE_URL')}/functions/v1/trigger-workflow`, {
+            const workflowResponse1 = await fetch(`${Deno.env.get('SUPABASE_URL')}/functions/v1/trigger-workflow`, {
               method: 'POST',
               headers: {
                 'Content-Type': 'application/json',
@@ -639,11 +681,32 @@ Deno.serve(async (req) => {
               })
             })
             
-            if (workflowResponse.ok) {
+            if (workflowResponse1.ok) {
               console.log('✅ Workflow booking_created déclenché avec succès')
             } else {
-              const workflowError = await workflowResponse.text()
+              const workflowError = await workflowResponse1.text()
               console.error('❌ Erreur déclenchement workflow:', workflowError)
+            }
+            
+            // Déclencher aussi payment_link_paid car c'est un paiement direct
+            const workflowResponse2 = await fetch(`${Deno.env.get('SUPABASE_URL')}/functions/v1/trigger-workflow`, {
+              method: 'POST',
+              headers: {
+                'Content-Type': 'application/json',
+                'Authorization': `Bearer ${Deno.env.get('SUPABASE_SERVICE_ROLE_KEY')}`,
+              },
+              body: JSON.stringify({
+                trigger: 'payment_link_paid',
+                booking_data: completeBookingData,
+                user_id: metadata.user_id
+              })
+            })
+            
+            if (workflowResponse2.ok) {
+              console.log('✅ Workflow payment_link_paid déclenché avec succès')
+            } else {
+              const workflowError2 = await workflowResponse2.text()
+              console.error('❌ Erreur déclenchement workflow payment_link_paid:', workflowError2)
             }
           } else {
             console.error('❌ Impossible de récupérer les données complètes de la réservation')
@@ -841,7 +904,7 @@ Deno.serve(async (req) => {
 
       // 🚀 DÉCLENCHER LES WORKFLOWS APRÈS MISE À JOUR RÉUSSIE
       try {
-        console.log('🚀 Déclenchement workflow payment_completed pour:', customerEmail)
+        console.log('🚀 Déclenchement workflow payment_link_paid pour:', customerEmail)
         
         // Récupérer les données complètes de la réservation mise à jour
         const { data: updatedBookingData, error: fetchError } = await supabaseClient
@@ -855,7 +918,28 @@ Deno.serve(async (req) => {
         
         if (!fetchError && updatedBookingData) {
           // Appeler la fonction de workflow
-          const workflowResponse = await fetch(`${Deno.env.get('SUPABASE_URL')}/functions/v1/trigger-workflow`, {
+          const workflowResponse1 = await fetch(`${Deno.env.get('SUPABASE_URL')}/functions/v1/trigger-workflow`, {
+            method: 'POST',
+            headers: {
+              'Content-Type': 'application/json',
+              'Authorization': `Bearer ${Deno.env.get('SUPABASE_SERVICE_ROLE_KEY')}`,
+            },
+            body: JSON.stringify({
+              trigger: 'payment_link_paid',
+              booking_data: updatedBookingData,
+              user_id: metadata.user_id || booking.user_id
+            })
+          })
+          
+          if (workflowResponse1.ok) {
+            console.log('✅ Workflow payment_link_paid déclenché avec succès')
+          } else {
+            const workflowError = await workflowResponse1.text()
+            console.error('❌ Erreur déclenchement workflow payment_link_paid:', workflowError)
+          }
+          
+          // Déclencher aussi payment_completed
+          const workflowResponse2 = await fetch(`${Deno.env.get('SUPABASE_URL')}/functions/v1/trigger-workflow`, {
             method: 'POST',
             headers: {
               'Content-Type': 'application/json',
@@ -868,11 +952,11 @@ Deno.serve(async (req) => {
             })
           })
           
-          if (workflowResponse.ok) {
+          if (workflowResponse2.ok) {
             console.log('✅ Workflow payment_completed déclenché avec succès')
           } else {
-            const workflowError = await workflowResponse.text()
-            console.error('❌ Erreur déclenchement workflow:', workflowError)
+            const workflowError2 = await workflowResponse2.text()
+            console.error('❌ Erreur déclenchement workflow payment_completed:', workflowError2)
           }
         }
       } catch (workflowError) {
