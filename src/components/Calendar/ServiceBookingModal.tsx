@@ -1,5 +1,5 @@
 import React from 'react';
-import { X, Clock, User, Mail, Phone, CreditCard, Edit, Trash2, Calendar } from 'lucide-react';
+import { X, Clock, User, Mail, Phone, CreditCard, CreditCard as Edit, Trash2, Calendar } from 'lucide-react';
 import { Booking } from '../../types';
 
 interface ServiceBookingModalProps {
