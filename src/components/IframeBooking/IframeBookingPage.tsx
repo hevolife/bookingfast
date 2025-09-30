@@ -437,7 +437,7 @@ export function IframeBookingPage() {
     const dates = [];
     const today = new Date();
     
-    for (let i = 0; i < 30; i++) {
+    for (let i = 0; i < 90; i++) {
       const date = new Date(today);
       date.setDate(today.getDate() + i);
       
