@@ -21,6 +21,44 @@ import { PWAInstallPrompt } from './components/Layout/PWAInstallPrompt';
 
 type Page = 'dashboard' | 'calendar' | 'services' | 'admin' | 'emails' | 'superadmin';
 
+// Fonction pour détecter si l'app est en mode PWA
+function isPWAMode(): boolean {
+  // Vérifier si l'app est en mode standalone (PWA installée)
+  const isStandalone = window.matchMedia('(display-mode: standalone)').matches;
+  const isInWebAppiOS = (window.navigator as any).standalone === true;
+  const isInWebAppChrome = window.matchMedia('(display-mode: standalone)').matches;
+  
+  return isStandalone || isInWebAppiOS || isInWebAppChrome;
+}
+
+// Composant pour rediriger landing vers login en mode PWA
+function PWALandingRedirect() {
+  const navigate = useNavigate();
+  
+  React.useEffect(() => {
+    if (isPWAMode()) {
+      console.log('🔄 Mode PWA détecté - redirection vers login');
+      navigate('/login', { replace: true });
+    }
+  }, [navigate]);
+  
+  // Si en mode PWA, afficher un écran de chargement pendant la redirection
+  if (isPWAMode()) {
+    return (
+      <div className="min-h-screen bg-gradient-to-br from-blue-50 via-purple-50 to-pink-50 flex items-center justify-center">
+        <div className="text-center">
+          <div className="w-16 h-16 border-4 border-purple-200 rounded-full animate-spin mx-auto mb-4"></div>
+          <div className="absolute top-0 left-0 w-16 h-16 border-4 border-purple-600 rounded-full animate-spin border-t-transparent mx-auto"></div>
+          <p className="text-gray-600 text-lg">Chargement de l'application...</p>
+        </div>
+      </div>
+    );
+  }
+  
+  // Si pas en mode PWA, afficher la landing page normale
+  return <LandingPage />;
+}
+
 function AppContent() {
   const location = useLocation();
   const navigate = useNavigate();
@@ -72,14 +110,16 @@ function AppContent() {
 
   return (
     <Routes>
-      {/* Page d'accueil publique */}
-      <Route path="/" element={<LandingPage />} />
+      {/* Page d'accueil - Landing en web, Login en PWA */}
+      <Route path="/" element={
+        isPWAMode() ? <LoginPage /> : <LandingPage />
+      } />
       
       {/* Page d'inscription avec code d'affiliation */}
       <Route path="/register" element={<LoginPage />} />
       
-      {/* Landing page accessible via /landing */}
-      <Route path="/landing" element={<LandingPage />} />
+      {/* Landing page - redirige vers login si PWA */}
+      <Route path="/landing" element={<PWALandingRedirect />} />
       
       {/* Page de connexion */}
       <Route path="/login" element={<LoginPage />} />
