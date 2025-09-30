@@ -40,6 +40,8 @@ export function useAppVersion() {
         .from('app_versions')
         .select('*')
         .eq('is_current', true)
+        .order('created_at', { ascending: false })
+        .limit(1)
         .maybeSingle();
 
       if (fetchError) {
