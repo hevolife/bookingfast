@@ -48,7 +48,7 @@ export function ServiceBookingModal({
       case 'completed':
         return '✅ Payé';
       case 'partial':
-        return '⏳ Acompte';
+        return '💵 Partiellement';
       default:
         return '❌ Non payé';
     }
