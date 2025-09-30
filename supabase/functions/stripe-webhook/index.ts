@@ -282,7 +282,29 @@ Deno.serve(async (req) => {
             created_at: new Date().toISOString()
           }
           
-          const finalTransactions = [...existingTransactions, newTransaction]
+          // Chercher une transaction Stripe en attente avec le même montant pour la mettre à jour
+          let transactionUpdated = false
+          const finalTransactions = existingTransactions.map(t => {
+            if (t.method === 'stripe' && 
+                t.status === 'pending' && 
+                Math.abs(t.amount - amountPaid) < 0.01 && 
+                !transactionUpdated) {
+              transactionUpdated = true
+              return {
+                ...t,
+                status: 'completed',
+                note: `Acompte payé via Stripe (${amountPaid.toFixed(2)}€) - Session: ${sessionId}`,
+                updated_at: new Date().toISOString()
+              }
+            }
+            return t
+          })
+          
+          // Si aucune transaction n'a été mise à jour, ajouter une nouvelle
+          if (!transactionUpdated) {
+            finalTransactions.push(newTransaction)
+          }
+          
           const newTotalPaid = amountPaid + (existingBooking.payment_amount || 0)
           const totalAmount = existingBooking.total_amount
 
@@ -473,7 +495,29 @@ Deno.serve(async (req) => {
                 created_at: new Date().toISOString()
               }
               
-              const finalTransactions = [...existingTransactions, newTransaction]
+              // Chercher une transaction Stripe en attente avec le même montant pour la mettre à jour
+              let transactionUpdated = false
+              const finalTransactions = existingTransactions.map(t => {
+                if (t.method === 'stripe' && 
+                    t.status === 'pending' && 
+                    Math.abs(t.amount - amountPaid) < 0.01 && 
+                    !transactionUpdated) {
+                  transactionUpdated = true
+                  return {
+                    ...t,
+                    status: 'completed',
+                    note: `Acompte payé via Stripe (${amountPaid.toFixed(2)}€) - Session: ${sessionId}`,
+                    updated_at: new Date().toISOString()
+                  }
+                }
+                return t
+              })
+              
+              // Si aucune transaction n'a été mise à jour, ajouter une nouvelle
+              if (!transactionUpdated) {
+                finalTransactions.push(newTransaction)
+              }
+              
               const newTotalPaid = amountPaid + (conflictBooking.payment_amount || 0)
               const totalAmount = conflictBooking.total_amount
 
@@ -730,7 +774,30 @@ Deno.serve(async (req) => {
         created_at: new Date().toISOString()
       }
       
-      const finalTransactions = [...existingTransactions, newTransaction]
+      // Chercher une transaction Stripe en attente avec le même montant pour la mettre à jour
+      let transactionUpdated = false
+      const finalTransactions = existingTransactions.map(t => {
+        if (t.method === 'stripe' && 
+            t.status === 'pending' && 
+            Math.abs(t.amount - amountPaid) < 0.01 && 
+            !transactionUpdated) {
+          transactionUpdated = true
+          return {
+            ...t,
+            status: 'completed',
+            note: metadata.is_deposit === 'true' 
+              ? `Acompte payé via Stripe (${amountPaid.toFixed(2)}€) - Session: ${sessionId}`
+              : `Paiement Stripe (${amountPaid.toFixed(2)}€) - Session: ${sessionId}`,
+            updated_at: new Date().toISOString()
+          }
+        }
+        return t
+      })
+      
+      // Si aucune transaction n'a été mise à jour, ajouter une nouvelle
+      if (!transactionUpdated) {
+        finalTransactions.push(newTransaction)
+      }
 
       // Calculer le nouveau montant payé
       const completedTransactions = finalTransactions.filter((t: any) => t.status === 'completed' || !t.status)
