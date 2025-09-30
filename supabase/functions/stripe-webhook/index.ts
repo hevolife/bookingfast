@@ -1,5 +1,4 @@
-import { serve } from "https://deno.land/std@0.168.0/http/server.ts"
-import { createClient } from 'https://esm.sh/@supabase/supabase-js@2'
+import { createClient } from 'npm:@supabase/supabase-js@2'
 
 const corsHeaders = {
   'Access-Control-Allow-Origin': '*',
@@ -22,7 +21,7 @@ setInterval(() => {
   }
 }, 10 * 60 * 1000)
 
-serve(async (req) => {
+Deno.serve(async (req) => {
   if (req.method === 'OPTIONS') {
     return new Response('ok', { headers: corsHeaders })
   }
@@ -458,6 +457,47 @@ serve(async (req) => {
               if (!updateError) {
                 console.log('✅ CONFLIT RÉSOLU - Réservation mise à jour au lieu de créer un doublon')
                 
+                // 🚀 DÉCLENCHER LES WORKFLOWS APRÈS MISE À JOUR RÉUSSIE
+                try {
+                  console.log('🚀 Déclenchement workflow booking_updated pour:', customerEmail)
+                  
+                  // Récupérer les données complètes de la réservation mise à jour
+                  const { data: updatedBookingData, error: fetchError } = await supabaseClient
+                    .from('bookings')
+                    .select(`
+                      *,
+                      service:services(*)
+                    `)
+                    .eq('id', conflictBooking.id)
+                    .single()
+                  
+                  if (!fetchError && updatedBookingData) {
+                    // Appeler la fonction de workflow
+                    const workflowResponse = await fetch(`${supabaseUrl}/functions/v1/trigger-workflow`, {
+                      method: 'POST',
+                      headers: {
+                        'Content-Type': 'application/json',
+                        'Authorization': `Bearer ${Deno.env.get('SUPABASE_SERVICE_ROLE_KEY')}`,
+                      },
+                      body: JSON.stringify({
+                        trigger: 'payment_completed',
+                        booking_data: updatedBookingData,
+                        user_id: metadata.user_id
+                      })
+                    })
+                    
+                    if (workflowResponse.ok) {
+                      console.log('✅ Workflow payment_completed déclenché avec succès')
+                    } else {
+                      const workflowError = await workflowResponse.text()
+                      console.error('❌ Erreur déclenchement workflow:', workflowError)
+                    }
+                  }
+                } catch (workflowError) {
+                  console.error('❌ Erreur déclenchement workflow payment_completed:', workflowError)
+                  // Ne pas faire échouer le paiement pour une erreur de workflow
+                }
+                
                 const result = { 
                   success: true, 
                   type: 'conflict_resolved',
@@ -484,6 +524,48 @@ serve(async (req) => {
         }
         
         console.log('✅ NOUVELLE RÉSERVATION CRÉÉE avec succès APRÈS paiement:', newBooking.id)
+        
+        // 🚀 DÉCLENCHER LES WORKFLOWS APRÈS CRÉATION RÉUSSIE
+        try {
+          console.log('🚀 Déclenchement workflow booking_created pour:', customerEmail)
+          
+          // Préparer les données complètes pour le workflow
+          const workflowBookingData = {
+            ...newBooking,
+            service: {
+              id: selectedService.id,
+              name: selectedService.name,
+              price_ttc: selectedService.price_ttc,
+              duration_minutes: selectedService.duration_minutes,
+              description: selectedService.description || ''
+            },
+            payment_link: null // Pas de lien de paiement pour les réservations créées après paiement
+          }
+          
+          // Appeler la fonction de workflow via Edge Function
+          const workflowResponse = await fetch(`${supabaseUrl}/functions/v1/trigger-workflow`, {
+            method: 'POST',
+            headers: {
+              'Content-Type': 'application/json',
+              'Authorization': `Bearer ${Deno.env.get('SUPABASE_SERVICE_ROLE_KEY')}`,
+            },
+            body: JSON.stringify({
+              trigger: 'booking_created',
+              booking_data: workflowBookingData,
+              user_id: metadata.user_id
+            })
+          })
+          
+          if (workflowResponse.ok) {
+            console.log('✅ Workflow booking_created déclenché avec succès')
+          } else {
+            const workflowError = await workflowResponse.text()
+            console.error('❌ Erreur déclenchement workflow:', workflowError)
+          }
+        } catch (workflowError) {
+          console.error('❌ Erreur déclenchement workflow booking_created:', workflowError)
+          // Ne pas faire échouer le paiement pour une erreur de workflow
+        }
         
         const result = { 
           success: true, 
@@ -648,6 +730,47 @@ serve(async (req) => {
 
       console.log('✅ Réservation existante mise à jour avec succès')
 
+      // 🚀 DÉCLENCHER LES WORKFLOWS APRÈS MISE À JOUR RÉUSSIE
+      try {
+        console.log('🚀 Déclenchement workflow payment_completed pour:', customerEmail)
+        
+        // Récupérer les données complètes de la réservation mise à jour
+        const { data: updatedBookingData, error: fetchError } = await supabaseClient
+          .from('bookings')
+          .select(`
+            *,
+            service:services(*)
+          `)
+          .eq('id', booking.id)
+          .single()
+        
+        if (!fetchError && updatedBookingData) {
+          // Appeler la fonction de workflow
+          const workflowResponse = await fetch(`${supabaseUrl}/functions/v1/trigger-workflow`, {
+            method: 'POST',
+            headers: {
+              'Content-Type': 'application/json',
+              'Authorization': `Bearer ${Deno.env.get('SUPABASE_SERVICE_ROLE_KEY')}`,
+            },
+            body: JSON.stringify({
+              trigger: 'payment_completed',
+              booking_data: updatedBookingData,
+              user_id: metadata.user_id || booking.user_id
+            })
+          })
+          
+          if (workflowResponse.ok) {
+            console.log('✅ Workflow payment_completed déclenché avec succès')
+          } else {
+            const workflowError = await workflowResponse.text()
+            console.error('❌ Erreur déclenchement workflow:', workflowError)
+          }
+        }
+      } catch (workflowError) {
+        console.error('❌ Erreur déclenchement workflow payment_completed:', workflowError)
+        // Ne pas faire échouer le paiement pour une erreur de workflow
+      }
+      
       const result = { 
         success: true, 
         bookingId: booking?.id || 'updated',
