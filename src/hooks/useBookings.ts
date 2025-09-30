@@ -262,7 +262,7 @@ export function useBookings(date?: string) {
           t.method === 'stripe' && 
           t.status === 'completed' && 
           t.created_at &&
-          (Date.now() - new Date(t.created_at).getTime()) < 300000 // Moins de 5 minutes
+          (Date.now() - new Date(t.created_at).getTime()) < 600000 // Moins de 10 minutes
         );
         
         if (hasRecentStripePayment) {
@@ -272,6 +272,24 @@ export function useBookings(date?: string) {
             console.log('✅ Workflow payment_link_paid déclenché avec succès');
           } catch (workflowError) {
             console.error('❌ Erreur déclenchement workflow payment_link_paid:', workflowError);
+          }
+        }
+        
+        // Déclenchement alternatif basé sur le changement de statut de paiement
+        if (data.payment_status === 'completed' || data.payment_status === 'partial') {
+          const hasStripeTransaction = data.transactions?.some(t => 
+            t.method === 'stripe' && 
+            t.status === 'completed'
+          );
+          
+          if (hasStripeTransaction) {
+            try {
+              console.log('🚀 Déclenchement workflow payment_completed pour:', data.client_email);
+              await triggerWorkflow('payment_completed', data, user.id);
+              console.log('✅ Workflow payment_completed déclenché avec succès');
+            } catch (workflowError) {
+              console.error('❌ Erreur déclenchement workflow payment_completed:', workflowError);
+            }
           }
         }
         
@@ -359,7 +377,7 @@ export function useBookings(date?: string) {
             t.method === 'stripe' && 
             t.status === 'completed' && 
             t.created_at &&
-            (Date.now() - new Date(t.created_at).getTime()) < 300000 // Moins de 5 minutes (plus large)
+            (Date.now() - new Date(t.created_at).getTime()) < 600000 // Moins de 10 minutes
           );
           
           if (hasRecentStripePayment) {
