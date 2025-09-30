@@ -248,13 +248,47 @@ export function useBookings(date?: string) {
         
         console.log('✅ Nouvelle réservation créée:', data.id);
         
-        // Déclencher le workflow immédiatement après création réussie
-        try {
-          console.log('🚀 Déclenchement workflow booking_created pour:', data.client_email);
-          await triggerWorkflow('booking_created', data, user.id);
-          console.log('✅ Workflow booking_created déclenché avec succès');
-        } catch (workflowError) {
-          console.error('❌ Erreur déclenchement workflow:', workflowError);
+        // Vérifier s'il y a des liens de paiement générés
+        const hasPaymentLinks = data.transactions?.some(t => 
+          t.method === 'stripe' && 
+          t.status === 'pending' &&
+          t.note && 
+          t.note.includes('Lien de paiement')
+        );
+        
+        console.log('🔍 Vérification liens de paiement:', {
+          hasPaymentLinks,
+          transactionsCount: data.transactions?.length || 0,
+          transactions: data.transactions?.map(t => ({
+            method: t.method,
+            status: t.status,
+            hasLinkInNote: t.note?.includes('Lien de paiement')
+          }))
+        });
+        
+        // Déclencher le workflow "Nouvelle réservation" SEULEMENT si aucun lien de paiement n'a été généré
+        if (!hasPaymentLinks) {
+          console.log('✅ Aucun lien de paiement - Déclenchement workflow booking_created');
+          try {
+            console.log('🚀 Déclenchement workflow booking_created pour:', data.client_email);
+            await triggerWorkflow('booking_created', data, user.id);
+            console.log('✅ Workflow booking_created déclenché avec succès');
+          } catch (workflowError) {
+            console.error('❌ Erreur déclenchement workflow:', workflowError);
+          }
+        } else {
+          console.log('⏭️ Lien de paiement généré - Workflow booking_created ignoré (sera déclenché après paiement)');
+        }
+        
+        // Déclencher le workflow "Lien de paiement créé" si un lien a été généré
+        if (hasPaymentLinks) {
+          try {
+            console.log('🚀 Déclenchement workflow payment_link_created pour:', data.client_email);
+            await triggerWorkflow('payment_link_created', data, user.id);
+            console.log('✅ Workflow payment_link_created déclenché avec succès');
+          } catch (workflowError) {
+            console.error('❌ Erreur déclenchement workflow payment_link_created:', workflowError);
+          }
         }
         
         // Vérifier si c'est un paiement de lien qui vient d'être complété
@@ -262,7 +296,7 @@ export function useBookings(date?: string) {
           t.method === 'stripe' && 
           t.status === 'completed' && 
           t.created_at &&
-          (Date.now() - new Date(t.created_at).getTime()) < 300000 // Moins de 5 minutes
+          (Date.now() - new Date(t.created_at).getTime()) < 600000 // Moins de 10 minutes
         );
         
         if (hasRecentStripePayment) {
@@ -272,6 +306,24 @@ export function useBookings(date?: string) {
             console.log('✅ Workflow payment_link_paid déclenché avec succès');
           } catch (workflowError) {
             console.error('❌ Erreur déclenchement workflow payment_link_paid:', workflowError);
+          }
+        }
+        
+        // Déclenchement alternatif basé sur le changement de statut de paiement
+        if (data.payment_status === 'completed' || data.payment_status === 'partial') {
+          const hasStripeTransaction = data.transactions?.some(t => 
+            t.method === 'stripe' && 
+            t.status === 'completed'
+          );
+          
+          if (hasStripeTransaction) {
+            try {
+              console.log('🚀 Déclenchement workflow payment_completed pour:', data.client_email);
+              await triggerWorkflow('payment_completed', data, user.id);
+              console.log('✅ Workflow payment_completed déclenché avec succès');
+            } catch (workflowError) {
+              console.error('❌ Erreur déclenchement workflow payment_completed:', workflowError);
+            }
           }
         }
         
@@ -359,7 +411,7 @@ export function useBookings(date?: string) {
             t.method === 'stripe' && 
             t.status === 'completed' && 
             t.created_at &&
-            (Date.now() - new Date(t.created_at).getTime()) < 300000 // Moins de 5 minutes (plus large)
+            (Date.now() - new Date(t.created_at).getTime()) < 600000 // Moins de 10 minutes
           );
           
           if (hasRecentStripePayment) {
