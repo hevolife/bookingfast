@@ -176,9 +176,6 @@ export function PaymentSection({
       
       paymentUrl.searchParams.set('amount', transaction.amount.toString());
       paymentUrl.searchParams.set('service', serviceName);
-      paymentUrl.searchParams.set('client', `Client`);
-      paymentUrl.searchParams.set('email', clientEmail);
-      paymentUrl.searchParams.set('date', bookingDate);
       await navigator.clipboard.writeText(paymentUrl.toString());
       alert('Lien de paiement copié dans le presse-papiers !');
     } catch (error) {
