@@ -188,6 +188,7 @@ export function BookingModal({
       paymentUrl.searchParams.set('service', isCustomService ? customServiceData.name : selectedService.name);
       paymentUrl.searchParams.set('client', `${selectedClient.firstname} ${selectedClient.lastname}`);
       paymentUrl.searchParams.set('email', selectedClient.email);
+      paymentUrl.searchParams.set('phone', selectedClient.phone);
       paymentUrl.searchParams.set('date', date);
       paymentUrl.searchParams.set('time', time);
       paymentUrl.searchParams.set('expires', expiresAt.toString());
