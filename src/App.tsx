@@ -73,7 +73,7 @@ function AppContent() {
   return (
     <Routes>
       {/* Page d'accueil publique */}
-      <Route path="/" element={<LoginPage />} />
+      <Route path="/" element={<LandingPage />} />
       
       {/* Page d'inscription avec code d'affiliation */}
       <Route path="/register" element={<LoginPage />} />
