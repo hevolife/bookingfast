@@ -1,5 +1,4 @@
-import { serve } from "https://deno.land/std@0.168.0/http/server.ts"
-import { createClient } from 'https://esm.sh/@supabase/supabase-js@2'
+import { corsHeaders } from '../_shared/cors.ts'
 
 const corsHeaders = {
   'Access-Control-Allow-Origin': '*',
@@ -22,8 +21,9 @@ setInterval(() => {
   }
 }, 10 * 60 * 1000)
 
-serve(async (req) => {
+Deno.serve(async (req) => {
   console.log('🔔 Webhook Stripe reçu - Méthode:', req.method)
+  console.log('🔔 URL:', req.url)
   console.log('🔔 Headers:', Object.fromEntries(req.headers.entries()))
   
   if (req.method === 'OPTIONS') {
@@ -33,9 +33,17 @@ serve(async (req) => {
 
   if (req.method !== 'POST') {
     console.error('❌ Méthode non autorisée:', req.method)
-    return new Response('Method not allowed', { 
+    return new Response(JSON.stringify({ 
+      error: 'Method not allowed',
+      allowed_methods: ['POST', 'OPTIONS'],
+      received_method: req.method 
+    }), { 
       status: 405, 
-      headers: { ...corsHeaders, 'Allow': 'POST, OPTIONS' }
+      headers: { 
+        ...corsHeaders, 
+        'Allow': 'POST, OPTIONS',
+        'Content-Type': 'application/json'
+      }
     })
   }
 
@@ -43,10 +51,26 @@ serve(async (req) => {
     console.log('🔔 Début traitement webhook POST')
     
     // Créer le client Supabase
-    const supabaseClient = createClient(
-      Deno.env.get('SUPABASE_URL') ?? '',
-      Deno.env.get('SUPABASE_SERVICE_ROLE_KEY') ?? ''
-    )
+    const supabaseUrl = Deno.env.get('SUPABASE_URL')
+    const supabaseServiceKey = Deno.env.get('SUPABASE_SERVICE_ROLE_KEY')
+    
+    if (!supabaseUrl || !supabaseServiceKey) {
+      console.error('❌ Variables d\'environnement Supabase manquantes')
+      return new Response(JSON.stringify({ 
+        error: 'Server configuration error',
+        missing: {
+          supabase_url: !supabaseUrl,
+          service_key: !supabaseServiceKey
+        }
+      }), { 
+        status: 500, 
+        headers: { ...corsHeaders, 'Content-Type': 'application/json' }
+      })
+    }
+
+    // Import dynamique de Supabase
+    const { createClient } = await import('https://esm.sh/@supabase/supabase-js@2')
+    const supabaseClient = createClient(supabaseUrl, supabaseServiceKey)
 
     console.log('✅ Client Supabase créé')
 
@@ -59,10 +83,16 @@ serve(async (req) => {
 
     if (!signature) {
       console.error('❌ Signature Stripe manquante')
-      return new Response('Signature manquante', { status: 400, headers: corsHeaders })
+      return new Response(JSON.stringify({ 
+        error: 'Signature manquante',
+        headers_received: Object.fromEntries(req.headers.entries())
+      }), { 
+        status: 400, 
+        headers: { ...corsHeaders, 'Content-Type': 'application/json' }
+      })
     }
 
-    // Pour le développement, on parse directement le JSON
+    // Parser l'événement Stripe
     let event
     try {
       event = JSON.parse(body)
@@ -70,7 +100,13 @@ serve(async (req) => {
       console.log('📦 ID événement:', event.id)
     } catch (err) {
       console.error('❌ Erreur parsing JSON:', err)
-      return new Response('JSON invalide', { status: 400, headers: corsHeaders })
+      return new Response(JSON.stringify({ 
+        error: 'JSON invalide',
+        body_preview: body.substring(0, 200)
+      }), { 
+        status: 400, 
+        headers: { ...corsHeaders, 'Content-Type': 'application/json' }
+      })
     }
 
     // Traiter l'événement checkout.session.completed
@@ -85,7 +121,7 @@ serve(async (req) => {
       console.log('💰 Montant payé:', session.amount_total, 'centimes')
       console.log('🏷️ Métadonnées complètes:', JSON.stringify(session.metadata, null, 2))
       
-      // 🔒 VÉRIFICATION CRITIQUE : Ne traiter QUE les paiements complètement réussis
+      // Vérification critique : Ne traiter QUE les paiements complètement réussis
       if (session.status !== 'complete' || session.payment_status !== 'paid') {
         console.log('⚠️ PAIEMENT NON COMPLET - Session ignorée')
         console.log('📊 Détails:', {
@@ -108,23 +144,21 @@ serve(async (req) => {
       
       console.log('✅ PAIEMENT COMPLET CONFIRMÉ - Traitement de la réservation')
       
-      // 🔒 VÉRIFICATION CACHE GLOBAL - PREMIÈRE LIGNE DE DÉFENSE
+      // Vérification cache global
       if (processedSessions.has(sessionId)) {
         const cached = processedSessions.get(sessionId)!
-        console.log('🔒 SESSION DÉJÀ TRAITÉE DANS LE CACHE - Webhook en doublon absolu')
-        console.log('⏰ Traitée il y a:', Math.round((Date.now() - cached.timestamp) / 1000), 'secondes')
+        console.log('🔒 SESSION DÉJÀ TRAITÉE DANS LE CACHE')
         return new Response(JSON.stringify({ 
           success: true, 
           type: 'cached_duplicate_prevented',
           message: 'Session already processed in cache',
-          processed_at: new Date(cached.timestamp).toISOString(),
-          result: cached.result
+          processed_at: new Date(cached.timestamp).toISOString()
         }), {
           headers: { ...corsHeaders, 'Content-Type': 'application/json' }
         })
       }
 
-      // Marquer immédiatement dans le cache pour bloquer les autres webhooks
+      // Marquer immédiatement dans le cache
       processedSessions.set(sessionId, { 
         timestamp: Date.now(), 
         result: { processing: true } 
@@ -136,8 +170,14 @@ serve(async (req) => {
 
       if (!customerEmail) {
         console.error('❌ Email client manquant')
-        processedSessions.delete(sessionId) // Nettoyer le cache en cas d'erreur
-        return new Response('Email client manquant', { status: 400, headers: corsHeaders })
+        processedSessions.delete(sessionId)
+        return new Response(JSON.stringify({ 
+          error: 'Email client manquant',
+          session_data: session
+        }), { 
+          status: 400, 
+          headers: { ...corsHeaders, 'Content-Type': 'application/json' }
+        })
       }
 
       console.log('🔍 Recherche de la réservation pour:', customerEmail)
@@ -148,380 +188,8 @@ serve(async (req) => {
         email: customerEmail
       })
 
-      // Vérifier si c'est un paiement d'abonnement
-      if (metadata.subscription === 'true') {
-        console.log('💳 Paiement d\'abonnement détecté')
-        
-        const userId = metadata.user_id
-        const planId = metadata.plan_id
-        
-        if (!userId || !planId) {
-          console.error('❌ Données abonnement manquantes')
-          processedSessions.delete(sessionId)
-          return new Response('Données abonnement manquantes', { status: 400, headers: corsHeaders })
-        }
-        
-        // Mettre à jour le statut d'abonnement de l'utilisateur
-        const { error: updateError } = await supabaseClient
-          .from('users')
-          .update({
-            subscription_status: 'active',
-            trial_ends_at: null,
-            updated_at: new Date().toISOString()
-          })
-          .eq('id', userId)
-        
-        if (updateError) {
-          console.error('❌ Erreur mise à jour abonnement:', updateError)
-          processedSessions.delete(sessionId)
-          return new Response('Erreur mise à jour abonnement', { status: 500, headers: corsHeaders })
-        }
-        
-        console.log('✅ Abonnement activé pour utilisateur:', userId)
-        
-        const result = { 
-          success: true, 
-          type: 'subscription',
-          userId: userId,
-          planId: planId,
-          status: 'active'
-        }
-        
-        // Mettre à jour le cache avec le résultat final
-        processedSessions.set(sessionId, { timestamp: Date.now(), result })
-        
-        return new Response(JSON.stringify(result), {
-          headers: { ...corsHeaders, 'Content-Type': 'application/json' }
-        })
-      }
-
-      // Vérifier si c'est un paiement de réservation publique
-      if (metadata.create_booking_after_payment === 'true') {
-        console.log('🎯 Paiement de réservation publique détecté - CRÉATION UNIQUE')
-        
-        // 🔒 VERROU ULTRA-STRICT AVEC CRITÈRES EXACTS
-        const searchCriteria = {
-          email: customerEmail,
-          date: metadata.date || metadata.booking_date,
-          time: metadata.time || metadata.booking_time,
-          service_id: metadata.service_id,
-          user_id: metadata.user_id
-        }
-        
-        console.log('🔍 Critères de recherche ULTRA-STRICTS:', searchCriteria)
-        
-        // 🔒 RECHERCHE AVEC VERROU POUR ÉVITER LES CONDITIONS DE COURSE
-        const { data: existingBookings, error: searchError } = await supabaseClient
-          .from('bookings')
-          .select('id, created_at, payment_amount, total_amount, transactions, booking_status')
-          .eq('client_email', searchCriteria.email)
-          .eq('date', searchCriteria.date)
-          .eq('time', searchCriteria.time)
-          .eq('service_id', searchCriteria.service_id)
-          .eq('user_id', searchCriteria.user_id)
-          .in('booking_status', ['pending', 'confirmed'])
-          .order('created_at', { ascending: false })
-
-        if (!searchError && existingBookings && existingBookings.length > 0) {
-          console.log('⚠️ RÉSERVATION(S) EXISTANTE(S) TROUVÉE(S) - AUCUNE CRÉATION')
-          console.log('📋 Nombre de réservations existantes:', existingBookings.length)
-          
-          // Prendre la première réservation (la plus récente) et la mettre à jour
-          const existingBooking = existingBookings[0]
-          console.log('🔄 Mise à jour de la réservation existante:', existingBooking.id)
-          
-          // Récupérer les transactions existantes
-          const existingTransactions = existingBooking.transactions || []
-          
-          // Vérifier si cette session Stripe n'a pas déjà été traitée
-          const sessionAlreadyProcessed = existingTransactions.some((t: any) => 
-            t.method === 'stripe' && 
-            t.note && 
-            t.note.includes(sessionId)
-          )
-          
-          if (sessionAlreadyProcessed) {
-            console.log('🔒 SESSION STRIPE DÉJÀ TRAITÉE - Webhook en doublon absolu')
-            
-            const result = { 
-              success: true, 
-              type: 'session_already_processed',
-              message: 'Session already processed',
-              existingBookingId: existingBooking.id
-            }
-            
-            processedSessions.set(sessionId, { timestamp: Date.now(), result })
-            
-            return new Response(JSON.stringify(result), {
-              headers: { ...corsHeaders, 'Content-Type': 'application/json' }
-            })
-          }
-          
-          // Ajouter la nouvelle transaction avec référence à la session
-          const newTransaction = {
-            id: crypto.randomUUID(),
-            amount: amountPaid,
-            method: 'stripe',
-            status: 'completed',
-            note: `Acompte payé via Stripe (${amountPaid.toFixed(2)}€) - Session: ${sessionId}`,
-            created_at: new Date().toISOString()
-          }
-          
-          const finalTransactions = [...existingTransactions, newTransaction]
-          const newTotalPaid = amountPaid + (existingBooking.payment_amount || 0)
-          const totalAmount = existingBooking.total_amount
-
-          let newPaymentStatus = 'pending'
-          if (newTotalPaid >= totalAmount) {
-            newPaymentStatus = 'completed'
-          } else if (newTotalPaid > 0) {
-            newPaymentStatus = 'partial'
-          }
-
-          console.log('🔄 DÉBUT MISE À JOUR BASE DE DONNÉES...')
-          console.log('📊 Données de mise à jour:', {
-            booking_id: existingBooking.id,
-            new_payment_amount: newTotalPaid,
-            new_payment_status: newPaymentStatus,
-            transactions_count: finalTransactions.length
-          })
-
-          const { error: updateError } = await supabaseClient
-            .from('bookings')
-            .update({
-              payment_amount: newTotalPaid,
-              payment_status: newPaymentStatus,
-              booking_status: 'confirmed',
-              transactions: finalTransactions,
-              updated_at: new Date().toISOString()
-            })
-            .eq('id', existingBooking.id)
-
-          if (updateError) {
-            console.error('❌ Erreur mise à jour réservation existante:', updateError)
-            console.error('❌ Détails erreur:', {
-              message: updateError.message,
-              details: updateError.details,
-              hint: updateError.hint,
-              code: updateError.code
-            })
-            processedSessions.delete(sessionId)
-            return new Response('Erreur mise à jour réservation', { status: 500, headers: corsHeaders })
-          }
-
-          console.log('✅ RÉSERVATION EXISTANTE MISE À JOUR - AUCUNE CRÉATION')
-          console.log('📊 Réservation après mise à jour:', {
-            id: existingBooking.id,
-            payment_amount: newTotalPaid,
-            payment_status: newPaymentStatus,
-            booking_status: 'confirmed'
-          })
-          
-          const result = { 
-            success: true, 
-            type: 'existing_booking_updated',
-            bookingId: existingBooking.id,
-            amountPaid: amountPaid,
-            totalPaid: newTotalPaid,
-            paymentStatus: newPaymentStatus,
-            bookingStatus: 'confirmed',
-            sessionId: sessionId
-          }
-          
-          processedSessions.set(sessionId, { timestamp: Date.now(), result })
-          
-          return new Response(JSON.stringify(result), {
-            headers: { ...corsHeaders, 'Content-Type': 'application/json' }
-          })
-        }
-        
-        console.log('🆕 AUCUNE RÉSERVATION EXISTANTE - Création d\'une nouvelle')
-        
-        // 🔒 CRÉATION AVEC PROTECTION CONTRE LES CONDITIONS DE COURSE
-        const bookingData = {
-          user_id: metadata.user_id,
-          service_id: metadata.service_id,
-          date: metadata.date || metadata.booking_date,
-          time: metadata.time || metadata.booking_time,
-          duration_minutes: parseInt(metadata.duration_minutes),
-          quantity: parseInt(metadata.quantity),
-          client_name: metadata.client_name,
-          client_firstname: metadata.client_firstname,
-          client_email: customerEmail,
-          client_phone: metadata.phone,
-          total_amount: parseFloat(metadata.total_amount),
-          payment_status: 'partial',
-          payment_amount: amountPaid,
-          booking_status: 'confirmed',
-          transactions: [{
-            id: crypto.randomUUID(),
-            amount: amountPaid,
-            method: 'stripe',
-            status: 'completed',
-            note: `Acompte payé via Stripe (${amountPaid.toFixed(2)}€) - Session: ${sessionId}`,
-            created_at: new Date().toISOString()
-          }]
-        }
-        
-        console.log('📝 Données de réservation à créer:', bookingData)
-        
-        // 🔒 CRÉATION SÉCURISÉE AVEC GESTION D'ERREUR DE CONTRAINTE UNIQUE
-        const { data: newBooking, error: bookingError } = await supabaseClient
-          .from('bookings')
-          .insert([bookingData])
-          .select()
-          .single()
-        
-        if (bookingError) {
-          console.error('❌ Erreur création réservation:', bookingError)
-          
-          // Si c'est une erreur de contrainte unique (doublon), essayer de mettre à jour
-          if (bookingError.code === '23505' || 
-              bookingError.message.includes('duplicate') || 
-              bookingError.message.includes('unique') ||
-              bookingError.message.includes('already exists')) {
-            
-            console.log('🔄 Erreur de doublon détectée - tentative de mise à jour...')
-            
-            // Rechercher la réservation qui cause le conflit
-            const { data: conflictBooking, error: conflictError } = await supabaseClient
-              .from('bookings')
-              .select('*')
-              .eq('client_email', customerEmail)
-              .eq('date', bookingData.date)
-              .eq('time', bookingData.time)
-              .eq('service_id', bookingData.service_id)
-              .eq('user_id', bookingData.user_id)
-              .in('booking_status', ['pending', 'confirmed'])
-              .order('created_at', { ascending: false })
-              .limit(1)
-              .single()
-            
-            if (!conflictError && conflictBooking) {
-              console.log('✅ Réservation en conflit trouvée - mise à jour...')
-              
-              // Récupérer les transactions existantes
-              const existingTransactions = conflictBooking.transactions || []
-              
-              // Vérifier si cette session Stripe n'a pas déjà été traitée
-              const sessionAlreadyProcessed = existingTransactions.some((t: any) => 
-                t.method === 'stripe' && 
-                t.note && 
-                t.note.includes(sessionId)
-              )
-              
-              if (sessionAlreadyProcessed) {
-                console.log('🔒 SESSION STRIPE DÉJÀ TRAITÉE - Webhook en doublon absolu')
-                
-                const result = { 
-                  success: true, 
-                  type: 'session_already_processed_conflict',
-                  message: 'Session already processed in conflict resolution',
-                  existingBookingId: conflictBooking.id
-                }
-                
-                processedSessions.set(sessionId, { timestamp: Date.now(), result })
-                
-                return new Response(JSON.stringify(result), {
-                  headers: { ...corsHeaders, 'Content-Type': 'application/json' }
-                })
-              }
-              
-              // Ajouter la nouvelle transaction avec référence à la session
-              const newTransaction = {
-                id: crypto.randomUUID(),
-                amount: amountPaid,
-                method: 'stripe',
-                status: 'completed',
-                note: `Acompte payé via Stripe (${amountPaid.toFixed(2)}€) - Session: ${sessionId}`,
-                created_at: new Date().toISOString()
-              }
-              
-              const finalTransactions = [...existingTransactions, newTransaction]
-              const newTotalPaid = amountPaid + (conflictBooking.payment_amount || 0)
-              const totalAmount = conflictBooking.total_amount
-
-              let newPaymentStatus = 'pending'
-              if (newTotalPaid >= totalAmount) {
-                newPaymentStatus = 'completed'
-              } else if (newTotalPaid > 0) {
-                newPaymentStatus = 'partial'
-              }
-
-              const { error: updateError } = await supabaseClient
-                .from('bookings')
-                .update({
-                  payment_amount: newTotalPaid,
-                  payment_status: newPaymentStatus,
-                  booking_status: 'confirmed',
-                  transactions: finalTransactions,
-                  updated_at: new Date().toISOString()
-                })
-                .eq('id', conflictBooking.id)
-
-              if (!updateError) {
-                console.log('✅ CONFLIT RÉSOLU - Réservation mise à jour au lieu de créer un doublon')
-                
-                const result = { 
-                  success: true, 
-                  type: 'conflict_resolved',
-                  bookingId: conflictBooking.id,
-                  amountPaid: amountPaid,
-                  totalPaid: newTotalPaid,
-                  paymentStatus: newPaymentStatus,
-                  bookingStatus: 'confirmed',
-                  sessionId: sessionId
-                }
-                
-                processedSessions.set(sessionId, { timestamp: Date.now(), result })
-                
-                return new Response(JSON.stringify(result), {
-                  headers: { ...corsHeaders, 'Content-Type': 'application/json' }
-                })
-              }
-            }
-          }
-          
-          console.error('❌ Erreur création réservation après paiement:', bookingError)
-          processedSessions.delete(sessionId)
-          return new Response('Erreur création réservation', { status: 500, headers: corsHeaders })
-        }
-        
-        console.log('✅ NOUVELLE RÉSERVATION CRÉÉE avec succès APRÈS paiement:', newBooking.id)
-        
-        const result = { 
-          success: true, 
-          type: 'booking_created',
-          bookingId: newBooking.id,
-          amountPaid: amountPaid,
-          paymentStatus: 'partial',
-          bookingStatus: 'confirmed',
-          sessionId: sessionId
-        }
-        
-        // Mettre à jour le cache avec le résultat final
-        processedSessions.set(sessionId, { timestamp: Date.now(), result })
-        
-        return new Response(JSON.stringify(result), {
-          headers: { ...corsHeaders, 'Content-Type': 'application/json' }
-        })
-      }
-      
-      // Sinon, c'est un paiement pour une réservation existante (backend)
-      console.log('🔍 Recherche de la réservation existante pour:', customerEmail)
-      
+      // Recherche de la réservation avec critères précis
       let booking = null
-      
-      // 🔍 RECHERCHE AMÉLIORÉE DE LA RÉSERVATION EXISTANTE
-      console.log('🔍 Métadonnées reçues pour recherche:', {
-        email: customerEmail,
-        date: metadata.date || metadata.booking_date,
-        time: metadata.time || metadata.booking_time,
-        user_id: metadata.user_id,
-        service_id: metadata.service_id
-      })
-
-      // Recherche par critères exacts (email + date + heure + user_id)
       const searchDate = metadata.date || metadata.booking_date
       const searchTime = metadata.time || metadata.booking_time
       const searchUserId = metadata.user_id
@@ -544,6 +212,12 @@ serve(async (req) => {
           .in('booking_status', ['pending', 'confirmed'])
           .order('created_at', { ascending: false })
           .limit(1)
+
+        console.log('📊 Résultat recherche complète:', {
+          data: bookingData,
+          error: bookingError,
+          count: bookingData?.length || 0
+        })
 
         if (!bookingError && bookingData && bookingData.length > 0) {
           booking = bookingData[0]
@@ -610,10 +284,22 @@ serve(async (req) => {
         }
         
         processedSessions.delete(sessionId)
-        return new Response('Réservation non trouvée', { status: 404, headers: corsHeaders })
+        return new Response(JSON.stringify({ 
+          error: 'Réservation non trouvée',
+          search_criteria: {
+            email: customerEmail,
+            date: searchDate,
+            time: searchTime,
+            user_id: searchUserId
+          },
+          debug_bookings: allBookings || []
+        }), { 
+          status: 404, 
+          headers: { ...corsHeaders, 'Content-Type': 'application/json' }
+        })
       }
 
-      console.log('💳 MISE À JOUR RÉSERVATION EXISTANTE:', booking.id)
+      console.log('💳 MISE À JOUR RÉSERVATION:', booking.id)
       console.log('📊 Réservation avant mise à jour:', {
         id: booking.id,
         payment_amount: booking.payment_amount,
@@ -622,7 +308,7 @@ serve(async (req) => {
         transactions_count: (booking.transactions || []).length
       })
 
-      // Mettre à jour la réservation existante
+      // Mettre à jour la réservation
       const existingTransactions = booking.transactions || []
       
       // Vérifier si cette session n'a pas déjà été traitée
@@ -633,7 +319,7 @@ serve(async (req) => {
       )
       
       if (sessionAlreadyProcessed) {
-        console.log('🔒 SESSION STRIPE DÉJÀ TRAITÉE - Webhook en doublon absolu')
+        console.log('🔒 SESSION STRIPE DÉJÀ TRAITÉE')
         
         const result = { 
           success: true, 
@@ -685,7 +371,7 @@ serve(async (req) => {
 
       console.log('🔄 DÉBUT MISE À JOUR BASE DE DONNÉES...')
       
-      const { error: updateError } = await supabaseClient
+      const { data: updatedBooking, error: updateError } = await supabaseClient
         .from('bookings')
         .update({
           payment_amount: newTotalPaid,
@@ -695,6 +381,8 @@ serve(async (req) => {
           updated_at: new Date().toISOString()
         })
         .eq('id', booking.id)
+        .select()
+        .single()
 
       if (updateError) {
         console.error('❌ Erreur mise à jour réservation:', updateError)
@@ -705,10 +393,16 @@ serve(async (req) => {
           code: updateError.code
         })
         processedSessions.delete(sessionId)
-        return new Response('Erreur mise à jour', { status: 500, headers: corsHeaders })
+        return new Response(JSON.stringify({ 
+          error: 'Erreur mise à jour',
+          details: updateError
+        }), { 
+          status: 500, 
+          headers: { ...corsHeaders, 'Content-Type': 'application/json' }
+        })
       }
 
-      console.log('✅ RÉSERVATION MISE À JOUR AVEC SUCCÈS EN BASE DE DONNÉES')
+      console.log('✅ RÉSERVATION MISE À JOUR AVEC SUCCÈS')
       console.log('📊 Réservation après mise à jour:', {
         id: booking.id,
         payment_amount: newTotalPaid,
@@ -719,13 +413,14 @@ serve(async (req) => {
       
       const result = { 
         success: true, 
-        type: 'existing_booking_updated',
-        bookingId: booking?.id || 'updated',
+        type: 'booking_updated',
+        bookingId: booking.id,
         amountPaid: amountPaid,
         totalPaid: newTotalPaid,
         paymentStatus: newPaymentStatus,
         bookingStatus: newBookingStatus,
-        sessionId: sessionId
+        sessionId: sessionId,
+        updatedBooking: updatedBooking
       }
       
       // Mettre à jour le cache avec le résultat final
@@ -739,13 +434,21 @@ serve(async (req) => {
     // Autres types d'événements
     console.log('ℹ️ Événement non traité:', event.type)
 
-    return new Response(JSON.stringify({ received: true }), {
+    return new Response(JSON.stringify({ 
+      received: true,
+      event_type: event.type,
+      message: 'Event received but not processed'
+    }), {
       headers: { ...corsHeaders, 'Content-Type': 'application/json' }
     })
 
   } catch (error) {
     console.error('❌ Erreur webhook:', error)
-    return new Response(JSON.stringify({ error: error.message }), {
+    return new Response(JSON.stringify({ 
+      error: error.message,
+      stack: error.stack,
+      timestamp: new Date().toISOString()
+    }), {
       status: 500,
       headers: { ...corsHeaders, 'Content-Type': 'application/json' }
     })
