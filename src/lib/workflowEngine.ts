@@ -70,6 +70,9 @@ const checkWorkflowConditions = (workflow: EmailWorkflow, booking: Booking): boo
       case 'service_name':
         fieldValue = booking.service?.name;
         break;
+      case 'service_id':
+        fieldValue = booking.service_id;
+        break;
       case 'total_amount':
         fieldValue = booking.total_amount;
         break;

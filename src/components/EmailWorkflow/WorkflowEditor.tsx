@@ -2,6 +2,7 @@ import React, { useState, useEffect } from 'react';
 import { X, Save, Plus, Trash2, Zap, Clock, Mail, Filter } from 'lucide-react';
 import { EmailWorkflow, EmailTemplate, WorkflowCondition } from '../../types/email';
 import { Modal } from '../UI/Modal';
+import { useServices } from '../../hooks/useServices';
 
 interface WorkflowEditorProps {
   workflow: EmailWorkflow | null;
@@ -25,6 +26,7 @@ export function WorkflowEditor({ workflow, templates, onSave, onClose }: Workflo
     { value: 'booking_created', label: '📅 Nouvelle réservation' },
     { value: 'booking_updated', label: '✏️ Réservation modifiée' },
     { value: 'payment_link_created', label: '💳 Lien de paiement créé' },
+    { value: 'payment_link_paid', label: '💰 Lien de paiement payé' },
     { value: 'payment_completed', label: '✅ Paiement complété' },
     { value: 'booking_cancelled', label: '❌ Réservation annulée' },
     { value: 'reminder_24h', label: '⏰ Rappel 24h avant' },
@@ -36,6 +38,7 @@ export function WorkflowEditor({ workflow, templates, onSave, onClose }: Workflo
     { value: 'booking_status', label: 'Statut réservation' },
     { value: 'payment_status', label: 'Statut paiement' },
     { value: 'service_name', label: 'Nom du service' },
+    { value: 'service_id', label: 'Service spécifique' },
     { value: 'total_amount', label: 'Montant total' },
     { value: 'client_email', label: 'Email client' }
   ];
@@ -47,6 +50,45 @@ export function WorkflowEditor({ workflow, templates, onSave, onClose }: Workflo
     { value: 'greater_than', label: 'Supérieur à' },
     { value: 'less_than', label: 'Inférieur à' }
   ];
+
+  // Récupérer les services pour les sélecteurs
+  const { services } = useServices();
+
+  // Options pour les statuts de réservation
+  const bookingStatusOptions = [
+    { value: 'pending', label: 'En attente' },
+    { value: 'confirmed', label: 'Confirmée' },
+    { value: 'cancelled', label: 'Annulée' }
+  ];
+
+  // Options pour les statuts de paiement
+  const paymentStatusOptions = [
+    { value: 'pending', label: 'Non payé' },
+    { value: 'partial', label: 'Acompte' },
+    { value: 'completed', label: 'Payé' }
+  ];
+
+  // Fonction pour obtenir les options selon le champ
+  const getFieldOptions = (field: string) => {
+    switch (field) {
+      case 'booking_status':
+        return bookingStatusOptions;
+      case 'payment_status':
+        return paymentStatusOptions;
+      case 'service_id':
+        return services.map(service => ({
+          value: service.id,
+          label: service.name
+        }));
+      default:
+        return [];
+    }
+  };
+
+  // Fonction pour déterminer si on doit afficher un sélecteur ou un input
+  const shouldShowSelector = (field: string) => {
+    return ['booking_status', 'payment_status', 'service_id'].includes(field);
+  };
 
   useEffect(() => {
     if (workflow) {
@@ -261,6 +303,28 @@ export function WorkflowEditor({ workflow, templates, onSave, onClose }: Workflo
                   placeholder="Valeur"
                   className="flex-1 p-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-orange-500 focus:border-orange-500"
                 />
+                {shouldShowSelector(condition.field) ? (
+                  <select
+                    value={condition.value}
+                    onChange={(e) => updateCondition(index, 'value', e.target.value)}
+                    className="flex-1 p-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-orange-500 focus:border-orange-500"
+                  >
+                    <option value="">Sélectionner...</option>
+                    {getFieldOptions(condition.field).map(option => (
+                      <option key={option.value} value={option.value}>
+                        {option.label}
+                      </option>
+                    ))}
+                  </select>
+                ) : (
+                  <input
+                    type="text"
+                    value={condition.value}
+                    onChange={(e) => updateCondition(index, 'value', e.target.value)}
+                    placeholder="Valeur"
+                    className="flex-1 p-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-orange-500 focus:border-orange-500"
+                  />
+                )}
 
                 <button
                   type="button"

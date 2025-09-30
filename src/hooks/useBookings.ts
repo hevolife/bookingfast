@@ -257,6 +257,24 @@ export function useBookings(date?: string) {
           console.error('❌ Erreur déclenchement workflow:', workflowError);
         }
         
+        // Vérifier si c'est un paiement de lien qui vient d'être complété
+        const hasRecentStripePayment = data.transactions?.some(t => 
+          t.method === 'stripe' && 
+          t.status === 'completed' && 
+          t.created_at &&
+          (Date.now() - new Date(t.created_at).getTime()) < 60000 // Moins d'1 minute
+        );
+        
+        if (hasRecentStripePayment) {
+          try {
+            console.log('🚀 Déclenchement workflow payment_link_paid pour:', data.client_email);
+            await triggerWorkflow('payment_link_paid', data, user.id);
+            console.log('✅ Workflow payment_link_paid déclenché avec succès');
+          } catch (workflowError) {
+            console.error('❌ Erreur déclenchement workflow payment_link_paid:', workflowError);
+          }
+        }
+        
         return data;
       }
     } catch (err) {
@@ -331,6 +349,30 @@ export function useBookings(date?: string) {
         });
         
         console.log('Réservation mise à jour:', data.id);
+        
+        // Émettre l'événement de modification immédiatement
+        if (data) {
+          bookingEvents.emit('bookingUpdated', data);
+          
+          // Vérifier si c'est un paiement de lien qui vient d'être complété
+          const hasRecentStripePayment = data.transactions?.some(t => 
+            t.method === 'stripe' && 
+            t.status === 'completed' && 
+            t.created_at &&
+            (Date.now() - new Date(t.created_at).getTime()) < 60000 // Moins d'1 minute
+          );
+          
+          if (hasRecentStripePayment) {
+            try {
+              console.log('🚀 Déclenchement workflow payment_link_paid pour:', data.client_email);
+              await triggerWorkflow('payment_link_paid', data, user.id);
+              console.log('✅ Workflow payment_link_paid déclenché avec succès');
+            } catch (workflowError) {
+              console.error('❌ Erreur déclenchement workflow payment_link_paid:', workflowError);
+            }
+          }
+        }
+        
         return data;
       }
     } catch (err) {
