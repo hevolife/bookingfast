@@ -275,6 +275,7 @@ export function PaymentPage() {
             metadata: {
               client: client,
               email: email,
+              phone: phone,
               date: date,
               time: time,
               user_id: userId,
