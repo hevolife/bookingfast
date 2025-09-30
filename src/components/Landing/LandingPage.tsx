@@ -178,14 +178,6 @@ export function LandingPage() {
                   Essai gratuit 7 jours
                   <ArrowRight className="w-5 h-5 sm:w-6 sm:h-6 group-hover:translate-x-1 transition-transform" />
                 </button>
-                
-                <button
-                  onClick={() => scrollToSection('demo')}
-                  className="bg-white/80 backdrop-blur-sm text-purple-600 px-6 sm:px-8 py-3 sm:py-4 rounded-2xl hover:bg-white transition-all duration-300 transform hover:scale-105 shadow-xl font-bold text-base sm:text-lg flex items-center gap-2 sm:gap-3 border border-purple-200"
-                >
-                  <Play className="w-5 h-5 sm:w-6 sm:h-6" />
-                  Voir la démo
-                </button>
               </div>
 
               {/* Trust indicators */}
