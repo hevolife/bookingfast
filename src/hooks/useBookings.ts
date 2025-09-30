@@ -248,14 +248,8 @@ export function useBookings(date?: string) {
         
         console.log('✅ Nouvelle réservation créée:', data.id);
         
-        // Déclencher le workflow immédiatement après création réussie
-        try {
-          console.log('🚀 Déclenchement workflow booking_created pour:', data.client_email);
-          await triggerWorkflow('booking_created', data, user.id);
-          console.log('✅ Workflow booking_created déclenché avec succès');
-        } catch (workflowError) {
-          console.error('❌ Erreur déclenchement workflow:', workflowError);
-        }
+        // Le workflow booking_created est maintenant géré dans BookingModal
+        // pour éviter le déclenchement quand des liens de paiement sont en attente
         
         return data;
       }
