@@ -500,16 +500,6 @@ Deno.serve(async (req) => {
                 finalTransactions = [...finalTransactions, newTransaction]
               }
               
-                  id: crypto.randomUUID(),
-                  amount: amountPaid,
-                  method: 'stripe',
-                  status: 'completed',
-                  note: `Acompte payé via Stripe (${amountPaid.toFixed(2)}€) - Session: ${sessionId}`,
-                  created_at: new Date().toISOString()
-                }
-                finalTransactions = [...finalTransactions, newTransaction]
-              }
-              
               const newTotalPaid = amountPaid + (conflictBooking.payment_amount || 0)
               const totalAmount = conflictBooking.total_amount
 
