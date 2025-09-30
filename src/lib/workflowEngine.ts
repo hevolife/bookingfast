@@ -167,24 +167,6 @@ export const triggerWorkflow = async (trigger: string, booking: Booking, userId?
     console.log('⚠️ Pas d\'utilisateur connecté, workflow ignoré');
     return;
   }
-  
-  // 🔒 PROTECTION SPÉCIALE POUR BOOKING_CREATED
-  if (trigger === 'booking_created') {
-    // Vérifier s'il y a des liens de paiement en attente
-    const hasPendingPaymentLinks = booking.transactions?.some(t => 
-      t.method === 'stripe' && 
-      t.status === 'pending'
-    ) || false;
-    
-    if (hasPendingPaymentLinks) {
-      console.log('⏳ WORKFLOW BOOKING_CREATED BLOQUÉ - Liens de paiement en attente');
-      console.log('📋 Transactions en attente:', booking.transactions?.filter(t => t.method === 'stripe' && t.status === 'pending'));
-      return; // Ne pas déclencher le workflow
-    } else {
-      console.log('✅ WORKFLOW BOOKING_CREATED AUTORISÉ - Aucun lien de paiement en attente');
-    }
-  }
-  
   console.log('🚀 DÉBUT DÉCLENCHEMENT WORKFLOW');
   console.log('📋 Trigger:', trigger);
   console.log('📋 Réservation ID:', booking.id);

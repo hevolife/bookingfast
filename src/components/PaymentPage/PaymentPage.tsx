@@ -1,6 +1,6 @@
 import React, { useState, useEffect } from 'react';
 import { useSearchParams, useNavigate } from 'react-router-dom';
-import { CreditCard, Clock, User, Mail, Calendar, AlertTriangle, XCircle, Timer, CheckCircle } from 'lucide-react';
+import { CreditCard, Clock, User, Mail, Calendar, AlertTriangle, XCircle, Timer } from 'lucide-react';
 import { supabase, isSupabaseConfigured } from '../../lib/supabase';
 
 export function PaymentPage() {
@@ -10,7 +10,6 @@ export function PaymentPage() {
   const [isExpired, setIsExpired] = useState(false);
   const [processing, setProcessing] = useState(false);
   const [isDeleted, setIsDeleted] = useState(false);
-  const [isAlreadyPaid, setIsAlreadyPaid] = useState(false);
   const [checkingStatus, setCheckingStatus] = useState(true);
 
   // Récupérer les paramètres de l'URL
@@ -57,8 +56,8 @@ export function PaymentPage() {
         // Si la réservation est déjà entièrement payée, marquer comme supprimé
         if (booking.payment_status === 'completed' && 
             (booking.payment_amount || 0) >= booking.total_amount) {
-          console.log('💰 Réservation déjà entièrement payée - affichage message de confirmation');
-          setIsAlreadyPaid(true);
+          console.log('💰 Réservation déjà entièrement payée');
+          setIsDeleted(true);
           setCheckingStatus(false);
           return;
         }
@@ -131,51 +130,6 @@ export function PaymentPage() {
   }
 
   // Vérifier si le lien a été supprimé
-  if (isAlreadyPaid) {
-    return (
-      <div className="min-h-screen bg-gradient-to-br from-green-50 to-emerald-50 flex items-center justify-center p-4">
-        <div className="bg-white rounded-3xl shadow-2xl p-8 max-w-md w-full text-center">
-          <div className="w-20 h-20 bg-gradient-to-r from-green-500 to-emerald-500 rounded-full flex items-center justify-center mx-auto mb-6">
-            <CheckCircle className="w-12 h-12 text-white" />
-          </div>
-          <h1 className="text-3xl font-bold text-gray-900 mb-4">
-            Paiement validé !
-          </h1>
-          <p className="text-gray-600 text-lg mb-6">
-            Cette réservation a déjà été payée intégralement. Votre réservation est confirmée.
-          </p>
-          <div className="bg-green-50 border border-green-200 rounded-2xl p-4 mb-6">
-            <h4 className="font-bold text-green-800 mb-2">✅ Réservation confirmée</h4>
-            <div className="text-green-700 text-sm space-y-1">
-              <div><strong>Service :</strong> {service}</div>
-              <div><strong>Client :</strong> {client}</div>
-              <div><strong>Date :</strong> {new Date(date).toLocaleDateString('fr-FR', {
-                weekday: 'long',
-                day: 'numeric',
-                month: 'long'
-              })}</div>
-              <div><strong>Heure :</strong> {time}</div>
-              <div><strong>Montant payé :</strong> {parseFloat(amount).toFixed(2)}€</div>
-            </div>
-          </div>
-          <button
-            onClick={() => {
-              window.close();
-              setTimeout(() => {
-                if (!window.closed) {
-                  window.location.href = '/';
-                }
-              }, 100);
-            }}
-            className="w-full bg-gradient-to-r from-green-600 to-emerald-600 text-white py-3 px-6 rounded-2xl font-medium hover:from-green-700 hover:to-emerald-700 transition-all duration-300 transform hover:scale-105 shadow-lg"
-          >
-            Fermer
-          </button>
-        </div>
-      </div>
-    );
-  }
-
   if (isDeleted) {
     return (
       <div className="min-h-screen bg-gradient-to-br from-red-50 to-pink-50 flex items-center justify-center p-4">

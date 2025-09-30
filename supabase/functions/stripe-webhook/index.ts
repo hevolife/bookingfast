@@ -309,9 +309,7 @@ Deno.serve(async (req) => {
             processedSessions.delete(sessionId)
             return new Response('Erreur mise à jour réservation', { status: 500, headers: corsHeaders })
           }
-          // Calculer le nouveau montant payé depuis toutes les transactions complétées
-          const completedTransactions = finalTransactions.filter(t => t.status === 'completed' || t.status === 'success')
-          const newTotalPaid = completedTransactions.reduce((sum, t) => sum + t.amount, 0)
+
           console.log('✅ RÉSERVATION EXISTANTE MISE À JOUR - AUCUNE CRÉATION')
           
           // 🚀 DÉCLENCHER LES WORKFLOWS APRÈS MISE À JOUR RÉUSSIE
@@ -466,42 +464,16 @@ Deno.serve(async (req) => {
               }
               
               // Ajouter la nouvelle transaction avec référence à la session
-              // 🔄 METTRE À JOUR LA TRANSACTION EXISTANTE AU LIEU D'EN CRÉER UNE NOUVELLE
-              let finalTransactions = [...existingTransactions]
-              let transactionUpdated = false
-              
-              // Chercher une transaction Stripe en attente avec le même montant
-              finalTransactions = finalTransactions.map(t => {
-                if (t.method === 'stripe' && 
-                    t.status === 'pending' && 
-                    Math.abs(t.amount - amountPaid) < 0.01 && 
-                    !transactionUpdated) {
-                  console.log('🔄 Mise à jour transaction existante:', t.amount, '€')
-                  transactionUpdated = true
-                  return {
-                    ...t,
-                    status: 'completed',
-                    note: `Acompte payé via Stripe (${amountPaid.toFixed(2)}€) - Session: ${sessionId}`,
-                    updated_at: new Date().toISOString()
-                  }
-                }
-                return t
-              })
-              
-              // Si aucune transaction existante n'a été mise à jour, créer une nouvelle
-              if (!transactionUpdated) {
-                console.log('➕ Création nouvelle transaction:', amountPaid, '€')
-                const newTransaction = {
-                  id: crypto.randomUUID(),
-                  amount: amountPaid,
-                  method: 'stripe',
-                  status: 'completed',
-                  note: `Acompte payé via Stripe (${amountPaid.toFixed(2)}€) - Session: ${sessionId}`,
-                  created_at: new Date().toISOString()
-                }
-                finalTransactions = [...finalTransactions, newTransaction]
+              const newTransaction = {
+                id: crypto.randomUUID(),
+                amount: amountPaid,
+                method: 'stripe',
+                status: 'completed',
+                note: `Acompte payé via Stripe (${amountPaid.toFixed(2)}€) - Session: ${sessionId}`,
+                created_at: new Date().toISOString()
               }
               
+              const finalTransactions = [...existingTransactions, newTransaction]
               const newTotalPaid = amountPaid + (conflictBooking.payment_amount || 0)
               const totalAmount = conflictBooking.total_amount
 
@@ -747,48 +719,21 @@ Deno.serve(async (req) => {
       }
       
       // Créer une nouvelle transaction pour ce paiement
-      // 🔄 METTRE À JOUR LA TRANSACTION EXISTANTE AU LIEU D'EN CRÉER UNE NOUVELLE
-      let finalTransactions = [...existingTransactions]
-      let transactionUpdated = false
-      
-      // Chercher une transaction Stripe en attente avec le même montant
-      finalTransactions = finalTransactions.map(t => {
-        if (t.method === 'stripe' && 
-            t.status === 'pending' && 
-            Math.abs(t.amount - amountPaid) < 0.01 && 
-            !transactionUpdated) {
-          console.log('🔄 Mise à jour transaction existante:', t.amount, '€')
-          transactionUpdated = true
-          return {
-            ...t,
-            status: 'completed',
-            note: metadata.is_deposit === 'true' 
-              ? `Acompte payé via Stripe (${amountPaid.toFixed(2)}€) - Session: ${sessionId}`
-              : `Paiement Stripe (${amountPaid.toFixed(2)}€) - Session: ${sessionId}`,
-            updated_at: new Date().toISOString()
-          }
-        }
-        return t
-      })
-      
-      // Si aucune transaction existante n'a été mise à jour, créer une nouvelle
-      if (!transactionUpdated) {
-        console.log('➕ Création nouvelle transaction:', amountPaid, '€')
-        const newTransaction = {
-          id: crypto.randomUUID(),
-          amount: amountPaid,
-          method: 'stripe',
-          status: 'completed',
-          note: metadata.is_deposit === 'true' 
-            ? `Acompte payé via Stripe (${amountPaid.toFixed(2)}€) - Session: ${sessionId}`
-            : `Paiement Stripe (${amountPaid.toFixed(2)}€) - Session: ${sessionId}`,
-          created_at: new Date().toISOString()
-        }
-        finalTransactions = [...finalTransactions, newTransaction]
+      const newTransaction = {
+        id: crypto.randomUUID(),
+        amount: amountPaid,
+        method: 'stripe',
+        status: 'completed',
+        note: metadata.is_deposit === 'true' 
+          ? `Acompte payé via Stripe (${amountPaid.toFixed(2)}€)`
+          : `Paiement Stripe (${amountPaid.toFixed(2)}€)`,
+        created_at: new Date().toISOString()
       }
+      
+      const finalTransactions = [...existingTransactions, newTransaction]
 
       // Calculer le nouveau montant payé
-      const completedTransactions = finalTransactions.filter((t: any) => t.status === 'completed' || t.status === 'success')
+      const completedTransactions = finalTransactions.filter((t: any) => t.status === 'completed' || !t.status)
       const newTotalPaid = completedTransactions.reduce((sum: number, t: any) => sum + t.amount, 0)
       const totalAmount = parseFloat(booking.total_amount)
 

@@ -286,14 +286,6 @@ export function BookingModal({
     }
   };
 
-  // Fonction pour vérifier si la réservation a des liens de paiement en attente
-  const hasPendingPaymentLinks = (transactions: Transaction[]): boolean => {
-    return transactions.some(t => 
-      t.method === 'stripe' && 
-      t.status === 'pending'
-    );
-  };
-
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
     
@@ -377,22 +369,9 @@ export function BookingModal({
       } else {
         const newBooking = await addBooking(bookingData);
         
-        // Émettre l'événement de création SEULEMENT si aucun lien de paiement en attente
+        // Émettre l'événement de création immédiatement
         if (newBooking) {
           bookingEvents.emit('bookingCreated', newBooking);
-          
-          // Déclencher le workflow "nouvelle réservation" SEULEMENT si aucun lien de paiement en attente
-          if (!hasPendingPaymentLinks(transactions) && user?.id) {
-            console.log('🚀 Aucun lien de paiement en attente - déclenchement workflow booking_created');
-            try {
-              await triggerWorkflow('booking_created', newBooking, user.id);
-              console.log('✅ Workflow booking_created déclenché avec succès');
-            } catch (workflowError) {
-              console.error('❌ Erreur déclenchement workflow booking_created:', workflowError);
-            }
-          } else {
-            console.log('⏳ Liens de paiement en attente - workflow booking_created différé');
-          }
         }
       }
 
