@@ -397,13 +397,13 @@ export function useBookings(date?: string) {
   useEffect(() => {
     const interval = setInterval(() => {
       const timeSinceLastInteraction = Date.now() - lastInteraction;
-      const oneMinute = 1 * 60 * 1000; // Réduire à 1 minute pour détecter plus vite les paiements
+      const twoMinutes = 2 * 60 * 1000;
       
-      if (timeSinceLastInteraction >= oneMinute) {
-        console.log('🔄 Auto-refresh du planning (1 minute d\'inactivité)');
+      if (timeSinceLastInteraction >= twoMinutes) {
+        console.log('🔄 Auto-refresh du planning (2 minutes d\'inactivité)');
         fetchBookings();
       }
-    }, 1 * 60 * 1000); // Vérifier toutes les minutes
+    }, 2 * 60 * 1000);
 
     return () => clearInterval(interval);
   }, [lastInteraction, user?.id]);
@@ -415,18 +415,8 @@ export function useBookings(date?: string) {
       fetchBookings();
     };
 
-    const handlePaymentCompleted = () => {
-      console.log('💰 Paiement complété détecté - rafraîchissement immédiat');
-      fetchBookings();
-    };
-
     window.addEventListener('refreshBookings', handleRefreshBookings);
-    window.addEventListener('paymentCompleted', handlePaymentCompleted);
     return () => window.removeEventListener('refreshBookings', handleRefreshBookings);
-    return () => {
-      window.removeEventListener('refreshBookings', handleRefreshBookings);
-      window.removeEventListener('paymentCompleted', handlePaymentCompleted);
-    };
   }, []);
 
   // Mettre à jour lastInteraction lors des interactions utilisateur

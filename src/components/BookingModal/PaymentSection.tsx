@@ -22,7 +22,6 @@ interface PaymentSectionProps {
 function PaymentLinkTimer({ createdAt, expiryMinutes = 30 }: { createdAt: string; expiryMinutes?: number }) {
   const [timeLeft, setTimeLeft] = React.useState<number>(0);
   const [isExpired, setIsExpired] = React.useState(false);
-  const [checkingPayment, setCheckingPayment] = React.useState(false);
 
   React.useEffect(() => {
     const updateTimer = () => {
@@ -33,26 +32,13 @@ function PaymentLinkTimer({ createdAt, expiryMinutes = 30 }: { createdAt: string
       
       setTimeLeft(remaining);
       setIsExpired(remaining === 0);
-      
-      // Vérifier le statut du paiement toutes les 30 secondes
-      if (remaining > 0 && !checkingPayment) {
-        const timeSinceCreation = now - createdTime;
-        if (timeSinceCreation > 30000 && timeSinceCreation % 30000 < 1000) {
-          setCheckingPayment(true);
-          // Déclencher un refresh des données
-          setTimeout(() => {
-            window.dispatchEvent(new CustomEvent('refreshBookings'));
-            setCheckingPayment(false);
-          }, 1000);
-        }
-      }
     };
 
     updateTimer();
     const interval = setInterval(updateTimer, 1000);
 
     return () => clearInterval(interval);
-  }, [createdAt, expiryMinutes, checkingPayment]);
+  }, [createdAt, expiryMinutes]);
 
   const formatTimeLeft = (ms: number) => {
     const minutes = Math.floor(ms / 60000);
@@ -74,10 +60,9 @@ function PaymentLinkTimer({ createdAt, expiryMinutes = 30 }: { createdAt: string
   return (
     <div className={`flex items-center gap-1 text-xs font-bold ${
       isWarning ? 'text-orange-600 animate-pulse' : 'text-blue-600'
-    } ${checkingPayment ? 'opacity-50' : ''}`}>
+    }`}>
       <Clock className="w-3 h-3" />
       <span>{formatTimeLeft(timeLeft)}</span>
-      {checkingPayment && <span className="ml-1">🔄</span>}
     </div>
   );
 }
@@ -184,23 +169,18 @@ export function PaymentSection({
     if (transaction.method !== 'stripe' || transaction.status !== 'pending') return;
     
     try {
-      // Reconstituer le lien de paiement avec user_id
+      // Reconstituer le lien de paiement
       const expiryMinutes = settings?.payment_link_expiry_minutes || 30;
       const expiresAt = new Date(transaction.created_at).getTime() + (expiryMinutes * 60 * 1000);
       const paymentUrl = new URL('/payment', window.location.origin);
       
       paymentUrl.searchParams.set('amount', transaction.amount.toString());
       paymentUrl.searchParams.set('service', serviceName);
-      paymentUrl.searchParams.set('client', `${clientEmail.split('@')[0]}`);
+      paymentUrl.searchParams.set('client', `Client`);
       paymentUrl.searchParams.set('email', clientEmail);
       paymentUrl.searchParams.set('date', bookingDate);
       paymentUrl.searchParams.set('time', bookingTime);
       paymentUrl.searchParams.set('expires', expiresAt.toString());
-      
-      // Ajouter l'user_id pour la cohérence
-      if (user?.id) {
-        paymentUrl.searchParams.set('user_id', user.id);
-      }
       
       await navigator.clipboard.writeText(paymentUrl.toString());
       alert('Lien de paiement copié dans le presse-papiers !');
