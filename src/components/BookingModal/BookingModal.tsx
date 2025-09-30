@@ -268,9 +268,6 @@ export function BookingModal({
         // Continuer même si la copie échoue
       }
       
-      const successMessage = `Lien de paiement généré avec succès !\n\n${settings?.brevo_enabled ? 'Email envoyé automatiquement au client.' : 'Lien copié - envoyez-le au client.'}\n\nMontant: ${amount.toFixed(2)}€\nExpire dans ${expiryMinutes} minutes\n\nLien: ${paymentUrl.toString()}`;
-      
-      alert(successMessage);
       console.log('✅ Lien de paiement généré avec succès');
       
     } catch (error) {
