@@ -309,7 +309,9 @@ Deno.serve(async (req) => {
             processedSessions.delete(sessionId)
             return new Response('Erreur mise à jour réservation', { status: 500, headers: corsHeaders })
           }
-
+          // Calculer le nouveau montant payé depuis toutes les transactions complétées
+          const completedTransactions = finalTransactions.filter(t => t.status === 'completed' || t.status === 'success')
+          const newTotalPaid = completedTransactions.reduce((sum, t) => sum + t.amount, 0)
           console.log('✅ RÉSERVATION EXISTANTE MISE À JOUR - AUCUNE CRÉATION')
           
           // 🚀 DÉCLENCHER LES WORKFLOWS APRÈS MISE À JOUR RÉUSSIE
@@ -786,7 +788,7 @@ Deno.serve(async (req) => {
       }
 
       // Calculer le nouveau montant payé
-      const completedTransactions = finalTransactions.filter((t: any) => t.status === 'completed' || !t.status)
+      const completedTransactions = finalTransactions.filter((t: any) => t.status === 'completed' || t.status === 'success')
       const newTotalPaid = completedTransactions.reduce((sum: number, t: any) => sum + t.amount, 0)
       const totalAmount = parseFloat(booking.total_amount)
 
