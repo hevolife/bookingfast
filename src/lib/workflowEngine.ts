@@ -177,6 +177,21 @@ export const triggerWorkflow = async (trigger: string, booking: Booking, userId?
   console.log('📋 Service:', booking.service?.name || 'Service inconnu');
   console.log('📋 User ID:', userId);
   
+  // Debug spécial pour payment_link_paid
+  if (trigger === 'payment_link_paid') {
+    console.log('💳 DEBUG PAYMENT_LINK_PAID:');
+    console.log('💳 Transactions:', booking.transactions?.length || 0);
+    console.log('💳 Détails transactions:', booking.transactions?.map(t => ({
+      method: t.method,
+      status: t.status,
+      amount: t.amount,
+      created_at: t.created_at,
+      age_minutes: t.created_at ? Math.round((Date.now() - new Date(t.created_at).getTime()) / 60000) : 'N/A'
+    })));
+    console.log('💳 Payment status:', booking.payment_status);
+    console.log('💳 Payment amount:', booking.payment_amount);
+  }
+  
   if (!isSupabaseConfigured()) {
     console.log('📧 MODE DÉMO - SIMULATION WORKFLOW');
     console.log('✅ Workflow simulé avec succès pour:', trigger);

@@ -262,7 +262,7 @@ export function useBookings(date?: string) {
           t.method === 'stripe' && 
           t.status === 'completed' && 
           t.created_at &&
-          (Date.now() - new Date(t.created_at).getTime()) < 60000 // Moins d'1 minute
+          (Date.now() - new Date(t.created_at).getTime()) < 300000 // Moins de 5 minutes
         );
         
         if (hasRecentStripePayment) {
@@ -359,7 +359,7 @@ export function useBookings(date?: string) {
             t.method === 'stripe' && 
             t.status === 'completed' && 
             t.created_at &&
-            (Date.now() - new Date(t.created_at).getTime()) < 60000 // Moins d'1 minute
+            (Date.now() - new Date(t.created_at).getTime()) < 300000 // Moins de 5 minutes (plus large)
           );
           
           if (hasRecentStripePayment) {
