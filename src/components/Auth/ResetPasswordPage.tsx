@@ -7,6 +7,7 @@ import { Button } from '../UI/Button';
 export function ResetPasswordPage() {
   const [searchParams] = useSearchParams();
   const navigate = useNavigate();
+  const [urlParams, setUrlParams] = useState<URLSearchParams | null>(null);
   const [password, setPassword] = useState('');
   const [confirmPassword, setConfirmPassword] = useState('');
   const [showPassword, setShowPassword] = useState(false);
@@ -15,12 +16,24 @@ export function ResetPasswordPage() {
   const [error, setError] = useState<string | null>(null);
   const [success, setSuccess] = useState(false);
 
-  // Récupérer les tokens depuis l'URL
-  const accessToken = searchParams.get('access_token');
-  const refreshToken = searchParams.get('refresh_token');
-  const type = searchParams.get('type');
-  const urlError = searchParams.get('error');
-  const errorDescription = searchParams.get('error_description');
+  // Parse URL fragments (Supabase uses # instead of ?)
+  useEffect(() => {
+    const hash = window.location.hash.substring(1); // Remove #
+    if (hash) {
+      const params = new URLSearchParams(hash);
+      setUrlParams(params);
+    } else {
+      // Fallback to search params
+      setUrlParams(searchParams);
+    }
+  }, [searchParams]);
+
+  // Récupérer les tokens depuis l'URL (fragments ou query params)
+  const accessToken = urlParams?.get('access_token') || searchParams.get('access_token');
+  const refreshToken = urlParams?.get('refresh_token') || searchParams.get('refresh_token');
+  const type = urlParams?.get('type') || searchParams.get('type');
+  const urlError = urlParams?.get('error') || searchParams.get('error');
+  const errorDescription = urlParams?.get('error_description') || searchParams.get('error_description');
 
   useEffect(() => {
     // Vérifier s'il y a une erreur dans l'URL

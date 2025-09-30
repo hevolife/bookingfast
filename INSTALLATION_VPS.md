@@ -87,7 +87,7 @@ systemctl status nginx
 apt install -y certbot python3-certbot-nginx
 
 # Obtenir le certificat SSL (remplacez votre-domaine.com)
-certbot --nginx -d votre-domaine.com -d www.votre-domaine.com -d api.votre-domaine.com -d studio.votre-domaine.com
+certbot --nginx -d bookingfast.pro -d www.bookingfast.pro -d api.bookingfast.pro -d studio.bookingfast.pro
 
 # Vérifier le renouvellement automatique
 certbot renew --dry-run
