@@ -242,7 +242,7 @@ export function LoginPage() {
             <button
               type="button"
               onClick={toggleMode}
-              className="text-purple-600 hover:text-purple-800 font-bold text-lg hover:underline transition-all duration-300 text-center w-full"
+              className="text-purple-600 hover:text-purple-800 font-bold text-lg hover:underline transition-all duration-300 text-center w-full mx-auto block"
             >
               {isLogin ? 'Créer un compte' : 'Se connecter'}
             </button>
