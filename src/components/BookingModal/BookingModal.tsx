@@ -64,6 +64,8 @@ export function useAppVersion() {
         setCurrentVersion({
           id: 'default',
           version: '1.2.3',
+        }
+        )
         // L'événement sera émis par useBookings avec la logique conditionnelle
         bookingEvents.emit('bookingCreated', newBooking);
       }
