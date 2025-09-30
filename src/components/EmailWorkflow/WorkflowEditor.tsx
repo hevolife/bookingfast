@@ -2,6 +2,7 @@ import React, { useState, useEffect } from 'react';
 import { X, Save, Plus, Trash2, Zap, Clock, Mail, Filter } from 'lucide-react';
 import { EmailWorkflow, EmailTemplate, WorkflowCondition } from '../../types/email';
 import { Modal } from '../UI/Modal';
+import { useServices } from '../../hooks/useServices';
 
 interface WorkflowEditorProps {
   workflow: EmailWorkflow | null;
