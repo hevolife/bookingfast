@@ -139,8 +139,8 @@ max_rows = 1000
 
 [auth]
 enabled = true
-site_url = "https://votre-domaine.com"
-additional_redirect_urls = ["https://votre-domaine.com/**"]
+site_url = "https://bookingfast.pro"
+additional_redirect_urls = ["https://bookingfast.pro/**"]
 jwt_expiry = 3600
 enable_signup = true
 enable_confirmations = false

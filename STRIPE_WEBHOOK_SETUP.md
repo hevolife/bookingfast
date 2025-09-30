@@ -18,7 +18,7 @@
 
 **URL du webhook :**
 ```
-https://bookingfast.app/functions/v1/stripe-webhook
+https://bookingfast.pro/functions/v1/stripe-webhook
 ```
 
 **OU si vous utilisez Supabase self-hosting :**

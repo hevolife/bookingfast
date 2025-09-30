@@ -66,8 +66,8 @@ services:
       GOTRUE_DB_DRIVER: postgres
       GOTRUE_DB_DATABASE_URL: postgresql://${POSTGRES_USER:-postgres}:${POSTGRES_PASSWORD}@db:5432/${POSTGRES_DB:-postgres}?search_path=auth
       
-      GOTRUE_SITE_URL: ${GOTRUE_SITE_URL:-https://bookingfast.app}
-      GOTRUE_URI_ALLOW_LIST: ${GOTRUE_URI_ALLOW_LIST:-https://bookingfast.app/**}
+      GOTRUE_SITE_URL: ${GOTRUE_SITE_URL:-https://bookingfast.pro}
+      GOTRUE_URI_ALLOW_LIST: ${GOTRUE_URI_ALLOW_LIST:-https://bookingfast.pro/**}
       GOTRUE_DISABLE_SIGNUP: ${GOTRUE_DISABLE_SIGNUP:-false}
       
       GOTRUE_JWT_ADMIN_ROLES: service_role

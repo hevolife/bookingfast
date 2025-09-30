@@ -52,7 +52,7 @@ Vous verrez deux types de clés :
 ### 3.2 URL du webhook
 Utilisez cette URL (remplacez par votre domaine) :
 ```
-https://bookingfast.app/functions/v1/stripe-webhook
+https://bookingfast.pro/functions/v1/stripe-webhook
 ```
 
 ### 3.3 Événements à écouter

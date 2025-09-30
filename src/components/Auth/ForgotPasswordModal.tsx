@@ -33,7 +33,7 @@ export function ForgotPasswordModal({ isOpen, onClose }: ForgotPasswordModalProp
 
     try {
       const { error: resetError } = await supabase.auth.resetPasswordForEmail(email.trim(), {
-        redirectTo: `https://bookingfast.app/reset-password`,
+        redirectTo: `https://bookingfast.pro/reset-password`,
       });
 
       if (resetError) {
