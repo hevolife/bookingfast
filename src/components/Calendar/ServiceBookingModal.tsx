@@ -142,7 +142,8 @@ export function ServiceBookingModal({
                              booking.booking_status === 'cancelled' ? '❌ Annulée' : '⏳ En attente'}
                           </div>
                           <div className={`px-2 sm:px-3 py-1 rounded-full text-xs font-medium border self-start ${getPaymentStatusColor(booking.payment_status)}`}>
-                            {getPaymentStatusText(booking.payment_status)}
+                            {booking.payment_status === 'completed' ? '✅ Payé' :
+                             booking.payment_status === 'partial' ? '💵 Partiellement' : '❌ Non payé'}
                           </div>
                         </div>
                       </div>

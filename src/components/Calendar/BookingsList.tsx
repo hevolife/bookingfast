@@ -320,7 +320,7 @@ export function BookingsList({ onEditBooking }: BookingsListProps) {
                             </span>
                             <span className={`inline-flex items-center px-3 py-1 rounded-full text-xs font-medium border ${getPaymentStatusColor(booking.payment_status)}`}>
                               {booking.payment_status === 'completed' ? '💰 Payé' :
-                               booking.payment_status === 'partial' ? '💳 Acompte' : '❌ Non payé'}
+                               booking.payment_status === 'partial' ? '💵 Partiellement' : '❌ Non payé'}
                             </span>
                           </div>
                         </td>

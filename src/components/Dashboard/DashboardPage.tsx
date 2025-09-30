@@ -646,7 +646,7 @@ export function DashboardPage() {
                       : 'bg-red-100 text-red-700'
                   }`}>
                     {selectedBooking.payment_status === 'completed' ? '✅ Payé' :
-                     selectedBooking.payment_status === 'partial' ? '⏳ Acompte' : '❌ Non payé'}
+                     selectedBooking.payment_status === 'partial' ? '💵 Partiellement' : '❌ Non payé'}
                   </span>
                 </div>
               </div>
