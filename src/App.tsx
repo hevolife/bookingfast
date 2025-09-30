@@ -13,6 +13,7 @@ import { EmailWorkflowPage } from './components/EmailWorkflow/EmailWorkflowPage'
 import { PaymentPage } from './components/PaymentPage/PaymentPage';
 import { PaymentSuccess } from './components/PaymentPage/PaymentSuccess';
 import { PaymentCancel } from './components/PaymentPage/PaymentCancel';
+import { ResetPasswordPage } from './components/Auth/ResetPasswordPage';
 import { LandingPage } from './components/Landing/LandingPage';
 import { IframeBookingPage } from './components/IframeBooking/IframeBookingPage';
 import { Navbar } from './components/Layout/Navbar';
@@ -82,6 +83,9 @@ function AppContent() {
       
       {/* Page de connexion */}
       <Route path="/login" element={<LoginPage />} />
+      
+      {/* Page de réinitialisation de mot de passe */}
+      <Route path="/reset-password" element={<ResetPasswordPage />} />
       
       {/* Pages de paiement sans navbar et sans authentification */}
       <Route path="/payment" element={<PaymentPage />} />

@@ -1,11 +1,12 @@
 import React, { useState } from 'react';
 import { useSearchParams } from 'react-router-dom';
-import { Mail, Lock, Eye, EyeOff, LogIn, UserPlus, Building2, Sparkles, Key, Gift } from 'lucide-react';
+import { Mail, Lock, Eye, EyeOff, LogIn, UserPlus, Building2, Sparkles, Key, Gift, RotateCcw } from 'lucide-react';
 import { useAuth } from '../../contexts/AuthContext';
 import { useNavigate } from 'react-router-dom';
 import { isSupabaseConfigured } from '../../lib/supabase';
 import { AccessCodeRedemption } from './AccessCodeRedemption';
 import { useAppVersion } from '../../hooks/useAppVersion';
+import { ForgotPasswordModal } from './ForgotPasswordModal';
 
 export function LoginPage() {
   const [searchParams] = useSearchParams();
@@ -16,6 +17,7 @@ export function LoginPage() {
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [showSecretCode, setShowSecretCode] = useState(false);
+  const [showForgotPassword, setShowForgotPassword] = useState(false);
   
   const { signIn, signUp } = useAuth();
   const navigate = useNavigate();
@@ -218,6 +220,20 @@ export function LoginPage() {
             </button>
           </form>
 
+          {/* Mot de passe oublié */}
+          {isLogin && (
+            <div className="mt-4 text-center">
+              <button
+                type="button"
+                onClick={() => setShowForgotPassword(true)}
+                className="text-blue-600 hover:text-blue-800 font-medium hover:underline transition-all duration-300 flex items-center gap-2 mx-auto"
+              >
+                <RotateCcw className="w-4 h-4" />
+                Mot de passe oublié ?
+              </button>
+            </div>
+          )}
+
           {/* Toggle entre login/register */}
           <div className="mt-8 text-center">
             <div className="text-gray-600 mb-4">
@@ -271,6 +287,14 @@ export function LoginPage() {
             </div>
           )}
         </div>
+
+        {/* Modal mot de passe oublié */}
+        {showForgotPassword && (
+          <ForgotPasswordModal
+            isOpen={showForgotPassword}
+            onClose={() => setShowForgotPassword(false)}
+          />
+        )}
 
         {/* Footer */}
         <div className="text-center mt-8 text-gray-500 text-sm">
