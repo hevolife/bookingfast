@@ -55,13 +55,9 @@ export function useAppVersion() {
           created_at: new Date().toISOString(),
           updated_at: new Date().toISOString()
         });
-      } else if (data && data.length > 0) {
-        // Prendre la première version (la plus récente)
-        setCurrentVersion(data[0]);
-        console.log('✅ Version actuelle chargée:', data.version, 'Build:', data.build);
+        // Ne pas déclencher le workflow ici - il sera géré par l'événement bookingCreated
       } else {
-        // Aucune version trouvée, utiliser la version par défaut
-        setCurrentVersion({
+        setCurrentVersion(data?.[0] || {
           id: 'default',
           version: '1.2.3',
           build: '2025.01.28',

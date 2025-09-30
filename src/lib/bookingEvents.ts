@@ -58,34 +58,34 @@ export function useAppVersion() {
       } else if (data && data.length > 0) {
         // Prendre la première version (la plus récente)
         setCurrentVersion(data[0]);
-        t.method === 'stripe' && t.status === 'pending'
-      );
+        // t.method === 'stripe' && t.status === 'pending'
+      // );
       
-      console.log('🔍 Transactions en attente détectées:', hasPendingStripeTransaction);
-      console.log('📋 Transactions:', data.transactions?.map(t => ({
-        method: t.method,
-        status: t.status,
-        amount: t.amount
-      })));
+      // console.log('🔍 Transactions en attente détectées:', hasPendingStripeTransaction);
+      // console.log('📋 Transactions:', data.transactions?.map(t => ({
+      //   method: t.method,
+      //   status: t.status,
+      //   amount: t.amount
+      // })));
       
-      if (!hasPendingStripeTransaction) {
-        // Pas de lien de paiement en attente → déclencher le workflow immédiatement
-        console.log('✅ Réservation sans lien de paiement - déclenchement workflow immédiat');
-        try {
-          await triggerWorkflow('booking_created', data, this.userId);
-          console.log('✅ Workflow booking_created déclenché avec succès');
-        } catch (workflowError) {
-          console.error('❌ Erreur déclenchement workflow:', workflowError);
-        }
-      } else {
-        // Lien de paiement en attente → attendre le paiement
-        console.log('⏳ Réservation avec lien de paiement - workflow en attente du paiement');
-        console.log('💳 Le workflow sera déclenché par le webhook Stripe après paiement');
-      }
-    }
+      // if (!hasPendingStripeTransaction) {
+      //   // Pas de lien de paiement en attente → déclencher le workflow immédiatement
+      //   console.log('✅ Réservation sans lien de paiement - déclenchement workflow immédiat');
+      //   try {
+      //     await triggerWorkflow('booking_created', data, this.userId);
+      //     console.log('✅ Workflow booking_created déclenché avec succès');
+      //   } catch (workflowError) {
+      //     console.error('❌ Erreur déclenchement workflow:', workflowError);
+      //   }
+      // } else {
+      //   // Lien de paiement en attente → attendre le paiement
+      //   console.log('⏳ Réservation avec lien de paiement - workflow en attente du paiement');
+      //   console.log('💳 Le workflow sera déclenché par le webhook Stripe après paiement');
+      // }
+    // }
     
     // Émettre l'événement normal pour les listeners
-        console.log('✅ Version actuelle chargée:', data.version, 'Build:', data.build);
+        console.log('✅ Version actuelle chargée:', data[0].version, 'Build:', data[0].build);
       } else {
         // Aucune version trouvée, utiliser la version par défaut
         setCurrentVersion({
