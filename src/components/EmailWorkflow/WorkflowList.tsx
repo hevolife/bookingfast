@@ -1,5 +1,5 @@
 import React from 'react';
-import { Play, Pause, Edit, Trash2, Mail, Clock, User, Zap } from 'lucide-react';
+import { Play, Pause, CreditCard as Edit, Trash2, Mail, Clock, User, Zap } from 'lucide-react';
 import { EmailWorkflow, EmailTemplate } from '../../types/email';
 
 interface WorkflowListProps {
