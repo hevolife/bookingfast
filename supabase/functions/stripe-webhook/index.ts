@@ -60,31 +60,31 @@ Deno.serve(async (req) => {
       const sessionId = session.id
       
       console.log('💳 Session de paiement complétée:', sessionId)
-     console.log('📊 Statut de la session:', session.status)
-     console.log('📊 Statut du paiement:', session.payment_status)
-     
-     // 🔒 VÉRIFICATION CRITIQUE : Ne traiter QUE les paiements complètement réussis
-     if (session.status !== 'complete' || session.payment_status !== 'paid') {
-       console.log('⚠️ PAIEMENT NON COMPLET - Session ignorée')
-       console.log('📊 Détails:', {
-         session_status: session.status,
-         payment_status: session.payment_status,
-         expected_session_status: 'complete',
-         expected_payment_status: 'paid'
-       })
-       
-       return new Response(JSON.stringify({ 
-         success: true, 
-         type: 'payment_not_complete',
-         message: 'Payment not complete - session ignored',
-         session_status: session.status,
-         payment_status: session.payment_status
-       }), {
-         headers: { ...corsHeaders, 'Content-Type': 'application/json' }
-       })
-     }
-     
-     console.log('✅ PAIEMENT COMPLET CONFIRMÉ - Traitement de la réservation')
+      console.log('📊 Statut de la session:', session.status)
+      console.log('📊 Statut du paiement:', session.payment_status)
+      
+      // 🔒 VÉRIFICATION CRITIQUE : Ne traiter QUE les paiements complètement réussis
+      if (session.status !== 'complete' || session.payment_status !== 'paid') {
+        console.log('⚠️ PAIEMENT NON COMPLET - Session ignorée')
+        console.log('📊 Détails:', {
+          session_status: session.status,
+          payment_status: session.payment_status,
+          expected_session_status: 'complete',
+          expected_payment_status: 'paid'
+        })
+        
+        return new Response(JSON.stringify({ 
+          success: true, 
+          type: 'payment_not_complete',
+          message: 'Payment not complete - session ignored',
+          session_status: session.status,
+          payment_status: session.payment_status
+        }), {
+          headers: { ...corsHeaders, 'Content-Type': 'application/json' }
+        })
+      }
+      
+      console.log('✅ PAIEMENT COMPLET CONFIRMÉ - Traitement de la réservation')
       
       // 🔒 VÉRIFICATION CACHE GLOBAL - PREMIÈRE LIGNE DE DÉFENSE
       if (processedSessions.has(sessionId)) {
@@ -311,6 +311,47 @@ Deno.serve(async (req) => {
           }
 
           console.log('✅ RÉSERVATION EXISTANTE MISE À JOUR - AUCUNE CRÉATION')
+          
+          // 🚀 DÉCLENCHER LES WORKFLOWS APRÈS MISE À JOUR RÉUSSIE
+          try {
+            console.log('🚀 Déclenchement workflow payment_completed pour:', customerEmail)
+            
+            // Récupérer les données complètes de la réservation mise à jour
+            const { data: updatedBookingData, error: fetchError } = await supabaseClient
+              .from('bookings')
+              .select(`
+                *,
+                service:services(*)
+              `)
+              .eq('id', existingBooking.id)
+              .single()
+            
+            if (!fetchError && updatedBookingData) {
+              // Appeler la fonction de workflow
+              const workflowResponse = await fetch(`${Deno.env.get('SUPABASE_URL')}/functions/v1/trigger-workflow`, {
+                method: 'POST',
+                headers: {
+                  'Content-Type': 'application/json',
+                  'Authorization': `Bearer ${Deno.env.get('SUPABASE_SERVICE_ROLE_KEY')}`,
+                },
+                body: JSON.stringify({
+                  trigger: 'payment_completed',
+                  booking_data: updatedBookingData,
+                  user_id: metadata.user_id
+                })
+              })
+              
+              if (workflowResponse.ok) {
+                console.log('✅ Workflow payment_completed déclenché avec succès')
+              } else {
+                const workflowError = await workflowResponse.text()
+                console.error('❌ Erreur déclenchement workflow:', workflowError)
+              }
+            }
+          } catch (workflowError) {
+            console.error('❌ Erreur déclenchement workflow payment_completed:', workflowError)
+            // Ne pas faire échouer le paiement pour une erreur de workflow
+          }
           
           const result = { 
             success: true, 
