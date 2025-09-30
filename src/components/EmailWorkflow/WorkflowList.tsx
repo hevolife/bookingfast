@@ -1,5 +1,5 @@
 import React from 'react';
-import { Play, Pause, CreditCard as Edit, Trash2, Mail, Clock, User, Zap } from 'lucide-react';
+import { Play, Pause, Edit, Trash2, Mail, Clock, User, Zap } from 'lucide-react';
 import { EmailWorkflow, EmailTemplate } from '../../types/email';
 
 interface WorkflowListProps {
@@ -16,7 +16,6 @@ export function WorkflowList({ workflows, templates, onEdit, onDelete, onToggle 
       'booking_created': '📅 Nouvelle réservation',
       'booking_updated': '✏️ Réservation modifiée',
       'payment_link_created': '💳 Lien de paiement créé',
-      'payment_link_paid': '💰 Lien de paiement payé',
       'payment_completed': '✅ Paiement complété',
       'booking_cancelled': '❌ Réservation annulée',
       'reminder_24h': '⏰ Rappel 24h avant',
