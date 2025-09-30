@@ -288,7 +288,11 @@ export function LoginPage() {
         <div className="text-center mt-8 text-gray-500 text-sm">
           <p>© 2025 BookingFast - Système de réservation professionnel</p>
           <p className="text-xs text-gray-400 mt-1">
-            Version {currentVersion?.version || '1.2.3'} - Build {currentVersion?.build || '2025.01.28'}
+            {currentVersion ? (
+              <>Version {currentVersion.version} - Build {currentVersion.build}</>
+            ) : (
+              'Chargement de la version...'
+            )}
           </p>
           {currentVersion?.release_notes && (
             <p className="text-xs text-gray-400 mt-1 max-w-md mx-auto">
