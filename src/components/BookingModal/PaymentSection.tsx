@@ -169,14 +169,27 @@ export function PaymentSection({
     if (transaction.method !== 'stripe' || transaction.status !== 'pending') return;
     
     try {
-      // Reconstituer le lien de paiement
-      const expiryMinutes = settings?.payment_link_expiry_minutes || 30;
-      const expiresAt = new Date(transaction.created_at).getTime() + (expiryMinutes * 60 * 1000);
-      const paymentUrl = new URL('/payment', window.location.origin);
-      
-      paymentUrl.searchParams.set('amount', transaction.amount.toString());
-      paymentUrl.searchParams.set('service', serviceName);
-      await navigator.clipboard.writeText(paymentUrl.toString());
+      // Récupérer le lien complet depuis la note de la transaction
+      const noteMatch = transaction.note.match(/Lien: (https?:\/\/[^\s)]+)/);
+      if (noteMatch) {
+        const fullPaymentLink = noteMatch[1];
+        await navigator.clipboard.writeText(fullPaymentLink);
+      } else {
+        // Fallback: reconstituer le lien complet
+        const expiryMinutes = settings?.payment_link_expiry_minutes || 30;
+        const expiresAt = new Date(transaction.created_at).getTime() + (expiryMinutes * 60 * 1000);
+        const paymentUrl = new URL('/payment', window.location.origin);
+        
+        paymentUrl.searchParams.set('amount', transaction.amount.toString());
+        paymentUrl.searchParams.set('service', serviceName);
+        paymentUrl.searchParams.set('client', `${clientEmail.split('@')[0]}`);
+        paymentUrl.searchParams.set('email', clientEmail);
+        paymentUrl.searchParams.set('date', bookingDate);
+        paymentUrl.searchParams.set('time', bookingTime);
+        paymentUrl.searchParams.set('expires', expiresAt.toString());
+        
+        await navigator.clipboard.writeText(paymentUrl.toString());
+      }
       alert('Lien de paiement copié dans le presse-papiers !');
     } catch (error) {
       console.error('Erreur copie lien:', error);

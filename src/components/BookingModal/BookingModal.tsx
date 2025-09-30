@@ -203,7 +203,7 @@ export function BookingModal({
       const pendingTransaction = {
         amount: amount,
         method: 'stripe' as const,
-        note: `Lien de paiement généré (expire dans ${expiryMinutes}min) - En attente`,
+        note: `Lien de paiement généré (expire dans ${expiryMinutes}min) - En attente - Lien: ${paymentUrl.toString()}`,
         status: 'pending' as const
       };
       
