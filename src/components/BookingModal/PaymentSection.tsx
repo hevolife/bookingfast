@@ -199,10 +199,12 @@ export function PaymentSection({
 
   // Fonction pour nettoyer le texte de la note (enlever les IDs de session)
   const cleanTransactionNote = (note: string) => {
-    // Supprimer les références aux sessions Stripe
+    // Supprimer les références aux sessions Stripe et aux liens de paiement
     return note
       .replace(/\s*-\s*Session:\s*cs_[a-zA-Z0-9_]+/g, '')
       .replace(/\s*\(Session:\s*cs_[a-zA-Z0-9_]+\)/g, '')
+      .replace(/\s*-\s*Lien:\s*https?:\/\/[^\s)]+/g, '')
+      .replace(/\s*\(Lien:\s*https?:\/\/[^\s)]+\)/g, '')
       .trim();
   };
 
