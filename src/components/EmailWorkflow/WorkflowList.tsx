@@ -16,6 +16,7 @@ export function WorkflowList({ workflows, templates, onEdit, onDelete, onToggle 
       'booking_created': '📅 Nouvelle réservation',
       'booking_updated': '✏️ Réservation modifiée',
       'payment_link_created': '💳 Lien de paiement créé',
+      'payment_link_paid': '💰 Lien de paiement payé',
       'payment_completed': '✅ Paiement complété',
       'booking_cancelled': '❌ Réservation annulée',
       'reminder_24h': '⏰ Rappel 24h avant',

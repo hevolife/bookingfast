@@ -30,6 +30,7 @@ export function WorkflowStats({ workflows }: WorkflowStatsProps) {
       'booking_created': 'Nouvelles réservations',
       'booking_updated': 'Réservations modifiées',
       'payment_link_created': 'Liens de paiement',
+      'payment_link_paid': 'Liens de paiement payés',
       'payment_completed': 'Paiements complétés',
       'booking_cancelled': 'Annulations',
       'reminder_24h': 'Rappels 24h',

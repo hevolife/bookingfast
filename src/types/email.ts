@@ -36,6 +36,7 @@ export type WorkflowTrigger =
   | 'booking_created'
   | 'booking_updated'
   | 'payment_link_created'
+  | 'payment_link_paid'
   | 'payment_completed'
   | 'booking_cancelled'
   | 'reminder_24h'
