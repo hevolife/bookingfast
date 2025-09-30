@@ -14,6 +14,7 @@ interface Notification {
   booking: Booking;
   timestamp: Date;
   read: boolean;
+  scheduledFor?: Date; // Pour les notifications programmées
 }
 
 export function NotificationCenter() {
@@ -23,6 +24,7 @@ export function NotificationCenter() {
   const [isOpen, setIsOpen] = useState(false);
   const [unreadCount, setUnreadCount] = useState(0);
   const [notificationPermission, setNotificationPermission] = useState<NotificationPermission>('default');
+  const [pendingNotificationTimers, setPendingNotificationTimers] = useState<Map<string, NodeJS.Timeout>>(new Map());
 
   // Demander la permission pour les notifications système
   useEffect(() => {
@@ -180,11 +182,12 @@ export function NotificationCenter() {
     };
   }, [services]);
 
-  // Vérifier les liens de paiement expirés
+  // Vérifier les liens de paiement expirés et créer les notifications en attente
   useEffect(() => {
-    const checkExpiredPayments = () => {
+    const checkPaymentNotifications = () => {
       const now = Date.now();
       const newNotifications: Notification[] = [];
+      const newTimers = new Map(pendingNotificationTimers);
 
       bookings.forEach(booking => {
         // Vérifier si la réservation a des transactions en attente
@@ -197,6 +200,7 @@ export function NotificationCenter() {
         pendingTransactions.forEach(transaction => {
           const transactionTime = new Date(transaction.created_at).getTime();
           const expirationTime = transactionTime + (30 * 60 * 1000); // 30 minutes
+          const notificationTime = transactionTime + (20 * 60 * 1000); // 20 minutes pour notification en attente
           
           // Si le lien a expiré et le paiement n'est pas complété
           if (now > expirationTime && booking.payment_status !== 'completed') {
@@ -216,37 +220,102 @@ export function NotificationCenter() {
               });
             }
           }
+          
+          // Programmer une notification "en attente" après 20 minutes
+          else if (now < expirationTime && now >= notificationTime && booking.payment_status === 'pending') {
+            const pendingNotificationId = `pending_${booking.id}_${transaction.id}`;
+            
+            // Vérifier si cette notification n'existe pas déjà
+            const existingPendingNotification = notifications.find(n => n.id === pendingNotificationId);
+            if (!existingPendingNotification) {
+              newNotifications.push({
+                id: pendingNotificationId,
+                type: 'pending_payment',
+                title: 'Paiement en attente',
+                message: `${booking.client_firstname} ${booking.client_name} n'a pas encore payé son lien (${transaction.amount.toFixed(2)}€) - 20min écoulées`,
+                booking,
+                timestamp: new Date(),
+                read: false
+              });
+            }
+          }
+          
+          // Programmer une notification future si pas encore le moment
+          else if (now < notificationTime && booking.payment_status === 'pending') {
+            const pendingNotificationId = `pending_${booking.id}_${transaction.id}`;
+            const timerKey = `timer_${booking.id}_${transaction.id}`;
+            
+            // Vérifier si un timer n'est pas déjà programmé
+            if (!newTimers.has(timerKey) && !notifications.find(n => n.id === pendingNotificationId)) {
+              const timeUntilNotification = notificationTime - now;
+              
+              console.log(`⏰ Programmation notification en attente dans ${Math.round(timeUntilNotification / 60000)}min pour ${booking.client_email}`);
+              
+              const timer = setTimeout(() => {
+                // Vérifier que le paiement est toujours en attente
+                const currentBooking = bookings.find(b => b.id === booking.id);
+                if (currentBooking && currentBooking.payment_status === 'pending') {
+                  const delayedNotification: Notification = {
+                    id: pendingNotificationId,
+                    type: 'pending_payment',
+                    title: 'Paiement en attente',
+                    message: `${booking.client_firstname} ${booking.client_name} n'a pas encore payé son lien (${transaction.amount.toFixed(2)}€) - 20min écoulées`,
+                    booking,
+                    timestamp: new Date(),
+                    read: false
+                  };
+                  
+                  setNotifications(prev => [delayedNotification, ...prev]);
+                  
+                  // Notification système
+                  if ('Notification' in window && Notification.permission === 'granted') {
+                    new Notification('💳 Paiement en attente', {
+                      body: `${booking.client_firstname} ${booking.client_name} - ${transaction.amount.toFixed(2)}€`,
+                      icon: '/pwa-192x192.png',
+                      badge: '/pwa-192x192.png',
+                      tag: `payment-pending-${booking.id}`,
+                      requireInteraction: true
+                    });
+                  }
+                }
+                
+                // Nettoyer le timer
+                setPendingNotificationTimers(prev => {
+                  const updated = new Map(prev);
+                  updated.delete(timerKey);
+                  return updated;
+                });
+              }, timeUntilNotification);
+              
+              newTimers.set(timerKey, timer);
+            }
+          }
         });
 
-        // Notification pour paiements en attente (non expirés)
-        if (booking.payment_status === 'pending' && pendingTransactions.length > 0) {
-          const notificationId = `pending_${booking.id}`;
-          const existingNotification = notifications.find(n => n.id === notificationId);
-          
-          if (!existingNotification) {
-            newNotifications.push({
-              id: notificationId,
-              type: 'pending_payment',
-              title: 'Paiement en attente',
-              message: `${booking.client_firstname} ${booking.client_name} n'a pas encore payé (${(booking.total_amount - (booking.payment_amount || 0)).toFixed(2)}€)`,
-              booking,
-              timestamp: new Date(booking.created_at || Date.now()),
-              read: false
-            });
-          }
-        }
       });
 
       if (newNotifications.length > 0) {
         setNotifications(prev => [...newNotifications, ...prev]);
       }
+      
+      // Mettre à jour les timers
+      if (newTimers.size !== pendingNotificationTimers.size) {
+        setPendingNotificationTimers(newTimers);
+      }
     };
 
-    checkExpiredPayments();
-    const interval = setInterval(checkExpiredPayments, 30000); // Vérifier toutes les 30 secondes
+    checkPaymentNotifications();
+    const interval = setInterval(checkPaymentNotifications, 30000); // Vérifier toutes les 30 secondes
 
     return () => clearInterval(interval);
-  }, [bookings, notifications]);
+  }, [bookings, notifications, pendingNotificationTimers]);
+  
+  // Nettoyer les timers au démontage du composant
+  useEffect(() => {
+    return () => {
+      pendingNotificationTimers.forEach(timer => clearTimeout(timer));
+    };
+  }, []);
 
   // Calculer le nombre de notifications non lues
   useEffect(() => {
@@ -263,8 +332,35 @@ export function NotificationCenter() {
     setNotifications(prev => prev.map(n => ({ ...n, read: true })));
   };
 
-  const removeNotification = (notificationId: string) => {
-    setNotifications(prev => prev.filter(n => n.id !== notificationId));
+  const removeNotification = (notificationId: string, event?: React.MouseEvent) => {
+    if (event) {
+      event.preventDefault();
+      event.stopPropagation();
+    }
+    
+    console.log('🗑️ Suppression notification:', notificationId);
+    
+    setNotifications(prev => {
+      const updated = prev.filter(n => n.id !== notificationId);
+      console.log('📊 Notifications après suppression:', updated.length);
+      return updated;
+    });
+    
+    // Nettoyer les timers associés si ils existent
+    const timerKey = notificationId.replace('pending_', 'timer_');
+    if (pendingNotificationTimers.has(timerKey)) {
+      clearTimeout(pendingNotificationTimers.get(timerKey)!);
+      setPendingNotificationTimers(prev => {
+        const updated = new Map(prev);
+        updated.delete(timerKey);
+        return updated;
+      });
+    }
+    
+    // Forcer un re-render
+    setTimeout(() => {
+      setNotifications(prev => [...prev]);
+    }, 100);
   };
 
   const getNotificationIcon = (type: string) => {
@@ -418,6 +514,8 @@ export function NotificationCenter() {
                             <button
                               onClick={() => removeNotification(notification.id)}
                               className="p-1 text-gray-400 hover:text-gray-600 rounded transition-colors"
+                              onMouseDown={(e) => e.stopPropagation()}
+                              onTouchStart={(e) => e.stopPropagation()}
                             >
                               <X className="w-3 h-3" />
                             </button>
@@ -436,6 +534,8 @@ export function NotificationCenter() {
                               <button
                                 onClick={() => markAsRead(notification.id)}
                                 className="text-xs text-blue-600 hover:text-blue-800 font-medium"
+                                onMouseDown={(e) => e.stopPropagation()}
+                                onTouchStart={(e) => e.stopPropagation()}
                               >
                                 Marquer comme lu
                               </button>
