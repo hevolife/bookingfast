@@ -171,25 +171,38 @@ export function PaymentSection({
     try {
       // Récupérer le lien complet depuis la note de la transaction
       const noteMatch = transaction.note.match(/Lien: (https?:\/\/[^\s)]+)/);
+      let fullPaymentLink = '';
+      
       if (noteMatch) {
-        const fullPaymentLink = noteMatch[1];
-        await navigator.clipboard.writeText(fullPaymentLink);
+        fullPaymentLink = noteMatch[1];
+        console.log('🔗 Lien trouvé dans la note:', fullPaymentLink);
       } else {
-        // Fallback: reconstituer le lien complet
+        // Fallback: reconstituer le lien complet avec TOUS les paramètres
+        console.log('🔄 Reconstitution du lien complet...');
         const expiryMinutes = settings?.payment_link_expiry_minutes || 30;
         const expiresAt = new Date(transaction.created_at).getTime() + (expiryMinutes * 60 * 1000);
         const paymentUrl = new URL('/payment', window.location.origin);
         
+        // Ajouter TOUS les paramètres nécessaires
         paymentUrl.searchParams.set('amount', transaction.amount.toString());
         paymentUrl.searchParams.set('service', serviceName);
-        paymentUrl.searchParams.set('client', `${clientEmail.split('@')[0]}`);
+        paymentUrl.searchParams.set('client', `${selectedClient?.firstname || ''} ${selectedClient?.lastname || ''}`);
         paymentUrl.searchParams.set('email', clientEmail);
+        paymentUrl.searchParams.set('phone', selectedClient?.phone || '');
         paymentUrl.searchParams.set('date', bookingDate);
         paymentUrl.searchParams.set('time', bookingTime);
         paymentUrl.searchParams.set('expires', expiresAt.toString());
         
-        await navigator.clipboard.writeText(paymentUrl.toString());
+        // Ajouter l'user_id si disponible
+        if (user?.id) {
+          paymentUrl.searchParams.set('user_id', user.id);
+        }
+        
+        fullPaymentLink = paymentUrl.toString();
+        console.log('🔗 Lien reconstitué:', fullPaymentLink);
       }
+      
+      await navigator.clipboard.writeText(fullPaymentLink);
       alert('Lien de paiement copié dans le presse-papiers !');
     } catch (error) {
       console.error('Erreur copie lien:', error);
