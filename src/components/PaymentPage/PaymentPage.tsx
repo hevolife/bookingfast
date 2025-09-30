@@ -62,6 +62,31 @@ export function PaymentPage() {
           return;
         }
         
+        // Vérifier aussi si le montant demandé a déjà été payé
+        const requestedAmount = parseFloat(amount || '0');
+        const alreadyPaid = (booking.payment_amount || 0);
+        
+        if (requestedAmount > 0 && alreadyPaid >= requestedAmount) {
+          console.log('💰 Montant demandé déjà payé:', { requestedAmount, alreadyPaid });
+          setIsDeleted(true); // Afficher "Paiement validé"
+          setCheckingStatus(false);
+          return;
+        }
+        
+        // Vérifier si il y a des transactions Stripe complétées pour ce montant
+        const stripeTransactions = booking.transactions?.filter(t => 
+          t.method === 'stripe' && 
+          t.status === 'completed' &&
+          Math.abs(t.amount - requestedAmount) < 0.01
+        ) || [];
+        
+        if (stripeTransactions.length > 0) {
+          console.log('💰 Transaction Stripe déjà complétée pour ce montant');
+          setIsDeleted(true); // Afficher "Paiement validé"
+          setCheckingStatus(false);
+          return;
+        }
+        
         // Sinon, autoriser l'accès au lien de paiement
         console.log('✅ Lien de paiement autorisé');
       } catch (error) {
