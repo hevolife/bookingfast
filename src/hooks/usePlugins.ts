@@ -26,6 +26,7 @@ export function usePlugins() {
         .order('name');
 
       if (error) throw error;
+      console.log('📦 Plugins chargés:', data);
       setPlugins(data || []);
     } catch (err) {
       console.error('Erreur chargement plugins:', err);
@@ -40,6 +41,8 @@ export function usePlugins() {
         return;
       }
 
+      console.log('🔍 Chargement abonnements pour user:', user.id);
+
       const { data, error } = await supabase
         .from('plugin_subscriptions')
         .select(`
@@ -49,8 +52,13 @@ export function usePlugins() {
         .eq('user_id', user.id)
         .order('created_at', { ascending: false });
 
-      if (error) throw error;
+      if (error) {
+        console.error('❌ Erreur chargement abonnements:', error);
+        throw error;
+      }
+
       console.log('📦 Abonnements chargés:', data);
+      console.log('📊 Abonnements actifs/trial:', data?.filter(s => s.status === 'active' || s.status === 'trial'));
       setUserSubscriptions(data || []);
     } catch (err) {
       console.error('Erreur chargement abonnements:', err);
@@ -116,6 +124,8 @@ export function usePlugins() {
         console.error('❌ Erreur vérification souscription existante:', checkError);
         throw checkError;
       }
+
+      console.log('🔍 Souscription existante:', existingSub);
 
       if (existingSub) {
         console.log('⚠️ Souscription existante trouvée:', existingSub);
@@ -186,6 +196,7 @@ export function usePlugins() {
 
       console.log('✅ Souscription créée avec succès:', data);
 
+      // Recharger les données
       await fetchUserSubscriptions();
       await fetchUserPlugins();
 
@@ -272,6 +283,7 @@ export function usePlugins() {
 
   useEffect(() => {
     const loadData = async () => {
+      console.log('🔄 Chargement initial des données...');
       setLoading(true);
       await Promise.all([
         fetchPlugins(),
@@ -279,6 +291,7 @@ export function usePlugins() {
         fetchUserPlugins()
       ]);
       setLoading(false);
+      console.log('✅ Chargement terminé');
     };
 
     loadData();
@@ -296,11 +309,13 @@ export function usePlugins() {
     updatePluginConfiguration,
     cancelSubscription,
     refetch: async () => {
+      console.log('🔄 Rechargement manuel des données...');
       await Promise.all([
         fetchPlugins(),
         fetchUserSubscriptions(),
         fetchUserPlugins()
       ]);
+      console.log('✅ Rechargement terminé');
     }
   };
 }

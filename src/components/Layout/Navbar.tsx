@@ -23,7 +23,7 @@ interface NavbarProps {
 
 export function Navbar({ currentPage, onPageChange }: NavbarProps) {
   const { signOut, user } = useAuth();
-  const { userPlugins } = usePlugins();
+  const { userPlugins, userSubscriptions } = usePlugins();
   const [mobileMenuOpen, setMobileMenuOpen] = useState(false);
 
   const handleSignOut = async () => {
@@ -35,7 +35,17 @@ export function Navbar({ currentPage, onPageChange }: NavbarProps) {
   };
 
   // Vérifier si le plugin de rapports est activé
-  const hasReportsPlugin = userPlugins.some(p => p.slug === 'advanced-reports');
+  console.log('🔍 Vérification plugin rapports:', {
+    userPlugins,
+    userSubscriptions,
+    subscriptionsActives: userSubscriptions.filter(s => s.status === 'active' || s.status === 'trial')
+  });
+
+  const hasReportsPlugin = userSubscriptions.some(
+    sub => sub.plugin?.slug === 'reports' && (sub.status === 'active' || sub.status === 'trial')
+  );
+
+  console.log('📊 Plugin rapports activé:', hasReportsPlugin);
 
   const navItems = [
     { id: 'dashboard' as Page, label: 'Dashboard', icon: LayoutDashboard },
@@ -45,6 +55,8 @@ export function Navbar({ currentPage, onPageChange }: NavbarProps) {
     ...(hasReportsPlugin ? [{ id: 'reports' as Page, label: 'Rapports', icon: BarChart3 }] : []),
     { id: 'admin' as Page, label: 'Paramètres', icon: Settings }
   ];
+
+  console.log('📋 Items de navigation:', navItems.map(i => i.label));
 
   return (
     <>

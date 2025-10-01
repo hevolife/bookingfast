@@ -12,9 +12,11 @@ export function PluginsPage() {
   const [subscriptionError, setSubscriptionError] = useState<string | null>(null);
 
   const isSubscribed = (pluginId: string) => {
-    return userSubscriptions.some(
+    const subscribed = userSubscriptions.some(
       sub => sub.plugin_id === pluginId && (sub.status === 'active' || sub.status === 'trial')
     );
+    console.log(`🔍 isSubscribed(${pluginId}):`, subscribed);
+    return subscribed;
   };
 
   const getSubscription = (pluginId: string) => {
@@ -24,7 +26,7 @@ export function PluginsPage() {
   };
 
   const handleSubscribe = async (plugin: Plugin) => {
-    console.log('🎯 Clic sur souscription:', plugin.name);
+    console.log('🎯 Clic sur souscription:', plugin.name, plugin.id);
     
     setSubscribing(true);
     setSubscriptionError(null);
@@ -36,12 +38,18 @@ export function PluginsPage() {
       
       console.log('📋 Fonctionnalités incluses:', includedFeatures);
       
-      await subscribeToPlugin(plugin.id, includedFeatures);
+      const result = await subscribeToPlugin(plugin.id, includedFeatures);
       
-      console.log('✅ Souscription réussie, rechargement des données...');
+      console.log('✅ Souscription réussie:', result);
+      console.log('🔄 Rechargement des données...');
       
       // Recharger les données
       await refetch();
+      
+      console.log('📊 Nouvelles données:', {
+        userSubscriptions,
+        isSubscribed: isSubscribed(plugin.id)
+      });
       
       // Fermer le modal
       setSelectedPlugin(null);
@@ -67,6 +75,12 @@ export function PluginsPage() {
 
   const featuredPlugins = plugins.filter(p => p.is_featured);
   const otherPlugins = plugins.filter(p => !p.is_featured);
+
+  console.log('📦 Plugins affichés:', {
+    featured: featuredPlugins.length,
+    other: otherPlugins.length,
+    userSubscriptions: userSubscriptions.length
+  });
 
   return (
     <div className="space-y-8">
