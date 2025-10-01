@@ -177,9 +177,16 @@ export function DatePicker({ selectedDate, onDateSelect, availableDates, setting
       {/* Calendrier dropdown */}
       {isOpen && (
         <>
-          <div className="absolute top-full left-0 right-0 mt-4 bg-white border-2 border-gray-200 rounded-2xl sm:rounded-3xl shadow-2xl z-[100000] overflow-hidden">
+          {/* Overlay pour fermer - doit être en premier */}
+          <div 
+            className="fixed inset-0 z-[9998] bg-black/20 sm:bg-transparent" 
+            onClick={() => setIsOpen(false)}
+          />
+
+          {/* Calendrier - z-index plus élevé */}
+          <div className="fixed sm:absolute left-0 right-0 sm:top-full bottom-0 sm:bottom-auto sm:mt-4 bg-white border-2 border-gray-200 sm:rounded-2xl sm:rounded-3xl shadow-2xl z-[9999] overflow-hidden max-h-[85vh] sm:max-h-[700px] flex flex-col">
             {/* Header du calendrier */}
-            <div className="bg-gradient-to-r from-blue-600 to-purple-600 p-4 sm:p-6 text-white">
+            <div className="bg-gradient-to-r from-blue-600 to-purple-600 p-4 sm:p-6 text-white flex-shrink-0">
               <div className="flex items-center justify-between mb-4">
                 <button
                   type="button"
@@ -215,16 +222,16 @@ export function DatePicker({ selectedDate, onDateSelect, availableDates, setting
             </div>
 
             {/* Jours de la semaine */}
-            <div className="grid grid-cols-7 bg-gray-50 border-b border-gray-200">
+            <div className="grid grid-cols-7 bg-gray-50 border-b border-gray-200 flex-shrink-0">
               {weekDays.map(day => (
-                <div key={day} className="p-3 sm:p-4 text-center text-sm sm:text-base font-medium text-gray-600">
+                <div key={day} className="p-2 sm:p-3 sm:p-4 text-center text-xs sm:text-sm sm:text-base font-medium text-gray-600">
                   {day}
                 </div>
               ))}
             </div>
 
-            {/* Grille des jours */}
-            <div className="grid grid-cols-7 p-2 sm:p-4">
+            {/* Grille des jours - scrollable */}
+            <div className="grid grid-cols-7 p-2 sm:p-2 sm:p-4 overflow-y-auto flex-1">
               {days.map((day, index) => {
                 const isCurrentMonth = day.isCurrentMonth;
                 const isTodayDate = isToday(day.date);
@@ -237,7 +244,7 @@ export function DatePicker({ selectedDate, onDateSelect, availableDates, setting
                     type="button"
                     onClick={() => handleDateSelect(day.date)}
                     disabled={!isCurrentMonth || !isDateAvailable}
-                    className={`aspect-square m-1 sm:m-2 rounded-xl sm:rounded-2xl text-sm sm:text-base font-medium transition-all duration-300 transform hover:scale-110 animate-fadeIn ${
+                    className={`aspect-square m-0.5 sm:m-1 sm:m-2 rounded-lg sm:rounded-xl sm:rounded-2xl text-xs sm:text-sm sm:text-base font-medium transition-all duration-300 transform hover:scale-110 animate-fadeIn ${
                       isSelectedDate
                         ? 'bg-gradient-to-r from-blue-500 to-purple-500 text-white shadow-xl'
                         : isTodayDate && isDateAvailable
@@ -255,7 +262,7 @@ export function DatePicker({ selectedDate, onDateSelect, availableDates, setting
             </div>
 
             {/* Footer avec raccourcis */}
-            <div className="bg-gray-50 p-4 border-t border-gray-200">
+            <div className="bg-gray-50 p-3 sm:p-4 border-t border-gray-200 flex-shrink-0">
               <div className="flex flex-wrap gap-2 justify-center">
                 {availableDates.slice(0, 4).map((dateOption) => (
                   <button
@@ -276,12 +283,6 @@ export function DatePicker({ selectedDate, onDateSelect, availableDates, setting
               </div>
             </div>
           </div>
-
-          {/* Overlay pour fermer */}
-          <div 
-            className="fixed inset-0 z-[99999] bg-black/20 sm:bg-transparent" 
-            onClick={() => setIsOpen(false)}
-          />
         </>
       )}
     </div>

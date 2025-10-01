@@ -195,7 +195,7 @@ export function DatePicker({ value, onChange, disabled, required }: DatePickerPr
         type="button"
         onClick={() => !disabled && setIsOpen(!isOpen)}
         disabled={disabled}
-        className={`w-full flex items-center justify-between p-4 border rounded-2xl transition-all duration-300 text-left ${
+        className={`w-full flex items-center justify-between p-3 sm:p-4 border rounded-xl sm:rounded-2xl transition-all duration-300 text-left ${
           disabled 
             ? 'bg-gray-100 text-gray-400 cursor-not-allowed border-gray-200' 
             : isOpen
@@ -203,19 +203,19 @@ export function DatePicker({ value, onChange, disabled, required }: DatePickerPr
             : 'border-gray-300 bg-white hover:border-blue-400 hover:shadow-md'
         }`}
       >
-        <div className="flex items-center gap-3">
-          <div className={`w-10 h-10 rounded-xl flex items-center justify-center transition-all duration-300 ${
+        <div className="flex items-center gap-2 sm:gap-3">
+          <div className={`w-8 h-8 sm:w-10 sm:h-10 rounded-lg sm:rounded-xl flex items-center justify-center transition-all duration-300 ${
             value ? 'bg-gradient-to-r from-blue-500 to-purple-500 text-white' : 'bg-gray-100 text-gray-400'
           }`}>
-            <Calendar className="w-5 h-5" />
+            <Calendar className="w-4 h-4 sm:w-5 sm:h-5" />
           </div>
           <div>
-            <div className="font-medium text-gray-900">
+            <div className="font-medium text-gray-900 text-sm sm:text-base">
               {value ? formatDisplayDate(value) : 'Sélectionner une date'}
             </div>
           </div>
         </div>
-        <ChevronDown className={`w-5 h-5 text-gray-400 transition-transform duration-300 ${
+        <ChevronDown className={`w-4 h-4 sm:w-5 sm:h-5 text-gray-400 transition-transform duration-300 ${
           isOpen ? 'rotate-180' : ''
         }`} />
       </button>
@@ -223,9 +223,16 @@ export function DatePicker({ value, onChange, disabled, required }: DatePickerPr
       {/* Calendrier dropdown */}
       {isOpen && (
         <>
-          <div className="absolute top-full left-0 right-0 mt-2 bg-white border border-gray-200 rounded-2xl shadow-2xl z-[100000] overflow-hidden">
+          {/* Overlay pour fermer - doit être en premier pour être derrière le calendrier */}
+          <div 
+            className="fixed inset-0 z-[9998] bg-black/20 sm:bg-transparent" 
+            onClick={() => setIsOpen(false)}
+          />
+
+          {/* Calendrier - z-index plus élevé que l'overlay */}
+          <div className="fixed sm:absolute left-0 right-0 sm:top-full bottom-0 sm:bottom-auto sm:mt-2 bg-white border border-gray-200 sm:rounded-2xl shadow-2xl z-[9999] overflow-hidden max-h-[80vh] sm:max-h-[600px] flex flex-col">
             {/* Header du calendrier */}
-            <div className="bg-gradient-to-r from-blue-600 to-purple-600 p-4 text-white">
+            <div className="bg-gradient-to-r from-blue-600 to-purple-600 p-3 sm:p-4 text-white flex-shrink-0">
               <div className="flex items-center justify-between mb-3">
                 <button
                   type="button"
@@ -235,7 +242,7 @@ export function DatePicker({ value, onChange, disabled, required }: DatePickerPr
                   <ChevronLeft className="w-5 h-5" />
                 </button>
                 
-                <h3 className="text-lg font-bold">
+                <h3 className="text-base sm:text-lg font-bold">
                   {currentMonth.toLocaleDateString('fr-FR', { 
                     month: 'long', 
                     year: 'numeric' 
@@ -254,23 +261,23 @@ export function DatePicker({ value, onChange, disabled, required }: DatePickerPr
               <button
                 type="button"
                 onClick={goToToday}
-                className="w-full bg-white/20 hover:bg-white/30 text-white px-4 py-2 rounded-xl transition-colors font-medium"
+                className="w-full bg-white/20 hover:bg-white/30 text-white px-3 py-2 rounded-xl transition-colors font-medium text-sm"
               >
                 {settings && settings.minimum_booking_delay_hours > 0 ? 'Prochaine date disponible' : 'Aujourd\'hui'}
               </button>
             </div>
 
             {/* Jours de la semaine */}
-            <div className="grid grid-cols-7 bg-gray-50 border-b border-gray-200">
+            <div className="grid grid-cols-7 bg-gray-50 border-b border-gray-200 flex-shrink-0">
               {weekDays.map(day => (
-                <div key={day} className="p-3 text-center text-sm font-medium text-gray-600">
+                <div key={day} className="p-2 text-center text-xs sm:text-sm font-medium text-gray-600">
                   {day}
                 </div>
               ))}
             </div>
 
-            {/* Grille des jours */}
-            <div className="grid grid-cols-7 p-2">
+            {/* Grille des jours - scrollable sur mobile */}
+            <div className="grid grid-cols-7 p-2 overflow-y-auto flex-1">
               {days.map((day, index) => {
                 const isCurrentMonth = day.isCurrentMonth;
                 const isTodayDate = isToday(day.date);
@@ -283,7 +290,7 @@ export function DatePicker({ value, onChange, disabled, required }: DatePickerPr
                     type="button"
                     onClick={() => handleDateSelect(day.date)}
                     disabled={!isCurrentMonth}
-                    className={`aspect-square m-1 rounded-xl text-sm font-medium transition-all duration-300 transform hover:scale-110 animate-fadeIn ${
+                    className={`aspect-square m-0.5 sm:m-1 rounded-lg sm:rounded-xl text-xs sm:text-sm font-medium transition-all duration-300 transform hover:scale-110 animate-fadeIn ${
                       isSelectedDate
                         ? 'bg-gradient-to-r from-blue-500 to-purple-500 text-white shadow-lg'
                         : isTodayDate
@@ -303,12 +310,6 @@ export function DatePicker({ value, onChange, disabled, required }: DatePickerPr
               })}
             </div>
           </div>
-
-          {/* Overlay pour fermer */}
-          <div 
-            className="fixed inset-0 z-[99999]" 
-            onClick={() => setIsOpen(false)}
-          />
         </>
       )}
     </div>
