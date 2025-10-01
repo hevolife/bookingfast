@@ -3,13 +3,14 @@ import { Routes, Route, useLocation, useNavigate } from 'react-router-dom';
 import { AuthProvider } from './contexts/AuthContext';
 import { TeamProvider } from './contexts/TeamContext';
 import { ProtectedRoute } from './components/Auth/ProtectedRoute';
+import { PluginRoute } from './components/Plugins/PluginRoute';
 import { LoginPage } from './components/Auth/LoginPage';
-import { SuperAdminPage } from './components/SuperAdmin/SuperAdminPage';
 import { CalendarPage } from './components/Calendar/CalendarPage';
 import { DashboardPage } from './components/Dashboard/DashboardPage';
 import { ServicesPage } from './components/Services/ServicesPage';
 import { AdminPage } from './components/Admin/AdminPage';
 import { EmailWorkflowPage } from './components/EmailWorkflow/EmailWorkflowPage';
+import { ReportsPage } from './components/Reports/ReportsPage';
 import { PaymentPage } from './components/PaymentPage/PaymentPage';
 import { PaymentSuccess } from './components/PaymentPage/PaymentSuccess';
 import { PaymentCancel } from './components/PaymentPage/PaymentCancel';
@@ -19,7 +20,7 @@ import { IframeBookingPage } from './components/IframeBooking/IframeBookingPage'
 import { Navbar } from './components/Layout/Navbar';
 import { PWAInstallPrompt } from './components/Layout/PWAInstallPrompt';
 
-type Page = 'dashboard' | 'calendar' | 'services' | 'admin' | 'emails' | 'superadmin';
+type Page = 'dashboard' | 'calendar' | 'services' | 'admin' | 'emails' | 'reports';
 
 // Fonction pour détecter si l'app est en mode PWA
 function isPWAMode(): boolean {
@@ -72,7 +73,7 @@ function AppContent() {
     else if (path === '/services') setCurrentPage('services');
     else if (path === '/admin') setCurrentPage('admin');
     else if (path === '/emails') setCurrentPage('emails');
-    else if (path === '/superadmin') setCurrentPage('superadmin');
+    else if (path === '/reports') setCurrentPage('reports');
   }, [location.pathname]);
 
   const handlePageChange = (page: Page) => {
@@ -82,7 +83,7 @@ function AppContent() {
       services: '/services',
       admin: '/admin',
       emails: '/emails',
-      superadmin: '/superadmin'
+      reports: '/reports'
     };
     
     navigate(routes[page]);
@@ -101,8 +102,8 @@ function AppContent() {
         return <AdminPage />;
       case 'emails':
         return <EmailWorkflowPage />;
-      case 'superadmin':
-        return <SuperAdminPage />;
+      case 'reports':
+        return <ReportsPage />;
       default:
         return <DashboardPage />;
     }
@@ -191,14 +192,17 @@ function AppContent() {
         </ProtectedRoute>
       } />
       
-      <Route path="/superadmin" element={
+      {/* Page de rapports - protégée par plugin */}
+      <Route path="/reports" element={
         <ProtectedRoute>
-          <div className="min-h-screen-safe bg-gray-50">
-            <Navbar currentPage={currentPage} onPageChange={handlePageChange} />
-            <main className="main-content-safe">
-              <SuperAdminPage />
-            </main>
-          </div>
+          <PluginRoute pluginSlug="advanced-reports">
+            <div className="min-h-screen-safe bg-gray-50">
+              <Navbar currentPage={currentPage} onPageChange={handlePageChange} />
+              <main className="main-content-safe">
+                <ReportsPage />
+              </main>
+            </div>
+          </PluginRoute>
         </ProtectedRoute>
       } />
       

@@ -57,7 +57,7 @@ export function ServiceBookingModal({
   return (
     <div className="fixed inset-0 bg-black/60 backdrop-blur-sm flex items-end sm:items-center justify-center z-50 animate-fadeIn modal-container">
       <div className="bg-white w-full sm:max-w-4xl max-h-[95vh] sm:max-h-[90vh] overflow-y-auto sm:rounded-3xl shadow-2xl transform animate-slideUp modal-content">
-        {/* Header avec design amélioré */}
+        {/* Header avec design amélioré - Hauteur réduite sur mobile */}
         <div className="relative overflow-hidden touch-action-none sticky top-0 z-10 modal-header modal-safe-top">
           {/* Fond dégradé principal */}
           <div className="absolute inset-0 bg-gradient-to-br from-blue-600 via-purple-600 to-pink-600"></div>
@@ -71,42 +71,42 @@ export function ServiceBookingModal({
             <div className="absolute bottom-0 right-0 w-40 h-40 bg-white rounded-full blur-3xl"></div>
           </div>
           
-          {/* Contenu du header */}
-          <div className="relative z-10 p-4 sm:p-6">
+          {/* Contenu du header - Padding réduit sur mobile */}
+          <div className="relative z-10 p-3 sm:p-6">
             <div className="flex items-center justify-between">
               {/* Titre avec icône décorative */}
-              <div className="flex items-center gap-3 sm:gap-4 flex-1 pr-2">
-                <div className="hidden sm:flex w-12 h-12 bg-white/20 backdrop-blur-sm rounded-2xl items-center justify-center shadow-lg">
-                  <Calendar className="w-6 h-6 text-white" />
+              <div className="flex items-center gap-2 sm:gap-4 flex-1 pr-2">
+                <div className="hidden sm:flex w-10 h-10 sm:w-12 sm:h-12 bg-white/20 backdrop-blur-sm rounded-xl sm:rounded-2xl items-center justify-center shadow-lg">
+                  <Calendar className="w-5 h-5 sm:w-6 sm:h-6 text-white" />
                 </div>
                 <div className="flex-1">
-                  <h2 className="text-lg sm:text-2xl font-bold text-white drop-shadow-lg">
+                  <h2 className="text-base sm:text-2xl font-bold text-white drop-shadow-lg">
                     {serviceName}
                   </h2>
-                  <p className="text-sm sm:text-base text-white/80 mt-1">{bookings.length} réservation(s)</p>
+                  <p className="text-xs sm:text-base text-white/80 mt-0.5 sm:mt-1">{bookings.length} réservation(s)</p>
                 </div>
               </div>
               
-              {/* Bouton de fermeture amélioré */}
+              {/* Bouton de fermeture amélioré - Taille réduite sur mobile */}
               <button
                 onClick={onClose}
-                className="group relative p-2 sm:p-3 text-white hover:bg-white/20 rounded-xl sm:rounded-2xl transition-all duration-300 transform hover:scale-110 hover:rotate-90 mobile-tap-target flex-shrink-0 backdrop-blur-sm"
+                className="group relative p-1.5 sm:p-3 text-white hover:bg-white/20 rounded-lg sm:rounded-2xl transition-all duration-300 transform hover:scale-110 hover:rotate-90 mobile-tap-target flex-shrink-0 backdrop-blur-sm"
                 aria-label="Fermer"
               >
-                <div className="absolute inset-0 bg-white/10 rounded-xl sm:rounded-2xl opacity-0 group-hover:opacity-100 transition-opacity duration-300"></div>
+                <div className="absolute inset-0 bg-white/10 rounded-lg sm:rounded-2xl opacity-0 group-hover:opacity-100 transition-opacity duration-300"></div>
                 <X className="w-5 h-5 sm:w-6 sm:h-6 relative z-10" />
               </button>
             </div>
 
-            {/* Stats */}
-            <div className="grid grid-cols-2 gap-3 sm:gap-4 mt-4 sm:mt-6">
-              <div className="bg-white/20 backdrop-blur-sm rounded-xl sm:rounded-2xl p-3 sm:p-4">
-                <div className="text-white/80 text-xs sm:text-sm">Chiffre d'affaires</div>
-                <div className="text-lg sm:text-2xl font-bold text-white">{totalAmount.toFixed(2)}€</div>
+            {/* Stats - Taille réduite sur mobile */}
+            <div className="grid grid-cols-2 gap-2 sm:gap-4 mt-3 sm:mt-6">
+              <div className="bg-white/20 backdrop-blur-sm rounded-lg sm:rounded-2xl p-2 sm:p-4">
+                <div className="text-white/80 text-xs">Chiffre d'affaires</div>
+                <div className="text-base sm:text-2xl font-bold text-white">{totalAmount.toFixed(2)}€</div>
               </div>
-              <div className="bg-white/20 backdrop-blur-sm rounded-xl sm:rounded-2xl p-3 sm:p-4">
-                <div className="text-white/80 text-xs sm:text-sm">Encaissé</div>
-                <div className="text-lg sm:text-2xl font-bold text-white">{totalPaid.toFixed(2)}€</div>
+              <div className="bg-white/20 backdrop-blur-sm rounded-lg sm:rounded-2xl p-2 sm:p-4">
+                <div className="text-white/80 text-xs">Encaissé</div>
+                <div className="text-base sm:text-2xl font-bold text-white">{totalPaid.toFixed(2)}€</div>
               </div>
             </div>
           </div>

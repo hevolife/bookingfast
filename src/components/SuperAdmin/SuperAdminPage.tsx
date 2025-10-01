@@ -1,5 +1,5 @@
 import React, { useState, useEffect } from 'react';
-import { Shield, Users, CreditCard, Key, BarChart3, Settings, Crown, Zap } from 'lucide-react';
+import { Shield, Users, CreditCard, Key, BarChart3, Settings, Crown, Zap, Package } from 'lucide-react';
 import { Share2 } from 'lucide-react';
 import { useAdmin } from '../../hooks/useAdmin';
 import { UserManagement } from './UserManagement';
@@ -8,9 +8,10 @@ import { AccessCodeManagement } from './AccessCodeManagement';
 import { AdminStats } from './AdminStats';
 import { AffiliateAdminPanel } from './AffiliateAdminPanel';
 import { VersionManagement } from './VersionManagement';
+import { PluginManagement } from './PluginManagement';
 import { LoadingSpinner } from '../UI/LoadingSpinner';
 
-type AdminTab = 'stats' | 'users' | 'subscriptions' | 'codes' | 'affiliates' | 'versions';
+type AdminTab = 'stats' | 'users' | 'subscriptions' | 'codes' | 'affiliates' | 'versions' | 'plugins';
 
 export function SuperAdminPage() {
   const [activeTab, setActiveTab] = useState<AdminTab>('stats');
@@ -68,6 +69,7 @@ export function SuperAdminPage() {
     { id: 'users', label: 'Utilisateurs', icon: Users, description: 'Gestion des comptes' },
     { id: 'subscriptions', label: 'Abonnements', icon: CreditCard, description: 'Gestion Stripe' },
     { id: 'codes', label: 'Codes d\'accès', icon: Key, description: 'Codes secrets' },
+    { id: 'plugins', label: 'Plugins', icon: Package, description: 'Gestion des plugins' },
     { id: 'affiliates', label: 'Affiliations', icon: Share2, description: 'Programme de parrainage' },
     { id: 'versions', label: 'Versions', icon: Settings, description: 'Gestion des versions' }
   ];
@@ -82,6 +84,8 @@ export function SuperAdminPage() {
         return <SubscriptionManagement />;
       case 'codes':
         return <AccessCodeManagement />;
+      case 'plugins':
+        return <PluginManagement />;
       case 'affiliates':
         return <AffiliateAdminPanel />;
       case 'versions':
@@ -107,12 +111,12 @@ export function SuperAdminPage() {
           </div>
 
           {/* Navigation */}
-          <div className="flex gap-2 bg-white/10 backdrop-blur-sm rounded-2xl p-2">
+          <div className="flex gap-2 bg-white/10 backdrop-blur-sm rounded-2xl p-2 overflow-x-auto">
             {tabs.map(tab => (
               <button
                 key={tab.id}
                 onClick={() => setActiveTab(tab.id as AdminTab)}
-                className={`flex-1 flex items-center gap-3 px-6 py-4 rounded-xl font-medium transition-all duration-300 ${
+                className={`flex-shrink-0 flex items-center gap-3 px-6 py-4 rounded-xl font-medium transition-all duration-300 ${
                   activeTab === tab.id
                     ? 'bg-white text-purple-600 shadow-lg transform scale-105'
                     : 'text-white/80 hover:bg-white/20 hover:text-white'
