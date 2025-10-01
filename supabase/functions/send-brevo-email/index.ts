@@ -100,8 +100,8 @@ serve(async (req) => {
           .replace(/<[^>]*>/g, '') // Supprimer les balises HTML
           .replace(/&nbsp;/g, ' ')
           .replace(/&amp;/g, '&')
-          .replace(/&lt;/g, '<')
-          .replace(/&gt;/g, '>')
+          .replace(/</g, '<')
+          .replace(/>/g, '>')
           .replace(/&quot;/g, '"')
           .replace(/&#39;/g, "'")
           .replace(/\s+/g, ' ')
