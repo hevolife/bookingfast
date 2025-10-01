@@ -9,16 +9,27 @@ interface DatePickerProps {
   onChange: (date: string) => void;
   disabled?: boolean;
   required?: boolean;
+  isOpen?: boolean;
+  onOpenChange?: (isOpen: boolean) => void;
+  showInline?: boolean;
 }
 
-export function DatePicker({ value, onChange, disabled, required }: DatePickerProps) {
+export function DatePicker({ value, onChange, disabled, required, isOpen: externalIsOpen, onOpenChange, showInline }: DatePickerProps) {
   const { settings } = useBusinessSettings();
-  const [isOpen, setIsOpen] = useState(false);
+  const [internalIsOpen, setInternalIsOpen] = useState(false);
   const [currentMonth, setCurrentMonth] = useState(new Date());
   const [selectedDate, setSelectedDate] = useState<Date | null>(null);
-  const [calendarStyle, setCalendarStyle] = useState<React.CSSProperties>({});
   const dropdownRef = useRef<HTMLDivElement>(null);
   const buttonRef = useRef<HTMLButtonElement>(null);
+
+  const isOpen = externalIsOpen !== undefined ? externalIsOpen : internalIsOpen;
+  const setIsOpen = (open: boolean) => {
+    if (onOpenChange) {
+      onOpenChange(open);
+    } else {
+      setInternalIsOpen(open);
+    }
+  };
 
   // Initialiser avec la date du jour si aucune valeur n'est fournie
   useEffect(() => {
@@ -42,85 +53,10 @@ export function DatePicker({ value, onChange, disabled, required }: DatePickerPr
     }
   }, [value, onChange, settings]);
 
-  // Calculer la position optimale du calendrier avec marges de sécurité
-  useEffect(() => {
-    if (isOpen && buttonRef.current) {
-      const updatePosition = () => {
-        const buttonRect = buttonRef.current?.getBoundingClientRect();
-        if (!buttonRect) return;
-
-        const viewportHeight = window.innerHeight;
-        const viewportWidth = window.innerWidth;
-        const isMobile = viewportWidth < 640;
-        
-        // Marges de sécurité
-        const MARGIN_TOP = 16;
-        const MARGIN_BOTTOM = 16;
-        const MARGIN_SIDE = 16;
-        
-        // Hauteur du calendrier
-        const calendarHeight = isMobile ? Math.min(420, viewportHeight - MARGIN_TOP - MARGIN_BOTTOM) : 500;
-        
-        if (isMobile) {
-          // Sur mobile, centrer verticalement avec marges
-          const availableHeight = viewportHeight - MARGIN_TOP - MARGIN_BOTTOM;
-          const top = MARGIN_TOP + (availableHeight - calendarHeight) / 2;
-          
-          setCalendarStyle({
-            position: 'fixed',
-            top: `${Math.max(MARGIN_TOP, top)}px`,
-            left: `${MARGIN_SIDE}px`,
-            right: `${MARGIN_SIDE}px`,
-            maxHeight: `${calendarHeight}px`,
-            width: 'auto'
-          });
-        } else {
-          // Sur desktop, positionner par rapport au bouton
-          const spaceBelow = viewportHeight - buttonRect.bottom;
-          const spaceAbove = buttonRect.top;
-          
-          if (spaceBelow >= calendarHeight + 8) {
-            // Assez d'espace en dessous
-            setCalendarStyle({
-              position: 'absolute',
-              top: '100%',
-              marginTop: '8px',
-              maxHeight: `${calendarHeight}px`
-            });
-          } else if (spaceAbove >= calendarHeight + 8) {
-            // Assez d'espace au-dessus
-            setCalendarStyle({
-              position: 'absolute',
-              bottom: '100%',
-              marginBottom: '8px',
-              maxHeight: `${calendarHeight}px`
-            });
-          } else {
-            // Pas assez d'espace, centrer dans le viewport
-            const top = Math.max(MARGIN_TOP, (viewportHeight - calendarHeight) / 2);
-            setCalendarStyle({
-              position: 'fixed',
-              top: `${top}px`,
-              left: buttonRect.left,
-              maxHeight: `${calendarHeight}px`
-            });
-          }
-        }
-      };
-
-      updatePosition();
-      window.addEventListener('scroll', updatePosition, true);
-      window.addEventListener('resize', updatePosition);
-
-      return () => {
-        window.removeEventListener('scroll', updatePosition, true);
-        window.removeEventListener('resize', updatePosition);
-      };
-    }
-  }, [isOpen]);
-
   // Fermer le dropdown quand on clique en dehors
   useEffect(() => {
+    if (showInline) return; // Ne pas fermer si en mode inline
+    
     const handleClickOutside = (event: MouseEvent) => {
       if (dropdownRef.current && !dropdownRef.current.contains(event.target as Node)) {
         setIsOpen(false);
@@ -129,7 +65,7 @@ export function DatePicker({ value, onChange, disabled, required }: DatePickerPr
 
     document.addEventListener('mousedown', handleClickOutside);
     return () => document.removeEventListener('mousedown', handleClickOutside);
-  }, []);
+  }, [showInline]);
 
   const formatDisplayDate = (dateString: string) => {
     if (!dateString) return '';
@@ -182,7 +118,9 @@ export function DatePicker({ value, onChange, disabled, required }: DatePickerPr
     
     onChange(dateString);
     setSelectedDate(date);
-    setIsOpen(false);
+    if (!showInline) {
+      setIsOpen(false);
+    }
   };
 
   const navigateMonth = (direction: 'prev' | 'next') => {
@@ -264,6 +202,91 @@ export function DatePicker({ value, onChange, disabled, required }: DatePickerPr
   const days = getDaysInMonth();
   const weekDays = ['Lun', 'Mar', 'Mer', 'Jeu', 'Ven', 'Sam', 'Dim'];
 
+  // Si en mode inline, afficher uniquement le calendrier
+  if (showInline) {
+    return (
+      <div className="w-full bg-white border-2 border-gray-200 rounded-3xl shadow-2xl overflow-hidden">
+        {/* Header du calendrier */}
+        <div className="bg-gradient-to-r from-blue-600 to-purple-600 p-3 sm:p-4 text-white">
+          <div className="flex items-center justify-between mb-2 sm:mb-3">
+            <button
+              type="button"
+              onClick={() => navigateMonth('prev')}
+              className="p-1.5 sm:p-2 hover:bg-white/20 rounded-xl transition-colors"
+            >
+              <ChevronLeft className="w-4 h-4 sm:w-5 sm:h-5" />
+            </button>
+            
+            <h3 className="text-sm sm:text-lg font-bold">
+              {currentMonth.toLocaleDateString('fr-FR', { 
+                month: 'long', 
+                year: 'numeric' 
+              })}
+            </h3>
+            
+            <button
+              type="button"
+              onClick={() => navigateMonth('next')}
+              className="p-1.5 sm:p-2 hover:bg-white/20 rounded-xl transition-colors"
+            >
+              <ChevronRight className="w-4 h-4 sm:w-5 sm:h-5" />
+            </button>
+          </div>
+          
+          <button
+            type="button"
+            onClick={goToToday}
+            className="w-full bg-white/20 hover:bg-white/30 text-white px-2 sm:px-3 py-1.5 sm:py-2 rounded-xl transition-colors font-medium text-xs sm:text-sm"
+          >
+            {settings && settings.minimum_booking_delay_hours > 0 ? 'Prochaine date disponible' : 'Aujourd\'hui'}
+          </button>
+        </div>
+
+        {/* Jours de la semaine */}
+        <div className="grid grid-cols-7 bg-gray-50 border-b border-gray-200">
+          {weekDays.map(day => (
+            <div key={day} className="py-2 text-center text-[10px] sm:text-xs font-medium text-gray-600">
+              {day}
+            </div>
+          ))}
+        </div>
+
+        {/* Grille des jours */}
+        <div className="grid grid-cols-7 gap-1 p-2 sm:p-3">
+          {days.map((day, index) => {
+            const isCurrentMonth = day.isCurrentMonth;
+            const isTodayDate = isToday(day.date);
+            const isSelectedDate = isSelected(day.date);
+            const isNotAvailable = isPastDate(day.date);
+            
+            return (
+              <button
+                key={index}
+                type="button"
+                onClick={() => handleDateSelect(day.date)}
+                disabled={!isCurrentMonth}
+                className={`h-8 sm:h-10 rounded-xl text-xs sm:text-sm font-medium transition-all duration-300 transform hover:scale-110 ${
+                  isSelectedDate
+                    ? 'bg-gradient-to-r from-blue-500 to-purple-500 text-white shadow-lg'
+                    : isTodayDate
+                    ? 'bg-gradient-to-r from-green-500 to-emerald-500 text-white'
+                    : isCurrentMonth
+                    ? isNotAvailable
+                      ? 'bg-gray-100 text-gray-400 hover:bg-gray-200'
+                      : 'bg-gray-50 text-gray-700 hover:bg-blue-50 hover:text-blue-600'
+                    : 'bg-transparent text-gray-300 cursor-not-allowed'
+                }`}
+                title={isNotAvailable && settings ? `Délai minimum: ${settings.minimum_booking_delay_hours}h` : ''}
+              >
+                {day.date.getDate()}
+              </button>
+            );
+          })}
+        </div>
+      </div>
+    );
+  }
+
   return (
     <div ref={dropdownRef} className="relative">
       <label className="block text-sm font-medium text-gray-700 mb-2">
@@ -275,7 +298,7 @@ export function DatePicker({ value, onChange, disabled, required }: DatePickerPr
         type="button"
         onClick={() => !disabled && setIsOpen(!isOpen)}
         disabled={disabled}
-        className={`w-full flex items-center justify-between p-3 sm:p-4 border rounded-xl sm:rounded-2xl transition-all duration-300 text-left ${
+        className={`w-full flex items-center justify-between p-3 sm:p-4 border-2 rounded-2xl transition-all duration-300 text-left ${
           disabled 
             ? 'bg-gray-100 text-gray-400 cursor-not-allowed border-gray-200' 
             : isOpen
@@ -284,7 +307,7 @@ export function DatePicker({ value, onChange, disabled, required }: DatePickerPr
         }`}
       >
         <div className="flex items-center gap-2 sm:gap-3">
-          <div className={`w-8 h-8 sm:w-10 sm:h-10 rounded-lg sm:rounded-xl flex items-center justify-center transition-all duration-300 ${
+          <div className={`w-8 h-8 sm:w-10 sm:h-10 rounded-xl flex items-center justify-center transition-all duration-300 ${
             value ? 'bg-gradient-to-r from-blue-500 to-purple-500 text-white' : 'bg-gray-100 text-gray-400'
           }`}>
             <Calendar className="w-4 h-4 sm:w-5 sm:h-5" />
@@ -299,102 +322,6 @@ export function DatePicker({ value, onChange, disabled, required }: DatePickerPr
           isOpen ? 'rotate-180' : ''
         }`} />
       </button>
-
-      {/* Calendrier dropdown */}
-      {isOpen && (
-        <>
-          {/* Overlay pour fermer */}
-          <div 
-            className="fixed inset-0 z-[9998] bg-black/20 sm:bg-transparent" 
-            onClick={() => setIsOpen(false)}
-          />
-
-          {/* Calendrier - avec positionnement dynamique */}
-          <div 
-            style={calendarStyle}
-            className="bg-white border border-gray-200 rounded-2xl shadow-2xl z-[9999] overflow-hidden flex flex-col w-full sm:w-[380px]"
-          >
-            {/* Header du calendrier - réduit sur mobile */}
-            <div className="bg-gradient-to-r from-blue-600 to-purple-600 p-3 sm:p-4 text-white flex-shrink-0">
-              <div className="flex items-center justify-between mb-2 sm:mb-3">
-                <button
-                  type="button"
-                  onClick={() => navigateMonth('prev')}
-                  className="p-1.5 sm:p-2 hover:bg-white/20 rounded-lg sm:rounded-xl transition-colors"
-                >
-                  <ChevronLeft className="w-4 h-4 sm:w-5 sm:h-5" />
-                </button>
-                
-                <h3 className="text-sm sm:text-lg font-bold">
-                  {currentMonth.toLocaleDateString('fr-FR', { 
-                    month: 'long', 
-                    year: 'numeric' 
-                  })}
-                </h3>
-                
-                <button
-                  type="button"
-                  onClick={() => navigateMonth('next')}
-                  className="p-1.5 sm:p-2 hover:bg-white/20 rounded-lg sm:rounded-xl transition-colors"
-                >
-                  <ChevronRight className="w-4 h-4 sm:w-5 sm:h-5" />
-                </button>
-              </div>
-              
-              <button
-                type="button"
-                onClick={goToToday}
-                className="w-full bg-white/20 hover:bg-white/30 text-white px-2 sm:px-3 py-1.5 sm:py-2 rounded-lg sm:rounded-xl transition-colors font-medium text-xs sm:text-sm"
-              >
-                {settings && settings.minimum_booking_delay_hours > 0 ? 'Prochaine date disponible' : 'Aujourd\'hui'}
-              </button>
-            </div>
-
-            {/* Jours de la semaine - réduit sur mobile */}
-            <div className="grid grid-cols-7 bg-gray-50 border-b border-gray-200 flex-shrink-0">
-              {weekDays.map(day => (
-                <div key={day} className="p-1.5 sm:p-2 text-center text-[10px] sm:text-sm font-medium text-gray-600">
-                  {day}
-                </div>
-              ))}
-            </div>
-
-            {/* Grille des jours - optimisée pour mobile */}
-            <div className="grid grid-cols-7 p-1.5 sm:p-2 overflow-y-auto flex-1">
-              {days.map((day, index) => {
-                const isCurrentMonth = day.isCurrentMonth;
-                const isTodayDate = isToday(day.date);
-                const isSelectedDate = isSelected(day.date);
-                const isNotAvailable = isPastDate(day.date);
-                
-                return (
-                  <button
-                    key={index}
-                    type="button"
-                    onClick={() => handleDateSelect(day.date)}
-                    disabled={!isCurrentMonth}
-                    className={`aspect-square m-0.5 rounded-lg text-[11px] sm:text-sm font-medium transition-all duration-300 transform hover:scale-110 animate-fadeIn ${
-                      isSelectedDate
-                        ? 'bg-gradient-to-r from-blue-500 to-purple-500 text-white shadow-lg'
-                        : isTodayDate
-                        ? 'bg-gradient-to-r from-green-500 to-emerald-500 text-white'
-                        : isCurrentMonth
-                        ? isNotAvailable
-                          ? 'bg-gray-100 text-gray-400 hover:bg-gray-200'
-                          : 'bg-gray-50 text-gray-700 hover:bg-blue-50 hover:text-blue-600'
-                        : 'bg-transparent text-gray-300 cursor-not-allowed'
-                    }`}
-                    style={{ animationDelay: `${index * 20}ms` }}
-                    title={isNotAvailable && settings ? `Délai minimum: ${settings.minimum_booking_delay_hours}h` : ''}
-                  >
-                    {day.date.getDate()}
-                  </button>
-                );
-              })}
-            </div>
-          </div>
-        </>
-      )}
     </div>
   );
 }

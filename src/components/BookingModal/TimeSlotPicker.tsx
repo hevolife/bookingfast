@@ -174,10 +174,7 @@ export function TimeSlotPicker({
                       }`}
                       style={{ animationDelay: `${index * 50}ms` }}
                     >
-                      <div className="font-bold">{slot.time}</div>
-                      <div className="text-xs mt-1">
-                        {slot.available ? '✓ Libre' : '✗ Occupé'}
-                      </div>
+                      {slot.time}
                     </button>
                   ))}
                 </div>

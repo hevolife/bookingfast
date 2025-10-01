@@ -57,6 +57,7 @@ export function BookingModal({
   const [saving, setSaving] = useState(false);
   const [showDeleteConfirm, setShowDeleteConfirm] = useState(false);
   const [bookingStatus, setBookingStatus] = useState<'pending' | 'confirmed' | 'cancelled'>('pending');
+  const [isDatePickerOpen, setIsDatePickerOpen] = useState(false);
 
   // Calculer les créneaux occupés pour la date sélectionnée
   const occupiedSlots = bookings
@@ -590,6 +591,8 @@ export function BookingModal({
                   value={date}
                   onChange={setDate}
                   required
+                  isOpen={isDatePickerOpen}
+                  onOpenChange={setIsDatePickerOpen}
                 />
 
                 <TimeSlotPicker
@@ -600,6 +603,23 @@ export function BookingModal({
                   serviceDuration={isCustomService ? customServiceData.duration : selectedService?.duration_minutes || 60}
                 />
               </div>
+
+              {/* DatePicker en pleine largeur entre heure et participants */}
+              {isDatePickerOpen && (
+                <div className="w-full">
+                  <DatePicker
+                    value={date}
+                    onChange={(newDate) => {
+                      setDate(newDate);
+                      setIsDatePickerOpen(false);
+                    }}
+                    required
+                    isOpen={true}
+                    onOpenChange={setIsDatePickerOpen}
+                    showInline={true}
+                  />
+                </div>
+              )}
 
               {/* Participants */}
               {(selectedService || (isCustomService && customServiceData.name && customServiceData.price > 0)) && (

@@ -57,26 +57,44 @@ export function ServiceBookingModal({
   return (
     <div className="fixed inset-0 bg-black/60 backdrop-blur-sm flex items-end sm:items-center justify-center z-50 animate-fadeIn modal-container">
       <div className="bg-white w-full sm:max-w-4xl max-h-[95vh] sm:max-h-[90vh] overflow-y-auto sm:rounded-3xl shadow-2xl transform animate-slideUp modal-content">
-        {/* Header */}
-        <div className="bg-gradient-to-r from-blue-600 via-purple-600 to-pink-600 p-4 sm:p-6 sm:rounded-t-3xl relative overflow-hidden modal-header">
-          <div className="absolute inset-0 bg-gradient-to-r from-transparent via-white/20 to-transparent -skew-x-12 animate-shimmer"></div>
+        {/* Header avec design amélioré */}
+        <div className="relative overflow-hidden touch-action-none sticky top-0 z-10 modal-header modal-safe-top">
+          {/* Fond dégradé principal */}
+          <div className="absolute inset-0 bg-gradient-to-br from-blue-600 via-purple-600 to-pink-600"></div>
           
-          <div className="relative z-10">
+          {/* Effet de brillance animé */}
+          <div className="absolute inset-0 bg-gradient-to-r from-transparent via-white/30 to-transparent -skew-x-12 animate-shimmer"></div>
+          
+          {/* Motif de points décoratifs */}
+          <div className="absolute inset-0 opacity-10">
+            <div className="absolute top-0 left-0 w-32 h-32 bg-white rounded-full blur-3xl"></div>
+            <div className="absolute bottom-0 right-0 w-40 h-40 bg-white rounded-full blur-3xl"></div>
+          </div>
+          
+          {/* Contenu du header */}
+          <div className="relative z-10 p-4 sm:p-6">
             <div className="flex items-center justify-between">
-              <div className="flex items-center gap-4">
-                <div className="w-10 h-10 sm:w-12 sm:h-12 bg-white/20 rounded-2xl flex items-center justify-center backdrop-blur-sm">
-                  <Calendar className="w-5 h-5 sm:w-6 sm:h-6 text-white" />
+              {/* Titre avec icône décorative */}
+              <div className="flex items-center gap-3 sm:gap-4 flex-1 pr-2">
+                <div className="hidden sm:flex w-12 h-12 bg-white/20 backdrop-blur-sm rounded-2xl items-center justify-center shadow-lg">
+                  <Calendar className="w-6 h-6 text-white" />
                 </div>
-                <div>
-                  <h2 className="text-lg sm:text-2xl font-bold text-white">{serviceName}</h2>
-                  <p className="text-sm sm:text-base text-white/80">{bookings.length} réservation(s)</p>
+                <div className="flex-1">
+                  <h2 className="text-lg sm:text-2xl font-bold text-white drop-shadow-lg">
+                    {serviceName}
+                  </h2>
+                  <p className="text-sm sm:text-base text-white/80 mt-1">{bookings.length} réservation(s)</p>
                 </div>
               </div>
+              
+              {/* Bouton de fermeture amélioré */}
               <button
                 onClick={onClose}
-                className="p-2 sm:p-3 text-white hover:bg-white/20 rounded-xl transition-all duration-300 transform hover:scale-110"
+                className="group relative p-2 sm:p-3 text-white hover:bg-white/20 rounded-xl sm:rounded-2xl transition-all duration-300 transform hover:scale-110 hover:rotate-90 mobile-tap-target flex-shrink-0 backdrop-blur-sm"
+                aria-label="Fermer"
               >
-                <X className="w-5 h-5 sm:w-6 sm:h-6" />
+                <div className="absolute inset-0 bg-white/10 rounded-xl sm:rounded-2xl opacity-0 group-hover:opacity-100 transition-opacity duration-300"></div>
+                <X className="w-5 h-5 sm:w-6 sm:h-6 relative z-10" />
               </button>
             </div>
 
@@ -92,6 +110,9 @@ export function ServiceBookingModal({
               </div>
             </div>
           </div>
+          
+          {/* Bordure inférieure décorative */}
+          <div className="absolute bottom-0 left-0 right-0 h-1 bg-gradient-to-r from-transparent via-white/50 to-transparent"></div>
         </div>
 
         {/* Bookings List */}
