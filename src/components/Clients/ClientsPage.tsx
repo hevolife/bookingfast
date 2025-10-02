@@ -66,7 +66,7 @@ export function ClientsPage({ onEditClient }: ClientsPageProps) {
     });
 
     setFilteredClients(filtered);
-    setCurrentPage(1); // Reset à la première page lors du filtrage
+    setCurrentPage(1);
   }, [clients, searchTerm, sortBy, sortOrder]);
 
   // Calculer la pagination
@@ -157,7 +157,7 @@ export function ClientsPage({ onEditClient }: ClientsPageProps) {
 
   return (
     <>
-      <div className="p-4 sm:p-6 h-full overflow-y-auto bg-gradient-to-br from-blue-50 via-purple-50 to-pink-50 mobile-optimized">
+      <div className="p-4 sm:p-6 bg-gradient-to-br from-blue-50 via-purple-50 to-pink-50 mobile-optimized">
         {/* Header */}
         <div className="mb-6 sm:mb-8">
           <h1 className="text-2xl sm:text-3xl font-bold bg-gradient-to-r from-purple-600 to-pink-600 bg-clip-text text-transparent">
