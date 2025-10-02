@@ -1,33 +1,39 @@
-import { StrictMode } from 'react';
-import { createRoot } from 'react-dom/client';
-import App from './App.tsx';
-import './index.css';
+import React from 'react';
+import ReactDOM from 'react-dom/client';
+import { BrowserRouter, Routes, Route } from 'react-router-dom';
+import App from './App';
+import { PaymentPage } from './components/PaymentPage/PaymentPage';
+import { PaymentSuccessPage } from './components/PaymentPage/PaymentSuccessPage';
+import { PaymentCancelPage } from './components/PaymentPage/PaymentCancelPage';
+import { IframeBookingPage } from './components/IframeBooking/IframeBookingPage';
+import { LoginPage } from './components/Auth/LoginPage';
+import { ProtectedRoute } from './components/Auth/ProtectedRoute';
 import { AuthProvider } from './contexts/AuthContext';
-import { registerSW } from 'virtual:pwa-register';
+import './index.css';
 
-// Enregistrement du Service Worker
-const updateSW = registerSW({
-  onNeedRefresh() {
-    console.log('🔄 Nouvelle version disponible');
-    if (confirm('Une nouvelle version est disponible. Voulez-vous mettre à jour ?')) {
-      updateSW(true);
-    }
-  },
-  onOfflineReady() {
-    console.log('✅ Application prête pour une utilisation hors ligne');
-  },
-  onRegistered(registration) {
-    console.log('✅ Service Worker enregistré:', registration);
-  },
-  onRegisterError(error) {
-    console.error('❌ Erreur lors de l\'enregistrement du Service Worker:', error);
-  }
-});
-
-createRoot(document.getElementById('root')!).render(
-  <StrictMode>
-    <AuthProvider>
-      <App />
-    </AuthProvider>
-  </StrictMode>
+ReactDOM.createRoot(document.getElementById('root')!).render(
+  <React.StrictMode>
+    <BrowserRouter>
+      <AuthProvider>
+        <Routes>
+          {/* Routes publiques - SANS authentification */}
+          <Route path="/login" element={<LoginPage />} />
+          <Route path="/payment" element={<PaymentPage />} />
+          <Route path="/payment-success" element={<PaymentSuccessPage />} />
+          <Route path="/payment-cancel" element={<PaymentCancelPage />} />
+          <Route path="/booking/:userId" element={<IframeBookingPage />} />
+          
+          {/* Routes protégées - AVEC authentification */}
+          <Route
+            path="/*"
+            element={
+              <ProtectedRoute>
+                <App />
+              </ProtectedRoute>
+            }
+          />
+        </Routes>
+      </AuthProvider>
+    </BrowserRouter>
+  </React.StrictMode>
 );
