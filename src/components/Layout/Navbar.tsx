@@ -19,6 +19,17 @@ export function Navbar({ currentPage, onPageChange }: NavbarProps) {
     console.log('🔍 Navbar - Loading:', loading);
   }, [userPlugins, loading]);
 
+  useEffect(() => {
+    if (mobileMenuOpen) {
+      document.body.style.overflow = 'hidden';
+    } else {
+      document.body.style.overflow = '';
+    }
+    return () => {
+      document.body.style.overflow = '';
+    };
+  }, [mobileMenuOpen]);
+
   const hasReportsAccess = userPlugins.some(p => p.plugin_slug === 'reports');
   const hasMultiUserAccess = userPlugins.some(p => p.plugin_slug === 'multi-user');
   const hasPOSAccess = userPlugins.some(p => p.plugin_slug === 'pos');
@@ -53,7 +64,7 @@ export function Navbar({ currentPage, onPageChange }: NavbarProps) {
 
   return (
     <>
-      <nav className="bg-white border-b border-gray-200 sticky top-0 z-50 shadow-sm navbar-safe">
+      <nav className="bg-white border-b border-gray-200 navbar-safe shadow-sm">
         <div className="px-4 sm:px-6">
           <div className="flex items-center justify-between h-16">
             <div className="flex items-center gap-3">
@@ -166,8 +177,8 @@ export function Navbar({ currentPage, onPageChange }: NavbarProps) {
       </nav>
 
       {mobileMenuOpen && (
-        <div className="lg:hidden fixed inset-0 z-40 bg-gradient-to-br from-purple-900/95 via-pink-900/95 to-blue-900/95 backdrop-blur-md animate-fadeIn safe-all">
-          <div className="h-full overflow-y-auto p-6 pt-20">
+        <div className="lg:hidden fixed inset-0 z-[9999] bg-gradient-to-br from-purple-900/95 via-pink-900/95 to-blue-900/95 backdrop-blur-md animate-fadeIn safe-all" style={{ top: 'calc(4rem + env(safe-area-inset-top))' }}>
+          <div className="h-full overflow-y-auto p-6 -webkit-overflow-scrolling-touch">
             <div className="max-w-md mx-auto space-y-3">
               <div className="text-center mb-8">
                 <div className="w-20 h-20 bg-white rounded-2xl flex items-center justify-center mx-auto mb-4 shadow-2xl">
