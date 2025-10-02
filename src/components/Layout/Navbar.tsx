@@ -20,14 +20,7 @@ export function Navbar({ currentPage, onPageChange }: NavbarProps) {
   }, [userPlugins, loading]);
 
   useEffect(() => {
-    if (mobileMenuOpen) {
-      document.body.style.overflow = 'hidden';
-    } else {
-      document.body.style.overflow = '';
-    }
-    return () => {
-      document.body.style.overflow = '';
-    };
+    console.log('🔍 Mobile Menu State:', mobileMenuOpen);
   }, [mobileMenuOpen]);
 
   const hasReportsAccess = userPlugins.some(p => p.plugin_slug === 'reports');
@@ -60,6 +53,11 @@ export function Navbar({ currentPage, onPageChange }: NavbarProps) {
     onPageChange(pageId);
     setMobileMenuOpen(false);
     setPluginsMenuOpen(false);
+  };
+
+  const handleMenuToggle = () => {
+    console.log('🔍 Menu Toggle Clicked - Current State:', mobileMenuOpen);
+    setMobileMenuOpen(!mobileMenuOpen);
   };
 
   return (
@@ -166,8 +164,8 @@ export function Navbar({ currentPage, onPageChange }: NavbarProps) {
               </button>
 
               <button
-                onClick={() => setMobileMenuOpen(!mobileMenuOpen)}
-                className="lg:hidden p-2 rounded-xl hover:bg-gray-100 transition-colors"
+                onClick={handleMenuToggle}
+                className="lg:hidden p-2 rounded-xl hover:bg-gray-100 transition-colors z-[10000]"
               >
                 {mobileMenuOpen ? <X className="w-6 h-6" /> : <Menu className="w-6 h-6" />}
               </button>
@@ -177,8 +175,21 @@ export function Navbar({ currentPage, onPageChange }: NavbarProps) {
       </nav>
 
       {mobileMenuOpen && (
-        <div className="lg:hidden fixed inset-0 z-[9999] bg-gradient-to-br from-purple-900/95 via-pink-900/95 to-blue-900/95 backdrop-blur-md animate-fadeIn safe-all" style={{ top: 'calc(4rem + env(safe-area-inset-top))' }}>
-          <div className="h-full overflow-y-auto p-6 -webkit-overflow-scrolling-touch">
+        <div 
+          className="lg:hidden fixed inset-0 bg-gradient-to-br from-purple-900/95 via-pink-900/95 to-blue-900/95 backdrop-blur-md animate-fadeIn"
+          style={{ 
+            zIndex: 9999,
+            top: 0,
+            left: 0,
+            right: 0,
+            bottom: 0,
+            paddingTop: `calc(4rem + env(safe-area-inset-top, 0px))`,
+            paddingBottom: `env(safe-area-inset-bottom, 0px)`,
+            paddingLeft: `env(safe-area-inset-left, 0px)`,
+            paddingRight: `env(safe-area-inset-right, 0px)`
+          }}
+        >
+          <div className="h-full overflow-y-auto p-6" style={{ WebkitOverflowScrolling: 'touch' }}>
             <div className="max-w-md mx-auto space-y-3">
               <div className="text-center mb-8">
                 <div className="w-20 h-20 bg-white rounded-2xl flex items-center justify-center mx-auto mb-4 shadow-2xl">
