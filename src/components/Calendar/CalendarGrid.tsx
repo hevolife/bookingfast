@@ -18,7 +18,6 @@ interface CalendarGridProps {
 }
 
 export function CalendarGrid({ currentDate, onTimeSlotClick, onBookingClick, bookings: allBookings, loading, onDeleteBooking }: CalendarGridProps) {
-  // Utiliser la vraie date du jour directement
   const today = new Date();
   const todayString = `${today.getFullYear()}-${(today.getMonth() + 1).toString().padStart(2, '0')}-${today.getDate().toString().padStart(2, '0')}`;
   
@@ -33,18 +32,13 @@ export function CalendarGrid({ currentDate, onTimeSlotClick, onBookingClick, boo
   const { settings } = useBusinessSettings();
   const [refreshTrigger, setRefreshTrigger] = useState(0);
 
-  // Calculer selectedDateString après selectedDate
   const selectedDateString = `${selectedDate.getFullYear()}-${(selectedDate.getMonth() + 1).toString().padStart(2, '0')}-${selectedDate.getDate().toString().padStart(2, '0')}`;
 
-  console.log('📅 CALENDAR GRID - Initialisation:');
-
-  // Fonction pour obtenir la date du jour réelle
   const getTodayString = (): string => {
     const now = new Date();
     return `${now.getFullYear()}-${(now.getMonth() + 1).toString().padStart(2, '0')}-${now.getDate().toString().padStart(2, '0')}`;
   };
 
-  // Fonction pour vérifier si une date est aujourd'hui
   const isToday = (date: Date): boolean => {
     const now = new Date();
     return date.getFullYear() === now.getFullYear() &&
@@ -52,14 +46,12 @@ export function CalendarGrid({ currentDate, onTimeSlotClick, onBookingClick, boo
            date.getDate() === now.getDate();
   };
 
-  // Fonction pour vérifier si une date est sélectionnée
   const isSelected = (date: Date): boolean => {
     return date.getFullYear() === selectedDate.getFullYear() &&
            date.getMonth() === selectedDate.getMonth() &&
            date.getDate() === selectedDate.getDate();
   };
 
-  // Générer les jours pour le calendrier
   const generateDaysForMonth = () => {
     const days = [];
     const year = viewMonth.getFullYear();
@@ -67,12 +59,11 @@ export function CalendarGrid({ currentDate, onTimeSlotClick, onBookingClick, boo
     const firstDay = new Date(year, month, 1);
     const lastDay = new Date(year, month + 1, 0);
     const daysInMonth = lastDay.getDate();
-    const startingDayOfWeek = (firstDay.getDay() + 6) % 7; // Lundi = 0
+    const startingDayOfWeek = (firstDay.getDay() + 6) % 7;
 
-    // Obtenir la date d'aujourd'hui pour comparaison
     const today = new Date();
     const todayDateOnly = new Date(today.getFullYear(), today.getMonth(), today.getDate());
-    // Jours du mois précédent
+
     for (let i = startingDayOfWeek - 1; i >= 0; i--) {
       const day = new Date(year, month, -i);
       const dayDateOnly = new Date(day.getFullYear(), day.getMonth(), day.getDate());
@@ -86,7 +77,6 @@ export function CalendarGrid({ currentDate, onTimeSlotClick, onBookingClick, boo
       });
     }
 
-    // Jours du mois actuel
     for (let day = 1; day <= daysInMonth; day++) {
       const date = new Date(year, month, day);
       const dayDateOnly = new Date(date.getFullYear(), date.getMonth(), date.getDate());
@@ -100,8 +90,7 @@ export function CalendarGrid({ currentDate, onTimeSlotClick, onBookingClick, boo
       });
     }
 
-    // Jours du mois suivant pour compléter la grille
-    const remainingDays = 42 - days.length; // 6 semaines × 7 jours
+    const remainingDays = 42 - days.length;
     for (let day = 1; day <= remainingDays; day++) {
       const date = new Date(year, month + 1, day);
       const dayDateOnly = new Date(date.getFullYear(), date.getMonth(), date.getDate());
@@ -120,22 +109,15 @@ export function CalendarGrid({ currentDate, onTimeSlotClick, onBookingClick, boo
 
   const days = generateDaysForMonth();
 
-  // Initialiser avec la date du jour au chargement
   useEffect(() => {
-    // Toujours initialiser sur la date du jour
     const now = new Date();
-    console.log('🔄 Initialisation calendrier - Sélection date du jour:', getTodayString());
     setSelectedDate(now);
     setViewMonth(new Date(now.getFullYear(), now.getMonth(), 1));
   }, []);
 
-  // Écouter les événements de changement de réservations
   useEffect(() => {
     const handleBookingChange = () => {
-      // Forcer un re-render immédiat
       setRefreshTrigger(prev => prev + 1);
-      
-      // Déclencher aussi un refetch pour s'assurer d'avoir les dernières données
       setTimeout(() => {
         window.dispatchEvent(new CustomEvent('refreshBookings'));
       }, 100);
@@ -152,38 +134,28 @@ export function CalendarGrid({ currentDate, onTimeSlotClick, onBookingClick, boo
     };
   }, []);
 
-  // Navigation de mois simplifiée
   const navigateMonth = (direction: 'prev' | 'next') => {
-    console.log('📅 Navigation mois:', direction);
-    
     const newViewMonth = new Date(viewMonth);
     if (direction === 'prev') {
       newViewMonth.setMonth(viewMonth.getMonth() - 1);
     } else {
       newViewMonth.setMonth(viewMonth.getMonth() + 1);
     }
-    
-    console.log('📅 Nouveau mois affiché:', newViewMonth.toLocaleDateString('fr-FR'));
     setViewMonth(newViewMonth);
-    
-    // Sélectionner le premier jour du nouveau mois
     const newSelectedDate = new Date(newViewMonth.getFullYear(), newViewMonth.getMonth(), 1);
     setSelectedDate(newSelectedDate);
   };
 
-  // Aller au mois actuel
   const goToCurrentMonth = () => {
     const now = new Date();
     setViewMonth(new Date(now.getFullYear(), now.getMonth(), 1));
-    setSelectedDate(now); // Sélectionner le jour actuel, pas le 1er du mois
+    setSelectedDate(now);
   };
 
-  // Aller à un mois spécifique
   const goToMonth = (monthOffset: number) => {
     const now = new Date();
     const targetMonth = new Date(now.getFullYear(), now.getMonth() + monthOffset, 1);
     setViewMonth(targetMonth);
-    // Si c'est le mois actuel (offset 0), sélectionner le jour actuel
     if (monthOffset === 0) {
       setSelectedDate(now);
     } else {
@@ -191,9 +163,7 @@ export function CalendarGrid({ currentDate, onTimeSlotClick, onBookingClick, boo
     }
   };
 
-  // Générer les options de navigation rapide
   const getQuickNavOptions = () => {
-    const now = new Date();
     return [
       { label: 'Ce mois', offset: 0, isCurrent: true },
       { label: 'Mois prochain', offset: 1, isCurrent: false },
@@ -204,34 +174,26 @@ export function CalendarGrid({ currentDate, onTimeSlotClick, onBookingClick, boo
 
   const quickNavOptions = getQuickNavOptions();
 
-  // Vérifier si on affiche le mois actuel
   const isCurrentMonth = () => {
     const now = new Date();
     return viewMonth.getFullYear() === now.getFullYear() && 
            viewMonth.getMonth() === now.getMonth();
   };
 
-  // Fonction pour changer de mois avec les flèches
   const changeMonth = (direction: 'prev' | 'next') => {
     const newMonth = new Date(viewMonth);
-    
     if (direction === 'prev') {
       newMonth.setMonth(viewMonth.getMonth() - 1);
     } else {
       newMonth.setMonth(viewMonth.getMonth() + 1);
     }
     setViewMonth(newMonth);
-    
-    // Sélectionner le premier jour du nouveau mois
     const firstDay = new Date(newMonth.getFullYear(), newMonth.getMonth(), 1);
     setSelectedDate(firstDay);
   };
 
-  // Fonction pour sélectionner un jour
   const selectDay = (date: Date) => {
     setSelectedDate(date);
-    
-    // Si on sélectionne un jour d'un autre mois, changer le mois affiché
     if (date.getMonth() !== viewMonth.getMonth() || date.getFullYear() !== viewMonth.getFullYear()) {
       setViewMonth(new Date(date.getFullYear(), date.getMonth(), 1));
     }
@@ -310,22 +272,16 @@ export function CalendarGrid({ currentDate, onTimeSlotClick, onBookingClick, boo
 
   const scrollToToday = () => {
     const now = new Date();
-    
-    // Recharger le mois actuel si on n'est pas déjà dessus
     if (viewMonth.getMonth() !== now.getMonth() || viewMonth.getFullYear() !== now.getFullYear()) {
       setViewMonth(new Date(now.getFullYear(), now.getMonth(), 1));
     }
-    
     setSelectedDate(now);
-    
     if (scrollContainerRef.current) {
       const todayIndex = days.findIndex(day => isToday(day.date));
-      
       if (todayIndex !== -1) {
         const dayWidth = 76;
         const containerWidth = scrollContainerRef.current.clientWidth;
         const scrollPosition = (todayIndex * dayWidth) - (containerWidth / 2) + (dayWidth / 2);
-        
         scrollContainerRef.current.scrollTo({
           left: Math.max(0, scrollPosition),
           behavior: 'smooth'
@@ -337,12 +293,10 @@ export function CalendarGrid({ currentDate, onTimeSlotClick, onBookingClick, boo
   const scrollToSelectedDate = () => {
     if (scrollContainerRef.current) {
       const selectedIndex = days.findIndex(day => isSelected(day.date));
-      
       if (selectedIndex !== -1) {
         const dayWidth = 76;
         const containerWidth = scrollContainerRef.current.clientWidth;
         const scrollPosition = (selectedIndex * dayWidth) - (containerWidth / 2) + (dayWidth / 2);
-        
         scrollContainerRef.current.scrollTo({
           left: Math.max(0, scrollPosition),
           behavior: 'smooth'
@@ -351,48 +305,27 @@ export function CalendarGrid({ currentDate, onTimeSlotClick, onBookingClick, boo
     }
   };
 
-  // Centrer sur la date sélectionnée quand elle change
   useEffect(() => {
-    // Délai pour permettre au DOM de se charger
     const timer = setTimeout(() => {
       scrollToSelectedDate();
     }, 100);
-    
     return () => clearTimeout(timer);
   }, [selectedDate]);
 
-  // Centrer sur la date sélectionnée au chargement initial
   useEffect(() => {
-    // Délai plus long pour le chargement initial
     const timer = setTimeout(() => {
       scrollToSelectedDate();
     }, 500);
-    
     return () => clearTimeout(timer);
-  }, []); // Se déclenche une seule fois au montage
+  }, []);
 
   const getBookingsForDay = (date: Date) => {
     const dateString = `${date.getFullYear()}-${(date.getMonth() + 1).toString().padStart(2, '0')}-${date.getDate().toString().padStart(2, '0')}`;
     const dayBookings = allBookings.filter(b => b.date === dateString);
-    
-    if (isSelected(date)) {
-      console.log('📅 Réservations pour date sélectionnée', dateString, ':', dayBookings.length, dayBookings.map(b => `${b.client_firstname} ${b.time}`));
-    }
-    
     return dayBookings.sort((a, b) => a.time.localeCompare(b.time));
   };
 
-  // Grouper les réservations par service et créneau horaire
   const groupBookingsByServiceAndTime = (bookings: Booking[]) => {
-    console.log('🔍 Début groupement des réservations:', bookings.length);
-    console.log('📋 Réservations à grouper:', bookings.map(b => ({
-      id: b.id,
-      client: b.client_firstname,
-      time: b.time,
-      service_id: b.service_id,
-      service_name: b.service?.name
-    })));
-    
     const groups: Array<{
       serviceId: string;
       serviceName: string;
@@ -405,74 +338,23 @@ export function CalendarGrid({ currentDate, onTimeSlotClick, onBookingClick, boo
     const serviceTimeGroups = new Map<string, Booking[]>();
     
     bookings.forEach(booking => {
-      // Normaliser l'heure en enlevant les secondes
-      const normalizedTime = booking.time.slice(0, 5); // "08:30:00" -> "08:30"
+      const normalizedTime = booking.time.slice(0, 5);
       const key = `${booking.service_id}-${normalizedTime}`;
-      console.log('📋 Traitement réservation:', {
-        id: booking.id,
-        client: booking.client_firstname,
-        originalTime: booking.time,
-        normalizedTime: normalizedTime,
-        serviceId: booking.service_id,
-        serviceName: booking.service?.name,
-        key: key
-      });
-      
       if (!serviceTimeGroups.has(key)) {
         serviceTimeGroups.set(key, []);
-        console.log('🆕 Nouveau groupe créé:', key);
       }
       serviceTimeGroups.get(key)!.push(booking);
-      console.log('➕ Réservation ajoutée au groupe:', key, 'Total dans ce groupe:', serviceTimeGroups.get(key)!.length);
     });
-
-    console.log('🗂️ Groupes créés:', Array.from(serviceTimeGroups.keys()));
-    console.log('🗂️ Détails des groupes:', Array.from(serviceTimeGroups.entries()).map(([key, bookings]) => ({
-      key,
-      count: bookings.length,
-      firstBooking: bookings[0] ? {
-        id: bookings[0].id,
-        service: bookings[0].service?.name,
-        time: bookings[0].time
-      } : null
-    })));
     
     serviceTimeGroups.forEach((groupBookings, key) => {
       const firstBooking = groupBookings[0];
-      console.log('🔍 Traitement groupe:', key, 'Première réservation:', firstBooking ? {
-        id: firstBooking.id,
-        service: firstBooking.service?.name || 'Service non trouvé',
-        hasService: !!firstBooking.service,
-        service_id: firstBooking.service_id
-      } : 'null');
+      if (!firstBooking) return;
       
-      if (!firstBooking) {
-        console.log('❌ Pas de première réservation pour le groupe:', key);
-        return;
-      }
-      
-      // Utiliser le service_id même si l'objet service n'est pas chargé
       const serviceName = firstBooking.service?.name || `Service ${firstBooking.service_id.slice(0, 8)}`;
-      
-      const bookingTime = firstBooking.time.slice(0, 5); // Normaliser l'heure
+      const bookingTime = firstBooking.time.slice(0, 5);
       const timeIndex = timeSlots.findIndex(slot => slot.time === bookingTime);
       
-      console.log('🔍 Recherche créneau pour groupe:', {
-        key: key,
-        bookingTime: bookingTime,
-        timeIndex: timeIndex,
-        availableSlots: timeSlots.map(s => s.time),
-        serviceName: serviceName,
-        bookingsCount: groupBookings.length
-      });
-      
       if (timeIndex !== -1) {
-        console.log('✅ Groupe ajouté:', {
-          serviceName: serviceName,
-          timeIndex: timeIndex,
-          bookingsCount: groupBookings.length
-        });
-        
         groups.push({
           serviceId: firstBooking.service_id,
           serviceName: serviceName,
@@ -481,18 +363,9 @@ export function CalendarGrid({ currentDate, onTimeSlotClick, onBookingClick, boo
           bookings: groupBookings,
           startTime: bookingTime
         });
-      } else {
-        console.error('❌ Créneau horaire non trouvé pour:', bookingTime, 'dans', timeSlots.map(s => s.time));
       }
     });
 
-    console.log('🏁 Groupes finaux créés:', groups.length, groups);
-    console.log('🏁 Détails groupes finaux:', groups.map(g => ({
-      serviceName: g.serviceName,
-      startTime: g.startTime,
-      timeIndex: g.timeIndex,
-      bookingsCount: g.bookings.length
-    })));
     return groups;
   };
 
@@ -517,12 +390,10 @@ export function CalendarGrid({ currentDate, onTimeSlotClick, onBookingClick, boo
     setServiceModalOpen(true);
   };
 
-  // Générer les options de mois
   const getMonthOptions = () => {
     const now = new Date();
     const options = [];
     
-    // 6 mois précédents
     for (let i = 6; i >= 1; i--) {
       const date = new Date(now.getFullYear(), now.getMonth() - i, 1);
       options.push({
@@ -532,14 +403,12 @@ export function CalendarGrid({ currentDate, onTimeSlotClick, onBookingClick, boo
       });
     }
     
-    // Mois actuel
     options.push({
       date: new Date(now.getFullYear(), now.getMonth(), 1),
       label: now.toLocaleDateString('fr-FR', { month: 'long', year: 'numeric' }),
       isCurrentMonth: true
     });
     
-    // 6 mois suivants
     for (let i = 1; i <= 6; i++) {
       const date = new Date(now.getFullYear(), now.getMonth() + i, 1);
       options.push({
@@ -560,16 +429,9 @@ export function CalendarGrid({ currentDate, onTimeSlotClick, onBookingClick, boo
     setShowMonthSelector(false);
   };
 
-  // Debug logs pour les blocs de service
-  console.log('🎯 DEBUG BLOCS SERVICE:');
-  console.log('📅 Date sélectionnée:', selectedDateString);
-  console.log('📋 Réservations du jour:', dayBookings.length, dayBookings);
-  console.log('🏷️ Groupes de service:', serviceGroups.length, serviceGroups);
-  console.log('⏰ Créneaux horaires disponibles:', timeSlots.length, timeSlots.map(s => s.time));
-
   if (loading || !settings) {
     return (
-      <div className="h-full bg-gradient-to-br from-blue-50 via-purple-50 to-pink-50 flex items-center justify-center">
+      <div className="min-h-screen bg-gradient-to-br from-blue-50 via-purple-50 to-pink-50 flex items-center justify-center">
         <div className="text-center">
           <LoadingSpinner size="lg" className="mx-auto mb-4" />
           <p className="text-gray-600">Chargement du planning...</p>
@@ -578,19 +440,15 @@ export function CalendarGrid({ currentDate, onTimeSlotClick, onBookingClick, boo
     );
   }
 
-  // Composant Dropdown rendu via portail
   const MonthDropdown = () => {
     if (!showMonthSelector) return null;
 
     return createPortal(
       <>
-        {/* Overlay pour fermer */}
         <div 
           className="fixed inset-0 z-[999998] bg-transparent" 
           onClick={() => setShowMonthSelector(false)}
         />
-        
-        {/* Dropdown */}
         <div 
           className="fixed z-[999999] bg-white border border-gray-200 rounded-2xl shadow-2xl min-w-64 max-h-80 overflow-y-auto"
           style={{
@@ -625,10 +483,11 @@ export function CalendarGrid({ currentDate, onTimeSlotClick, onBookingClick, boo
       document.body
     );
   };
+
   return (
     <>
-      <div className="h-full bg-gradient-to-br from-blue-50 via-purple-50 to-pink-50 flex flex-col overflow-x-hidden">
-        {/* Header avec gradient animé */}
+      <div className="bg-gradient-to-br from-blue-50 via-purple-50 to-pink-50">
+        {/* Header */}
         <div className="bg-white/90 backdrop-blur-md border-b border-gray-100 p-4 shadow-lg">
           <div className="flex items-center justify-between mb-4">
             <div className="flex items-center gap-3">
@@ -663,7 +522,7 @@ export function CalendarGrid({ currentDate, onTimeSlotClick, onBookingClick, boo
             </div>
           </div>
 
-          {/* Navigation de mois avec boutons rapides */}
+          {/* Navigation de mois */}
           <div className="flex items-center justify-center mb-2">
             <div className="flex items-center gap-2">
               <button
@@ -708,7 +567,7 @@ export function CalendarGrid({ currentDate, onTimeSlotClick, onBookingClick, boo
             ))}
           </div>
 
-          {/* Navigation des jours avec animations */}
+          {/* Navigation des jours */}
           <div className="flex items-center gap-2">
             <button
               onClick={() => scrollToDays('left')}
@@ -772,8 +631,8 @@ export function CalendarGrid({ currentDate, onTimeSlotClick, onBookingClick, boo
           </div>
         </div>
 
-        {/* Calendrier avec animations */}
-        <div className="flex-1 overflow-y-auto overflow-x-hidden">
+        {/* Calendrier */}
+        <div className="p-4">
           {isDayClosed() ? (
             <div className="flex items-center justify-center h-64 animate-fadeIn">
               <div className="text-center p-8 bg-white/80 backdrop-blur-sm rounded-3xl shadow-xl">
@@ -822,7 +681,7 @@ export function CalendarGrid({ currentDate, onTimeSlotClick, onBookingClick, boo
 
               {/* Zone principale */}
               <div className="flex-1 relative bg-white/60 backdrop-blur-sm overflow-x-hidden">
-                {/* Lignes de grille avec alternance de couleurs */}
+                {/* Lignes de grille */}
                 {timeSlots.map((slot, index) => (
                   <div
                     key={slot.time}
@@ -837,17 +696,13 @@ export function CalendarGrid({ currentDate, onTimeSlotClick, onBookingClick, boo
                   />
                 ))}
 
-                {/* Zones cliquables avec animations */}
+                {/* Zones cliquables */}
                 {timeSlots.map((slot, index) => (
                   <button
                     key={slot.time}
                     onClick={() => {
                       if (!slot.available) return;
-                      
                       const selectedDateString = `${selectedDate.getFullYear()}-${(selectedDate.getMonth() + 1).toString().padStart(2, '0')}-${selectedDate.getDate().toString().padStart(2, '0')}`;
-                      
-                      console.log('🕐 Clic sur créneau:');
-                      
                       onTimeSlotClick(selectedDateString, slot.time);
                     }}
                     disabled={!slot.available}
@@ -871,31 +726,14 @@ export function CalendarGrid({ currentDate, onTimeSlotClick, onBookingClick, boo
                   </button>
                 ))}
 
-                {/* Blocs de service avec couleurs et animations */}
+                {/* Blocs de service */}
                 <div className="absolute inset-0 z-30 pointer-events-none">
                   {serviceGroups.map((group, groupIndex) => {
                     const { bookings, serviceName, startTime } = group;
-                    
-                    console.log('🔍 Rendu bloc service:', {
-                      groupIndex,
-                      serviceName,
-                      startTime,
-                      bookingsCount: bookings?.length || 0,
-                      bookings: bookings
-                    });
-                    
-                    if (!bookings || bookings.length === 0) {
-                      console.log('❌ Pas de réservations pour ce groupe');
-                      return null;
-                    }
+                    if (!bookings || bookings.length === 0) return null;
                     
                     const timeIndex = timeSlots.findIndex(slot => slot && slot.time === startTime);
-                    if (timeIndex === -1) {
-                      console.log('❌ Créneau horaire non trouvé:', startTime, 'dans', timeSlots.map(s => s.time));
-                      return null;
-                    }
-                    
-                    console.log('✅ Rendu bloc service:', serviceName, 'à', startTime, 'index:', timeIndex);
+                    if (timeIndex === -1) return null;
                     
                     const duration = Math.ceil(bookings[0].duration_minutes / 30);
                     
@@ -905,7 +743,6 @@ export function CalendarGrid({ currentDate, onTimeSlotClick, onBookingClick, boo
                       const otherEnd = otherStartIndex + otherDuration;
                       const currentStart = timeIndex;
                       const currentEnd = timeIndex + duration;
-                      
                       return (otherStartIndex < currentEnd && otherEnd > currentStart);
                     });
                     
@@ -946,7 +783,6 @@ export function CalendarGrid({ currentDate, onTimeSlotClick, onBookingClick, boo
                               overlapCount > 1 ? 'text-xs' : 'text-xs sm:text-sm'
                             }`}>
                               {(() => {
-                                // Pour les services personnalisés, utiliser le nom stocké dans custom_service_data
                                 if (serviceName === 'Service personnalisé' && bookings.length > 0) {
                                   const firstBooking = bookings[0];
                                   if (firstBooking.custom_service_data?.name) {
@@ -977,7 +813,6 @@ export function CalendarGrid({ currentDate, onTimeSlotClick, onBookingClick, boo
                             </div>
                           </div>
                         </div>
-                        
                       </div>
                     );
                   })}
@@ -988,7 +823,7 @@ export function CalendarGrid({ currentDate, onTimeSlotClick, onBookingClick, boo
         </div>
       </div>
 
-      {/* Bouton flottant pour aller à aujourd'hui - Position fixe en bas à droite */}
+      {/* Bouton flottant */}
       <button
         onClick={scrollToToday}
         className="fixed bottom-6 right-6 z-40 p-4 bg-gradient-to-r from-green-500 to-emerald-500 text-white rounded-full hover:from-green-600 hover:to-emerald-600 transition-all duration-300 transform hover:scale-110 shadow-2xl border-2 border-white/20 backdrop-blur-sm"
@@ -1003,7 +838,7 @@ export function CalendarGrid({ currentDate, onTimeSlotClick, onBookingClick, boo
         </div>
       </button>
 
-      {/* Modal des réservations par service */}
+      {/* Modal */}
       <ServiceBookingModal
         isOpen={serviceModalOpen}
         onClose={() => setServiceModalOpen(false)}

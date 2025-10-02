@@ -9,10 +9,10 @@ import { PermissionGate, UsageLimitIndicator } from '../UI/PermissionGate';
 import { Booking } from '../../types';
 
 export function CalendarPage() {
-  const [currentDate] = useState(new Date()); // Date actuelle réelle
+  const [currentDate] = useState(new Date());
   const [activeView, setActiveView] = useState<'calendar' | 'list' | 'clients'>('calendar');
   const [isModalOpen, setIsModalOpen] = useState(false);
-  const [selectedDate, setSelectedDate] = useState(new Date().toISOString().split('T')[0]); // Date du jour
+  const [selectedDate, setSelectedDate] = useState(new Date().toISOString().split('T')[0]);
   const [selectedTime, setSelectedTime] = useState('');
   const [editingBooking, setEditingBooking] = useState<Booking | null>(null);
   
@@ -24,18 +24,12 @@ export function CalendarPage() {
     b.date === new Date().toISOString().split('T')[0]
   ).length;
 
-
-
-
-
   const handleTimeSlotClick = (date: string, time: string) => {
-    // Vérifier les permissions avant d'ouvrir le modal
     if (!hasPermission('create_booking')) {
       alert('Vous n\'avez pas la permission de créer des réservations');
       return;
     }
     
-    // Vérifier les limites d'utilisation
     if (usageLimits.maxBookingsPerDay && todayBookingsCount >= usageLimits.maxBookingsPerDay) {
       alert(`Limite atteinte: ${usageLimits.maxBookingsPerDay} réservations par jour maximum pour votre rôle`);
       return;
@@ -47,7 +41,6 @@ export function CalendarPage() {
   };
 
   const handleBookingClick = (booking: Booking) => {
-    // Vérifier les permissions avant d'ouvrir le modal d'édition
     if (!canEditBooking(booking)) {
       alert('Vous n\'avez pas la permission de modifier cette réservation');
       return;
@@ -75,9 +68,9 @@ export function CalendarPage() {
   };
 
   return (
-    <div className="h-full">
+    <div className="h-full flex flex-col overflow-hidden">
       {/* Navigation des vues */}
-      <div className="p-4 bg-white border-b border-gray-200">
+      <div className="flex-shrink-0 p-4 bg-white border-b border-gray-200">
         <div className="flex gap-2">
           <PermissionGate permission="view_calendar" showMessage={false}>
             <button
@@ -118,34 +111,35 @@ export function CalendarPage() {
             </button>
           </PermissionGate>
         </div>
-        
       </div>
       
-      {/* Contenu selon la vue active */}
-      <PermissionGate permission="view_calendar">
-        {activeView === 'calendar' ? (
-          <UsageLimitIndicator currentUsage={todayBookingsCount} permission="create_booking">
-            <CalendarGrid
-              currentDate={currentDate}
-              onTimeSlotClick={handleTimeSlotClick}
-              onBookingClick={handleBookingClick}
-              bookings={bookings}
-              loading={loading}
-              onDeleteBooking={handleDeleteBooking}
-            />
-          </UsageLimitIndicator>
-        ) : activeView === 'list' ? (
-          <PermissionGate permission="view_calendar">
-            <BookingsList
-              onEditBooking={handleBookingClick}
-            />
-          </PermissionGate>
-        ) : (
-          <PermissionGate permission="view_clients">
-            <ClientsPage />
-          </PermissionGate>
-        )}
-      </PermissionGate>
+      {/* Contenu selon la vue active - Scroll unifié */}
+      <div className="flex-1 overflow-y-auto overflow-x-hidden">
+        <PermissionGate permission="view_calendar">
+          {activeView === 'calendar' ? (
+            <UsageLimitIndicator currentUsage={todayBookingsCount} permission="create_booking">
+              <CalendarGrid
+                currentDate={currentDate}
+                onTimeSlotClick={handleTimeSlotClick}
+                onBookingClick={handleBookingClick}
+                bookings={bookings}
+                loading={loading}
+                onDeleteBooking={handleDeleteBooking}
+              />
+            </UsageLimitIndicator>
+          ) : activeView === 'list' ? (
+            <PermissionGate permission="view_calendar">
+              <BookingsList
+                onEditBooking={handleBookingClick}
+              />
+            </PermissionGate>
+          ) : (
+            <PermissionGate permission="view_clients">
+              <ClientsPage />
+            </PermissionGate>
+          )}
+        </PermissionGate>
+      </div>
       
       {isModalOpen && (
         <BookingModal
