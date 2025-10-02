@@ -71,33 +71,106 @@ export function usePlugins() {
         return;
       }
 
-      console.log('🔍 Appel get_user_active_plugins pour:', user.id);
+      console.log('🔍 Chargement plugins actifs pour:', user.id);
 
-      const { data, error } = await supabase
-        .rpc('get_user_active_plugins', { p_user_id: user.id });
+      // Vérifier si l'utilisateur est propriétaire ou membre d'équipe
+      const { data: teamMemberData, error: teamError } = await supabase
+        .from('team_members')
+        .select('id, owner_id, user_id')
+        .eq('user_id', user.id)
+        .eq('is_active', true)
+        .maybeSingle();
 
-      if (error) {
-        console.error('❌ Erreur RPC:', error);
-        throw error;
+      if (teamError) {
+        console.error('❌ Erreur vérification membre:', teamError);
+        throw teamError;
       }
 
-      console.log('✅ Plugins actifs reçus:', data);
+      console.log('👤 Données membre:', teamMemberData);
 
-      const formattedPlugins: UserPlugin[] = (data || []).map((p: any) => ({
-        plugin_id: p.plugin_id,
-        plugin_name: p.plugin_name,
-        plugin_slug: p.plugin_slug,
-        plugin_icon: p.plugin_icon,
-        plugin_category: p.plugin_category,
-        activated_features: Array.isArray(p.activated_features) 
-          ? p.activated_features 
-          : [],
-        settings: p.settings || {}
-      }));
+      let accessiblePlugins: UserPlugin[] = [];
 
-      console.log('🔌 Plugins formatés:', formattedPlugins);
-      console.log('🔌 Plugin POS trouvé:', formattedPlugins.find(p => p.plugin_slug === 'pos'));
-      setUserPlugins(formattedPlugins);
+      if (teamMemberData) {
+        // C'est un membre d'équipe - récupérer ses permissions
+        console.log('👥 Utilisateur est membre d\'équipe');
+        
+        const { data: permissionsData, error: permError } = await supabase
+          .from('team_member_plugin_permissions')
+          .select(`
+            plugin_id,
+            plugin:plugins(
+              id,
+              name,
+              slug,
+              icon,
+              category
+            )
+          `)
+          .eq('team_member_id', teamMemberData.id);
+
+        if (permError) {
+          console.error('❌ Erreur permissions:', permError);
+          throw permError;
+        }
+
+        console.log('🔐 Permissions trouvées:', permissionsData);
+
+        accessiblePlugins = (permissionsData || [])
+          .filter(p => p.plugin)
+          .map(p => ({
+            plugin_id: p.plugin.id,
+            plugin_name: p.plugin.name,
+            plugin_slug: p.plugin.slug,
+            plugin_icon: p.plugin.icon,
+            plugin_category: p.plugin.category,
+            activated_features: [],
+            settings: {}
+          }));
+      } else {
+        // C'est un propriétaire - récupérer ses abonnements actifs
+        console.log('👑 Utilisateur est propriétaire');
+        
+        const { data: subsData, error: subsError } = await supabase
+          .from('plugin_subscriptions')
+          .select(`
+            plugin_id,
+            activated_features,
+            plugin:plugins(
+              id,
+              name,
+              slug,
+              icon,
+              category
+            )
+          `)
+          .eq('user_id', user.id)
+          .in('status', ['active', 'trial']);
+
+        if (subsError) {
+          console.error('❌ Erreur abonnements:', subsError);
+          throw subsError;
+        }
+
+        console.log('💳 Abonnements trouvés:', subsData);
+
+        accessiblePlugins = (subsData || [])
+          .filter(s => s.plugin)
+          .map(s => ({
+            plugin_id: s.plugin.id,
+            plugin_name: s.plugin.name,
+            plugin_slug: s.plugin.slug,
+            plugin_icon: s.plugin.icon,
+            plugin_category: s.plugin.category,
+            activated_features: Array.isArray(s.activated_features) 
+              ? s.activated_features 
+              : [],
+            settings: {}
+          }));
+      }
+
+      console.log('🔌 Plugins accessibles:', accessiblePlugins);
+      console.log('🔌 Plugin POS trouvé:', accessiblePlugins.find(p => p.plugin_slug === 'pos'));
+      setUserPlugins(accessiblePlugins);
     } catch (err) {
       console.error('❌ Erreur chargement plugins actifs:', err);
       setUserPlugins([]);

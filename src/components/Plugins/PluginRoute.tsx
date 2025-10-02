@@ -11,23 +11,21 @@ interface PluginRouteProps {
 
 export function PluginRoute({ pluginSlug, children }: PluginRouteProps) {
   const navigate = useNavigate();
-  const { userSubscriptions, loading } = usePlugins();
+  const { userPlugins, loading } = usePlugins();
   const [hasAccess, setHasAccess] = useState(false);
 
   useEffect(() => {
     console.log('🔐 Vérification accès plugin:', {
       pluginSlug,
-      userSubscriptions,
-      subscriptionsActives: userSubscriptions.filter(s => s.status === 'active' || s.status === 'trial')
+      userPlugins,
+      pluginsActifs: userPlugins.map(p => p.plugin_slug)
     });
 
-    const access = userSubscriptions.some(
-      sub => sub.plugin?.slug === pluginSlug && (sub.status === 'active' || sub.status === 'trial')
-    );
+    const access = userPlugins.some(p => p.plugin_slug === pluginSlug);
 
     console.log('✅ Accès plugin:', access);
     setHasAccess(access);
-  }, [pluginSlug, userSubscriptions]);
+  }, [pluginSlug, userPlugins]);
 
   if (loading) {
     return (

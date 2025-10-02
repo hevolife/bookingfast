@@ -1,5 +1,6 @@
 import React, { useState } from 'react';
-import { Users, Plus, CreditCard as Edit, Trash2, Shield, Mail, Save, X, AlertTriangle, UserPlus, Eye, EyeOff, Crown, Star, Award, Settings, Building2, Zap, TrendingUp } from 'lucide-react';
+import { Users, Plus, CreditCard as Edit, Trash2, Shield, Mail, Save, X, AlertTriangle, UserPlus, Eye, EyeOff, Crown, Star, Award, Settings, Building2, Zap, TrendingUp, Puzzle } from 'lucide-react';
+import { supabase } from '../../lib/supabase';
 import { useTeam } from '../../hooks/useTeam';
 import { useTeamLimit } from '../../hooks/useTeamLimit';
 import { usePlugins } from '../../hooks/usePlugins';
@@ -15,7 +16,8 @@ export function TeamManagement() {
     loading, 
     error,
     inviteTeamMember, 
-    updateMemberPermissions, 
+    updateMemberPermissions,
+    updateMemberPluginPermissions,
     removeMember,
     refetch,
     getUserRoleInfo,
@@ -31,7 +33,7 @@ export function TeamManagement() {
     refetch: refetchStats
   } = useTeamLimit();
 
-  const { subscribeToPlugin, createPluginSubscription, plugins } = usePlugins();
+  const { subscribeToPlugin, plugins, userSubscriptions } = usePlugins();
   
   const [showMemberModal, setShowMemberModal] = useState(false);
   const [editingMember, setEditingMember] = useState<any>(null);
@@ -42,6 +44,9 @@ export function TeamManagement() {
   const [showPassword, setShowPassword] = useState(false);
   const [selectedRole, setSelectedRole] = useState<string>('employee');
   const [showUpgradeModal, setShowUpgradeModal] = useState(false);
+  const [showPluginPermissionsModal, setShowPluginPermissionsModal] = useState(false);
+  const [selectedMemberForPlugins, setSelectedMemberForPlugins] = useState<any>(null);
+  const [selectedPluginIds, setSelectedPluginIds] = useState<string[]>([]);
 
   const [memberFormData, setMemberFormData] = useState({
     email: '',
@@ -50,6 +55,13 @@ export function TeamManagement() {
     role_name: 'employee',
     permissions: [] as string[]
   });
+
+  const availablePlugins = plugins.filter(plugin => 
+    userSubscriptions.some(sub => 
+      sub.plugin_id === plugin.id && 
+      (sub.status === 'active' || sub.status === 'trial')
+    )
+  );
 
   const filteredMembers = teamMembers.filter(member =>
     (member.email || '').toLowerCase().includes(searchTerm.toLowerCase()) ||
@@ -62,7 +74,6 @@ export function TeamManagement() {
       return;
     }
 
-    // Vérifier la limite avant d'inviter
     const canAdd = await canAddMember();
     if (!canAdd) {
       alert(`Limite de ${teamStats.memberLimit} membres atteinte ! Passez au Pack Société pour augmenter à 50 membres.`);
@@ -128,9 +139,6 @@ export function TeamManagement() {
         return;
       }
 
-      console.log('🚀 Souscription au Pack Société...');
-      
-      // Créer la souscription en mode trial
       await subscribeToPlugin(enterprisePlugin.id, ['team_limit_50', 'advanced_permissions', 'team_analytics']);
       
       alert('✅ Pack Société activé en période d\'essai de 7 jours !');
@@ -143,6 +151,43 @@ export function TeamManagement() {
     } finally {
       setSaving(false);
     }
+  };
+
+  const handleOpenPluginPermissions = async (member: any) => {
+    setSelectedMemberForPlugins(member);
+    
+    const { data } = await supabase
+      .from('team_member_plugin_permissions')
+      .select('plugin_id')
+      .eq('team_member_id', member.id);
+    
+    setSelectedPluginIds(data?.map(p => p.plugin_id) || []);
+    setShowPluginPermissionsModal(true);
+  };
+
+  const handleSavePluginPermissions = async () => {
+    if (!selectedMemberForPlugins) return;
+
+    setSaving(true);
+    try {
+      await updateMemberPluginPermissions(selectedMemberForPlugins.id, selectedPluginIds);
+      setShowPluginPermissionsModal(false);
+      setSelectedMemberForPlugins(null);
+      setSelectedPluginIds([]);
+      alert('Permissions plugins mises à jour avec succès !');
+    } catch (error) {
+      alert(`Erreur: ${error instanceof Error ? error.message : 'Erreur inconnue'}`);
+    } finally {
+      setSaving(false);
+    }
+  };
+
+  const togglePluginPermission = (pluginId: string) => {
+    setSelectedPluginIds(prev =>
+      prev.includes(pluginId)
+        ? prev.filter(id => id !== pluginId)
+        : [...prev, pluginId]
+    );
   };
 
   const resetForm = () => {
@@ -529,6 +574,14 @@ export function TeamManagement() {
                       </div>
                       
                       <button
+                        onClick={() => handleOpenPluginPermissions(member)}
+                        className="p-2 bg-gradient-to-r from-blue-500 to-cyan-500 text-white rounded-lg hover:from-blue-600 hover:to-cyan-600 transition-all duration-300 transform hover:scale-110"
+                        title="Gérer les plugins"
+                      >
+                        <Puzzle className="w-4 h-4" />
+                      </button>
+                      
+                      <button
                         onClick={() => {
                           setEditingMember(member);
                           setMemberFormData({
@@ -577,6 +630,109 @@ export function TeamManagement() {
           )}
         </div>
       </div>
+
+      {showPluginPermissionsModal && selectedMemberForPlugins && (
+        <Modal
+          isOpen={showPluginPermissionsModal}
+          onClose={() => {
+            setShowPluginPermissionsModal(false);
+            setSelectedMemberForPlugins(null);
+            setSelectedPluginIds([]);
+          }}
+          title="Permissions Plugins"
+          size="md"
+        >
+          <div className="space-y-6">
+            <div className="text-center">
+              <div className="w-16 h-16 bg-gradient-to-r from-blue-500 to-cyan-500 rounded-2xl flex items-center justify-center mx-auto mb-4 shadow-lg">
+                <Puzzle className="w-8 h-8 text-white" />
+              </div>
+              <h3 className="text-xl font-bold text-gray-900 mb-2">
+                Gérer les Plugins
+              </h3>
+              <p className="text-gray-600">
+                {selectedMemberForPlugins.full_name || selectedMemberForPlugins.email}
+              </p>
+            </div>
+
+            {availablePlugins.length > 0 ? (
+              <div className="space-y-3">
+                <div className="text-sm font-medium text-gray-700 mb-3">
+                  Sélectionnez les plugins accessibles :
+                </div>
+                {availablePlugins.map(plugin => {
+                  const subscription = userSubscriptions.find(sub => sub.plugin_id === plugin.id);
+                  const isTrial = subscription?.status === 'trial';
+                  
+                  return (
+                    <label
+                      key={plugin.id}
+                      className="flex items-center gap-3 p-4 bg-gray-50 rounded-xl hover:bg-gray-100 cursor-pointer transition-colors"
+                    >
+                      <input
+                        type="checkbox"
+                        checked={selectedPluginIds.includes(plugin.id)}
+                        onChange={() => togglePluginPermission(plugin.id)}
+                        className="w-5 h-5 text-blue-600 rounded focus:ring-blue-500"
+                      />
+                      <div className="flex-1">
+                        <div className="font-bold text-gray-900 flex items-center gap-2">
+                          {plugin.name}
+                          {isTrial && (
+                            <span className="px-2 py-1 bg-green-100 text-green-700 text-xs rounded-full font-medium">
+                              Essai gratuit
+                            </span>
+                          )}
+                        </div>
+                        <div className="text-sm text-gray-600">{plugin.description}</div>
+                      </div>
+                    </label>
+                  );
+                })}
+              </div>
+            ) : (
+              <div className="text-center py-8">
+                <Puzzle className="w-12 h-12 text-gray-300 mx-auto mb-3" />
+                <p className="text-gray-600">Aucun plugin actif disponible</p>
+                <p className="text-sm text-gray-500 mt-1">
+                  Activez des plugins pour les assigner aux membres
+                </p>
+              </div>
+            )}
+
+            <div className="flex gap-3 pt-4 border-t border-gray-200">
+              <Button
+                variant="secondary"
+                onClick={() => {
+                  setShowPluginPermissionsModal(false);
+                  setSelectedMemberForPlugins(null);
+                  setSelectedPluginIds([]);
+                }}
+                className="flex-1"
+              >
+                Annuler
+              </Button>
+              <Button
+                onClick={handleSavePluginPermissions}
+                disabled={saving}
+                className="flex-1"
+              >
+                {saving ? (
+                  <>
+                    <div className="w-4 h-4 border-2 border-white/30 border-t-white rounded-full animate-spin"></div>
+                    Sauvegarde...
+                  </>
+                ) : (
+                  <>
+                    <Save className="w-4 h-4" />
+                    Enregistrer
+                  </>
+                )}
+              </Button>
+            </div>
+          </div>
+        </Modal>
+      )}
 
       {showUpgradeModal && (
         <Modal
