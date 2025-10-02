@@ -1,3 +1,11 @@
+export interface PluginFeature {
+  id: string;
+  name: string;
+  description: string;
+  included: boolean;
+  price?: number;
+}
+
 export interface Plugin {
   id: string;
   name: string;
@@ -13,19 +21,10 @@ export interface Plugin {
   updated_at: string;
 }
 
-export interface PluginFeature {
-  id: string;
-  name: string;
-  description: string;
-  included: boolean;
-  price?: number;
-}
-
 export interface PluginSubscription {
   id: string;
   user_id: string;
   plugin_id: string;
-  plugin?: Plugin;
   stripe_subscription_id?: string;
   status: 'active' | 'cancelled' | 'expired' | 'trial';
   current_period_start?: string;
@@ -33,6 +32,7 @@ export interface PluginSubscription {
   activated_features: string[];
   created_at: string;
   updated_at: string;
+  plugin?: Plugin;
 }
 
 export interface PluginConfiguration {
@@ -48,8 +48,6 @@ export interface UserPlugin {
   plugin_id: string;
   plugin_name: string;
   plugin_slug: string;
-  plugin_icon: string;
-  plugin_category: string;
   activated_features: string[];
   settings: Record<string, any>;
 }

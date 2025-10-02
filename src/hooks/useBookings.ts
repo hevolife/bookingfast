@@ -138,7 +138,6 @@ export function useBookings(date?: string) {
 
       // Déterminer l'ID utilisateur pour lequel charger les données
       let targetUserId = user.id;
-      let isTeamMember = false;
       
       // Vérifier si l'utilisateur est membre d'une équipe
       try {
@@ -151,7 +150,6 @@ export function useBookings(date?: string) {
 
         if (!membershipError && membershipData?.owner_id) {
           targetUserId = membershipData.owner_id;
-          isTeamMember = true;
           console.log('👥 Membre d\'équipe - chargement données du propriétaire:', targetUserId);
         } else {
           console.log('👑 Propriétaire - chargement données propres:', targetUserId);
@@ -159,27 +157,6 @@ export function useBookings(date?: string) {
       } catch (teamError) {
         console.warn('⚠️ Erreur vérification équipe, utilisation ID utilisateur:', teamError);
       }
-
-      // Vérifier les paramètres de visibilité pour les membres d'équipe
-      let canViewOnlyAssigned = false;
-      if (isTeamMember) {
-        try {
-          const { data: settingsData, error: settingsError } = await supabase
-            .from('multi_user_settings')
-            .select('can_view_only_assigned')
-            .eq('user_id', targetUserId)
-            .eq('team_member_id', user.id)
-            .maybeSingle();
-
-          if (!settingsError && settingsData) {
-            canViewOnlyAssigned = settingsData.can_view_only_assigned;
-            console.log('🔒 Visibilité restreinte activée:', canViewOnlyAssigned);
-          }
-        } catch (settingsError) {
-          console.warn('⚠️ Erreur vérification paramètres visibilité:', settingsError);
-        }
-      }
-
       let query = supabase
         .from('bookings')
         .select(`
@@ -192,16 +169,9 @@ export function useBookings(date?: string) {
         .order('time', { ascending: true })
         .limit(1000);
 
-      // Filtrer par date si spécifié
       if (date) {
         console.log('📅 Filtrage par date:', date);
         query = query.eq('date', date);
-      }
-
-      // Filtrer par assigned_user_id si visibilité restreinte
-      if (canViewOnlyAssigned) {
-        console.log('🔒 Application du filtre assigned_user_id:', user.id);
-        query = query.eq('assigned_user_id', user.id);
       }
 
       const { data, error } = await Promise.race([query, timeoutPromise]) as any;
@@ -278,6 +248,7 @@ export function useBookings(date?: string) {
         
         console.log('✅ Nouvelle réservation créée:', data.id);
         
+        // Vérifier s'il y a des liens de paiement générés
         const hasPaymentLinks = data.transactions?.some(t => 
           t.method === 'stripe' && 
           t.status === 'pending' &&
@@ -295,6 +266,7 @@ export function useBookings(date?: string) {
           }))
         });
         
+        // Déclencher le workflow "Nouvelle réservation" SEULEMENT si aucun lien de paiement n'a été généré
         if (!hasPaymentLinks) {
           console.log('✅ Aucun lien de paiement - Déclenchement workflow booking_created');
           try {
@@ -308,6 +280,7 @@ export function useBookings(date?: string) {
           console.log('⏭️ Lien de paiement généré - Workflow booking_created ignoré (sera déclenché après paiement)');
         }
         
+        // Déclencher le workflow "Lien de paiement créé" si un lien a été généré
         if (hasPaymentLinks) {
           try {
             console.log('🚀 Déclenchement workflow payment_link_created pour:', data.client_email);
@@ -318,11 +291,12 @@ export function useBookings(date?: string) {
           }
         }
         
+        // Vérifier si c'est un paiement de lien qui vient d'être complété
         const hasRecentStripePayment = data.transactions?.some(t => 
           t.method === 'stripe' && 
           t.status === 'completed' && 
           t.created_at &&
-          (Date.now() - new Date(t.created_at).getTime()) < 600000
+          (Date.now() - new Date(t.created_at).getTime()) < 600000 // Moins de 10 minutes
         );
         
         if (hasRecentStripePayment) {
@@ -335,6 +309,7 @@ export function useBookings(date?: string) {
           }
         }
         
+        // Déclenchement alternatif basé sur le changement de statut de paiement
         if (data.payment_status === 'completed' || data.payment_status === 'partial') {
           const hasStripeTransaction = data.transactions?.some(t => 
             t.method === 'stripe' && 
@@ -427,14 +402,16 @@ export function useBookings(date?: string) {
         
         console.log('Réservation mise à jour:', data.id);
         
+        // Émettre l'événement de modification immédiatement
         if (data) {
           bookingEvents.emit('bookingUpdated', data);
           
+          // Vérifier si c'est un paiement de lien qui vient d'être complété
           const hasRecentStripePayment = data.transactions?.some(t => 
             t.method === 'stripe' && 
             t.status === 'completed' && 
             t.created_at &&
-            (Date.now() - new Date(t.created_at).getTime()) < 600000
+            (Date.now() - new Date(t.created_at).getTime()) < 600000 // Moins de 10 minutes
           );
           
           if (hasRecentStripePayment) {
@@ -484,6 +461,7 @@ export function useBookings(date?: string) {
     fetchBookings();
   };
 
+  // Vérifier les liens expirés toutes les 30 secondes
   useEffect(() => {
     const checkExpiredLinks = async () => {
       if (bookings.length > 0) {
@@ -509,6 +487,7 @@ export function useBookings(date?: string) {
     return () => clearInterval(interval);
   }, [bookings, settings]);
 
+  // Auto-refresh toutes les 2 minutes si pas d'interaction
   useEffect(() => {
     const interval = setInterval(() => {
       const timeSinceLastInteraction = Date.now() - lastInteraction;
@@ -523,6 +502,7 @@ export function useBookings(date?: string) {
     return () => clearInterval(interval);
   }, [lastInteraction, user?.id]);
 
+  // Écouter l'événement de rafraîchissement manuel
   useEffect(() => {
     const handleRefreshBookings = () => {
       console.log('🔄 Rafraîchissement manuel des réservations demandé');
@@ -533,6 +513,7 @@ export function useBookings(date?: string) {
     return () => window.removeEventListener('refreshBookings', handleRefreshBookings);
   }, []);
 
+  // Mettre à jour lastInteraction lors des interactions utilisateur
   useEffect(() => {
     const handleUserInteraction = () => {
       setLastInteraction(Date.now());

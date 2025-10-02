@@ -21,6 +21,7 @@ export function DatePicker({ selectedDate, onDateSelect, availableDates, setting
   const dropdownRef = useRef<HTMLDivElement>(null);
   const buttonRef = useRef<HTMLButtonElement>(null);
 
+  // Fermer le dropdown quand on clique en dehors
   useEffect(() => {
     const handleClickOutside = (event: MouseEvent) => {
       if (dropdownRef.current && !dropdownRef.current.contains(event.target as Node)) {
@@ -32,6 +33,7 @@ export function DatePicker({ selectedDate, onDateSelect, availableDates, setting
     return () => document.removeEventListener('mousedown', handleClickOutside);
   }, []);
 
+  // Initialiser le mois actuel
   useEffect(() => {
     if (selectedDate) {
       setCurrentMonth(new Date(selectedDate));
@@ -53,21 +55,24 @@ export function DatePicker({ selectedDate, onDateSelect, availableDates, setting
     const firstDay = new Date(year, month, 1);
     const lastDay = new Date(year, month + 1, 0);
     const daysInMonth = lastDay.getDate();
-    const startingDayOfWeek = (firstDay.getDay() + 6) % 7;
+    const startingDayOfWeek = (firstDay.getDay() + 6) % 7; // Lundi = 0
 
     const days = [];
     
+    // Jours du mois précédent
     for (let i = startingDayOfWeek - 1; i >= 0; i--) {
       const day = new Date(year, month, -i);
       days.push({ date: day, isCurrentMonth: false });
     }
     
+    // Jours du mois actuel
     for (let day = 1; day <= daysInMonth; day++) {
       const dayDate = new Date(year, month, day);
       days.push({ date: dayDate, isCurrentMonth: true });
     }
     
-    const remainingDays = 42 - days.length;
+    // Jours du mois suivant pour compléter la grille
+    const remainingDays = 42 - days.length; // 6 semaines × 7 jours
     for (let day = 1; day <= remainingDays; day++) {
       const dayDate = new Date(year, month + 1, day);
       days.push({ date: dayDate, isCurrentMonth: false });
@@ -82,6 +87,7 @@ export function DatePicker({ selectedDate, onDateSelect, availableDates, setting
     const day = date.getDate().toString().padStart(2, '0');
     const dateString = `${year}-${month}-${day}`;
     
+    // Vérifier si cette date est disponible
     const isAvailable = availableDates.some(d => d.date === dateString);
     if (isAvailable) {
       onDateSelect(dateString);
@@ -105,6 +111,7 @@ export function DatePicker({ selectedDate, onDateSelect, availableDates, setting
     const today = new Date();
     setCurrentMonth(today);
     
+    // Sélectionner aujourd'hui si disponible
     const todayString = today.toISOString().split('T')[0];
     const todayAvailable = availableDates.find(d => d.date === todayString);
     if (todayAvailable) {
@@ -138,6 +145,7 @@ export function DatePicker({ selectedDate, onDateSelect, availableDates, setting
 
   return (
     <div ref={dropdownRef} className="relative">
+      {/* Bouton principal */}
       <button
         ref={buttonRef}
         type="button"
@@ -168,8 +176,15 @@ export function DatePicker({ selectedDate, onDateSelect, availableDates, setting
         }`} />
       </button>
 
+      {/* Calendrier dropdown */}
       {isOpen && (
-        <div className="absolute left-0 right-0 mt-2 bg-white border-2 border-gray-200 rounded-3xl shadow-2xl z-50 overflow-hidden">
+        <div 
+          className="fixed left-2 right-2 sm:absolute sm:left-0 sm:right-0 mt-2 bg-white border-2 border-gray-200 rounded-3xl shadow-2xl z-[9999] overflow-hidden"
+          style={{
+            top: buttonRef.current ? `${buttonRef.current.getBoundingClientRect().bottom + window.scrollY}px` : 'auto'
+          }}
+        >
+          {/* Header du calendrier */}
           <div className="bg-gradient-to-r from-blue-600 to-purple-600 p-4 sm:p-6 text-white">
             <div className="flex items-center justify-between mb-4">
               <button
@@ -205,6 +220,7 @@ export function DatePicker({ selectedDate, onDateSelect, availableDates, setting
             </button>
           </div>
 
+          {/* Jours de la semaine */}
           <div className="grid grid-cols-7 bg-gray-50 border-b border-gray-200">
             {weekDays.map(day => (
               <div key={day} className="py-2 sm:py-3 text-center text-xs sm:text-sm font-medium text-gray-600">
@@ -213,6 +229,7 @@ export function DatePicker({ selectedDate, onDateSelect, availableDates, setting
             ))}
           </div>
 
+          {/* Grille des jours */}
           <div className="grid grid-cols-7 gap-1 sm:gap-2 p-3 sm:p-4">
             {days.map((day, index) => {
               const isCurrentMonth = day.isCurrentMonth;
@@ -242,6 +259,7 @@ export function DatePicker({ selectedDate, onDateSelect, availableDates, setting
             })}
           </div>
 
+          {/* Footer avec raccourcis */}
           <div className="bg-gray-50 p-3 sm:p-4 border-t border-gray-200">
             <div className="flex flex-wrap gap-2 justify-center">
               {availableDates.slice(0, 4).map((dateOption) => (

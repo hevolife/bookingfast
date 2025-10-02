@@ -1,28 +1,94 @@
 import React, { useState } from 'react';
-import { DashboardPage } from './components/Dashboard/DashboardPage';
+import { Routes, Route, useLocation, useNavigate } from 'react-router-dom';
+import { AuthProvider } from './contexts/AuthContext';
+import { TeamProvider } from './contexts/TeamContext';
+import { ProtectedRoute } from './components/Auth/ProtectedRoute';
+import { PluginRoute } from './components/Plugins/PluginRoute';
+import { LoginPage } from './components/Auth/LoginPage';
 import { CalendarPage } from './components/Calendar/CalendarPage';
+import { DashboardPage } from './components/Dashboard/DashboardPage';
 import { ServicesPage } from './components/Services/ServicesPage';
 import { AdminPage } from './components/Admin/AdminPage';
 import { EmailWorkflowPage } from './components/EmailWorkflow/EmailWorkflowPage';
 import { ReportsPage } from './components/Reports/ReportsPage';
-import { MultiUserSettingsPage } from './components/MultiUser/MultiUserSettingsPage';
+import { PaymentPage } from './components/PaymentPage/PaymentPage';
+import { PaymentSuccess } from './components/PaymentPage/PaymentSuccess';
+import { PaymentCancel } from './components/PaymentPage/PaymentCancel';
+import { ResetPasswordPage } from './components/Auth/ResetPasswordPage';
+import { LandingPage } from './components/Landing/LandingPage';
+import { IframeBookingPage } from './components/IframeBooking/IframeBookingPage';
 import { Navbar } from './components/Layout/Navbar';
-import { PluginRoute } from './components/Plugins/PluginRoute';
-import { useAuth } from './contexts/AuthContext';
+import { PWAInstallPrompt } from './components/Layout/PWAInstallPrompt';
 
-type Page = 'dashboard' | 'calendar' | 'services' | 'admin' | 'emails' | 'reports' | 'multi-user';
+type Page = 'dashboard' | 'calendar' | 'services' | 'admin' | 'emails' | 'reports';
 
-function App() {
-  const { user, loading } = useAuth();
-  const [currentPage, setCurrentPage] = useState<Page>('dashboard');
+// Fonction pour détecter si l'app est en mode PWA
+function isPWAMode(): boolean {
+  // Vérifier si l'app est en mode standalone (PWA installée)
+  const isStandalone = window.matchMedia('(display-mode: standalone)').matches;
+  const isInWebAppiOS = (window.navigator as any).standalone === true;
+  const isInWebAppChrome = window.matchMedia('(display-mode: standalone)').matches;
+  
+  return isStandalone || isInWebAppiOS || isInWebAppChrome;
+}
 
-  if (loading) {
+// Composant pour rediriger landing vers login en mode PWA
+function PWALandingRedirect() {
+  const navigate = useNavigate();
+  
+  React.useEffect(() => {
+    if (isPWAMode()) {
+      console.log('🔄 Mode PWA détecté - redirection vers login');
+      navigate('/login', { replace: true });
+    }
+  }, [navigate]);
+  
+  // Si en mode PWA, afficher un écran de chargement pendant la redirection
+  if (isPWAMode()) {
     return (
-      <div className="min-h-screen flex items-center justify-center bg-gradient-to-br from-blue-50 via-purple-50 to-pink-50">
-        <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-purple-600"></div>
+      <div className="min-h-screen bg-gradient-to-br from-blue-50 via-purple-50 to-pink-50 flex items-center justify-center">
+        <div className="text-center">
+          <div className="w-16 h-16 border-4 border-purple-200 rounded-full animate-spin mx-auto mb-4"></div>
+          <div className="absolute top-0 left-0 w-16 h-16 border-4 border-purple-600 rounded-full animate-spin border-t-transparent mx-auto"></div>
+          <p className="text-gray-600 text-lg">Chargement de l'application...</p>
+        </div>
       </div>
     );
   }
+  
+  // Si pas en mode PWA, afficher la landing page normale
+  return <LandingPage />;
+}
+
+function AppContent() {
+  const location = useLocation();
+  const navigate = useNavigate();
+  const [currentPage, setCurrentPage] = useState<Page>('dashboard');
+
+  // Synchroniser currentPage avec l'URL
+  React.useEffect(() => {
+    const path = location.pathname;
+    if (path === '/dashboard') setCurrentPage('dashboard');
+    else if (path === '/calendar') setCurrentPage('calendar');
+    else if (path === '/services') setCurrentPage('services');
+    else if (path === '/admin') setCurrentPage('admin');
+    else if (path === '/emails') setCurrentPage('emails');
+    else if (path === '/reports') setCurrentPage('reports');
+  }, [location.pathname]);
+
+  const handlePageChange = (page: Page) => {
+    const routes = {
+      dashboard: '/dashboard',
+      calendar: '/calendar',
+      services: '/services',
+      admin: '/admin',
+      emails: '/emails',
+      reports: '/reports'
+    };
+    
+    navigate(routes[page]);
+    setCurrentPage(page);
+  };
 
   const renderPage = () => {
     switch (currentPage) {
@@ -37,29 +103,131 @@ function App() {
       case 'emails':
         return <EmailWorkflowPage />;
       case 'reports':
-        return (
-          <PluginRoute pluginSlug="reports">
-            <ReportsPage />
-          </PluginRoute>
-        );
-      case 'multi-user':
-        return (
-          <PluginRoute pluginSlug="multi-user">
-            <MultiUserSettingsPage />
-          </PluginRoute>
-        );
+        return <ReportsPage />;
       default:
         return <DashboardPage />;
     }
   };
 
   return (
-    <div className="min-h-screen bg-gradient-to-br from-blue-50 via-purple-50 to-pink-50">
-      <Navbar currentPage={currentPage} onPageChange={setCurrentPage} />
-      <main className="h-[calc(100vh-4rem)] overflow-hidden">
-        {renderPage()}
-      </main>
-    </div>
+    <Routes>
+      {/* Page d'accueil - Landing en web, Login en PWA */}
+      <Route path="/" element={
+        isPWAMode() ? <LoginPage /> : <LandingPage />
+      } />
+      
+      {/* Page d'inscription avec code d'affiliation */}
+      <Route path="/register" element={<LoginPage />} />
+      
+      {/* Landing page - redirige vers login si PWA */}
+      <Route path="/landing" element={<PWALandingRedirect />} />
+      
+      {/* Page de connexion */}
+      <Route path="/login" element={<LoginPage />} />
+      
+      {/* Page de réinitialisation de mot de passe */}
+      <Route path="/reset-password" element={<ResetPasswordPage />} />
+      
+      {/* Pages de paiement sans navbar et sans authentification */}
+      <Route path="/payment" element={<PaymentPage />} />
+      <Route path="/payment-success" element={<PaymentSuccess />} />
+      <Route path="/payment-cancel" element={<PaymentCancel />} />
+      
+      {/* Page de réservation iframe publique */}
+      <Route path="/booking/:userId" element={<IframeBookingPage />} />
+      
+      {/* Application principale protégée avec navigation SPA */}
+      <Route path="/dashboard" element={
+        <ProtectedRoute>
+          <div className="min-h-screen-safe bg-gray-50">
+            <Navbar currentPage={currentPage} onPageChange={handlePageChange} />
+            <main className="main-content-safe">
+              <DashboardPage />
+            </main>
+          </div>
+        </ProtectedRoute>
+      } />
+      
+      <Route path="/calendar" element={
+        <ProtectedRoute>
+          <div className="min-h-screen-safe bg-gray-50">
+            <Navbar currentPage={currentPage} onPageChange={handlePageChange} />
+            <main className="main-content-safe">
+              <CalendarPage />
+            </main>
+          </div>
+        </ProtectedRoute>
+      } />
+      
+      <Route path="/services" element={
+        <ProtectedRoute>
+          <div className="min-h-screen-safe bg-gray-50">
+            <Navbar currentPage={currentPage} onPageChange={handlePageChange} />
+            <main className="main-content-safe">
+              <ServicesPage />
+            </main>
+          </div>
+        </ProtectedRoute>
+      } />
+      
+      <Route path="/admin" element={
+        <ProtectedRoute>
+          <div className="min-h-screen-safe bg-gray-50">
+            <Navbar currentPage={currentPage} onPageChange={handlePageChange} />
+            <main className="main-content-safe">
+              <AdminPage />
+            </main>
+          </div>
+        </ProtectedRoute>
+      } />
+      
+      <Route path="/emails" element={
+        <ProtectedRoute>
+          <div className="min-h-screen-safe bg-gray-50">
+            <Navbar currentPage={currentPage} onPageChange={handlePageChange} />
+            <main className="main-content-safe">
+              <EmailWorkflowPage />
+            </main>
+          </div>
+        </ProtectedRoute>
+      } />
+      
+      {/* Page de rapports - protégée par plugin */}
+      <Route path="/reports" element={
+        <ProtectedRoute>
+          <PluginRoute pluginSlug="advanced-reports">
+            <div className="min-h-screen-safe bg-gray-50">
+              <Navbar currentPage={currentPage} onPageChange={handlePageChange} />
+              <main className="main-content-safe">
+                <ReportsPage />
+              </main>
+            </div>
+          </PluginRoute>
+        </ProtectedRoute>
+      } />
+      
+      {/* Fallback - rediriger vers login si route inconnue */}
+      <Route path="*" element={
+        <div className="min-h-screen-safe bg-gradient-to-br from-blue-50 via-purple-50 to-pink-50 flex items-center justify-center safe-all">
+          <div className="text-center">
+            <div className="w-16 h-16 border-4 border-purple-200 rounded-full animate-spin mx-auto mb-4"></div>
+            <div className="absolute top-0 left-0 w-16 h-16 border-4 border-purple-600 rounded-full animate-spin border-t-transparent mx-auto"></div>
+            <p className="text-gray-600 text-lg">Redirection...</p>
+          </div>
+        </div>
+      } />
+    </Routes>
+  );
+}
+
+function App() {
+  return (
+    <AuthProvider>
+      <TeamProvider>
+        <PWAInstallPrompt />
+        <AppContent />
+      </TeamProvider>
+    </AuthProvider>
   );
 }
 
