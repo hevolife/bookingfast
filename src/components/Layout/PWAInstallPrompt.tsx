@@ -12,7 +12,6 @@ export function PWAInstallPrompt() {
   const [isInstalled, setIsInstalled] = useState(false);
 
   useEffect(() => {
-    // Vérifier si l'app est déjà installée
     const checkIfInstalled = () => {
       const isStandalone = window.matchMedia('(display-mode: standalone)').matches;
       const isInWebAppiOS = (window.navigator as any).standalone === true;
@@ -23,20 +22,17 @@ export function PWAInstallPrompt() {
 
     setIsInstalled(checkIfInstalled());
 
-    // Écouter l'événement beforeinstallprompt
     const handleBeforeInstallPrompt = (e: Event) => {
       e.preventDefault();
       setDeferredPrompt(e as BeforeInstallPromptEvent);
       
-      // Attendre plus longtemps en production avant de montrer le prompt
       setTimeout(() => {
         if (!checkIfInstalled()) {
           setShowPrompt(true);
         }
-      }, import.meta.env.PROD ? 10000 : 3000); // 10s en prod, 3s en dev
+      }, import.meta.env.PROD ? 10000 : 3000);
     };
 
-    // Écouter l'installation
     const handleAppInstalled = () => {
       setIsInstalled(true);
       setShowPrompt(false);
@@ -75,17 +71,15 @@ export function PWAInstallPrompt() {
 
   const handleDismiss = () => {
     setShowPrompt(false);
-    // Ne plus montrer pendant cette session
     sessionStorage.setItem('pwa-prompt-dismissed', 'true');
   };
 
-  // Ne pas afficher si déjà installé ou si déjà refusé cette session
   if (isInstalled || !showPrompt || !deferredPrompt || sessionStorage.getItem('pwa-prompt-dismissed')) {
     return null;
   }
 
   return (
-    <div className="fixed bottom-4 left-4 right-4 sm:left-auto sm:right-4 sm:max-w-sm z-50 animate-slideUp">
+    <div className="fixed bottom-4 left-4 right-4 sm:left-auto sm:right-4 sm:max-w-sm z-50 animate-slideUp safe-bottom">
       <div className="bg-gradient-to-r from-blue-600 via-purple-600 to-pink-600 rounded-2xl p-6 text-white shadow-2xl border border-white/20 backdrop-blur-sm">
         <div className="flex items-start gap-4">
           <div className="w-12 h-12 bg-white/20 rounded-xl flex items-center justify-center flex-shrink-0">

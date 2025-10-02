@@ -627,7 +627,7 @@ export function CalendarGrid({ currentDate, onTimeSlotClick, onBookingClick, boo
   };
   return (
     <>
-      <div className="h-full bg-gradient-to-br from-blue-50 via-purple-50 to-pink-50 flex flex-col">
+      <div className="h-full bg-gradient-to-br from-blue-50 via-purple-50 to-pink-50 flex flex-col overflow-x-hidden">
         {/* Header avec gradient animé */}
         <div className="bg-white/90 backdrop-blur-md border-b border-gray-100 p-4 shadow-lg">
           <div className="flex items-center justify-between mb-4">
@@ -773,7 +773,7 @@ export function CalendarGrid({ currentDate, onTimeSlotClick, onBookingClick, boo
         </div>
 
         {/* Calendrier avec animations */}
-        <div className="flex-1 overflow-y-auto">
+        <div className="flex-1 overflow-y-auto overflow-x-hidden">
           {isDayClosed() ? (
             <div className="flex items-center justify-center h-64 animate-fadeIn">
               <div className="text-center p-8 bg-white/80 backdrop-blur-sm rounded-3xl shadow-xl">
@@ -799,7 +799,7 @@ export function CalendarGrid({ currentDate, onTimeSlotClick, onBookingClick, boo
               </div>
             </div>
           ) : (
-            <div className="flex">
+            <div className="flex overflow-x-hidden">
               {/* Colonne des heures */}
               <div className="w-20 bg-white/80 backdrop-blur-sm border-r border-gray-100 flex-shrink-0 shadow-lg">
                 {timeSlots.map((slot, index) => (
@@ -821,7 +821,7 @@ export function CalendarGrid({ currentDate, onTimeSlotClick, onBookingClick, boo
               </div>
 
               {/* Zone principale */}
-              <div className="flex-1 relative bg-white/60 backdrop-blur-sm">
+              <div className="flex-1 relative bg-white/60 backdrop-blur-sm overflow-x-hidden">
                 {/* Lignes de grille avec alternance de couleurs */}
                 {timeSlots.map((slot, index) => (
                   <div
