@@ -61,9 +61,9 @@ function App() {
   };
 
   return (
-    <div className="min-h-screen bg-gradient-to-br from-blue-50 via-purple-50 to-pink-50">
+    <div className="min-h-screen bg-gradient-to-br from-blue-50 via-purple-50 to-pink-50" style={{ overflow: 'auto' }}>
       <Navbar currentPage={currentPage} onPageChange={setCurrentPage} />
-      <main className="h-[calc(100vh-4rem)] overflow-hidden">
+      <main className="overflow-auto" style={{ height: 'calc(100vh - 4rem)' }}>
         {renderPage()}
       </main>
     </div>

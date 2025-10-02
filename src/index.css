@@ -11,16 +11,22 @@
     text-rendering: optimizeLegibility;
     -webkit-font-smoothing: antialiased;
     -moz-osx-font-smoothing: grayscale;
+    overflow-y: auto !important;
+    overflow-x: hidden !important;
+    height: 100% !important;
   }
   body {
     font-feature-settings: 'kern' 1;
     text-rendering: optimizeLegibility;
+    overflow-y: auto !important;
+    overflow-x: hidden !important;
+    height: 100% !important;
+    position: relative !important;
   }
 }
 
 html, body {
-  overscroll-behavior: none;
-  touch-action: pan-y;
+  touch-action: pan-y !important;
   -webkit-touch-callout: none;
   -webkit-user-select: none;
   -khtml-user-select: none;
@@ -42,10 +48,14 @@ input, textarea, [contenteditable] {
 }
 
 body {
-  overflow-x: hidden;
-  position: relative;
   min-height: 100vh;
   min-height: calc(100vh);
+}
+
+#root {
+  min-height: 100vh;
+  overflow-y: auto !important;
+  overflow-x: hidden !important;
 }
 
 @media screen and (-webkit-min-device-pixel-ratio: 0) {
@@ -94,14 +104,6 @@ body {
     align-items: center !important;
     justify-content: center !important;
   }
-}
-
-html {
-  overscroll-behavior-y: contain;
-}
-
-* {
-  overscroll-behavior-x: none;
 }
 
 @keyframes fadeIn {
@@ -600,7 +602,6 @@ html {
   .mobile-optimized {
     touch-action: manipulation;
     -webkit-tap-highlight-color: transparent;
-    overscroll-behavior: none;
   }
   button, .interactive {
     min-height: 44px;
@@ -610,12 +611,14 @@ html {
     padding: 12px 16px;
   }
   body, html {
-    overflow-x: hidden;
+    overflow-x: hidden !important;
+    overflow-y: auto !important;
     position: relative;
     width: 100%;
   }
   #root {
-    overflow-x: hidden;
+    overflow-x: hidden !important;
+    overflow-y: auto !important;
     width: 100%;
     position: relative;
   }
@@ -633,7 +636,6 @@ html {
     bottom: 0 !important;
     overflow: hidden !important;
     touch-action: none !important;
-    overscroll-behavior: none !important;
     z-index: 100000 !important;
     padding-top: env(safe-area-inset-top, 0) !important;
     padding-bottom: env(safe-area-inset-bottom, 0) !important;
@@ -649,8 +651,6 @@ html {
     overflow-y: auto !important;
     overflow-x: hidden !important;
     touch-action: pan-y !important;
-    overscroll-behavior-x: none !important;
-    overscroll-behavior-y: contain !important;
     -webkit-overflow-scrolling: touch !important;
   }
   .modal-header {
@@ -661,7 +661,6 @@ html {
   }
   .modal-body {
     touch-action: pan-y !important;
-    overscroll-behavior: none !important;
   }
   .mobile-full-width {
     width: 100% !important;
