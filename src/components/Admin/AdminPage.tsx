@@ -73,12 +73,6 @@ export function AdminPage() {
       description: 'Statut et codes secrets'
     },
     { 
-      id: 'plugins', 
-      label: 'Plugins', 
-      icon: Package, 
-      description: 'Extensions et fonctionnalités'
-    },
-    { 
       id: 'affiliate', 
       label: 'Affiliation', 
       icon: Share2, 
@@ -91,6 +85,16 @@ export function AdminPage() {
       description: 'Lien de réservation'
     },
   ];
+
+  // Ajouter l'onglet Plugins seulement pour les propriétaires
+  if (isOwner) {
+    tabs.push({
+      id: 'plugins', 
+      label: 'Plugins', 
+      icon: Package, 
+      description: 'Extensions et fonctionnalités'
+    });
+  }
 
   // Ajouter l'onglet Équipe seulement pour les propriétaires
   if (isOwner) {
@@ -123,7 +127,7 @@ export function AdminPage() {
       case 'subscription':
         return <SubscriptionStatus />;
       case 'plugins':
-        return <PluginsPage />;
+        return isOwner ? <PluginsPage /> : <BusinessSettingsForm />;
       case 'affiliate':
         return <AffiliateManagement />;
       case 'iframe':

@@ -53,3 +53,32 @@ export interface UserPlugin {
   activated_features: string[];
   settings: Record<string, any>;
 }
+
+export interface TeamMemberPluginPermission {
+  id: string;
+  user_id: string;
+  owner_id: string;
+  plugin_id: string;
+  can_access: boolean;
+  created_at: string;
+  updated_at: string;
+}
+
+export interface MemberAccessiblePlugin {
+  plugin_id: string;
+  plugin_name: string;
+  plugin_slug: string;
+  plugin_icon: string;
+  plugin_category: string;
+  owner_id: string;
+  owner_email: string;
+  can_access: boolean;
+}
+
+export interface TeamMemberPluginAccess {
+  plugin_id: string;
+  plugin_name: string;
+  plugin_slug: string;
+  plugin_icon: string;
+  can_access: boolean;
+}

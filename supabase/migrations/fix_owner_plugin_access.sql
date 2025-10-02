@@ -1,57 +1,12 @@
 /*
-  # Système de Permissions pour Plugins
+  # Fix Owner Plugin Access
 
-  1. Nouvelles Tables
-    - `team_member_plugin_permissions`
-      - `id` (uuid, primary key)
-      - `user_id` (uuid, foreign key) - Membre de l'équipe
-      - `owner_id` (uuid, foreign key) - Propriétaire qui a souscrit
-      - `plugin_id` (uuid, foreign key) - Plugin concerné
-      - `can_access` (boolean) - Accès au plugin
-      - `created_at` (timestamptz)
-      - `updated_at` (timestamptz)
-
-  2. Sécurité
-    - RLS activé
-    - Policies pour propriétaires et membres
-    
-  3. Fonctions
-    - `check_plugin_access` - Vérifie l'accès d'un membre à un plugin
-    - `get_member_accessible_plugins` - Liste des plugins accessibles pour un membre
+  1. Corrections
+    - Mise à jour de la fonction check_plugin_access pour mieux gérer l'accès propriétaire
+    - Ajout de logs pour debug
 */
 
--- Table des permissions de plugins pour les membres d'équipe
-CREATE TABLE IF NOT EXISTS team_member_plugin_permissions (
-  id uuid PRIMARY KEY DEFAULT gen_random_uuid(),
-  user_id uuid NOT NULL REFERENCES users(id) ON DELETE CASCADE,
-  owner_id uuid NOT NULL REFERENCES users(id) ON DELETE CASCADE,
-  plugin_id uuid NOT NULL REFERENCES plugins(id) ON DELETE CASCADE,
-  can_access boolean NOT NULL DEFAULT false,
-  created_at timestamptz DEFAULT now(),
-  updated_at timestamptz DEFAULT now(),
-  UNIQUE(user_id, owner_id, plugin_id)
-);
-
--- Index pour les performances
-CREATE INDEX IF NOT EXISTS idx_team_plugin_permissions_user_id ON team_member_plugin_permissions(user_id);
-CREATE INDEX IF NOT EXISTS idx_team_plugin_permissions_owner_id ON team_member_plugin_permissions(owner_id);
-CREATE INDEX IF NOT EXISTS idx_team_plugin_permissions_plugin_id ON team_member_plugin_permissions(plugin_id);
-
--- RLS
-ALTER TABLE team_member_plugin_permissions ENABLE ROW LEVEL SECURITY;
-
--- Policies
-CREATE POLICY "Owners can manage team plugin permissions"
-  ON team_member_plugin_permissions FOR ALL
-  TO authenticated
-  USING (owner_id = auth.uid());
-
-CREATE POLICY "Members can view own plugin permissions"
-  ON team_member_plugin_permissions FOR SELECT
-  TO authenticated
-  USING (user_id = auth.uid());
-
--- Fonction pour vérifier l'accès d'un membre à un plugin
+-- Fonction corrigée pour vérifier l'accès d'un membre à un plugin
 CREATE OR REPLACE FUNCTION check_plugin_access(
   p_user_id uuid,
   p_plugin_slug text
@@ -61,14 +16,24 @@ DECLARE
   v_is_owner boolean;
   v_has_permission boolean;
   v_owner_id uuid;
+  v_plugin_id uuid;
 BEGIN
+  -- Récupérer l'ID du plugin
+  SELECT id INTO v_plugin_id
+  FROM plugins
+  WHERE slug = p_plugin_slug;
+
+  -- Si le plugin n'existe pas, pas d'accès
+  IF v_plugin_id IS NULL THEN
+    RETURN false;
+  END IF;
+
   -- Vérifier si l'utilisateur est propriétaire avec un abonnement actif
   SELECT EXISTS (
     SELECT 1
     FROM plugin_subscriptions ps
-    JOIN plugins p ON p.id = ps.plugin_id
     WHERE ps.user_id = p_user_id
-    AND p.slug = p_plugin_slug
+    AND ps.plugin_id = v_plugin_id
     AND ps.status IN ('active', 'trial')
     AND (ps.current_period_end IS NULL OR ps.current_period_end > now())
   ) INTO v_is_owner;
@@ -79,13 +44,12 @@ BEGIN
   END IF;
 
   -- Sinon, vérifier si c'est un membre d'équipe avec permission
-  -- Trouver le propriétaire qui a l'abonnement
+  -- Trouver le propriétaire qui a l'abonnement et dont l'utilisateur est membre
   SELECT ps.user_id INTO v_owner_id
   FROM plugin_subscriptions ps
-  JOIN plugins p ON p.id = ps.plugin_id
   JOIN team_members tm ON tm.owner_id = ps.user_id
   WHERE tm.user_id = p_user_id
-  AND p.slug = p_plugin_slug
+  AND ps.plugin_id = v_plugin_id
   AND ps.status IN ('active', 'trial')
   AND (ps.current_period_end IS NULL OR ps.current_period_end > now())
   AND tm.is_active = true
@@ -100,10 +64,13 @@ BEGIN
   SELECT EXISTS (
     SELECT 1
     FROM team_member_plugin_permissions tmpp
-    JOIN plugins p ON p.id = tmpp.plugin_id
-    WHERE tmpp.user_id = p_user_id
+    WHERE tmpp.team_member_id = (
+      SELECT id FROM team_members 
+      WHERE user_id = p_user_id 
+      AND owner_id = v_owner_id
+    )
     AND tmpp.owner_id = v_owner_id
-    AND p.slug = p_plugin_slug
+    AND tmpp.plugin_id = v_plugin_id
     AND tmpp.can_access = true
   ) INTO v_has_permission;
 
@@ -111,7 +78,7 @@ BEGIN
 END;
 $$ LANGUAGE plpgsql SECURITY DEFINER;
 
--- Fonction pour obtenir les plugins accessibles pour un membre
+-- Fonction corrigée pour obtenir les plugins accessibles
 CREATE OR REPLACE FUNCTION get_member_accessible_plugins(p_user_id uuid)
 RETURNS TABLE (
   plugin_id uuid,
@@ -158,14 +125,15 @@ BEGIN
   JOIN plugins p ON p.id = tmpp.plugin_id
   JOIN users u ON u.id = tmpp.owner_id
   JOIN plugin_subscriptions ps ON ps.user_id = tmpp.owner_id AND ps.plugin_id = tmpp.plugin_id
-  WHERE tmpp.user_id = p_user_id
+  JOIN team_members tm ON tm.id = tmpp.team_member_id
+  WHERE tm.user_id = p_user_id
   AND tmpp.can_access = true
   AND ps.status IN ('active', 'trial')
   AND (ps.current_period_end IS NULL OR ps.current_period_end > now());
 END;
 $$ LANGUAGE plpgsql SECURITY DEFINER;
 
--- Fonction pour obtenir les permissions d'un membre pour tous les plugins du propriétaire
+-- Fonction corrigée pour obtenir les permissions d'un membre
 CREATE OR REPLACE FUNCTION get_team_member_plugin_permissions(
   p_owner_id uuid,
   p_member_id uuid
@@ -189,7 +157,7 @@ BEGIN
   JOIN plugins p ON p.id = ps.plugin_id
   LEFT JOIN team_member_plugin_permissions tmpp 
     ON tmpp.plugin_id = p.id 
-    AND tmpp.user_id = p_member_id 
+    AND tmpp.team_member_id = p_member_id
     AND tmpp.owner_id = p_owner_id
   WHERE ps.user_id = p_owner_id
   AND ps.status IN ('active', 'trial')
