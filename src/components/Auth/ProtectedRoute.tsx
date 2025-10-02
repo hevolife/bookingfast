@@ -1,6 +1,6 @@
 import React, { useEffect, useState } from 'react';
 import { useAuth } from '../../contexts/AuthContext';
-import { useNavigate } from 'react-router-dom';
+import { useNavigate, useLocation } from 'react-router-dom';
 import { LoadingSpinner } from '../UI/LoadingSpinner';
 
 interface ProtectedRouteProps {
@@ -10,27 +10,26 @@ interface ProtectedRouteProps {
 export function ProtectedRoute({ children }: ProtectedRouteProps) {
   const { isAuthenticated, loading } = useAuth();
   const navigate = useNavigate();
+  const location = useLocation();
   const [timeoutReached, setTimeoutReached] = useState(false);
 
-  // Timeout de sécurité pour éviter les blocages infinis
   useEffect(() => {
     const timer = setTimeout(() => {
       if (loading) {
         console.warn('⏰ Timeout authentification - déblocage forcé');
         setTimeoutReached(true);
       }
-    }, 10000); // 10 secondes max
+    }, 10000);
 
     return () => clearTimeout(timer);
   }, [loading]);
 
   useEffect(() => {
-    // Attendre que le chargement soit terminé avant de rediriger
     if ((!loading || timeoutReached) && !isAuthenticated) {
       console.log('🔒 Utilisateur non authentifié - redirection vers login');
-      navigate('/login', { replace: true });
+      navigate('/login', { replace: true, state: { from: location } });
     }
-  }, [isAuthenticated, loading, timeoutReached, navigate]);
+  }, [isAuthenticated, loading, timeoutReached, navigate, location]);
 
   if (loading && !timeoutReached) {
     return (
@@ -49,7 +48,7 @@ export function ProtectedRoute({ children }: ProtectedRouteProps) {
   }
 
   if (timeoutReached && !isAuthenticated) {
-    navigate('/login', { replace: true });
+    navigate('/login', { replace: true, state: { from: location } });
     return null;
   }
 

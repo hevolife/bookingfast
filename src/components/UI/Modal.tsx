@@ -71,8 +71,8 @@ export function Modal({ isOpen, onClose, title, children, size = 'md' }: ModalPr
           <div className="absolute bottom-0 left-0 right-0 h-1 bg-gradient-to-r from-transparent via-white/50 to-transparent"></div>
         </div>
 
-        {/* Body */}
-        <div className="modal-body">
+        {/* Body - Padding ajouté */}
+        <div className="modal-body p-4 sm:p-6">
           {children}
         </div>
       </div>

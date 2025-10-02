@@ -17,7 +17,8 @@ import {
   Shield,
   Award,
   Crown,
-  AlertTriangle
+  AlertTriangle,
+  Settings
 } from 'lucide-react';
 import { useBookings } from '../../hooks/useBookings';
 import { useServices } from '../../hooks/useServices';
@@ -66,7 +67,6 @@ export function DashboardPage() {
   });
 
   useEffect(() => {
-    // Éviter les recalculs multiples avec un debounce
     let mounted = true;
     
     const calculateStatsDebounced = () => {
@@ -81,7 +81,7 @@ export function DashboardPage() {
       mounted = false;
       clearTimeout(timer);
     };
-  }, [bookings.length, services.length, settings?.id]); // Dépendances optimisées
+  }, [bookings.length, services.length, settings?.id]);
 
   const calculateStats = () => {
     const timezone = getBusinessTimezone(settings);
@@ -91,17 +91,14 @@ export function DashboardPage() {
     startOfWeek.setDate(now.getDate() - now.getDay() + 1);
     const startOfMonth = new Date(now.getFullYear(), now.getMonth(), 1);
 
-    // Filtrer les réservations par période
     const todayBookings = bookings.filter(b => b.date === today);
     const weekBookings = bookings.filter(b => new Date(b.date) >= startOfWeek);
     const monthBookings = bookings.filter(b => new Date(b.date) >= startOfMonth);
 
-    // Calculer les revenus basés sur le montant total des réservations
     const todayRevenue = todayBookings.reduce((sum, b) => sum + b.total_amount, 0);
     const weekRevenue = weekBookings.reduce((sum, b) => sum + b.total_amount, 0);
     const monthRevenue = monthBookings.reduce((sum, b) => sum + b.total_amount, 0);
 
-    // Réservations à venir (dans les 24h)
     const tomorrow = new Date(now);
     tomorrow.setDate(now.getDate() + 1);
     const todayEnd = new Date(now);
@@ -119,19 +116,16 @@ export function DashboardPage() {
       })
       .slice(0, 5);
 
-    // Paiements en attente
     const pendingPayments = bookings
       .filter(b => (b.payment_status === 'pending' || (b.payment_amount || 0) < b.total_amount) && b.booking_status !== 'cancelled')
       .sort((a, b) => a.date.localeCompare(b.date))
       .slice(0, 5);
 
-    // Paiements complétés récemment
     const completedPayments = bookings
       .filter(b => b.payment_status === 'completed' && b.booking_status !== 'cancelled')
       .sort((a, b) => new Date(b.updated_at).getTime() - new Date(a.updated_at).getTime())
       .slice(0, 5);
 
-    // Services populaires
     const serviceStats = new Map<string, { count: number; revenue: number; service: Service }>();
     
     monthBookings.forEach(booking => {
@@ -203,6 +197,50 @@ export function DashboardPage() {
     const phoneNumber = booking.client_phone.replace(/\s/g, '');
     window.open(`tel:${phoneNumber}`, '_self');
   };
+
+  const getRoleIcon = (roleKey: string) => {
+    switch (roleKey) {
+      case 'owner': return Crown;
+      case 'admin': return Shield;
+      case 'manager': return Star;
+      case 'employee': return Users;
+      case 'receptionist': return Settings;
+      default: return Eye;
+    }
+  };
+
+  const getRoleGradient = (roleKey: string) => {
+    switch (roleKey) {
+      case 'owner': return 'from-purple-500 to-pink-500';
+      case 'admin': return 'from-red-500 to-pink-500';
+      case 'manager': return 'from-blue-500 to-cyan-500';
+      case 'employee': return 'from-green-500 to-emerald-500';
+      case 'receptionist': return 'from-purple-500 to-pink-500';
+      default: return 'from-gray-500 to-gray-600';
+    }
+  };
+
+  const getRoleBgGradient = (roleKey: string) => {
+    switch (roleKey) {
+      case 'owner': return 'from-purple-50 to-pink-50';
+      case 'admin': return 'from-red-50 to-pink-50';
+      case 'manager': return 'from-blue-50 to-cyan-50';
+      case 'employee': return 'from-green-50 to-emerald-50';
+      case 'receptionist': return 'from-purple-50 to-pink-50';
+      default: return 'from-gray-50 to-gray-100';
+    }
+  };
+
+  const getRoleBorderColor = (roleKey: string) => {
+    switch (roleKey) {
+      case 'owner': return 'border-purple-200';
+      case 'admin': return 'border-red-200';
+      case 'manager': return 'border-blue-200';
+      case 'employee': return 'border-green-200';
+      case 'receptionist': return 'border-purple-200';
+      default: return 'border-gray-200';
+    }
+  };
   
   if (bookingsLoading || servicesLoading) {
     return (
@@ -215,10 +253,14 @@ export function DashboardPage() {
     );
   }
 
+  const RoleIcon = getRoleIcon(userRole.key);
+  const roleGradient = getRoleGradient(userRole.key);
+  const roleBgGradient = getRoleBgGradient(userRole.key);
+  const roleBorderColor = getRoleBorderColor(userRole.key);
+
   return (
     <>
       <div className="p-4 sm:p-6 h-full overflow-y-auto bg-gradient-to-br from-blue-50 via-purple-50 to-pink-50">
-        {/* Header avec informations de rôle */}
         <div className="mb-6 sm:mb-8">
           <div className="flex items-center justify-between mb-4">
             <div>
@@ -228,25 +270,22 @@ export function DashboardPage() {
               <p className="text-sm sm:text-base text-gray-600 mt-2">Vue d'ensemble de votre activité</p>
             </div>
             
-            <div className={`bg-gradient-to-r ${userRole.color.replace('500', '50')} border-2 ${userRole.color.replace('500', '200').replace('from-', 'border-').replace(' to-', ' ')} rounded-xl p-3`}>
+            <div className={`bg-gradient-to-r ${roleBgGradient} border-2 ${roleBorderColor} rounded-xl p-3 shadow-lg hover:shadow-xl transition-all duration-300`}>
               <div className="flex items-center gap-2">
-                <div className={`w-8 h-8 bg-gradient-to-r ${userRole.color} rounded-lg flex items-center justify-center text-white`}>
-                  {userRole.level === 4 ? <Crown className="w-4 h-4" /> :
-                   userRole.level === 3 ? <Shield className="w-4 h-4" /> :
-                   userRole.level === 2 ? <Star className="w-4 h-4" /> :
-                   <Award className="w-4 h-4" />}
+                <div className={`w-10 h-10 bg-gradient-to-r ${roleGradient} rounded-xl flex items-center justify-center text-white shadow-md`}>
+                  <RoleIcon className="w-5 h-5" />
                 </div>
                 <div>
                   <div className="font-bold text-gray-900 text-sm">{userRole.name}</div>
-                  <div className="text-xs text-gray-600">Niveau {userRole.level}</div>
+                  <div className={`text-xs font-bold bg-gradient-to-r ${roleGradient} bg-clip-text text-transparent`}>
+                    Niveau {userRole.level}
+                  </div>
                 </div>
               </div>
             </div>
           </div>
-          
         </div>
 
-        {/* Sélecteur de période */}
         <div className="mb-4 sm:mb-6">
           <div className="flex gap-1 sm:gap-2 bg-white rounded-2xl p-2 shadow-lg w-full sm:w-fit overflow-x-auto">
             {[
@@ -269,9 +308,7 @@ export function DashboardPage() {
           </div>
         </div>
 
-        {/* Statistiques principales */}
         <div className="grid grid-cols-2 lg:grid-cols-4 gap-3 sm:gap-6 mb-6 sm:mb-8">
-          {/* Chiffre d'affaires - Conditionnel selon permissions */}
           <PermissionGate permission="view_revenue" showMessage={false} 
             alternative={
               <div className="bg-gradient-to-r from-gray-400 to-gray-500 rounded-xl sm:rounded-2xl p-4 sm:p-6 text-white transform hover:scale-105 transition-all duration-300 shadow-lg">
@@ -301,7 +338,6 @@ export function DashboardPage() {
             </div>
           </PermissionGate>
 
-          {/* Réservations */}
           <div className="bg-gradient-to-r from-blue-500 to-cyan-500 rounded-xl sm:rounded-2xl p-4 sm:p-6 text-white transform hover:scale-105 transition-all duration-300 shadow-lg">
             <div className="flex items-center justify-between mb-2 sm:mb-4">
               <div className="w-8 h-8 sm:w-12 sm:h-12 bg-white/20 rounded-lg sm:rounded-xl flex items-center justify-center">
@@ -317,7 +353,6 @@ export function DashboardPage() {
             </div>
           </div>
 
-          {/* Paiements en attente - Conditionnel selon permissions */}
           <PermissionGate permission="view_payments" showMessage={false}
             alternative={
               <div className="bg-gradient-to-r from-gray-400 to-gray-500 rounded-xl sm:rounded-2xl p-4 sm:p-6 text-white transform hover:scale-105 transition-all duration-300 shadow-lg">
@@ -347,7 +382,6 @@ export function DashboardPage() {
             </div>
           </PermissionGate>
 
-          {/* Paiements complétés - Conditionnel selon permissions */}
           <PermissionGate permission="view_payments" showMessage={false}
             alternative={
               <div className="bg-gradient-to-r from-gray-400 to-gray-500 rounded-xl sm:rounded-2xl p-4 sm:p-6 text-white transform hover:scale-105 transition-all duration-300 shadow-lg">
@@ -378,9 +412,7 @@ export function DashboardPage() {
           </PermissionGate>
         </div>
 
-        {/* Contenu principal */}
         <div className="grid grid-cols-1 lg:grid-cols-3 gap-4 sm:gap-8">
-          {/* Réservations à venir */}
           <div className="lg:col-span-2">
             <div className="bg-white rounded-xl sm:rounded-2xl shadow-lg p-4 sm:p-6">
               <div className="flex items-center gap-3 mb-4 sm:mb-6">
@@ -455,9 +487,7 @@ export function DashboardPage() {
             </div>
           </div>
 
-          {/* Sidebar droite */}
           <div className="space-y-4 sm:space-y-6">
-            {/* Services populaires */}
             <PermissionGate permission="view_services">
               <div className="bg-white rounded-xl sm:rounded-2xl shadow-lg p-4 sm:p-6">
                 <div className="flex items-center gap-3 mb-4 sm:mb-6">
@@ -491,7 +521,6 @@ export function DashboardPage() {
               </div>
             </PermissionGate>
 
-            {/* Paiements en attente */}
             <PermissionGate permission="view_payments">
               <div className="bg-white rounded-xl sm:rounded-2xl shadow-lg p-4 sm:p-6">
                 <div className="flex items-center gap-3 mb-4 sm:mb-6">
@@ -532,7 +561,6 @@ export function DashboardPage() {
         </div>
       </div>
       
-      {/* Modal de détails de réservation */}
       {showBookingModal && selectedBooking && (
         <Modal
           isOpen={showBookingModal}
@@ -541,7 +569,6 @@ export function DashboardPage() {
           size="md"
         >
           <div className="space-y-4 sm:space-y-6">
-            {/* Informations client */}
             <div className="bg-gradient-to-r from-blue-50 to-cyan-50 rounded-xl sm:rounded-2xl p-4 sm:p-6 border border-blue-200">
               <div className="flex items-center gap-3 mb-3 sm:mb-4">
                 <div className="w-10 h-10 sm:w-12 sm:h-12 bg-gradient-to-r from-blue-500 to-purple-500 rounded-lg sm:rounded-xl flex items-center justify-center text-white font-bold text-sm sm:text-lg">
@@ -583,7 +610,6 @@ export function DashboardPage() {
               </div>
             </div>
 
-            {/* Détails de la réservation */}
             <div className="bg-gradient-to-r from-purple-50 to-pink-50 rounded-xl sm:rounded-2xl p-4 sm:p-6 border border-purple-200">
               <h4 className="font-bold text-purple-800 mb-3 sm:mb-4 flex items-center gap-2 text-sm sm:text-base">
                 <Calendar className="w-4 h-4 sm:w-5 sm:h-5" />
@@ -614,7 +640,6 @@ export function DashboardPage() {
               </div>
             </div>
 
-            {/* Informations de paiement */}
             <div className="bg-gradient-to-r from-green-50 to-emerald-50 rounded-xl sm:rounded-2xl p-4 sm:p-6 border border-green-200">
               <h4 className="font-bold text-green-800 mb-3 sm:mb-4 flex items-center gap-2 text-sm sm:text-base">
                 <Euro className="w-4 h-4 sm:w-5 sm:h-5" />
@@ -652,7 +677,6 @@ export function DashboardPage() {
               </div>
             </div>
 
-            {/* Actions rapides */}
             <div className="flex flex-col sm:flex-row gap-3">
               <button
                 onClick={() => handleCallClient(selectedBooking)}

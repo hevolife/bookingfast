@@ -4,6 +4,7 @@ import { useClients } from '../../hooks/useClients';
 import { useBookings } from '../../hooks/useBookings';
 import { useServices } from '../../hooks/useServices';
 import { useBusinessSettings } from '../../hooks/useBusinessSettings';
+import { usePlugins } from '../../hooks/usePlugins';
 import { Booking, Service, Client, Transaction } from '../../types';
 import { Modal } from '../UI/Modal';
 import { Button } from '../UI/Button';
@@ -13,6 +14,7 @@ import { TimeSlotPicker } from './TimeSlotPicker';
 import { DatePicker } from './DatePicker';
 import { ParticipantSelector } from './ParticipantSelector';
 import { ClientSearch } from './ClientSearch';
+import { TeamMemberSelector } from './TeamMemberSelector';
 import { useAuth } from '../../contexts/AuthContext';
 import { bookingEvents } from '../../lib/bookingEvents';
 import { triggerWorkflow, sendConfirmationEmail } from '../../lib/workflowEngine';
@@ -41,6 +43,7 @@ export function BookingModal({
   const { user } = useAuth();
   const { settings } = useBusinessSettings();
   const { ensureCustomServiceExists } = useServices();
+  const { userPlugins } = usePlugins();
   
   const [selectedService, setSelectedService] = useState<Service | null>(null);
   const [isCustomService, setIsCustomService] = useState(false);
@@ -58,37 +61,30 @@ export function BookingModal({
   const [showDeleteConfirm, setShowDeleteConfirm] = useState(false);
   const [bookingStatus, setBookingStatus] = useState<'pending' | 'confirmed' | 'cancelled'>('pending');
   const [isDatePickerOpen, setIsDatePickerOpen] = useState(false);
+  const [assignedUserId, setAssignedUserId] = useState<string | null>(null);
 
-  // Calculer les créneaux occupés pour la date sélectionnée
+  const hasMultiUserPlugin = userPlugins.some(p => p.plugin_slug === 'multi-user');
+
   const occupiedSlots = bookings
     .filter(booking => booking.date === date && (!editingBooking || booking.id !== editingBooking.id))
     .map(booking => booking.time);
 
-  // Initialiser les données lors de l'édition
   useEffect(() => {
     if (editingBooking) {
       const service = services.find(s => s.id === editingBooking.service_id);
-      
-      // Vérifier si c'est un service personnalisé
       const isCustom = !service || service.description === 'Service personnalisé';
       
       setSelectedService(isCustom ? null : service);
       setIsCustomService(isCustom);
       
       if (isCustom) {
-        // Reconstituer les données du service personnalisé
         let serviceName = 'Service personnalisé';
         
-        // Priorité 1: custom_service_data (données stockées dans la réservation)
         if (editingBooking.custom_service_data?.name) {
           serviceName = editingBooking.custom_service_data.name;
-        }
-        // Priorité 2: service.name si disponible
-        else if (service?.name && service.name !== 'Service personnalisé') {
+        } else if (service?.name && service.name !== 'Service personnalisé') {
           serviceName = service.name;
-        }
-        // Priorité 3: editingBooking.service?.name
-        else if (editingBooking.service?.name && editingBooking.service.name !== 'Service personnalisé') {
+        } else if (editingBooking.service?.name && editingBooking.service.name !== 'Service personnalisé') {
           serviceName = editingBooking.service.name;
         }
         
@@ -112,8 +108,8 @@ export function BookingModal({
       setTime(editingBooking.time);
       setTransactions(editingBooking.transactions || []);
       setBookingStatus(editingBooking.booking_status || 'pending');
+      setAssignedUserId(editingBooking.assigned_user_id || null);
     } else {
-      // Réinitialiser pour une nouvelle réservation
       setSelectedService(null);
       setIsCustomService(false);
       setCustomServiceData({ name: '', price: 0, duration: 60 });
@@ -123,6 +119,7 @@ export function BookingModal({
       setTime(selectedTime);
       setTransactions([]);
       setBookingStatus('confirmed');
+      setAssignedUserId(null);
     }
   }, [editingBooking, services, selectedDate, selectedTime]);
 
@@ -131,10 +128,9 @@ export function BookingModal({
     setSelectedService(null);
     setIsCustomService(false);
     setCustomServiceData({ name: '', price: 0, duration: 60 });
+    setAssignedUserId(null);
     
-    // Réinitialiser la date pour forcer le recentrage du calendrier
     setTimeout(() => {
-      // Déclencher un événement pour recentrer le calendrier
       const event = new CustomEvent('resetDatePicker');
       window.dispatchEvent(event);
     }, 100);
@@ -180,7 +176,6 @@ export function BookingModal({
         service: isCustomService ? customServiceData.name : selectedService.name
       });
 
-      // Créer l'URL du lien de paiement
       const expiryMinutes = settings?.payment_link_expiry_minutes || 30;
       const expiresAt = Date.now() + (expiryMinutes * 60 * 1000);
       const paymentUrl = new URL('/payment', window.location.origin);
@@ -193,14 +188,12 @@ export function BookingModal({
       paymentUrl.searchParams.set('time', time);
       paymentUrl.searchParams.set('expires', expiresAt.toString());
       
-      // Ajouter l'user_id pour la cohérence
       if (user?.id) {
         paymentUrl.searchParams.set('user_id', user.id);
       }
 
       console.log('✅ URL de paiement générée:', paymentUrl.toString());
 
-      // Ajouter une transaction "en attente" pour le lien de paiement
       const pendingTransaction = {
         amount: amount,
         method: 'stripe' as const,
@@ -208,14 +201,12 @@ export function BookingModal({
         status: 'pending' as const
       };
       
-      // Ajouter la transaction à l'état local
       setTransactions(prev => [...prev, {
         ...pendingTransaction,
         id: crypto.randomUUID(),
         created_at: new Date().toISOString()
       }]);
 
-      // Préparer les données de réservation pour le workflow
       const bookingDataForWorkflow = {
         id: editingBooking?.id || crypto.randomUUID(),
         service_id: isCustomService ? 'custom' : selectedService.id,
@@ -247,7 +238,6 @@ export function BookingModal({
         custom_service_data: isCustomService ? customServiceData : null
       };
 
-      // Déclencher le workflow pour lien de paiement créé
       if (user?.id) {
         console.log('🚀 Déclenchement workflow payment_link_created pour:', selectedClient.email);
         
@@ -256,17 +246,14 @@ export function BookingModal({
           console.log('✅ Workflow payment_link_created déclenché avec succès');
         } catch (error) {
           console.error('❌ Erreur déclenchement workflow payment_link_created:', error);
-          // Ne pas faire échouer la génération du lien pour une erreur de workflow
         }
       }
       
-      // Copier le lien dans le presse-papiers
       try {
         await navigator.clipboard.writeText(paymentUrl.toString());
         console.log('✅ Lien copié dans le presse-papiers');
       } catch (clipboardError) {
         console.warn('⚠️ Impossible de copier automatiquement:', clipboardError);
-        // Continuer même si la copie échoue
       }
       
       console.log('✅ Lien de paiement généré avec succès');
@@ -274,7 +261,6 @@ export function BookingModal({
     } catch (error) {
       console.error('Erreur lors de la génération du lien:', error);
       
-      // Message d'erreur plus détaillé
       let errorMessage = 'Erreur lors de la génération du lien de paiement';
       if (error instanceof Error) {
         errorMessage += `\n\nDétails: ${error.message}`;
@@ -300,7 +286,6 @@ export function BookingModal({
     setSaving(true);
     
     try {
-      // Créer ou récupérer le client
       const client = await getOrCreateClient({
         firstname: selectedClient.firstname,
         lastname: selectedClient.lastname,
@@ -314,11 +299,9 @@ export function BookingModal({
       let serviceDuration;
       
       if (isCustomService) {
-        // Pour les services personnalisés, créer ou récupérer le service template
         let customServiceTemplate = services.find(s => s.description === 'Service personnalisé');
         
         if (!customServiceTemplate) {
-          // Créer le service personnalisé s'il n'existe pas
           try {
             customServiceTemplate = await ensureCustomServiceExists();
           } catch (error) {
@@ -349,7 +332,7 @@ export function BookingModal({
         payment_amount: calculateCurrentPaid(),
         transactions,
         booking_status: bookingStatus,
-        // Stocker les données du service personnalisé directement dans la réservation
+        assigned_user_id: assignedUserId,
         custom_service_data: isCustomService ? {
           name: customServiceData.name,
           price: customServiceData.price,
@@ -360,14 +343,12 @@ export function BookingModal({
       if (editingBooking) {
         const updatedBooking = await updateBooking(editingBooking.id, bookingData);
         
-        // Émettre l'événement de modification immédiatement
         if (updatedBooking) {
           bookingEvents.emit('bookingUpdated', updatedBooking);
         }
       } else {
         const newBooking = await addBooking(bookingData);
         
-        // Émettre l'événement de création immédiatement
         if (newBooking) {
           bookingEvents.emit('bookingCreated', newBooking);
         }
@@ -390,7 +371,6 @@ export function BookingModal({
     try {
       await deleteBooking(editingBooking.id);
       
-      // Émettre l'événement de suppression
       bookingEvents.emit('bookingDeleted', editingBooking.id);
       
       onSuccess();
@@ -416,15 +396,12 @@ export function BookingModal({
       >
         <form onSubmit={handleSubmit} className="space-y-4 sm:space-y-6 touch-action-pan-y">
           <div className="grid grid-cols-1 lg:grid-cols-2 gap-4 sm:gap-6">
-            {/* Colonne gauche - Informations principales */}
             <div className="space-y-4 sm:space-y-6 touch-action-pan-y">
-              {/* Sélection du service */}
               <div>
                 <label className="block text-sm font-medium text-gray-700 mb-2 sm:mb-3">
                   Service
                 </label>
                 
-                {/* Toggle Service Standard/Personnalisé */}
                 <div className="flex gap-1 mb-3 bg-gray-100 rounded-xl p-1">
                   <button
                     type="button"
@@ -495,7 +472,6 @@ export function BookingModal({
                     ))}
                   </div>
                 ) : (
-                  /* Formulaire Service Personnalisé */
                   <div className="bg-gradient-to-r from-purple-50 to-pink-50 border-2 border-purple-200 rounded-xl sm:rounded-2xl p-4 sm:p-6">
                     <div className="flex items-center gap-3 mb-4">
                       <div className="w-10 h-10 sm:w-12 sm:h-12 bg-gradient-to-r from-purple-500 to-pink-500 rounded-lg sm:rounded-xl flex items-center justify-center text-white">
@@ -556,7 +532,6 @@ export function BookingModal({
                         </div>
                       </div>
                       
-                      {/* Aperçu du service personnalisé */}
                       {customServiceData.name && customServiceData.price > 0 && (
                         <div className="bg-white border border-purple-300 rounded-xl p-3">
                           <div className="flex items-center gap-3">
@@ -579,13 +554,11 @@ export function BookingModal({
                 )}
               </div>
 
-              {/* Sélection client */}
               <ClientSearch
                 selectedClient={selectedClient}
                 onClientSelect={setSelectedClient}
               />
 
-              {/* Date et heure côte à côte */}
               <div className="grid grid-cols-2 gap-3 sm:gap-4">
                 <DatePicker
                   value={date}
@@ -604,7 +577,6 @@ export function BookingModal({
                 />
               </div>
 
-              {/* DatePicker en pleine largeur entre heure et participants */}
               {isDatePickerOpen && (
                 <div className="w-full">
                   <DatePicker
@@ -621,7 +593,6 @@ export function BookingModal({
                 </div>
               )}
 
-              {/* Participants */}
               {(selectedService || (isCustomService && customServiceData.name && customServiceData.price > 0)) && (
                 <ParticipantSelector
                   quantity={quantity}
@@ -630,9 +601,14 @@ export function BookingModal({
                 />
               )}
 
+              {hasMultiUserPlugin && (
+                <TeamMemberSelector
+                  value={assignedUserId}
+                  onChange={setAssignedUserId}
+                />
+              )}
             </div>
 
-            {/* Colonne droite - Informations client et récapitulatif */}
             <div className="space-y-4 sm:space-y-6">
               {selectedClient && (
                 <div className="bg-gradient-to-r from-gray-50 to-blue-50 rounded-xl sm:rounded-2xl p-4 sm:p-6 border border-blue-200">
@@ -713,7 +689,6 @@ export function BookingModal({
                 </div>
               )}
 
-              {/* Section Paiement */}
               {(selectedService || (isCustomService && customServiceData.name && customServiceData.price > 0)) && selectedClient && (
                 <div className="bg-gradient-to-r from-blue-50 to-purple-50 rounded-2xl p-6 border border-blue-200">
                   <div className="flex items-center gap-3 mb-4">
@@ -787,7 +762,6 @@ export function BookingModal({
             </div>
           </div>
 
-          {/* Boutons d'action */}
           <div className="flex flex-col sm:flex-row gap-3 mt-6 pt-4 border-t border-gray-200">
             <Button
               type="button"
@@ -822,7 +796,6 @@ export function BookingModal({
           </div>
         </form>
 
-        {/* Bouton de suppression - en dehors du formulaire */}
         {editingBooking && (
           <div className="mt-4 pt-4 border-t border-gray-200">
             <Button
@@ -838,7 +811,6 @@ export function BookingModal({
         )}
       </Modal>
 
-      {/* Modal de confirmation de suppression */}
       <Modal
         isOpen={showDeleteConfirm}
         onClose={() => setShowDeleteConfirm(false)}
