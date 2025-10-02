@@ -183,6 +183,46 @@ export function TeamManagement() {
     }
   };
 
+  const getRoleIcon = (roleKey: string) => {
+    switch (roleKey) {
+      case 'admin': return Shield;
+      case 'manager': return Star;
+      case 'employee': return Users;
+      case 'receptionist': return Settings;
+      default: return Eye;
+    }
+  };
+
+  const getRoleGradient = (roleKey: string) => {
+    switch (roleKey) {
+      case 'admin': return 'from-red-500 to-pink-500';
+      case 'manager': return 'from-blue-500 to-cyan-500';
+      case 'employee': return 'from-green-500 to-emerald-500';
+      case 'receptionist': return 'from-purple-500 to-pink-500';
+      default: return 'from-gray-500 to-gray-600';
+    }
+  };
+
+  const getRoleBgGradient = (roleKey: string) => {
+    switch (roleKey) {
+      case 'admin': return 'from-red-50 to-pink-50';
+      case 'manager': return 'from-blue-50 to-cyan-50';
+      case 'employee': return 'from-green-50 to-emerald-50';
+      case 'receptionist': return 'from-purple-50 to-pink-50';
+      default: return 'from-gray-50 to-gray-100';
+    }
+  };
+
+  const getRoleBorderColor = (roleKey: string) => {
+    switch (roleKey) {
+      case 'admin': return 'border-red-200';
+      case 'manager': return 'border-blue-200';
+      case 'employee': return 'border-green-200';
+      case 'receptionist': return 'border-purple-200';
+      default: return 'border-gray-200';
+    }
+  };
+
   if (loading) {
     return (
       <div className="flex items-center justify-center h-64">
@@ -210,7 +250,6 @@ export function TeamManagement() {
   return (
     <>
       <div className="space-y-6">
-        {/* Header avec informations du propriétaire */}
         <div className="bg-gradient-to-r from-purple-50 to-pink-50 rounded-2xl p-6 border border-purple-200">
           <div className="flex items-center gap-4 mb-4">
             <div className="w-12 h-12 bg-gradient-to-r from-purple-500 to-pink-500 rounded-xl flex items-center justify-center">
@@ -238,7 +277,6 @@ export function TeamManagement() {
           </div>
         </div>
 
-        {/* Actions principales */}
         <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4">
           <div>
             <h3 className="text-xl font-bold text-gray-900 flex items-center gap-3">
@@ -262,7 +300,6 @@ export function TeamManagement() {
           </Button>
         </div>
 
-        {/* Recherche */}
         <div className="relative w-full max-w-md">
           <input
             type="text"
@@ -273,7 +310,6 @@ export function TeamManagement() {
           />
         </div>
 
-        {/* Rôles disponibles */}
         <div className="bg-white rounded-2xl shadow-lg p-6">
           <h3 className="text-lg font-bold text-gray-900 mb-6 flex items-center gap-3">
             <Award className="w-6 h-6 text-orange-600" />
@@ -281,75 +317,84 @@ export function TeamManagement() {
           </h3>
 
           <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4">
-            {Object.entries(TEAM_ROLES).filter(([key]) => key !== 'owner').map(([roleKey, role], index) => (
-              <div
-                key={roleKey}
-                className={`bg-gradient-to-r ${role.color.replace('500', '50')} rounded-xl p-4 border-2 border-opacity-20 hover:shadow-lg transition-all duration-300 transform hover:scale-[1.02] animate-fadeIn`}
-                style={{ animationDelay: `${index * 100}ms` }}
-              >
-                <div className="flex items-center gap-3 mb-3">
-                  <div className={`w-10 h-10 bg-gradient-to-r ${role.color} rounded-xl flex items-center justify-center text-white`}>
-                    {roleKey === 'admin' ? <Shield className="w-5 h-5" /> :
-                     roleKey === 'manager' ? <Star className="w-5 h-5" /> :
-                     roleKey === 'employee' ? <Users className="w-5 h-5" /> :
-                     roleKey === 'receptionist' ? <Settings className="w-5 h-5" /> :
-                     <Eye className="w-5 h-5" />}
+            {Object.entries(TEAM_ROLES).filter(([key]) => key !== 'owner').map(([roleKey, role], index) => {
+              const RoleIcon = getRoleIcon(roleKey);
+              const gradient = getRoleGradient(roleKey);
+              const bgGradient = getRoleBgGradient(roleKey);
+              const borderColor = getRoleBorderColor(roleKey);
+              
+              return (
+                <div
+                  key={roleKey}
+                  className={`bg-gradient-to-r ${bgGradient} rounded-xl p-4 border-2 ${borderColor} hover:shadow-lg transition-all duration-300 transform hover:scale-[1.02] animate-fadeIn`}
+                  style={{ animationDelay: `${index * 100}ms` }}
+                >
+                  <div className="flex items-center gap-3 mb-3">
+                    <div className={`w-10 h-10 bg-gradient-to-r ${gradient} rounded-xl flex items-center justify-center text-white shadow-lg`}>
+                      <RoleIcon className="w-5 h-5" />
+                    </div>
+                    <div>
+                      <h4 className="font-bold text-gray-900">{role.name}</h4>
+                      <div className={`text-xs font-bold bg-gradient-to-r ${gradient} bg-clip-text text-transparent`}>
+                        Niveau {role.level}
+                      </div>
+                    </div>
                   </div>
-                  <div>
-                    <h4 className="font-bold text-gray-900">{role.name}</h4>
-                    <div className="text-xs text-gray-600">Niveau {role.level}</div>
-                  </div>
-                </div>
-                
-                <p className="text-sm text-gray-700 mb-3">{role.description}</p>
-                
-                <div className="text-xs text-gray-600">
-                  <div className="font-medium mb-1">{role.permissions.length} permissions</div>
-                  <div className="flex flex-wrap gap-1">
-                    {role.permissions.slice(0, 3).map(permissionId => {
-                      const permission = AVAILABLE_PERMISSIONS.find(p => p.id === permissionId);
-                      return permission ? (
-                        <span
-                          key={permissionId}
-                          className="bg-white/60 text-gray-700 px-2 py-1 rounded-full text-xs"
-                        >
-                          {permission.name}
+                  
+                  <p className="text-sm text-gray-700 mb-3">{role.description}</p>
+                  
+                  <div className="text-xs text-gray-600">
+                    <div className="font-medium mb-1">{role.permissions.length} permissions</div>
+                    <div className="flex flex-wrap gap-1">
+                      {role.permissions.slice(0, 3).map(permissionId => {
+                        const permission = AVAILABLE_PERMISSIONS.find(p => p.id === permissionId);
+                        return permission ? (
+                          <span
+                            key={permissionId}
+                            className="bg-white/60 text-gray-700 px-2 py-1 rounded-full text-xs"
+                          >
+                            {permission.name}
+                          </span>
+                        ) : null;
+                      })}
+                      {role.permissions.length > 3 && (
+                        <span className="bg-gray-200 text-gray-600 px-2 py-1 rounded-full text-xs">
+                          +{role.permissions.length - 3}
                         </span>
-                      ) : null;
-                    })}
-                    {role.permissions.length > 3 && (
-                      <span className="bg-gray-200 text-gray-600 px-2 py-1 rounded-full text-xs">
-                        +{role.permissions.length - 3}
-                      </span>
-                    )}
+                      )}
+                    </div>
                   </div>
                 </div>
-              </div>
-            ))}
+              );
+            })}
           </div>
         </div>
 
-        {/* Liste des membres */}
         <div className="bg-white rounded-2xl shadow-lg p-6">
           {filteredMembers.length > 0 ? (
             <div className="space-y-4">
               {filteredMembers.map((member, index) => {
                 const memberRole = getRoleInfo(member.role_name);
+                const RoleIcon = getRoleIcon(member.role_name);
+                const gradient = getRoleGradient(member.role_name);
+                const bgGradient = getRoleBgGradient(member.role_name);
+                const borderColor = getRoleBorderColor(member.role_name);
                 
                 return (
                   <div
                     key={member.id}
-                    className="flex items-center justify-between p-4 bg-gradient-to-r from-gray-50 to-blue-50 rounded-xl border border-blue-200 hover:shadow-md transition-all duration-300 animate-fadeIn"
+                    className={`flex items-center justify-between p-4 bg-gradient-to-r ${bgGradient} rounded-xl border-2 ${borderColor} hover:shadow-md transition-all duration-300 animate-fadeIn`}
                     style={{ animationDelay: `${index * 100}ms` }}
                   >
                     <div className="flex items-center gap-4">
-                      <div className={`w-12 h-12 bg-gradient-to-r ${memberRole.color} rounded-xl flex items-center justify-center text-white font-bold text-lg`}>
+                      <div className={`w-12 h-12 bg-gradient-to-r ${gradient} rounded-xl flex items-center justify-center text-white font-bold text-lg shadow-lg`}>
                         {(member.email || 'U').charAt(0).toUpperCase()}
                       </div>
                       <div>
                         <div className="font-bold text-gray-900 flex items-center gap-2">
                           {member.full_name || member.email}
-                          <span className={`px-3 py-1 rounded-full text-xs font-bold bg-gradient-to-r ${memberRole.color.replace('500', '100')} ${memberRole.color.replace('500', '700').replace('from-', 'text-').replace(' to-', ' border-').replace('-100', '-200')}`}>
+                          <span className={`px-3 py-1 rounded-full text-xs font-bold bg-gradient-to-r ${gradient} text-white shadow-md flex items-center gap-1`}>
+                            <RoleIcon className="w-3 h-3" />
                             {memberRole.name}
                           </span>
                         </div>
@@ -357,7 +402,9 @@ export function TeamManagement() {
                         <div className="text-xs text-gray-500 flex items-center gap-2">
                           <span>{member.permissions.length} permission(s)</span>
                           <span>•</span>
-                          <span>Niveau {memberRole.level}</span>
+                          <span className={`font-bold bg-gradient-to-r ${gradient} bg-clip-text text-transparent`}>
+                            Niveau {memberRole.level}
+                          </span>
                           <span>•</span>
                           <span>Rejoint le {new Date(member.joined_at || member.created_at).toLocaleDateString('fr-FR')}</span>
                         </div>
@@ -423,7 +470,6 @@ export function TeamManagement() {
         </div>
       </div>
 
-      {/* Modal Membre */}
       {showMemberModal && (
         <Modal
           isOpen={showMemberModal}
@@ -489,44 +535,47 @@ export function TeamManagement() {
               </>
             )}
 
-            {/* Sélection du rôle */}
             <div>
               <label className="block text-sm font-medium text-gray-700 mb-4">
                 Rôle prédéfini
               </label>
               <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
-                {Object.entries(TEAM_ROLES).filter(([key]) => key !== 'owner').map(([roleKey, role]) => (
-                  <button
-                    key={roleKey}
-                    type="button"
-                    onClick={() => handleRoleChange(roleKey)}
-                    className={`p-4 rounded-xl border-2 transition-all duration-300 text-left ${
-                      selectedRole === roleKey
-                        ? `border-opacity-100 bg-gradient-to-r ${role.color.replace('500', '50')} shadow-lg`
-                        : 'border-gray-200 bg-white hover:border-blue-300 hover:shadow-md'
-                    }`}
-                  >
-                    <div className="flex items-center gap-3 mb-2">
-                      <div className={`w-8 h-8 bg-gradient-to-r ${role.color} rounded-lg flex items-center justify-center text-white`}>
-                        {roleKey === 'admin' ? <Shield className="w-4 h-4" /> :
-                         roleKey === 'manager' ? <Star className="w-4 h-4" /> :
-                         roleKey === 'employee' ? <Users className="w-4 h-4" /> :
-                         roleKey === 'receptionist' ? <Settings className="w-4 h-4" /> :
-                         <Eye className="w-4 h-4" />}
+                {Object.entries(TEAM_ROLES).filter(([key]) => key !== 'owner').map(([roleKey, role]) => {
+                  const RoleIcon = getRoleIcon(roleKey);
+                  const gradient = getRoleGradient(roleKey);
+                  const bgGradient = getRoleBgGradient(roleKey);
+                  const borderColor = getRoleBorderColor(roleKey);
+                  
+                  return (
+                    <button
+                      key={roleKey}
+                      type="button"
+                      onClick={() => handleRoleChange(roleKey)}
+                      className={`p-4 rounded-xl border-2 transition-all duration-300 text-left ${
+                        selectedRole === roleKey
+                          ? `${borderColor} bg-gradient-to-r ${bgGradient} shadow-lg`
+                          : 'border-gray-200 bg-white hover:border-blue-300 hover:shadow-md'
+                      }`}
+                    >
+                      <div className="flex items-center gap-3 mb-2">
+                        <div className={`w-8 h-8 bg-gradient-to-r ${gradient} rounded-lg flex items-center justify-center text-white shadow-md`}>
+                          <RoleIcon className="w-4 h-4" />
+                        </div>
+                        <div>
+                          <div className="font-bold text-gray-900">{role.name}</div>
+                          <div className={`text-xs font-bold bg-gradient-to-r ${gradient} bg-clip-text text-transparent`}>
+                            Niveau {role.level}
+                          </div>
+                        </div>
                       </div>
-                      <div>
-                        <div className="font-bold text-gray-900">{role.name}</div>
-                        <div className="text-xs text-gray-600">Niveau {role.level}</div>
-                      </div>
-                    </div>
-                    <div className="text-sm text-gray-600 mb-2">{role.description}</div>
-                    <div className="text-xs text-blue-600">{role.permissions.length} permissions</div>
-                  </button>
-                ))}
+                      <div className="text-sm text-gray-600 mb-2">{role.description}</div>
+                      <div className="text-xs text-blue-600">{role.permissions.length} permissions</div>
+                    </button>
+                  );
+                })}
               </div>
             </div>
 
-            {/* Permissions personnalisées */}
             <div>
               <div className="flex items-center justify-between mb-4">
                 <label className="block text-sm font-medium text-gray-700">
@@ -628,7 +677,6 @@ export function TeamManagement() {
         </Modal>
       )}
 
-      {/* Modal de confirmation de suppression */}
       {showDeleteModal && memberToDelete && (
         <Modal
           isOpen={showDeleteModal}

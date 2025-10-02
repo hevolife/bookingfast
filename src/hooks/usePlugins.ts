@@ -1,6 +1,6 @@
 import { useState, useEffect } from 'react';
 import { supabase, isSupabaseConfigured } from '../lib/supabase';
-import { Plugin, PluginSubscription, PluginConfiguration, UserPlugin } from '../types/plugin';
+import { Plugin, PluginSubscription, UserPlugin } from '../types/plugin';
 import { useAuth } from '../contexts/AuthContext';
 
 export function usePlugins() {
@@ -58,7 +58,6 @@ export function usePlugins() {
       }
 
       console.log('📦 Abonnements chargés:', data);
-      console.log('📊 Abonnements actifs/trial:', data?.filter(s => s.status === 'active' || s.status === 'trial'));
       setUserSubscriptions(data || []);
     } catch (err) {
       console.error('Erreur chargement abonnements:', err);
@@ -72,14 +71,35 @@ export function usePlugins() {
         return;
       }
 
+      console.log('🔍 Appel get_user_active_plugins pour:', user.id);
+
       const { data, error } = await supabase
         .rpc('get_user_active_plugins', { p_user_id: user.id });
 
-      if (error) throw error;
-      console.log('🔌 Plugins actifs:', data);
-      setUserPlugins(data || []);
+      if (error) {
+        console.error('❌ Erreur RPC:', error);
+        throw error;
+      }
+
+      console.log('✅ Plugins actifs reçus:', data);
+
+      const formattedPlugins: UserPlugin[] = (data || []).map((p: any) => ({
+        plugin_id: p.plugin_id,
+        plugin_name: p.plugin_name,
+        plugin_slug: p.plugin_slug,
+        plugin_icon: p.plugin_icon,
+        plugin_category: p.plugin_category,
+        activated_features: Array.isArray(p.activated_features) 
+          ? p.activated_features 
+          : [],
+        settings: p.settings || {}
+      }));
+
+      console.log('🔌 Plugins formatés:', formattedPlugins);
+      setUserPlugins(formattedPlugins);
     } catch (err) {
-      console.error('Erreur chargement plugins actifs:', err);
+      console.error('❌ Erreur chargement plugins actifs:', err);
+      setUserPlugins([]);
     }
   };
 
@@ -112,7 +132,6 @@ export function usePlugins() {
     console.log('🚀 Début souscription plugin:', { pluginId, userId: user.id, activatedFeatures });
 
     try {
-      // Vérifier si une souscription existe déjà
       const { data: existingSub, error: checkError } = await supabase
         .from('plugin_subscriptions')
         .select('*')
@@ -130,7 +149,6 @@ export function usePlugins() {
       if (existingSub) {
         console.log('⚠️ Souscription existante trouvée:', existingSub);
         
-        // Si la souscription existe mais est expirée ou annulée, on la réactive
         if (existingSub.status === 'expired' || existingSub.status === 'cancelled') {
           console.log('🔄 Réactivation de la souscription...');
           
@@ -161,12 +179,10 @@ export function usePlugins() {
           return updatedSub;
         }
         
-        // Si la souscription est déjà active, on la retourne
         console.log('✅ Souscription déjà active');
         return existingSub as PluginSubscription;
       }
 
-      // Créer une nouvelle souscription
       console.log('➕ Création nouvelle souscription...');
       
       const newSubscription = {
@@ -196,13 +212,49 @@ export function usePlugins() {
 
       console.log('✅ Souscription créée avec succès:', data);
 
-      // Recharger les données
       await fetchUserSubscriptions();
       await fetchUserPlugins();
 
       return data;
     } catch (err) {
       console.error('❌ Erreur souscription plugin:', err);
+      throw err;
+    }
+  };
+
+  const createPluginSubscription = async (
+    pluginId: string,
+    subscriptionId: string
+  ): Promise<{ url: string }> => {
+    if (!isSupabaseConfigured() || !user) {
+      throw new Error('Configuration invalide');
+    }
+
+    console.log('💳 Création abonnement Stripe:', { pluginId, subscriptionId, userId: user.id });
+
+    try {
+      const { data, error } = await supabase.functions.invoke('create-plugin-subscription', {
+        body: {
+          plugin_id: pluginId,
+          user_id: user.id,
+          subscription_id: subscriptionId,
+        },
+      });
+
+      if (error) {
+        console.error('❌ Erreur Edge Function:', error);
+        throw error;
+      }
+
+      if (!data || !data.url) {
+        console.error('❌ Pas d\'URL de checkout:', data);
+        throw new Error('Pas d\'URL de checkout reçue');
+      }
+
+      console.log('✅ Session Stripe créée:', data.sessionId);
+      return { url: data.url };
+    } catch (err) {
+      console.error('❌ Erreur création abonnement:', err);
       throw err;
     }
   };
@@ -305,6 +357,7 @@ export function usePlugins() {
     error,
     hasPluginAccess,
     subscribeToPlugin,
+    createPluginSubscription,
     updatePluginFeatures,
     updatePluginConfiguration,
     cancelSubscription,

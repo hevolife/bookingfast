@@ -115,7 +115,7 @@ export function ServiceBookingModal({
           <div className="absolute bottom-0 left-0 right-0 h-1 bg-gradient-to-r from-transparent via-white/50 to-transparent"></div>
         </div>
 
-        {/* Bookings List */}
+        {/* Bookings List - Padding ajouté */}
         <div className="p-4 sm:p-6 modal-body">
           {/* Bouton Ajouter une réservation */}
           <div className="mb-4 sm:mb-6">
