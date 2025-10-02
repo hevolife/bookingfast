@@ -53,7 +53,7 @@ export function Navbar({ currentPage, onPageChange }: NavbarProps) {
 
   return (
     <>
-      <nav className="bg-white border-b border-gray-200 sticky top-0 z-50 shadow-sm">
+      <nav className="bg-white border-b border-gray-200 sticky top-0 z-50 shadow-sm navbar-safe">
         <div className="px-4 sm:px-6">
           <div className="flex items-center justify-between h-16">
             <div className="flex items-center gap-3">
@@ -166,7 +166,7 @@ export function Navbar({ currentPage, onPageChange }: NavbarProps) {
       </nav>
 
       {mobileMenuOpen && (
-        <div className="lg:hidden fixed inset-0 z-40 bg-gradient-to-br from-purple-900/95 via-pink-900/95 to-blue-900/95 backdrop-blur-md animate-fadeIn">
+        <div className="lg:hidden fixed inset-0 z-40 bg-gradient-to-br from-purple-900/95 via-pink-900/95 to-blue-900/95 backdrop-blur-md animate-fadeIn safe-all">
           <div className="h-full overflow-y-auto p-6 pt-20">
             <div className="max-w-md mx-auto space-y-3">
               <div className="text-center mb-8">
