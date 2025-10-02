@@ -11,7 +11,11 @@ export default defineConfig({
   },
   server: {
     headers: {
-      'Service-Worker-Allowed': '/'
+      'Service-Worker-Allowed': '/',
+      'Cache-Control': 'no-store, no-cache, must-revalidate, proxy-revalidate',
+      'Pragma': 'no-cache',
+      'Expires': '0',
+      'Surrogate-Control': 'no-store'
     }
   },
   build: {
@@ -53,7 +57,10 @@ export default defineConfig({
     port: 4173,
     strictPort: true,
     headers: {
-      'Cache-Control': 'public, max-age=31536000, immutable'
+      'Cache-Control': 'no-store, no-cache, must-revalidate, proxy-revalidate',
+      'Pragma': 'no-cache',
+      'Expires': '0',
+      'Surrogate-Control': 'no-store'
     }
   }
 });
