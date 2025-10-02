@@ -1,6 +1,4 @@
-import React, { useState, useEffect } from 'react';
-import { AuthProvider } from './contexts/AuthContext';
-import { LoginPage } from './components/Auth/LoginPage';
+import React, { useState } from 'react';
 import { DashboardPage } from './components/Dashboard/DashboardPage';
 import { CalendarPage } from './components/Calendar/CalendarPage';
 import { ServicesPage } from './components/Services/ServicesPage';
@@ -14,7 +12,7 @@ import { useAuth } from './contexts/AuthContext';
 
 type Page = 'dashboard' | 'calendar' | 'services' | 'admin' | 'emails' | 'reports' | 'multi-user';
 
-function AppContent() {
+function App() {
   const { user, loading } = useAuth();
   const [currentPage, setCurrentPage] = useState<Page>('dashboard');
 
@@ -24,10 +22,6 @@ function AppContent() {
         <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-purple-600"></div>
       </div>
     );
-  }
-
-  if (!user) {
-    return <LoginPage />;
   }
 
   const renderPage = () => {
@@ -66,14 +60,6 @@ function AppContent() {
         {renderPage()}
       </main>
     </div>
-  );
-}
-
-function App() {
-  return (
-    <AuthProvider>
-      <AppContent />
-    </AuthProvider>
   );
 }
 

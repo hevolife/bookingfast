@@ -200,7 +200,7 @@ export function DashboardPage() {
 
   const getRoleIcon = (roleKey: string) => {
     switch (roleKey) {
-      case 'owner': return Shield;
+      case 'owner': return Crown;
       case 'admin': return Shield;
       case 'manager': return Star;
       case 'employee': return Users;
@@ -211,7 +211,7 @@ export function DashboardPage() {
 
   const getRoleGradient = (roleKey: string) => {
     switch (roleKey) {
-      case 'owner': return 'from-yellow-500 to-amber-500';
+      case 'owner': return 'from-purple-500 to-pink-500';
       case 'admin': return 'from-red-500 to-pink-500';
       case 'manager': return 'from-blue-500 to-cyan-500';
       case 'employee': return 'from-green-500 to-emerald-500';
@@ -222,7 +222,7 @@ export function DashboardPage() {
 
   const getRoleBgGradient = (roleKey: string) => {
     switch (roleKey) {
-      case 'owner': return 'from-yellow-50 to-amber-50';
+      case 'owner': return 'from-purple-50 to-pink-50';
       case 'admin': return 'from-red-50 to-pink-50';
       case 'manager': return 'from-blue-50 to-cyan-50';
       case 'employee': return 'from-green-50 to-emerald-50';
@@ -233,7 +233,7 @@ export function DashboardPage() {
 
   const getRoleBorderColor = (roleKey: string) => {
     switch (roleKey) {
-      case 'owner': return 'border-yellow-200';
+      case 'owner': return 'border-purple-200';
       case 'admin': return 'border-red-200';
       case 'manager': return 'border-blue-200';
       case 'employee': return 'border-green-200';

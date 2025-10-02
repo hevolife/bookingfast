@@ -24,38 +24,87 @@ export function useMultiUserSettings() {
     }
 
     try {
+      console.log('🔍 Chargement paramètres pour user:', user.id);
+      
       const { data, error } = await supabase
         .from('multi_user_settings')
         .select('*')
         .eq('user_id', user.id)
         .order('created_at', { ascending: false });
 
-      if (error) throw error;
+      if (error) {
+        console.error('❌ Erreur chargement:', error);
+        throw error;
+      }
+      
+      console.log('✅ Paramètres chargés:', data);
       setSettings(data || []);
     } catch (error) {
-      console.error('Erreur chargement paramètres multi-user:', error);
+      console.error('❌ Erreur chargement paramètres multi-user:', error);
     } finally {
       setLoading(false);
     }
   };
 
   const updateSetting = async (teamMemberId: string, canViewOnlyAssigned: boolean) => {
-    if (!user || !isSupabaseConfigured()) return;
+    if (!user || !isSupabaseConfigured()) {
+      throw new Error('Utilisateur non connecté ou Supabase non configuré');
+    }
 
     try {
-      const { error } = await supabase
-        .from('multi_user_settings')
-        .upsert({
-          user_id: user.id,
-          team_member_id: teamMemberId,
-          can_view_only_assigned: canViewOnlyAssigned,
-          updated_at: new Date().toISOString()
-        });
+      console.log('🔄 Tentative mise à jour:', { 
+        user_id: user.id, 
+        team_member_id: teamMemberId, 
+        can_view_only_assigned: canViewOnlyAssigned 
+      });
 
-      if (error) throw error;
+      const { data: existing, error: checkError } = await supabase
+        .from('multi_user_settings')
+        .select('id')
+        .eq('user_id', user.id)
+        .eq('team_member_id', teamMemberId)
+        .maybeSingle();
+
+      if (checkError) {
+        console.error('❌ Erreur vérification:', checkError);
+        throw checkError;
+      }
+
+      if (existing) {
+        console.log('📝 UPDATE existant:', existing.id);
+        const { error: updateError } = await supabase
+          .from('multi_user_settings')
+          .update({
+            can_view_only_assigned: canViewOnlyAssigned,
+            updated_at: new Date().toISOString()
+          })
+          .eq('id', existing.id);
+
+        if (updateError) {
+          console.error('❌ Erreur UPDATE:', updateError);
+          throw updateError;
+        }
+        console.log('✅ UPDATE réussi');
+      } else {
+        console.log('➕ INSERT nouveau');
+        const { error: insertError } = await supabase
+          .from('multi_user_settings')
+          .insert({
+            user_id: user.id,
+            team_member_id: teamMemberId,
+            can_view_only_assigned: canViewOnlyAssigned
+          });
+
+        if (insertError) {
+          console.error('❌ Erreur INSERT:', insertError);
+          throw insertError;
+        }
+        console.log('✅ INSERT réussi');
+      }
+
       await fetchSettings();
     } catch (error) {
-      console.error('Erreur mise à jour paramètre:', error);
+      console.error('❌ Erreur mise à jour paramètre:', error);
       throw error;
     }
   };
