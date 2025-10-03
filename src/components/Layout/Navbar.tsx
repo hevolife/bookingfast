@@ -81,7 +81,7 @@ export function Navbar({ currentPage, onPageChange }: NavbarProps) {
         style={{ 
           position: 'sticky', 
           top: 0,
-          zIndex: 100,
+          zIndex: 40,
           paddingTop: 'env(safe-area-inset-top)'
         }}
       >
@@ -266,7 +266,7 @@ export function Navbar({ currentPage, onPageChange }: NavbarProps) {
         <div 
           className="lg:hidden fixed inset-0 bg-gradient-to-br from-purple-900/95 via-pink-900/95 to-blue-900/95 backdrop-blur-md animate-fadeIn safe-all scrollable-area"
           style={{
-            zIndex: 90,
+            zIndex: 45,
             overflow: 'auto',
             WebkitOverflowScrolling: 'touch',
             touchAction: 'pan-y',
