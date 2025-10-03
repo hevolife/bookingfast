@@ -19,10 +19,6 @@ export function Navbar({ currentPage, onPageChange }: NavbarProps) {
     console.log('🔍 Navbar - Loading:', loading);
   }, [userPlugins, loading]);
 
-  useEffect(() => {
-    console.log('🔍 Mobile Menu State:', mobileMenuOpen);
-  }, [mobileMenuOpen]);
-
   const hasReportsAccess = userPlugins.some(p => p.plugin_slug === 'reports');
   const hasMultiUserAccess = userPlugins.some(p => p.plugin_slug === 'multi-user');
   const hasPOSAccess = userPlugins.some(p => p.plugin_slug === 'pos');
@@ -55,14 +51,9 @@ export function Navbar({ currentPage, onPageChange }: NavbarProps) {
     setPluginsMenuOpen(false);
   };
 
-  const handleMenuToggle = () => {
-    console.log('🔍 Menu Toggle Clicked - Current State:', mobileMenuOpen);
-    setMobileMenuOpen(!mobileMenuOpen);
-  };
-
   return (
     <>
-      <nav className="bg-white border-b border-gray-200 navbar-safe shadow-sm">
+      <nav className="bg-white border-b border-gray-200 fixed top-0 left-0 right-0 z-50 shadow-sm navbar-safe">
         <div className="px-4 sm:px-6">
           <div className="flex items-center justify-between h-16">
             <div className="flex items-center gap-3">
@@ -164,8 +155,8 @@ export function Navbar({ currentPage, onPageChange }: NavbarProps) {
               </button>
 
               <button
-                onClick={handleMenuToggle}
-                className="lg:hidden p-2 rounded-xl hover:bg-gray-100 transition-colors z-[10000]"
+                onClick={() => setMobileMenuOpen(!mobileMenuOpen)}
+                className="lg:hidden p-2 rounded-xl hover:bg-gray-100 transition-colors"
               >
                 {mobileMenuOpen ? <X className="w-6 h-6" /> : <Menu className="w-6 h-6" />}
               </button>
@@ -175,21 +166,8 @@ export function Navbar({ currentPage, onPageChange }: NavbarProps) {
       </nav>
 
       {mobileMenuOpen && (
-        <div 
-          className="lg:hidden fixed inset-0 bg-gradient-to-br from-purple-900/95 via-pink-900/95 to-blue-900/95 backdrop-blur-md animate-fadeIn"
-          style={{ 
-            zIndex: 9999,
-            top: 0,
-            left: 0,
-            right: 0,
-            bottom: 0,
-            paddingTop: `calc(4rem + env(safe-area-inset-top, 0px))`,
-            paddingBottom: `env(safe-area-inset-bottom, 0px)`,
-            paddingLeft: `env(safe-area-inset-left, 0px)`,
-            paddingRight: `env(safe-area-inset-right, 0px)`
-          }}
-        >
-          <div className="h-full overflow-y-auto p-6" style={{ WebkitOverflowScrolling: 'touch' }}>
+        <div className="lg:hidden fixed inset-0 z-40 bg-gradient-to-br from-purple-900/95 via-pink-900/95 to-blue-900/95 backdrop-blur-md animate-fadeIn safe-all">
+          <div className="h-full overflow-y-auto p-6 pt-20">
             <div className="max-w-md mx-auto space-y-3">
               <div className="text-center mb-8">
                 <div className="w-20 h-20 bg-white rounded-2xl flex items-center justify-center mx-auto mb-4 shadow-2xl">

@@ -1,4 +1,4 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState } from 'react';
 import { DashboardPage } from './components/Dashboard/DashboardPage';
 import { CalendarPage } from './components/Calendar/CalendarPage';
 import { ServicesPage } from './components/Services/ServicesPage';
@@ -16,34 +16,6 @@ type Page = 'dashboard' | 'calendar' | 'services' | 'admin' | 'emails' | 'report
 function App() {
   const { user, loading } = useAuth();
   const [currentPage, setCurrentPage] = useState<Page>('dashboard');
-
-  useEffect(() => {
-    const preventPullToRefresh = (e: TouchEvent) => {
-      if (e.touches.length > 1) return;
-      
-      const target = e.target as HTMLElement;
-      const scrollableParent = target.closest('.scrollable-area, main, [data-scrollable="true"]');
-      
-      if (!scrollableParent) {
-        e.preventDefault();
-      }
-    };
-
-    const preventDefaultScroll = (e: TouchEvent) => {
-      const target = e.target as HTMLElement;
-      if (target.closest('nav, .navbar-safe')) {
-        e.preventDefault();
-      }
-    };
-
-    document.addEventListener('touchmove', preventPullToRefresh, { passive: false });
-    document.addEventListener('touchstart', preventDefaultScroll, { passive: false });
-
-    return () => {
-      document.removeEventListener('touchmove', preventPullToRefresh);
-      document.removeEventListener('touchstart', preventDefaultScroll);
-    };
-  }, []);
 
   if (loading) {
     return (
@@ -89,20 +61,9 @@ function App() {
   };
 
   return (
-    <div className="min-h-screen bg-gradient-to-br from-blue-50 via-purple-50 to-pink-50" style={{ height: '100vh', overflow: 'hidden' }}>
+    <div className="min-h-screen bg-gradient-to-br from-blue-50 via-purple-50 to-pink-50">
       <Navbar currentPage={currentPage} onPageChange={setCurrentPage} />
-      <main 
-        className="scrollable-area" 
-        data-scrollable="true"
-        style={{ 
-          height: 'calc(100vh - 4rem)', 
-          overflow: 'auto',
-          paddingTop: 'env(safe-area-inset-top)',
-          WebkitOverflowScrolling: 'touch',
-          position: 'relative',
-          marginTop: '4rem'
-        }}
-      >
+      <main className="pt-16 overflow-auto" style={{ height: 'calc(100vh - 4rem)' }}>
         {renderPage()}
       </main>
     </div>
