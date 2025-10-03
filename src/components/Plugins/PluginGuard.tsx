@@ -1,4 +1,4 @@
-import React, { useEffect, useState } from 'react';
+import React, { useEffect, useState, useCallback } from 'react';
 import { Lock, Sparkles, ArrowRight } from 'lucide-react';
 import { usePluginPermissions } from '../../hooks/usePluginPermissions';
 import { LoadingSpinner } from '../UI/LoadingSpinner';
@@ -14,21 +14,30 @@ export function PluginGuard({ pluginSlug, children }: PluginGuardProps) {
   const [loading, setLoading] = useState(true);
 
   useEffect(() => {
+    let mounted = true;
+
     const verifyAccess = async () => {
-      setLoading(true);
       try {
         const access = await checkPluginAccess(pluginSlug);
-        setHasAccess(access);
+        if (mounted) {
+          setHasAccess(access);
+          setLoading(false);
+        }
       } catch (error) {
         console.error('Erreur vérification accès plugin:', error);
-        setHasAccess(false);
-      } finally {
-        setLoading(false);
+        if (mounted) {
+          setHasAccess(false);
+          setLoading(false);
+        }
       }
     };
 
     verifyAccess();
-  }, [pluginSlug, checkPluginAccess]);
+
+    return () => {
+      mounted = false;
+    };
+  }, [pluginSlug]); // Retiré checkPluginAccess des dépendances
 
   if (loading) {
     return (
