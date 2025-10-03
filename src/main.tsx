@@ -16,14 +16,12 @@ ReactDOM.createRoot(document.getElementById('root')!).render(
     <BrowserRouter>
       <AuthProvider>
         <Routes>
-          {/* Routes publiques - SANS authentification */}
           <Route path="/login" element={<LoginPage />} />
           <Route path="/payment" element={<PaymentPage />} />
           <Route path="/payment-success" element={<PaymentSuccessPage />} />
           <Route path="/payment-cancel" element={<PaymentCancelPage />} />
           <Route path="/booking/:userId" element={<IframeBookingPage />} />
           
-          {/* Routes protégées - AVEC authentification */}
           <Route
             path="/*"
             element={

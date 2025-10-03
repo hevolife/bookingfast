@@ -71,8 +71,16 @@ export function CalendarPage({ view = 'calendar' }: CalendarPageProps) {
   };
 
   return (
-    <div className="h-full flex flex-col" style={{ overflow: 'hidden', margin: 0, padding: 0 }}>
-      <div className="flex-1" style={{ overflow: 'hidden', margin: 0, padding: 0 }}>
+    <div 
+      className="h-full flex flex-col overflow-y-auto scrollable-area" 
+      style={{ 
+        margin: 0, 
+        padding: 0,
+        WebkitOverflowScrolling: 'touch',
+        touchAction: 'pan-y'
+      }}
+    >
+      <div className="flex-1" style={{ margin: 0, padding: 0 }}>
         <PermissionGate permission="view_calendar">
           {view === 'calendar' ? (
             <UsageLimitIndicator currentUsage={todayBookingsCount} permission="create_booking">

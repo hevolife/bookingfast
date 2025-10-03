@@ -33,7 +33,6 @@
 }
 
 html, body {
-  touch-action: none !important;
   -webkit-touch-callout: none;
   -webkit-user-select: none;
   -khtml-user-select: none;
@@ -467,9 +466,28 @@ input, textarea, [contenteditable] {
   -webkit-tap-highlight-color: transparent;
 }
 
+/* CRITICAL: Permettre le scroll sur les zones scrollables */
+.scrollable-area,
+.overflow-y-auto,
+[class*="overflow-y-auto"] {
+  touch-action: pan-y !important;
+  -webkit-overflow-scrolling: touch !important;
+  overflow-y: auto !important;
+}
+
+/* CRITICAL: Bloquer le scroll uniquement sur html/body */
 @media (max-width: 640px) {
-  .mobile-optimized {
-    touch-action: pan-y;
+  html, body {
+    touch-action: none !important;
+  }
+  
+  /* Permettre le scroll sur les conteneurs de contenu */
+  .scrollable-area,
+  .overflow-y-auto,
+  [class*="overflow-y-auto"],
+  .modal-body,
+  main {
+    touch-action: pan-y !important;
   }
 }
 
@@ -691,7 +709,6 @@ input, textarea, [contenteditable] {
     padding-top: env(safe-area-inset-top, 48px);
   }
   .mobile-optimized {
-    touch-action: pan-y;
     -webkit-tap-highlight-color: transparent;
   }
   button, .interactive {
@@ -712,14 +729,6 @@ input, textarea, [contenteditable] {
     width: 100%;
     position: fixed !important;
     background: linear-gradient(135deg, #dbeafe 0%, #f3e8ff 50%, #fce7f3 100%) !important;
-  }
-  * {
-    touch-action: manipulation;
-  }
-  .scrollable-area {
-    touch-action: pan-y;
-    overflow-y: auto;
-    -webkit-overflow-scrolling: touch;
   }
   .mobile-full-width {
     width: 100% !important;
