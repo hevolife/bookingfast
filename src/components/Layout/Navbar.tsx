@@ -1,5 +1,5 @@
 import React, { useState, useEffect } from 'react';
-import { Calendar, Settings, LayoutDashboard, Package, Mail, BarChart3, Users, ShoppingCart, LogOut, Menu, X, ChevronDown, ChevronRight, Puzzle, List, UserCircle } from 'lucide-react';
+import { Calendar, Settings, LayoutDashboard, Package, Mail, BarChart3, Users, ShoppingCart, LogOut, Menu, X, ChevronDown, ChevronRight, Puzzle, List, CircleUser as UserCircle } from 'lucide-react';
 import { useAuth } from '../../contexts/AuthContext';
 import { usePlugins } from '../../hooks/usePlugins';
 
