@@ -65,9 +65,13 @@ function App() {
   };
 
   return (
-    <div className="h-screen bg-gradient-to-br from-blue-50 via-purple-50 to-pink-50 overflow-hidden">
+    <div className="h-screen bg-gradient-to-br from-blue-50 via-purple-50 to-pink-50 overflow-hidden fixed inset-0">
       <Navbar currentPage={currentPage} onPageChange={setCurrentPage} />
-      <main className="main-content-safe h-full overflow-auto">
+      <main className="main-content-safe h-full overflow-auto scrollable-area" style={{ 
+        height: 'calc(100vh - 64px)',
+        touchAction: 'pan-y',
+        WebkitOverflowScrolling: 'touch'
+      }}>
         {renderPage()}
       </main>
     </div>
