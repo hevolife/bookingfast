@@ -628,7 +628,7 @@ export function CalendarGrid({ currentDate, onTimeSlotClick, onBookingClick, boo
           </div>
         </div>
 
-        <div className="flex-1 overflow-y-auto pb-24" ref={timeGridRef}>
+        <div className="flex-1 overflow-y-auto" ref={timeGridRef} style={{ paddingBottom: 'max(6rem, calc(6rem + env(safe-area-inset-bottom)))' }}>
           {isDayClosed() ? (
             <div className="flex items-center justify-center h-64 animate-fadeIn">
               <div className="text-center p-8 bg-white/80 backdrop-blur-sm rounded-3xl shadow-xl">
