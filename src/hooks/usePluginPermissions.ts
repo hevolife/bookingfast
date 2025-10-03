@@ -89,9 +89,6 @@ export function usePluginPermissions() {
           plugin_id: pluginId,
           can_access: canAccess,
           updated_at: new Date().toISOString()
-        }, {
-          onConflict: 'team_member_id,owner_id,plugin_id',
-          ignoreDuplicates: false
         });
 
       if (error) throw error;
@@ -120,10 +117,7 @@ export function usePluginPermissions() {
 
       const { error } = await supabase
         .from('team_member_plugin_permissions')
-        .upsert(updates, {
-          onConflict: 'team_member_id,owner_id,plugin_id',
-          ignoreDuplicates: false
-        });
+        .upsert(updates);
 
       if (error) throw error;
     } catch (err) {

@@ -54,6 +54,24 @@ export function ServiceBookingModal({
     }
   };
 
+  // Fonction pour obtenir le nom d'unité du service
+  const getUnitName = (booking: Booking) => {
+    if (booking.service?.unit_name && booking.service.unit_name !== 'personnes') {
+      return booking.service.unit_name;
+    }
+    return 'participants';
+  };
+
+  // Fonction pour obtenir le pluriel du nom d'unité avec suffixe (s)
+  const getPluralUnitName = (booking: Booking, quantity: number) => {
+    const unitName = getUnitName(booking);
+    if (quantity <= 1) {
+      // Retirer le 's' final si présent et ajouter (s) après
+      return `${unitName.replace(/s$/, '')}(s)`;
+    }
+    return `${unitName}(s)`;
+  };
+
   return (
     <div className="fixed inset-0 bg-black/60 backdrop-blur-sm flex items-end sm:items-center justify-center z-50 animate-fadeIn modal-container">
       <div className="bg-white w-full sm:max-w-4xl max-h-[95vh] sm:max-h-[90vh] overflow-y-auto sm:rounded-3xl shadow-2xl transform animate-slideUp modal-content">
@@ -176,7 +194,7 @@ export function ServiceBookingModal({
                         </div>
                         <div className="flex items-center gap-2">
                           <User className="w-3 h-3 sm:w-4 sm:h-4 text-purple-500 flex-shrink-0" />
-                          <span>{booking.quantity} participant(s)</span>
+                          <span>{booking.quantity} {getPluralUnitName(booking, booking.quantity)}</span>
                         </div>
                         <div className="flex items-center gap-2">
                           <Mail className="w-3 h-3 sm:w-4 sm:h-4 text-green-500 flex-shrink-0" />

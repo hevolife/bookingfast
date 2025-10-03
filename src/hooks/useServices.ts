@@ -20,6 +20,7 @@ export function useServices() {
     description: 'Service personnalisé',
     duration_minutes: 60,
     capacity: 1,
+    unit_name: 'participants',
     availability_hours: null,
     created_at: new Date().toISOString(),
     updated_at: new Date().toISOString()
@@ -139,7 +140,8 @@ export function useServices() {
           id: s.id,
           name: s.name,
           user_id: s.user_id,
-          description: s.description
+          description: s.description,
+          unit_name: s.unit_name
         })));
       }
 
@@ -172,6 +174,7 @@ export function useServices() {
           description: 'Massage de détente de 60 minutes pour évacuer le stress',
           duration_minutes: 60,
           capacity: 1,
+          unit_name: 'personnes',
           availability_hours: {
             monday: { ranges: [{ start: '09:00', end: '17:00' }], closed: false },
             tuesday: { ranges: [{ start: '09:00', end: '17:00' }], closed: false },
@@ -193,6 +196,7 @@ export function useServices() {
           description: 'Soin complet du visage avec nettoyage et hydratation',
           duration_minutes: 45,
           capacity: 1,
+          unit_name: 'personnes',
           availability_hours: {
             monday: { ranges: [{ start: '10:00', end: '18:00' }], closed: false },
             tuesday: { ranges: [{ start: '10:00', end: '18:00' }], closed: false },
@@ -214,18 +218,36 @@ export function useServices() {
   };
 
   const ensureCustomServiceExists = async (): Promise<Service> => {
+    if (!user?.id) {
+      console.error('❌ Pas d\'utilisateur connecté pour créer le service personnalisé');
+      throw new Error('Utilisateur non connecté');
+    }
+
     try {
+      console.log('🔍 Recherche service personnalisé existant pour user:', user.id);
+      
+      // Chercher un service personnalisé existant pour cet utilisateur
       const { data: existingServices, error: searchError } = await supabase
         .from('services')
         .select('*')
+        .eq('user_id', user.id)
         .eq('description', 'Service personnalisé')
         .limit(1);
 
-      if (existingServices && existingServices.length > 0 && !searchError) {
+      if (searchError) {
+        console.error('❌ Erreur recherche service personnalisé:', searchError);
+        throw searchError;
+      }
+
+      if (existingServices && existingServices.length > 0) {
+        console.log('✅ Service personnalisé existant trouvé:', existingServices[0].id);
         return existingServices[0];
       }
 
+      console.log('➕ Création nouveau service personnalisé pour user:', user.id);
+
       const customServiceData = {
+        user_id: user.id, // CRITIQUE : Ajouter explicitement le user_id
         name: 'Service personnalisé',
         price_ht: 0,
         price_ttc: 0,
@@ -233,8 +255,11 @@ export function useServices() {
         description: 'Service personnalisé',
         duration_minutes: 60,
         capacity: 1,
+        unit_name: 'participants',
         availability_hours: null
       };
+
+      console.log('📤 Données service à créer:', customServiceData);
 
       const { data: newService, error: createError } = await supabase
         .from('services')
@@ -243,13 +268,19 @@ export function useServices() {
         .single();
 
       if (createError) {
+        console.error('❌ Erreur création service personnalisé:', createError);
         throw createError;
       }
 
+      console.log('✅ Service personnalisé créé avec succès:', newService.id);
+      
+      // Mettre à jour la liste des services
+      setServices(prev => [...prev, newService]);
+      
       return newService;
     } catch (err) {
-      console.error('Erreur lors de la création du service personnalisé:', err);
-      return createCustomServiceTemplate(DEMO_CUSTOM_SERVICE_UUID);
+      console.error('❌ Erreur lors de la création du service personnalisé:', err);
+      throw err;
     }
   };
 
@@ -258,12 +289,16 @@ export function useServices() {
       throw new Error('Supabase non configuré');
     }
 
+    if (!user?.id) {
+      throw new Error('Utilisateur non connecté');
+    }
+
     try {
       const { data, error } = await supabase
         .from('services')
         .insert([{ 
           ...service, 
-          user_id: user?.id
+          user_id: user.id
         }])
         .select()
         .single();

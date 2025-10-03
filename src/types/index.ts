@@ -60,6 +60,7 @@ export interface Booking {
   payment_link?: string;
   transactions?: Transaction[];
   booking_status: 'pending' | 'confirmed' | 'cancelled';
+  assigned_user_id?: string | null;
   custom_service_data?: {
     name: string;
     price: number;

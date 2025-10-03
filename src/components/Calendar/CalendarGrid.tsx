@@ -17,6 +17,21 @@ interface CalendarGridProps {
   onDeleteBooking: (bookingId: string) => void;
 }
 
+interface ServiceGroup {
+  serviceId: string;
+  serviceName: string;
+  timeIndex: number;
+  duration: number;
+  bookings: Booking[];
+  startTime: string;
+}
+
+interface ColumnLayout {
+  column: number;
+  totalColumns: number;
+  group: ServiceGroup;
+}
+
 export function CalendarGrid({ currentDate, onTimeSlotClick, onBookingClick, bookings: allBookings, loading, onDeleteBooking }: CalendarGridProps) {
   const today = new Date();
   const todayString = `${today.getFullYear()}-${(today.getMonth() + 1).toString().padStart(2, '0')}-${today.getDate().toString().padStart(2, '0')}`;
@@ -326,16 +341,8 @@ export function CalendarGrid({ currentDate, onTimeSlotClick, onBookingClick, boo
     return dayBookings.sort((a, b) => a.time.localeCompare(b.time));
   };
 
-  const groupBookingsByServiceAndTime = (bookings: Booking[]) => {
-    const groups: Array<{
-      serviceId: string;
-      serviceName: string;
-      timeIndex: number;
-      duration: number;
-      bookings: Booking[];
-      startTime: string;
-    }> = [];
-
+  const groupBookingsByServiceAndTime = (bookings: Booking[]): ServiceGroup[] => {
+    const groups: ServiceGroup[] = [];
     const serviceTimeGroups = new Map<string, Booking[]>();
     
     bookings.forEach(booking => {
@@ -370,6 +377,40 @@ export function CalendarGrid({ currentDate, onTimeSlotClick, onBookingClick, boo
     return groups;
   };
 
+  const calculateColumnLayout = (groups: ServiceGroup[]): ColumnLayout[] => {
+    const layouts: ColumnLayout[] = [];
+    const columns: Array<{ endIndex: number }> = [];
+
+    const sortedGroups = [...groups].sort((a, b) => a.timeIndex - b.timeIndex);
+
+    sortedGroups.forEach(group => {
+      const groupStart = group.timeIndex;
+      const groupEnd = group.timeIndex + group.duration;
+
+      let columnIndex = columns.findIndex(col => col.endIndex <= groupStart);
+      
+      if (columnIndex === -1) {
+        columnIndex = columns.length;
+        columns.push({ endIndex: groupEnd });
+      } else {
+        columns[columnIndex].endIndex = groupEnd;
+      }
+
+      layouts.push({
+        column: columnIndex,
+        totalColumns: 0,
+        group
+      });
+    });
+
+    const totalColumns = columns.length;
+    layouts.forEach(layout => {
+      layout.totalColumns = totalColumns;
+    });
+
+    return layouts;
+  };
+
   const getBookingColor = (index: number) => {
     const colors = [
       'from-rose-400 to-pink-500',
@@ -384,8 +425,9 @@ export function CalendarGrid({ currentDate, onTimeSlotClick, onBookingClick, boo
 
   const dayBookings = getBookingsForDay(selectedDate);
   const serviceGroups = timeSlots.length > 0 ? groupBookingsByServiceAndTime(dayBookings) : [];
+  const columnLayouts = calculateColumnLayout(serviceGroups);
 
-  const handleServiceBlockClick = (group: any) => {
+  const handleServiceBlockClick = (group: ServiceGroup) => {
     setSelectedServiceBookings(group.bookings);
     setSelectedServiceName(group.serviceName);
     setServiceModalOpen(true);
@@ -428,6 +470,21 @@ export function CalendarGrid({ currentDate, onTimeSlotClick, onBookingClick, boo
     setViewMonth(date);
     setSelectedDate(new Date(date.getFullYear(), date.getMonth(), 1));
     setShowMonthSelector(false);
+  };
+
+  const getUnitName = (booking: Booking) => {
+    if (booking.service?.unit_name && booking.service.unit_name !== 'personnes') {
+      return booking.service.unit_name;
+    }
+    return 'participants';
+  };
+
+  const getPluralUnitName = (booking: Booking, quantity: number) => {
+    const unitName = getUnitName(booking);
+    if (quantity <= 1) {
+      return `${unitName.replace(/s$/, '')}(s)`;
+    }
+    return `${unitName}(s)`;
   };
 
   if (loading || !settings) {
@@ -741,8 +798,10 @@ export function CalendarGrid({ currentDate, onTimeSlotClick, onBookingClick, boo
                 ))}
 
                 <div className="absolute inset-0 z-30 pointer-events-none">
-                  {serviceGroups.map((group, groupIndex) => {
+                  {columnLayouts.map((layout, layoutIndex) => {
+                    const { column, totalColumns, group } = layout;
                     const { bookings, serviceName, startTime } = group;
+                    
                     if (!bookings || bookings.length === 0) return null;
                     
                     const timeIndex = timeSlots.findIndex(slot => slot && slot.time === startTime);
@@ -750,50 +809,46 @@ export function CalendarGrid({ currentDate, onTimeSlotClick, onBookingClick, boo
                     
                     const duration = Math.ceil(bookings[0].duration_minutes / 30);
                     
-                    const overlappingGroups = serviceGroups.filter(otherGroup => {
-                      const otherStartIndex = timeSlots.findIndex(slot => slot.time === otherGroup.startTime);
-                      const otherDuration = Math.ceil(otherGroup.bookings[0].duration_minutes / 30);
-                      const otherEnd = otherStartIndex + otherDuration;
-                      const currentStart = timeIndex;
-                      const currentEnd = timeIndex + duration;
-                      return (otherStartIndex < currentEnd && otherEnd > currentStart);
-                    });
-                    
-                    const overlapCount = overlappingGroups.length;
-                    const overlapIndex = overlappingGroups.findIndex(g => g === group);
-                    
-                    const blockWidth = overlapCount > 1 ? `${100 / overlapCount}%` : 'calc(100% - 4px)';
-                    const blockLeft = overlapCount > 1 ? `calc(${(overlapIndex * 100) / overlapCount}% + ${overlapIndex * 2}px)` : '2px';
+                    // RÉDUCTION DES ÉCARTS : Espacement minimal entre colonnes
+                    const columnGap = totalColumns > 1 ? 2 : 0; // Réduit de 4px à 2px
+                    const columnWidth = totalColumns > 1 
+                      ? `calc(${100 / totalColumns}% - ${(totalColumns - 1) * columnGap}px)` 
+                      : 'calc(100% - 4px)'; // Réduit de 8px à 4px
+                    const columnLeft = totalColumns > 1 
+                      ? `calc(${(column * 100) / totalColumns}% + ${column * columnGap}px + 2px)` // Réduit de 4px à 2px
+                      : '2px'; // Réduit de 4px à 2px
 
                     const position = {
-                      top: `${timeIndex * 48}px`,
-                      height: `${duration * 48 - 4}px`,
+                      top: `${timeIndex * 48 + 1}px`, // Réduit de 2px à 1px
+                      height: `${duration * 48 - 2}px`, // Réduit de 4px à 2px
                     };
                     
-                    const colorClass = getBookingColor(groupIndex);
+                    const colorClass = getBookingColor(layoutIndex);
                     const totalParticipants = bookings.reduce((sum, booking) => sum + booking.quantity, 0);
+                    const firstBooking = bookings[0];
+                    const unitName = getPluralUnitName(firstBooking, totalParticipants);
                     
                     return (
                       <div
-                        key={`${group.serviceId}-${startTime}`}
-                        className={`absolute bg-gradient-to-r ${colorClass} text-white rounded-xl shadow-lg cursor-pointer hover:shadow-xl transition-all duration-300 transform hover:scale-105 hover:z-50 animate-fadeIn pointer-events-auto`}
+                        key={`${group.serviceId}-${startTime}-${column}`}
+                        className={`absolute bg-gradient-to-r ${colorClass} text-white rounded-xl shadow-lg cursor-pointer hover:shadow-2xl transition-all duration-300 transform hover:scale-105 hover:z-50 animate-fadeIn pointer-events-auto border-2 border-white/30`}
                         style={{
-                          left: blockLeft,
-                          width: blockWidth,
+                          left: columnLeft,
+                          width: columnWidth,
                           ...position,
-                          animationDelay: `${groupIndex * 100}ms`,
-                          zIndex: 30 + overlapIndex
+                          animationDelay: `${layoutIndex * 100}ms`,
+                          zIndex: 30 + column
                         }}
                         onClick={() => handleServiceBlockClick(group)}
                       >
                         <div className={`h-full flex flex-col justify-center relative overflow-hidden ${
-                          overlapCount > 1 ? 'p-2' : 'p-3'
+                          totalColumns > 2 ? 'p-1.5' : 'p-2' // Réduit le padding interne
                         }`}>
                           <div className="absolute inset-0 bg-gradient-to-r from-transparent via-white/10 to-transparent -skew-x-12"></div>
                           
                           <div className="relative z-10 text-center sm:text-left">
                             <div className={`font-bold break-words ${
-                              overlapCount > 1 ? 'text-xs' : 'text-xs sm:text-sm'
+                              totalColumns > 2 ? 'text-xs' : 'text-xs sm:text-sm'
                             }`}>
                               {(() => {
                                 if (serviceName === 'Service personnalisé' && bookings.length > 0) {
@@ -806,20 +861,20 @@ export function CalendarGrid({ currentDate, onTimeSlotClick, onBookingClick, boo
                               })()}
                             </div>
                             <div className={`opacity-90 truncate flex items-center justify-center sm:justify-start gap-1 ${
-                              overlapCount > 1 ? 'text-xs' : 'text-xs'
+                              totalColumns > 2 ? 'text-xs' : 'text-xs'
                             }`}>
                               <Clock className="w-3 h-3" />
                               {startTime}
                             </div>
-                            <div className="mt-1 flex flex-col items-center sm:items-start">
+                            <div className="mt-0.5 flex flex-col items-center sm:items-start">
                               <div className="text-xs font-medium text-white leading-tight">
-                                {totalParticipants} sur {bookings[0]?.service?.capacity || 1}
+                                {totalParticipants} {unitName} sur {firstBooking?.service?.capacity || 1}
                               </div>
                               <div className="w-10 bg-white/30 rounded-full h-1 overflow-hidden mt-0.5">
                                 <div 
                                   className="h-full bg-white rounded-full transition-all duration-500"
                                   style={{ 
-                                    width: `${Math.min((totalParticipants / (bookings[0]?.service?.capacity || 1)) * 100, 100)}%` 
+                                    width: `${Math.min((totalParticipants / (firstBooking?.service?.capacity || 1)) * 100, 100)}%` 
                                   }}
                                 />
                               </div>

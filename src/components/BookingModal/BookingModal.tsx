@@ -386,6 +386,27 @@ export function BookingModal({
   const totalAmount = calculateTotalAmount();
   const currentPaid = calculateCurrentPaid();
 
+  // Obtenir le nom d'unité du service sélectionné
+  const getUnitName = () => {
+    if (isCustomService) {
+      return 'participants'; // Par défaut pour les services personnalisés
+    }
+    if (selectedService?.unit_name && selectedService.unit_name !== 'personnes') {
+      return selectedService.unit_name;
+    }
+    return 'participants';
+  };
+
+  // Fonction pour obtenir le nom d'unité avec suffixe (s)
+  const getPluralUnitName = (qty: number) => {
+    const unitName = getUnitName();
+    if (qty <= 1) {
+      // Retirer le 's' final si présent et ajouter (s) après
+      return `${unitName.replace(/s$/, '')}(s)`;
+    }
+    return `${unitName}(s)`;
+  };
+
   return (
     <>
       <Modal
@@ -464,7 +485,7 @@ export function BookingModal({
                             <div className="flex items-center gap-2 sm:gap-4 mt-2 text-xs sm:text-sm">
                               <span className="font-medium text-green-600">{service.price_ttc.toFixed(2)}€</span>
                               <span className="text-gray-500">{service.duration_minutes}min</span>
-                              <span className="text-gray-500">Max {service.capacity} pers.</span>
+                              <span className="text-gray-500">Max {service.capacity} {service.unit_name || 'pers.'}</span>
                             </div>
                           </div>
                         </div>
@@ -598,6 +619,7 @@ export function BookingModal({
                   quantity={quantity}
                   maxCapacity={isCustomService ? 10 : selectedService?.capacity || 1}
                   onQuantityChange={setQuantity}
+                  unitName={getUnitName()}
                 />
               )}
 
@@ -666,7 +688,7 @@ export function BookingModal({
                     </div>
                     <div className="flex justify-between">
                       <span className="text-gray-600">Quantité</span>
-                      <span className="font-medium">{quantity} participant(s)</span>
+                      <span className="font-medium">{quantity} {getPluralUnitName(quantity)}</span>
                     </div>
                     <div className="flex justify-between">
                       <span className="text-gray-600">Durée</span>
