@@ -115,7 +115,6 @@ export function ServicesPage() {
   const handleCloseModal = () => {
     setIsModalOpen(false);
     resetForm();
-    // Les hooks gèrent automatiquement l'état
   };
 
   const handleEdit = (service: Service) => {
@@ -146,7 +145,6 @@ export function ServicesPage() {
     e.preventDefault();
     setSaving(true);
     
-    // Vérifier les limites avant de créer un nouveau service
     if (!editingService && usageLimits.maxServicesCreated && userServicesCount >= usageLimits.maxServicesCreated) {
       alert(`Limite atteinte: ${usageLimits.maxServicesCreated} services maximum pour votre rôle`);
       setSaving(false);
@@ -190,8 +188,10 @@ export function ServicesPage() {
   }
 
   return (
-    <div className="p-4 sm:p-6 h-full overflow-y-auto bg-gradient-to-br from-blue-50 via-purple-50 to-pink-50 mobile-optimized">
-      {/* Header */}
+    <div 
+      className="p-4 sm:p-6 h-full overflow-y-auto bg-gradient-to-br from-blue-50 via-purple-50 to-pink-50 mobile-optimized"
+      style={{ paddingBottom: 'max(6rem, calc(6rem + env(safe-area-inset-bottom)))' }}
+    >
       <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4 mb-6 sm:mb-8">
         <div>
           <h1 className="text-2xl sm:text-3xl font-bold bg-gradient-to-r from-purple-600 to-pink-600 bg-clip-text text-transparent">
@@ -216,7 +216,6 @@ export function ServicesPage() {
         </PermissionGate>
       </div>
 
-      {/* Services Grid */}
       <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4 sm:gap-6">
         {services.filter(service => service.description !== 'Service personnalisé').map((service, index) => (
           <div
@@ -224,7 +223,6 @@ export function ServicesPage() {
             className="bg-white rounded-xl sm:rounded-2xl shadow-lg p-4 sm:p-6 hover:shadow-xl transition-all duration-300 transform hover:scale-[1.02] animate-fadeIn"
             style={{ animationDelay: `${index * 100}ms` }}
           >
-            {/* Service Image */}
             {service.image_url && (
               <div className="w-full h-32 sm:h-48 bg-gray-100 rounded-lg sm:rounded-xl mb-3 sm:mb-4 overflow-hidden">
                 <img
@@ -238,7 +236,6 @@ export function ServicesPage() {
               </div>
             )}
             
-            {/* Service Info */}
             <div className="mb-3 sm:mb-4">
               <h3 className="text-lg sm:text-xl font-bold text-gray-900 mb-2">{service.name}</h3>
               <p className="text-gray-600 text-xs sm:text-sm mb-2 sm:mb-3 line-clamp-2">{service.description}</p>
@@ -269,7 +266,6 @@ export function ServicesPage() {
               </div>
             </div>
 
-            {/* Actions */}
             <div className="flex flex-col sm:flex-row gap-2">
               <PermissionGate permission="edit_service">
                 <button
@@ -317,11 +313,9 @@ export function ServicesPage() {
         </div>
       )}
 
-      {/* Modal */}
       {isModalOpen && (
         <div className="fixed inset-0 bg-black/60 backdrop-blur-sm flex items-end sm:items-center justify-center z-50 animate-fadeIn modal-container">
           <div className="bg-white w-full max-w-2xl max-h-[95vh] sm:max-h-[90vh] overflow-y-auto sm:rounded-3xl shadow-2xl transform animate-slideUp modal-content">
-            {/* Header */}
             <div className="bg-gradient-to-r from-purple-600 via-pink-600 to-red-500 p-4 sm:p-6 sm:rounded-t-3xl relative overflow-hidden modal-header">
               <div className="absolute inset-0 bg-gradient-to-r from-transparent via-white/20 to-transparent -skew-x-12 animate-shimmer"></div>
               
@@ -350,7 +344,6 @@ export function ServicesPage() {
               </div>
             </div>
 
-            {/* Form */}
             <form onSubmit={handleSubmit} className="p-4 sm:p-6 space-y-4 sm:space-y-6 modal-body">
               <div className="grid grid-cols-1 sm:grid-cols-2 gap-4 sm:gap-6">
                 <div className="md:col-span-2">
@@ -469,7 +462,6 @@ export function ServicesPage() {
                   />
                 </div>
 
-                {/* Horaires de disponibilité */}
                 <div className="md:col-span-2">
                   <label className="block text-sm font-medium text-gray-700 mb-4">
                     Horaires de disponibilité du service
@@ -555,7 +547,6 @@ export function ServicesPage() {
                 </div>
               </div>
 
-              {/* Actions */}
               <div className="flex flex-col sm:flex-row gap-3 pt-4">
                 <button
                   type="button"

@@ -112,8 +112,10 @@ export function EmailWorkflowPage() {
   }
 
   return (
-    <div className="p-4 sm:p-6 h-full overflow-y-auto bg-gradient-to-br from-blue-50 via-purple-50 to-pink-50 mobile-optimized">
-      {/* Header */}
+    <div 
+      className="p-4 sm:p-6 h-full overflow-y-auto bg-gradient-to-br from-blue-50 via-purple-50 to-pink-50 mobile-optimized"
+      style={{ paddingBottom: 'max(6rem, calc(6rem + env(safe-area-inset-bottom)))' }}
+    >
       <div className="mb-6 sm:mb-8">
         <h1 className="text-2xl sm:text-3xl font-bold bg-gradient-to-r from-purple-600 to-pink-600 bg-clip-text text-transparent">
           Workflows Email
@@ -121,7 +123,6 @@ export function EmailWorkflowPage() {
         <p className="text-sm sm:text-base text-gray-600 mt-2">Automatisez vos communications avec vos clients</p>
       </div>
 
-      {/* Navigation Tabs */}
       <div className="mb-6 sm:mb-8">
         <div className="flex flex-col sm:flex-row gap-2 bg-white rounded-2xl p-2 shadow-lg w-full sm:w-fit overflow-x-auto">
           {[
@@ -162,7 +163,6 @@ export function EmailWorkflowPage() {
         </div>
       </div>
 
-      {/* Content */}
       {activeTab === 'workflows' && (
         <div>
           <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4 mb-4 sm:mb-6">
@@ -279,7 +279,6 @@ export function EmailWorkflowPage() {
         <ManualEmailSender />
       )}
 
-      {/* Workflow Editor Modal */}
       {showWorkflowEditor && (
         <WorkflowEditor
           workflow={editingWorkflow}
@@ -292,7 +291,6 @@ export function EmailWorkflowPage() {
         />
       )}
 
-      {/* Template Editor Modal */}
       {showTemplateEditor && (
         <TemplateEditor
           template={editingTemplate}

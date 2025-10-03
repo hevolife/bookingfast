@@ -111,7 +111,10 @@ export function PluginsPage() {
   const otherPlugins = plugins.filter(p => !p.is_featured);
 
   return (
-    <div className="space-y-8">
+    <div 
+      className="space-y-8"
+      style={{ paddingBottom: 'max(6rem, calc(6rem + env(safe-area-inset-bottom)))' }}
+    >
       <div className="bg-gradient-to-r from-purple-600 via-pink-600 to-red-600 rounded-3xl p-8 text-white">
         <div className="flex items-center gap-4 mb-4">
           <div className="w-16 h-16 bg-white/20 rounded-2xl flex items-center justify-center backdrop-blur-sm">

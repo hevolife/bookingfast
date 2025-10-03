@@ -260,7 +260,10 @@ export function DashboardPage() {
 
   return (
     <>
-      <div className="p-4 sm:p-6 h-full overflow-y-auto bg-gradient-to-br from-blue-50 via-purple-50 to-pink-50">
+      <div 
+        className="p-4 sm:p-6 h-full overflow-y-auto bg-gradient-to-br from-blue-50 via-purple-50 to-pink-50"
+        style={{ paddingBottom: 'max(6rem, calc(6rem + env(safe-area-inset-bottom)))' }}
+      >
         <div className="mb-6 sm:mb-8">
           <div className="flex items-center justify-between mb-4">
             <div>
