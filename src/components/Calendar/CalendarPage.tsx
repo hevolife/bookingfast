@@ -90,16 +90,16 @@ export function CalendarPage() {
   return (
     <div className="h-full overflow-auto">
       {/* Bouton de navigation (mobile uniquement) */}
-      <div className="sm:hidden bg-gradient-to-r from-blue-500 to-purple-500 safe-top" style={{ position: 'static' }}>
+      <div className="sm:hidden bg-gradient-to-r from-blue-500 to-purple-500 safe-top submenu-mobile" style={{ position: 'static' }}>
         <button
           onClick={() => setIsNavExpanded(!isNavExpanded)}
-          className="w-full px-4 py-3 flex items-center justify-between text-left text-white font-medium"
+          className="w-full px-4 flex items-center justify-between text-left text-white font-medium submenu-button"
         >
-          <span>{getActiveViewLabel()}</span>
+          <span className="text-base">{getActiveViewLabel()}</span>
           {isNavExpanded ? (
-            <ChevronUp className="w-5 h-5" />
+            <ChevronUp className="w-5 h-5 flex-shrink-0" />
           ) : (
-            <ChevronDown className="w-5 h-5" />
+            <ChevronDown className="w-5 h-5 flex-shrink-0" />
           )}
         </button>
       </div>

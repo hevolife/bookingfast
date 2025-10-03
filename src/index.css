@@ -102,6 +102,38 @@ body {
     align-items: center !important;
     justify-content: center !important;
   }
+  
+  /* Fix pour le sous-menu Planning en mode PWA */
+  .submenu-mobile {
+    min-height: 48px !important;
+    max-height: 48px !important;
+    height: 48px !important;
+  }
+  
+  .submenu-button {
+    padding-top: 0.75rem !important;
+    padding-bottom: 0.75rem !important;
+    height: 48px !important;
+    min-height: 48px !important;
+    max-height: 48px !important;
+  }
+  
+  /* Mode PWA spécifique */
+  @media (display-mode: standalone) {
+    .submenu-mobile {
+      min-height: 48px !important;
+      max-height: 48px !important;
+      height: 48px !important;
+    }
+    
+    .submenu-button {
+      padding-top: 0.75rem !important;
+      padding-bottom: 0.75rem !important;
+      height: 48px !important;
+      min-height: 48px !important;
+      max-height: 48px !important;
+    }
+  }
 }
 
 @keyframes fadeIn {
