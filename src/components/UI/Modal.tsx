@@ -33,17 +33,22 @@ export function Modal({ isOpen, onClose, title, children, size = 'md' }: ModalPr
 
   return (
     <div 
-      className="fixed inset-0 bg-black/60 backdrop-blur-sm flex items-end sm:items-center justify-center modal-container sm:p-8 sm:pt-24"
+      className="fixed bg-black/60 backdrop-blur-sm flex items-end sm:items-center justify-center modal-container"
       style={{
         zIndex: 50,
-        paddingTop: 'max(64px, calc(64px + env(safe-area-inset-top)))'
+        top: 0,
+        left: 0,
+        right: 0,
+        bottom: 0,
+        padding: '0',
+        paddingTop: '0'
       }}
     >
       <div 
-        className={`bg-white w-full ${sizeClasses[size]} overflow-y-auto rounded-t-3xl sm:rounded-3xl shadow-2xl transform animate-slideUp modal-content sm:max-h-[85vh]`}
+        className={`bg-white w-full ${sizeClasses[size]} overflow-y-auto rounded-t-3xl sm:rounded-3xl shadow-2xl transform animate-slideUp modal-content`}
         style={{
-          maxHeight: 'calc(100vh - 64px - env(safe-area-inset-top))',
-          height: 'calc(100vh - 64px - env(safe-area-inset-top))'
+          maxHeight: '100%',
+          height: '100%'
         }}
       >
         <div className="relative overflow-hidden touch-action-none sticky top-0 z-10 modal-header">
