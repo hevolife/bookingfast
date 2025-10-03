@@ -68,9 +68,9 @@ export function CalendarPage() {
   };
 
   return (
-    <div className="h-full overflow-y-auto overflow-x-hidden">
-      {/* Navigation des vues - Scroll avec le contenu */}
-      <div className="p-4 bg-white border-b border-gray-200">
+    <div className="h-full overflow-auto">
+      {/* Navigation des vues */}
+      <div className="sticky top-0 z-10 p-4 bg-white border-b border-gray-200">
         <div className="flex gap-2">
           <PermissionGate permission="view_calendar" showMessage={false}>
             <button
