@@ -89,8 +89,8 @@ export function CalendarPage() {
 
   return (
     <div className="h-full overflow-auto">
-      {/* Bouton de navigation fixe (mobile uniquement) */}
-      <div className="sm:hidden fixed top-16 left-0 right-0 z-50 bg-gradient-to-r from-blue-500 to-purple-500 safe-top">
+      {/* Bouton de navigation (mobile uniquement) */}
+      <div className="sm:hidden bg-gradient-to-r from-blue-500 to-purple-500 safe-top" style={{ position: 'static' }}>
         <button
           onClick={() => setIsNavExpanded(!isNavExpanded)}
           className="w-full px-4 py-3 flex items-center justify-between text-left text-white font-medium"
@@ -104,9 +104,9 @@ export function CalendarPage() {
         </button>
       </div>
 
-      {/* Menu déroulant fixe (mobile uniquement) */}
+      {/* Menu déroulant (mobile uniquement) */}
       {isNavExpanded && (
-        <div className="sm:hidden fixed left-0 right-0 z-40 bg-white border-b border-gray-200 shadow-lg" style={{ top: 'calc(4rem + env(safe-area-inset-top) + 3rem)' }}>
+        <div className="sm:hidden bg-white border-b border-gray-200 shadow-lg" style={{ position: 'static' }}>
           <PermissionGate permission="view_calendar" showMessage={false}>
             <button
               onClick={() => handleViewChange('calendar')}
@@ -149,7 +149,7 @@ export function CalendarPage() {
       )}
 
       {/* Navigation desktop */}
-      <div className="hidden sm:block sticky top-16 z-10 bg-white border-b border-gray-200 p-4">
+      <div className="hidden sm:block bg-white border-b border-gray-200 p-4" style={{ position: 'static' }}>
         <div className="flex gap-2">
           <PermissionGate permission="view_calendar" showMessage={false}>
             <button
@@ -192,8 +192,8 @@ export function CalendarPage() {
         </div>
       </div>
       
-      {/* Contenu avec padding pour le bouton fixe mobile */}
-      <div className="pt-[3rem] sm:pt-0">
+      {/* Contenu */}
+      <div>
         <PermissionGate permission="view_calendar">
           {activeView === 'calendar' ? (
             <UsageLimitIndicator currentUsage={todayBookingsCount} permission="create_booking">
