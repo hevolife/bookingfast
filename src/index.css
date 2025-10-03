@@ -87,28 +87,25 @@ input, textarea, [contenteditable] {
   }
 }
 
-/* Mobile modal styling - CRITIQUE */
+/* Mobile modal styling - COLLÉ SOUS LA NAVBAR */
 @media (max-width: 640px) {
   .modal-container {
     position: fixed !important;
-    top: 64px !important;
+    top: calc(64px + env(safe-area-inset-top, 0px)) !important;
     left: 0 !important;
     right: 0 !important;
     bottom: 0 !important;
     z-index: 50 !important;
     padding: 0 !important;
     margin: 0 !important;
-    display: flex !important;
-    align-items: flex-end !important;
-    justify-content: center !important;
   }
   
   .modal-content {
     position: relative !important;
     width: 100% !important;
     max-width: 100% !important;
-    height: calc(100vh - 64px) !important;
-    max-height: calc(100vh - 64px) !important;
+    height: 100% !important;
+    max-height: 100% !important;
     border-radius: 1.5rem 1.5rem 0 0 !important;
     margin: 0 !important;
     overflow: hidden !important;
@@ -201,8 +198,8 @@ input, textarea, [contenteditable] {
   }
   
   .modal-content {
-    height: calc(100vh - 64px - env(safe-area-inset-top, 0px)) !important;
-    max-height: calc(100vh - 64px - env(safe-area-inset-top, 0px)) !important;
+    height: 100% !important;
+    max-height: 100% !important;
   }
 }
 
@@ -606,22 +603,20 @@ input, textarea, [contenteditable] {
   }
   .mobile-modal {
     position: fixed !important;
-    top: env(safe-area-inset-top, 0) !important;
-    left: env(safe-area-inset-left, 0) !important;
-    right: env(safe-area-inset-right, 0) !important;
-    bottom: env(safe-area-inset-bottom, 0) !important;
+    top: calc(64px + env(safe-area-inset-top, 0px)) !important;
+    left: 0 !important;
+    right: 0 !important;
+    bottom: 0 !important;
     margin: 0 !important;
     border-radius: 0 !important;
     max-width: 100% !important;
-    max-height: calc(100vh - env(safe-area-inset-top, 0) - env(safe-area-inset-bottom, 0)) !important;
-    height: calc(100vh - env(safe-area-inset-top, 0) - env(safe-area-inset-bottom, 0)) !important;
+    max-height: 100% !important;
+    height: 100% !important;
   }
   .mobile-modal-content {
     height: 100%;
     overflow-y: auto;
     padding: 1rem;
-    padding-top: max(1rem, env(safe-area-inset-top, 0));
-    padding-bottom: max(1rem, env(safe-area-inset-bottom, 0));
   }
   .mobile-table {
     display: block;
@@ -666,21 +661,18 @@ input, textarea, [contenteditable] {
   }
   .modal-container-mobile {
     position: fixed !important;
-    top: 0 !important;
+    top: calc(64px + env(safe-area-inset-top, 0px)) !important;
     left: 0 !important;
     right: 0 !important;
     bottom: 0 !important;
-    z-index: 200000 !important;
-    padding-top: env(safe-area-inset-top, 0) !important;
-    padding-bottom: env(safe-area-inset-bottom, 0) !important;
-    padding-left: env(safe-area-inset-left, 0) !important;
-    padding-right: env(safe-area-inset-right, 0) !important;
+    z-index: 50 !important;
+    padding: 0 !important;
   }
   .modal-content-mobile {
-    height: calc(100vh - env(safe-area-inset-top, 0) - env(safe-area-inset-bottom, 0)) !important;
-    max-height: calc(100vh - env(safe-area-inset-top, 0) - env(safe-area-inset-bottom, 0)) !important;
+    height: 100% !important;
+    max-height: 100% !important;
     overflow-y: auto !important;
-    border-radius: 0 !important;
+    border-radius: 1.5rem 1.5rem 0 0 !important;
   }
   .modal-header-mobile {
     position: sticky !important;
