@@ -1,10 +1,14 @@
 import { useState, useEffect } from 'react';
 import { supabase, isSupabaseConfigured } from '../lib/supabase';
 import { useAuth } from '../contexts/AuthContext';
+import { useServices } from './useServices';
 import { POSCategory, POSProduct, POSTransaction, POSSettings, CartItem } from '../types/pos';
+import { Service } from '../types';
+import { calculateTaxAmount } from '../lib/taxCalculations';
 
 export function usePOS() {
   const { user } = useAuth();
+  const { services: bookingServices } = useServices();
   const [categories, setCategories] = useState<POSCategory[]>([]);
   const [products, setProducts] = useState<POSProduct[]>([]);
   const [transactions, setTransactions] = useState<POSTransaction[]>([]);
@@ -16,7 +20,7 @@ export function usePOS() {
     if (user) {
       loadData();
     }
-  }, [user]);
+  }, [user, bookingServices]);
 
   const loadData = async () => {
     setLoading(true);
@@ -41,7 +45,21 @@ export function usePOS() {
         .order('display_order');
 
       if (error) throw error;
-      setCategories(data || []);
+      
+      // Ajouter une catégorie par défaut pour les services de réservation
+      const defaultCategory: POSCategory = {
+        id: 'booking-services',
+        user_id: user.id,
+        name: 'Services de réservation',
+        color: 'blue',
+        icon: 'calendar',
+        display_order: 0,
+        is_active: true,
+        created_at: new Date().toISOString(),
+        updated_at: new Date().toISOString()
+      };
+      
+      setCategories([defaultCategory, ...(data || [])]);
     } catch (err) {
       console.error('Erreur chargement catégories:', err);
     }
@@ -59,7 +77,37 @@ export function usePOS() {
         .order('name');
 
       if (error) throw error;
-      setProducts(data || []);
+      
+      // Convertir les services de réservation en produits POS
+      const bookingProducts: POSProduct[] = bookingServices
+        .filter(service => service.description !== 'Service personnalisé')
+        .map(service => ({
+          id: `booking-${service.id}`,
+          user_id: user.id,
+          category_id: 'booking-services',
+          name: service.name,
+          description: service.description,
+          price: service.price_ttc,
+          cost: service.price_ht,
+          stock: 999,
+          track_stock: false,
+          duration_minutes: service.duration_minutes,
+          color: 'blue',
+          is_active: true,
+          is_ttc_price: true,
+          created_at: service.created_at || new Date().toISOString(),
+          updated_at: service.updated_at || new Date().toISOString(),
+          _isBookingService: true,
+          _isTTCPrice: true
+        }));
+      
+      // Appliquer le flag _isTTCPrice aux produits POS selon leur configuration
+      const posProducts = (data || []).map(product => ({
+        ...product,
+        _isTTCPrice: product.is_ttc_price || false
+      }));
+      
+      setProducts([...bookingProducts, ...posProducts]);
     } catch (err) {
       console.error('Erreur chargement produits:', err);
     }
@@ -147,10 +195,30 @@ export function usePOS() {
   };
 
   const calculateCartTotal = () => {
-    const subtotal = cart.reduce((sum, item) => sum + (item.product.price * item.quantity), 0);
     const taxRate = settings?.tax_rate || 20;
-    const taxAmount = (subtotal * taxRate) / 100;
-    const total = subtotal + taxAmount;
+    
+    // Séparer les produits TTC et HT
+    const ttcItems = cart.filter(item => item.product._isTTCPrice);
+    const htItems = cart.filter(item => !item.product._isTTCPrice);
+    
+    // Calculer le total TTC (prix déjà TTC, pas de TVA à ajouter)
+    const ttcTotal = ttcItems.reduce((sum, item) => sum + (item.product.price * item.quantity), 0);
+    
+    // Calculer le total HT (prix HT, TVA à ajouter)
+    const htSubtotal = htItems.reduce((sum, item) => sum + (item.product.price * item.quantity), 0);
+    const htTaxAmount = (htSubtotal * taxRate) / 100;
+    const htTotal = htSubtotal + htTaxAmount;
+    
+    // Calculer la TVA incluse dans les produits TTC
+    const ttcTaxAmount = ttcItems.reduce((sum, item) => {
+      const itemTotal = item.product.price * item.quantity;
+      return sum + calculateTaxAmount(itemTotal, taxRate);
+    }, 0);
+    
+    // Totaux finaux
+    const subtotal = htSubtotal + (ttcTotal - ttcTaxAmount); // Sous-total HT
+    const taxAmount = htTaxAmount + ttcTaxAmount; // TVA totale
+    const total = ttcTotal + htTotal; // Total TTC
 
     return { subtotal, taxAmount, total, taxRate };
   };
@@ -194,7 +262,7 @@ export function usePOS() {
 
       const items = cart.map(item => ({
         transaction_id: transaction.id,
-        product_id: item.product.id,
+        product_id: item.product._isBookingService ? null : item.product.id,
         product_name: item.product.name,
         quantity: item.quantity,
         unit_price: item.product.price,

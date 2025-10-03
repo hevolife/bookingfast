@@ -23,8 +23,11 @@ export interface POSProduct {
   duration_minutes: number | null;
   color: string;
   is_active: boolean;
+  is_ttc_price: boolean; // Nouveau champ pour indiquer si le prix est TTC
   created_at: string;
   updated_at: string;
+  _isBookingService?: boolean; // Marqueur pour identifier les services de réservation
+  _isTTCPrice?: boolean; // Flag runtime pour le calcul
 }
 
 export interface POSTransaction {

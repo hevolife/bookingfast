@@ -1,5 +1,5 @@
 import React, { useState } from 'react';
-import { ShoppingCart, Package, Plus, Minus, Trash2, CreditCard, User, Mail, Phone, FileText, Settings, BarChart3, Edit, Search, Calendar, X, Banknote, Smartphone, FileCheck, ArrowLeftRight, ChevronLeft, Menu } from 'lucide-react';
+import { ShoppingCart, Package, Plus, Minus, Trash2, CreditCard, User, Mail, Phone, FileText, Settings, BarChart3, Edit, Search, Calendar, X, Banknote, Smartphone, FileCheck, ArrowLeftRight, ChevronLeft, Menu, Clock } from 'lucide-react';
 import { usePOS } from '../../hooks/usePOS';
 import { useClients } from '../../hooks/useClients';
 import { useBookings } from '../../hooks/useBookings';
@@ -277,6 +277,13 @@ export function POSPage() {
   const handleEditProduct = (e: React.MouseEvent, product: POSProduct) => {
     e.preventDefault();
     e.stopPropagation();
+    
+    // Ne pas permettre l'édition des services de réservation
+    if (product._isBookingService) {
+      alert('Les services de réservation ne peuvent pas être modifiés depuis le POS. Utilisez la page Services.');
+      return;
+    }
+    
     setEditingProduct(product);
     setShowProductModal(true);
   };
@@ -372,6 +379,9 @@ export function POSPage() {
 
   const hasItems = cart.length > 0 || selectedBooking !== null;
   const cartItemCount = selectedBooking ? 1 : cart.reduce((sum, item) => sum + item.quantity, 0);
+
+  // Vérifier si le panier contient des produits TTC
+  const hasTTCProducts = cart.some(item => item.product._isTTCPrice);
 
   return (
     <div className="h-full flex flex-col bg-gradient-to-br from-blue-50 via-purple-50 to-pink-50">
@@ -569,13 +579,20 @@ export function POSPage() {
                     key={product.id}
                     className={`bg-gradient-to-r ${getColorClasses(product.color)} rounded-2xl p-4 sm:p-6 text-white hover:shadow-xl transition-all duration-300 transform hover:scale-105 relative group`}
                   >
-                    <button
-                      type="button"
-                      onClick={(e) => handleEditProduct(e, product)}
-                      className="absolute top-2 right-2 bg-white/20 hover:bg-white/30 p-1.5 sm:p-2 rounded-lg opacity-0 group-hover:opacity-100 transition-opacity"
-                    >
-                      <Edit className="w-3 sm:w-4 h-3 sm:h-4" />
-                    </button>
+                    {!product._isBookingService && (
+                      <button
+                        type="button"
+                        onClick={(e) => handleEditProduct(e, product)}
+                        className="absolute top-2 right-2 bg-white/20 hover:bg-white/30 p-1.5 sm:p-2 rounded-lg opacity-0 group-hover:opacity-100 transition-opacity"
+                      >
+                        <Edit className="w-3 sm:w-4 h-3 sm:h-4" />
+                      </button>
+                    )}
+                    {product._isBookingService && (
+                      <div className="absolute top-2 right-2 bg-white/20 backdrop-blur-sm px-2 py-1 rounded-lg text-xs font-medium">
+                        📅 Réservation
+                      </div>
+                    )}
                     <button
                       type="button"
                       onClick={(e) => handleAddToCart(e, product)}
@@ -583,9 +600,15 @@ export function POSPage() {
                     >
                       <h3 className="font-bold text-base sm:text-lg mb-1 sm:mb-2">{product.name}</h3>
                       {product.duration_minutes && (
-                        <div className="text-xs sm:text-sm opacity-90 mb-2 sm:mb-3">{product.duration_minutes}min</div>
+                        <div className="flex items-center gap-1 text-xs sm:text-sm opacity-90 mb-2 sm:mb-3">
+                          <Clock className="w-3 sm:w-4 h-3 sm:h-4" />
+                          {product.duration_minutes}min
+                        </div>
                       )}
                       <div className="text-xl sm:text-2xl font-bold">{product.price.toFixed(2)} €</div>
+                      {product._isTTCPrice && (
+                        <div className="text-xs sm:text-sm opacity-90 mt-1">TTC</div>
+                      )}
                       {product.track_stock && (
                         <div className="text-xs sm:text-sm opacity-90 mt-1 sm:mt-2">Stock: {product.stock}</div>
                       )}
@@ -687,7 +710,12 @@ export function POSPage() {
                     <div className="flex items-start justify-between mb-3">
                       <div className="flex-1">
                         <h4 className="font-bold text-gray-900 text-sm xl:text-base">{item.product.name}</h4>
-                        <div className="text-xs xl:text-sm text-gray-600">{item.product.price.toFixed(2)} €</div>
+                        <div className="text-xs xl:text-sm text-gray-600">
+                          {item.product.price.toFixed(2)} € {item.product._isTTCPrice && '(TTC)'}
+                        </div>
+                        {item.product._isBookingService && (
+                          <div className="text-xs text-purple-600 mt-1">📅 Service de réservation</div>
+                        )}
                       </div>
                       <button
                         type="button"
@@ -730,15 +758,15 @@ export function POSPage() {
             {!selectedBooking && (
               <div className="space-y-2">
                 <div className="flex justify-between text-gray-600 text-sm xl:text-base">
-                  <span>Sous-total</span>
+                  <span>Sous-total HT</span>
                   <span className="font-medium">{subtotal.toFixed(2)} €</span>
                 </div>
                 <div className="flex justify-between text-gray-600 text-sm xl:text-base">
-                  <span>TVA ({taxRate}%)</span>
+                  <span>TVA {hasTTCProducts ? '(incluse)' : `(${taxRate}%)`}</span>
                   <span className="font-medium">{taxAmount.toFixed(2)} €</span>
                 </div>
                 <div className="flex justify-between text-lg xl:text-xl font-bold text-gray-900 pt-2 border-t border-gray-200">
-                  <span>Total</span>
+                  <span>Total TTC</span>
                   <span className="text-green-600">{total.toFixed(2)} €</span>
                 </div>
               </div>
@@ -879,7 +907,12 @@ export function POSPage() {
                       <div className="flex items-start justify-between mb-3">
                         <div className="flex-1">
                           <h4 className="font-bold text-gray-900">{item.product.name}</h4>
-                          <div className="text-sm text-gray-600">{item.product.price.toFixed(2)} €</div>
+                          <div className="text-sm text-gray-600">
+                            {item.product.price.toFixed(2)} € {item.product._isTTCPrice && '(TTC)'}
+                          </div>
+                          {item.product._isBookingService && (
+                            <div className="text-xs text-purple-600 mt-1">📅 Service de réservation</div>
+                          )}
                         </div>
                         <button
                           type="button"
@@ -922,15 +955,15 @@ export function POSPage() {
               {!selectedBooking && (
                 <div className="space-y-2">
                   <div className="flex justify-between text-gray-600">
-                    <span>Sous-total</span>
+                    <span>Sous-total HT</span>
                     <span className="font-medium">{subtotal.toFixed(2)} €</span>
                   </div>
                   <div className="flex justify-between text-gray-600">
-                    <span>TVA ({taxRate}%)</span>
+                    <span>TVA {hasTTCProducts ? '(incluse)' : `(${taxRate}%)`}</span>
                     <span className="font-medium">{taxAmount.toFixed(2)} €</span>
                   </div>
                   <div className="flex justify-between text-xl font-bold text-gray-900 pt-2 border-t border-gray-200">
-                    <span>Total</span>
+                    <span>Total TTC</span>
                     <span className="text-green-600">{total.toFixed(2)} €</span>
                   </div>
                 </div>
@@ -996,11 +1029,11 @@ export function POSPage() {
               {!selectedBooking && (
                 <div className="space-y-2 text-xs sm:text-sm">
                   <div className="flex justify-between">
-                    <span className="text-gray-600">Sous-total</span>
+                    <span className="text-gray-600">Sous-total HT</span>
                     <span className="font-medium">{subtotal.toFixed(2)} €</span>
                   </div>
                   <div className="flex justify-between">
-                    <span className="text-gray-600">TVA ({taxRate}%)</span>
+                    <span className="text-gray-600">TVA {hasTTCProducts ? '(incluse)' : `(${taxRate}%)`}</span>
                     <span className="font-medium">{taxAmount.toFixed(2)} €</span>
                   </div>
                 </div>
