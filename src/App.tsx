@@ -91,7 +91,9 @@ function App() {
         bottom: 0,
         overflow: 'hidden',
         touchAction: 'none',
-        overscrollBehavior: 'none'
+        overscrollBehavior: 'none',
+        margin: 0,
+        padding: 0
       }}
     >
       <Navbar currentPage={currentPage} onPageChange={setCurrentPage} />
@@ -99,7 +101,8 @@ function App() {
         className="main-content-safe scrollable-area" 
         style={{ 
           height: 'calc(100vh - 64px)',
-          paddingTop: 'max(1rem, env(safe-area-inset-top))',
+          paddingTop: 0,
+          margin: 0,
           overflow: 'auto',
           touchAction: 'pan-y',
           WebkitOverflowScrolling: 'touch',

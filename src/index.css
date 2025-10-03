@@ -5,6 +5,8 @@
 @layer base {
   * {
     box-sizing: border-box;
+    margin: 0;
+    padding: 0;
   }
   html {
     scroll-behavior: smooth;
@@ -60,6 +62,8 @@ input, textarea, [contenteditable] {
   top: 0;
   left: 0;
   background: linear-gradient(135deg, #dbeafe 0%, #f3e8ff 50%, #fce7f3 100%) !important;
+  margin: 0;
+  padding: 0;
 }
 
 @media screen and (-webkit-min-device-pixel-ratio: 0) {
