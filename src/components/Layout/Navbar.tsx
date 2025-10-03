@@ -76,7 +76,7 @@ export function Navbar({ currentPage, onPageChange }: NavbarProps) {
 
   return (
     <>
-      <nav className="bg-white border-b border-gray-200 z-50 shadow-sm navbar-safe" style={{ position: 'sticky', top: 0 }}>
+      <nav className="bg-white border-b border-gray-200 shadow-sm navbar-safe" style={{ position: 'sticky', top: 0, zIndex: 50 }}>
         <div className="px-4 sm:px-6">
           <div className="flex items-center justify-between h-16">
             <div className="flex items-center gap-3">
@@ -256,8 +256,13 @@ export function Navbar({ currentPage, onPageChange }: NavbarProps) {
 
       {mobileMenuOpen && (
         <div 
-          className="lg:hidden fixed inset-0 z-40 bg-gradient-to-br from-purple-900/95 via-pink-900/95 to-blue-900/95 backdrop-blur-md animate-fadeIn safe-all scrollable-area"
+          className="lg:hidden fixed bg-gradient-to-br from-purple-900/95 via-pink-900/95 to-blue-900/95 backdrop-blur-md animate-fadeIn safe-all scrollable-area"
           style={{
+            top: 'calc(64px + env(safe-area-inset-top))',
+            left: 0,
+            right: 0,
+            bottom: 0,
+            zIndex: 40,
             overflow: 'auto',
             WebkitOverflowScrolling: 'touch',
             touchAction: 'pan-y',
@@ -265,7 +270,7 @@ export function Navbar({ currentPage, onPageChange }: NavbarProps) {
           }}
         >
           <div 
-            className="h-full overflow-y-auto p-6 pt-20 scrollable-area"
+            className="h-full overflow-y-auto p-6 scrollable-area"
             style={{
               WebkitOverflowScrolling: 'touch',
               touchAction: 'pan-y',
