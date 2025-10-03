@@ -7,6 +7,7 @@ import { useBookings } from '../../hooks/useBookings';
 import { useTeam } from '../../hooks/useTeam';
 import { PermissionGate, UsageLimitIndicator } from '../UI/PermissionGate';
 import { Booking } from '../../types';
+import { ChevronDown, ChevronUp } from 'lucide-react';
 
 export function CalendarPage() {
   const [currentDate] = useState(new Date());
@@ -15,6 +16,7 @@ export function CalendarPage() {
   const [selectedDate, setSelectedDate] = useState(new Date().toISOString().split('T')[0]);
   const [selectedTime, setSelectedTime] = useState('');
   const [editingBooking, setEditingBooking] = useState<Booking | null>(null);
+  const [isNavExpanded, setIsNavExpanded] = useState(false);
   
   const { bookings, loading, addBooking, updateBooking, deleteBooking, refetch } = useBookings();
   const { hasPermission, canEditBooking, canDeleteBooking, getUsageLimits } = useTeam();
@@ -67,15 +69,92 @@ export function CalendarPage() {
     await deleteBooking(bookingId);
   };
 
+  const handleViewChange = (view: 'calendar' | 'list' | 'clients') => {
+    setActiveView(view);
+    setIsNavExpanded(false);
+  };
+
+  const getActiveViewLabel = () => {
+    switch (activeView) {
+      case 'calendar':
+        return 'Planning';
+      case 'list':
+        return 'Liste des réservations';
+      case 'clients':
+        return 'Clients';
+      default:
+        return 'Planning';
+    }
+  };
+
   return (
     <div className="h-full overflow-auto">
-      {/* Navigation des vues */}
-      <div className="sticky top-0 z-10 p-4 bg-white border-b border-gray-200">
+      {/* Bouton de navigation fixe (mobile uniquement) */}
+      <div className="sm:hidden fixed top-16 left-0 right-0 z-50 bg-gradient-to-r from-blue-500 to-purple-500 safe-top">
+        <button
+          onClick={() => setIsNavExpanded(!isNavExpanded)}
+          className="w-full px-4 py-3 flex items-center justify-between text-left text-white font-medium"
+        >
+          <span>{getActiveViewLabel()}</span>
+          {isNavExpanded ? (
+            <ChevronUp className="w-5 h-5" />
+          ) : (
+            <ChevronDown className="w-5 h-5" />
+          )}
+        </button>
+      </div>
+
+      {/* Menu déroulant fixe (mobile uniquement) */}
+      {isNavExpanded && (
+        <div className="sm:hidden fixed left-0 right-0 z-40 bg-white border-b border-gray-200 shadow-lg" style={{ top: 'calc(4rem + env(safe-area-inset-top) + 3rem)' }}>
+          <PermissionGate permission="view_calendar" showMessage={false}>
+            <button
+              onClick={() => handleViewChange('calendar')}
+              className={`w-full px-4 py-3 text-left font-medium transition-colors ${
+                activeView === 'calendar'
+                  ? 'bg-blue-50 text-blue-600'
+                  : 'text-gray-700 hover:bg-gray-50'
+              }`}
+            >
+              Planning
+            </button>
+          </PermissionGate>
+          
+          <PermissionGate permission="view_calendar" showMessage={false}>
+            <button
+              onClick={() => handleViewChange('list')}
+              className={`w-full px-4 py-3 text-left font-medium transition-colors ${
+                activeView === 'list'
+                  ? 'bg-blue-50 text-blue-600'
+                  : 'text-gray-700 hover:bg-gray-50'
+              }`}
+            >
+              Liste des réservations
+            </button>
+          </PermissionGate>
+          
+          <PermissionGate permission="view_clients" showMessage={false}>
+            <button
+              onClick={() => handleViewChange('clients')}
+              className={`w-full px-4 py-3 text-left font-medium transition-colors ${
+                activeView === 'clients'
+                  ? 'bg-blue-50 text-blue-600'
+                  : 'text-gray-700 hover:bg-gray-50'
+              }`}
+            >
+              Clients
+            </button>
+          </PermissionGate>
+        </div>
+      )}
+
+      {/* Navigation desktop */}
+      <div className="hidden sm:block sticky top-16 z-10 bg-white border-b border-gray-200 p-4">
         <div className="flex gap-2">
           <PermissionGate permission="view_calendar" showMessage={false}>
             <button
               onClick={() => setActiveView('calendar')}
-              className={`px-4 py-2 rounded-lg font-medium transition-all duration-300 ${
+              className={`px-4 py-2 rounded-lg text-base font-medium transition-all duration-300 ${
                 activeView === 'calendar'
                   ? 'bg-gradient-to-r from-blue-500 to-purple-500 text-white shadow-lg'
                   : 'text-gray-600 hover:bg-gray-100'
@@ -88,7 +167,7 @@ export function CalendarPage() {
           <PermissionGate permission="view_calendar" showMessage={false}>
             <button
               onClick={() => setActiveView('list')}
-              className={`px-4 py-2 rounded-lg font-medium transition-all duration-300 ${
+              className={`px-4 py-2 rounded-lg text-base font-medium transition-all duration-300 ${
                 activeView === 'list'
                   ? 'bg-gradient-to-r from-blue-500 to-purple-500 text-white shadow-lg'
                   : 'text-gray-600 hover:bg-gray-100'
@@ -101,7 +180,7 @@ export function CalendarPage() {
           <PermissionGate permission="view_clients" showMessage={false}>
             <button
               onClick={() => setActiveView('clients')}
-              className={`px-4 py-2 rounded-lg font-medium transition-all duration-300 ${
+              className={`px-4 py-2 rounded-lg text-base font-medium transition-all duration-300 ${
                 activeView === 'clients'
                   ? 'bg-gradient-to-r from-blue-500 to-purple-500 text-white shadow-lg'
                   : 'text-gray-600 hover:bg-gray-100'
@@ -113,31 +192,33 @@ export function CalendarPage() {
         </div>
       </div>
       
-      {/* Contenu selon la vue active */}
-      <PermissionGate permission="view_calendar">
-        {activeView === 'calendar' ? (
-          <UsageLimitIndicator currentUsage={todayBookingsCount} permission="create_booking">
-            <CalendarGrid
-              currentDate={currentDate}
-              onTimeSlotClick={handleTimeSlotClick}
-              onBookingClick={handleBookingClick}
-              bookings={bookings}
-              loading={loading}
-              onDeleteBooking={handleDeleteBooking}
-            />
-          </UsageLimitIndicator>
-        ) : activeView === 'list' ? (
-          <PermissionGate permission="view_calendar">
-            <BookingsList
-              onEditBooking={handleBookingClick}
-            />
-          </PermissionGate>
-        ) : (
-          <PermissionGate permission="view_clients">
-            <ClientsPage />
-          </PermissionGate>
-        )}
-      </PermissionGate>
+      {/* Contenu avec padding pour le bouton fixe mobile */}
+      <div className="pt-[3rem] sm:pt-0">
+        <PermissionGate permission="view_calendar">
+          {activeView === 'calendar' ? (
+            <UsageLimitIndicator currentUsage={todayBookingsCount} permission="create_booking">
+              <CalendarGrid
+                currentDate={currentDate}
+                onTimeSlotClick={handleTimeSlotClick}
+                onBookingClick={handleBookingClick}
+                bookings={bookings}
+                loading={loading}
+                onDeleteBooking={handleDeleteBooking}
+              />
+            </UsageLimitIndicator>
+          ) : activeView === 'list' ? (
+            <PermissionGate permission="view_calendar">
+              <BookingsList
+                onEditBooking={handleBookingClick}
+              />
+            </PermissionGate>
+          ) : (
+            <PermissionGate permission="view_clients">
+              <ClientsPage />
+            </PermissionGate>
+          )}
+        </PermissionGate>
+      </div>
       
       {isModalOpen && (
         <BookingModal
