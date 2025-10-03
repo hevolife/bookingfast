@@ -68,7 +68,8 @@ export function CalendarPage() {
   };
 
   return (
-    <div className="h-full overflow-y-auto overflow-x-hidden">
+    <div className="main-content-safe overflow-auto">
+      {/* Navigation des vues - Scroll avec le contenu */}
       <div className="p-4 bg-white border-b border-gray-200">
         <div className="flex gap-2">
           <PermissionGate permission="view_calendar" showMessage={false}>
@@ -112,28 +113,31 @@ export function CalendarPage() {
         </div>
       </div>
       
-      {activeView === 'calendar' ? (
-        <UsageLimitIndicator currentUsage={todayBookingsCount} permission="create_booking">
-          <CalendarGrid
-            currentDate={currentDate}
-            onTimeSlotClick={handleTimeSlotClick}
-            onBookingClick={handleBookingClick}
-            bookings={bookings}
-            loading={loading}
-            onDeleteBooking={handleDeleteBooking}
-          />
-        </UsageLimitIndicator>
-      ) : activeView === 'list' ? (
-        <PermissionGate permission="view_calendar">
-          <BookingsList
-            onEditBooking={handleBookingClick}
-          />
-        </PermissionGate>
-      ) : (
-        <PermissionGate permission="view_clients">
-          <ClientsPage />
-        </PermissionGate>
-      )}
+      {/* Contenu selon la vue active */}
+      <PermissionGate permission="view_calendar">
+        {activeView === 'calendar' ? (
+          <UsageLimitIndicator currentUsage={todayBookingsCount} permission="create_booking">
+            <CalendarGrid
+              currentDate={currentDate}
+              onTimeSlotClick={handleTimeSlotClick}
+              onBookingClick={handleBookingClick}
+              bookings={bookings}
+              loading={loading}
+              onDeleteBooking={handleDeleteBooking}
+            />
+          </UsageLimitIndicator>
+        ) : activeView === 'list' ? (
+          <PermissionGate permission="view_calendar">
+            <BookingsList
+              onEditBooking={handleBookingClick}
+            />
+          </PermissionGate>
+        ) : (
+          <PermissionGate permission="view_clients">
+            <ClientsPage />
+          </PermissionGate>
+        )}
+      </PermissionGate>
       
       {isModalOpen && (
         <BookingModal

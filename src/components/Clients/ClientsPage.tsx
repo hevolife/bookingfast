@@ -29,9 +29,11 @@ export function ClientsPage({ onEditClient }: ClientsPageProps) {
 
   const itemsPerPage = 12;
 
+  // Filtrer et trier les clients
   useEffect(() => {
     let filtered = [...clients];
 
+    // Filtrer par terme de recherche
     if (searchTerm) {
       filtered = filtered.filter(client =>
         client.firstname.toLowerCase().includes(searchTerm.toLowerCase()) ||
@@ -41,6 +43,7 @@ export function ClientsPage({ onEditClient }: ClientsPageProps) {
       );
     }
 
+    // Trier
     filtered.sort((a, b) => {
       let comparison = 0;
       
@@ -66,6 +69,7 @@ export function ClientsPage({ onEditClient }: ClientsPageProps) {
     setCurrentPage(1);
   }, [clients, searchTerm, sortBy, sortOrder]);
 
+  // Calculer la pagination
   const totalPages = Math.ceil(filteredClients.length / itemsPerPage);
   const startIndex = (currentPage - 1) * itemsPerPage;
   const endIndex = startIndex + itemsPerPage;
@@ -111,10 +115,12 @@ export function ClientsPage({ onEditClient }: ClientsPageProps) {
     }
   };
 
+  // Obtenir les réservations d'un client
   const getClientBookings = (clientEmail: string): Booking[] => {
     return bookings.filter(booking => booking.client_email === clientEmail);
   };
 
+  // Calculer les statistiques d'un client
   const getClientStats = (client: Client) => {
     const clientBookings = getClientBookings(client.email);
     const totalBookings = clientBookings.length;
@@ -152,6 +158,7 @@ export function ClientsPage({ onEditClient }: ClientsPageProps) {
   return (
     <>
       <div className="p-4 sm:p-6 bg-gradient-to-br from-blue-50 via-purple-50 to-pink-50 mobile-optimized">
+        {/* Header */}
         <div className="mb-6 sm:mb-8">
           <h1 className="text-2xl sm:text-3xl font-bold bg-gradient-to-r from-purple-600 to-pink-600 bg-clip-text text-transparent">
             Mes Clients
@@ -161,8 +168,10 @@ export function ClientsPage({ onEditClient }: ClientsPageProps) {
           </p>
         </div>
 
+        {/* Filtres et recherche */}
         <div className="bg-white rounded-xl sm:rounded-2xl shadow-lg p-4 sm:p-6 mb-6">
           <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4">
+            {/* Recherche */}
             <div className="relative">
               <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 text-gray-400 w-5 h-5" />
               <input
@@ -174,6 +183,7 @@ export function ClientsPage({ onEditClient }: ClientsPageProps) {
               />
             </div>
 
+            {/* Tri */}
             <div>
               <select
                 value={`${sortBy}-${sortOrder}`}
@@ -193,6 +203,7 @@ export function ClientsPage({ onEditClient }: ClientsPageProps) {
               </select>
             </div>
 
+            {/* Statistiques rapides */}
             <div className="bg-gradient-to-r from-purple-50 to-pink-50 border border-purple-200 rounded-xl p-3 text-center">
               <div className="text-lg font-bold text-purple-600">{clients.length}</div>
               <div className="text-xs text-purple-700">Clients total</div>
@@ -200,9 +211,11 @@ export function ClientsPage({ onEditClient }: ClientsPageProps) {
           </div>
         </div>
 
+        {/* Liste des clients */}
         <div className="bg-white rounded-xl sm:rounded-2xl shadow-lg overflow-hidden">
           {currentClients.length > 0 ? (
             <>
+              {/* Version desktop - Table */}
               <div className="hidden lg:block overflow-x-auto">
                 <table className="w-full">
                   <thead className="bg-gradient-to-r from-gray-50 to-purple-50 border-b border-gray-200">
@@ -343,6 +356,7 @@ export function ClientsPage({ onEditClient }: ClientsPageProps) {
                 </table>
               </div>
 
+              {/* Version mobile - Cards */}
               <div className="lg:hidden space-y-4 p-4">
                 {currentClients.map((client, index) => {
                   const stats = getClientStats(client);
@@ -353,6 +367,7 @@ export function ClientsPage({ onEditClient }: ClientsPageProps) {
                       className="bg-gradient-to-r from-gray-50 to-purple-50 rounded-xl border border-purple-200 p-4 hover:shadow-md transition-all duration-300 animate-fadeIn"
                       style={{ animationDelay: `${index * 100}ms` }}
                     >
+                      {/* Header */}
                       <div className="flex items-center justify-between mb-3">
                         <div className="flex items-center gap-3">
                           <div className="w-10 h-10 bg-gradient-to-r from-purple-500 to-pink-500 rounded-xl flex items-center justify-center text-white font-bold text-sm">
@@ -397,6 +412,7 @@ export function ClientsPage({ onEditClient }: ClientsPageProps) {
                         </div>
                       </div>
 
+                      {/* Informations de contact */}
                       <div className="grid grid-cols-1 gap-2 mb-3">
                         <div className="flex items-center gap-2">
                           <Mail className="w-4 h-4 text-blue-500" />
@@ -410,15 +426,16 @@ export function ClientsPage({ onEditClient }: ClientsPageProps) {
                         
                         <div className="flex items-center gap-2">
                           <Phone className="w-4 h-4 text-green-500" />
-                          <button
-                            onClick={() => window.open(`tel:${client.phone}`, '_self')}
+                          <a
+                            href={`tel:${client.phone}`}
                             className="text-green-600 hover:text-green-800 hover:underline font-medium text-sm"
                           >
                             {client.phone}
-                          </button>
+                          </a>
                         </div>
                       </div>
 
+                      {/* Statistiques */}
                       <div className="flex items-center justify-between">
                         <div className="flex flex-col gap-1">
                           <div className="text-xs text-gray-600">Réservations</div>
@@ -435,6 +452,7 @@ export function ClientsPage({ onEditClient }: ClientsPageProps) {
                 })}
               </div>
 
+              {/* Pagination */}
               {totalPages > 1 && (
                 <div className="flex items-center justify-between p-4 sm:p-6 border-t border-gray-200">
                   <div className="text-sm text-gray-600">
@@ -509,6 +527,7 @@ export function ClientsPage({ onEditClient }: ClientsPageProps) {
         </div>
       </div>
 
+      {/* Modal de détails */}
       {showDetailsModal && selectedClient && (
         <Modal
           isOpen={showDetailsModal}
@@ -517,6 +536,7 @@ export function ClientsPage({ onEditClient }: ClientsPageProps) {
           size="md"
         >
           <div className="space-y-6">
+            {/* Informations client */}
             <div className="bg-gradient-to-r from-purple-50 to-pink-50 rounded-2xl p-6 border border-purple-200">
               <div className="flex items-center gap-3 mb-4">
                 <div className="w-12 h-12 bg-gradient-to-r from-purple-500 to-pink-500 rounded-xl flex items-center justify-center text-white font-bold text-lg">
@@ -544,16 +564,17 @@ export function ClientsPage({ onEditClient }: ClientsPageProps) {
                 </div>
                 <div className="flex items-center gap-2">
                   <Phone className="w-4 h-4 text-green-500" />
-                  <button
-                    onClick={() => window.open(`tel:${selectedClient.phone}`, '_self')}
+                  <a
+                    href={`tel:${selectedClient.phone}`}
                     className="text-green-600 hover:text-green-800 hover:underline font-medium"
                   >
                     {selectedClient.phone}
-                  </button>
+                  </a>
                 </div>
               </div>
             </div>
 
+            {/* Statistiques du client */}
             {(() => {
               const stats = getClientStats(selectedClient);
               return (
@@ -592,6 +613,7 @@ export function ClientsPage({ onEditClient }: ClientsPageProps) {
               );
             })()}
 
+            {/* Réservations récentes */}
             {(() => {
               const clientBookings = getClientBookings(selectedClient.email)
                 .sort((a, b) => new Date(b.date).getTime() - new Date(a.date).getTime())
@@ -644,6 +666,7 @@ export function ClientsPage({ onEditClient }: ClientsPageProps) {
               );
             })()}
 
+            {/* Actions */}
             <div className="flex gap-3">
               <Button
                 variant="secondary"
@@ -671,6 +694,7 @@ export function ClientsPage({ onEditClient }: ClientsPageProps) {
         </Modal>
       )}
 
+      {/* Modal de confirmation de suppression */}
       {showDeleteModal && clientToDelete && (
         <Modal
           isOpen={showDeleteModal}
