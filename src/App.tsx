@@ -1,4 +1,4 @@
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 import { DashboardPage } from './components/Dashboard/DashboardPage';
 import { CalendarPage } from './components/Calendar/CalendarPage';
 import { ServicesPage } from './components/Services/ServicesPage';
@@ -16,6 +16,22 @@ type Page = 'dashboard' | 'calendar' | 'bookings-list' | 'clients' | 'services' 
 function App() {
   const { user, loading } = useAuth();
   const [currentPage, setCurrentPage] = useState<Page>('dashboard');
+
+  useEffect(() => {
+    // Prevent any scroll on the root element
+    const preventScroll = (e: TouchEvent) => {
+      const target = e.target as HTMLElement;
+      if (!target.closest('.scrollable-area')) {
+        e.preventDefault();
+      }
+    };
+
+    document.body.addEventListener('touchmove', preventScroll, { passive: false });
+    
+    return () => {
+      document.body.removeEventListener('touchmove', preventScroll);
+    };
+  }, []);
 
   if (loading) {
     return (
@@ -65,13 +81,31 @@ function App() {
   };
 
   return (
-    <div className="h-screen bg-gradient-to-br from-blue-50 via-purple-50 to-pink-50 overflow-hidden fixed inset-0">
+    <div 
+      className="h-screen bg-gradient-to-br from-blue-50 via-purple-50 to-pink-50"
+      style={{
+        position: 'fixed',
+        top: 0,
+        left: 0,
+        right: 0,
+        bottom: 0,
+        overflow: 'hidden',
+        touchAction: 'none',
+        overscrollBehavior: 'none'
+      }}
+    >
       <Navbar currentPage={currentPage} onPageChange={setCurrentPage} />
-      <main className="main-content-safe h-full overflow-auto scrollable-area" style={{ 
-        height: 'calc(100vh - 64px)',
-        touchAction: 'pan-y',
-        WebkitOverflowScrolling: 'touch'
-      }}>
+      <main 
+        className="main-content-safe scrollable-area" 
+        style={{ 
+          height: 'calc(100vh - 64px)',
+          overflow: 'auto',
+          touchAction: 'pan-y',
+          WebkitOverflowScrolling: 'touch',
+          position: 'relative',
+          overscrollBehavior: 'contain'
+        }}
+      >
         {renderPage()}
       </main>
     </div>
