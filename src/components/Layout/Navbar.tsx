@@ -255,8 +255,23 @@ export function Navbar({ currentPage, onPageChange }: NavbarProps) {
       </nav>
 
       {mobileMenuOpen && (
-        <div className="lg:hidden fixed inset-0 z-40 bg-gradient-to-br from-purple-900/95 via-pink-900/95 to-blue-900/95 backdrop-blur-md animate-fadeIn safe-all">
-          <div className="h-full overflow-y-auto p-6 pt-20">
+        <div 
+          className="lg:hidden fixed inset-0 z-40 bg-gradient-to-br from-purple-900/95 via-pink-900/95 to-blue-900/95 backdrop-blur-md animate-fadeIn safe-all scrollable-area"
+          style={{
+            overflow: 'auto',
+            WebkitOverflowScrolling: 'touch',
+            touchAction: 'pan-y',
+            overscrollBehavior: 'contain'
+          }}
+        >
+          <div 
+            className="h-full overflow-y-auto p-6 pt-20 scrollable-area"
+            style={{
+              WebkitOverflowScrolling: 'touch',
+              touchAction: 'pan-y',
+              overscrollBehavior: 'contain'
+            }}
+          >
             <div className="max-w-md mx-auto space-y-3">
               <div className="text-center mb-8">
                 <div className="w-20 h-20 bg-white rounded-2xl flex items-center justify-center mx-auto mb-4 shadow-2xl">

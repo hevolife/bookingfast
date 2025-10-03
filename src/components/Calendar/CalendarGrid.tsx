@@ -487,7 +487,14 @@ export function CalendarGrid({ currentDate, onTimeSlotClick, onBookingClick, boo
 
   return (
     <>
-      <div className="bg-gradient-to-br from-blue-50 via-purple-50 to-pink-50 h-full flex flex-col">
+      <div 
+        className="bg-gradient-to-br from-blue-50 via-purple-50 to-pink-50 h-full flex flex-col"
+        style={{
+          overflowX: 'hidden',
+          overflowY: 'auto',
+          touchAction: 'pan-y'
+        }}
+      >
         <div className="bg-white/90 backdrop-blur-md border-b border-gray-100 shadow-lg p-4 flex-shrink-0">
           <div className="flex items-center justify-between mb-4">
             <div className="flex items-center gap-3">
@@ -628,7 +635,15 @@ export function CalendarGrid({ currentDate, onTimeSlotClick, onBookingClick, boo
           </div>
         </div>
 
-        <div className="flex-1 overflow-y-auto" ref={timeGridRef} style={{ paddingBottom: 'max(6rem, calc(6rem + env(safe-area-inset-bottom)))' }}>
+        <div 
+          className="flex-1 overflow-y-auto" 
+          ref={timeGridRef} 
+          style={{ 
+            paddingBottom: 'max(6rem, calc(6rem + env(safe-area-inset-bottom)))',
+            overflowX: 'hidden',
+            touchAction: 'pan-y'
+          }}
+        >
           {isDayClosed() ? (
             <div className="flex items-center justify-center h-64 animate-fadeIn">
               <div className="text-center p-8 bg-white/80 backdrop-blur-sm rounded-3xl shadow-xl">
@@ -654,7 +669,7 @@ export function CalendarGrid({ currentDate, onTimeSlotClick, onBookingClick, boo
               </div>
             </div>
           ) : (
-            <div className="flex">
+            <div className="flex" style={{ overflowX: 'hidden' }}>
               <div className="w-20 bg-white/80 backdrop-blur-sm border-r border-gray-100 flex-shrink-0 shadow-lg">
                 {timeSlots.map((slot, index) => (
                   <div
@@ -674,7 +689,14 @@ export function CalendarGrid({ currentDate, onTimeSlotClick, onBookingClick, boo
                 ))}
               </div>
 
-              <div className="flex-1 relative bg-white/60 backdrop-blur-sm" style={{ minHeight: `${timeSlots.length * 48}px` }}>
+              <div 
+                className="flex-1 relative bg-white/60 backdrop-blur-sm" 
+                style={{ 
+                  minHeight: `${timeSlots.length * 48}px`,
+                  overflowX: 'hidden',
+                  maxWidth: '100%'
+                }}
+              >
                 {timeSlots.map((slot, index) => (
                   <div
                     key={slot.time}
