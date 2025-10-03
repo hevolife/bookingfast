@@ -25,30 +25,28 @@ export function Modal({ isOpen, onClose, title, children, size = 'md' }: ModalPr
   if (!isOpen) return null;
 
   const sizeClasses = {
-    sm: 'max-w-md',
-    md: 'max-w-2xl',
-    lg: 'max-w-4xl',
-    xl: 'max-w-7xl'
+    sm: 'sm:max-w-sm',
+    md: 'sm:max-w-lg',
+    lg: 'sm:max-w-2xl',
+    xl: 'sm:max-w-4xl'
   };
 
   return (
     <div 
-      className="fixed bg-black/60 backdrop-blur-sm flex items-end sm:items-center justify-center animate-fadeIn modal-container" 
-      style={{ 
-        zIndex: 100000,
-        top: 'calc(64px + env(safe-area-inset-top))',
-        left: 0,
-        right: 0,
-        bottom: 0
+      className="fixed inset-0 bg-black/60 backdrop-blur-sm flex items-end sm:items-center justify-center modal-container sm:p-8 sm:pt-24"
+      style={{
+        zIndex: 50,
+        paddingTop: 'max(64px, calc(64px + env(safe-area-inset-top)))'
       }}
     >
-      <div className={`bg-white w-full ${sizeClasses[size]} overflow-y-auto sm:rounded-3xl shadow-2xl transform animate-slideUp modal-content`}
+      <div 
+        className={`bg-white w-full ${sizeClasses[size]} overflow-y-auto rounded-t-3xl sm:rounded-3xl shadow-2xl transform animate-slideUp modal-content sm:max-h-[85vh]`}
         style={{
-          maxHeight: 'calc(100vh - 64px - env(safe-area-inset-top) - env(safe-area-inset-bottom))',
-          height: 'calc(100vh - 64px - env(safe-area-inset-top) - env(safe-area-inset-bottom))'
+          maxHeight: 'calc(100vh - 64px - env(safe-area-inset-top))',
+          height: 'calc(100vh - 64px - env(safe-area-inset-top))'
         }}
       >
-        <div className="relative overflow-hidden touch-action-none sticky top-0 z-10 modal-header modal-safe-top">
+        <div className="relative overflow-hidden touch-action-none sticky top-0 z-10 modal-header">
           <div className="absolute inset-0 bg-gradient-to-br from-blue-600 via-purple-600 to-pink-600"></div>
           <div className="absolute inset-0 bg-gradient-to-r from-transparent via-white/30 to-transparent -skew-x-12 animate-shimmer"></div>
           <div className="absolute inset-0 opacity-10">
@@ -72,7 +70,11 @@ export function Modal({ isOpen, onClose, title, children, size = 'md' }: ModalPr
           </div>
           <div className="absolute bottom-0 left-0 right-0 h-1 bg-gradient-to-r from-transparent via-white/50 to-transparent"></div>
         </div>
-        <div className="modal-body p-4 sm:p-6 modal-safe-bottom">
+        <div className="modal-body p-4 sm:p-6 scrollable-area" style={{
+          overflowY: 'auto',
+          WebkitOverflowScrolling: 'touch',
+          touchAction: 'pan-y'
+        }}>
           {children}
         </div>
       </div>

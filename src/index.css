@@ -72,6 +72,21 @@ input, textarea, [contenteditable] {
   }
 }
 
+/* Desktop modal styling */
+@media (min-width: 641px) {
+  .modal-container {
+    padding: 2rem !important;
+    padding-top: 6rem !important;
+  }
+  
+  .modal-content {
+    max-height: 85vh !important;
+    height: auto !important;
+    border-radius: 1.5rem !important;
+    box-shadow: 0 25px 50px -12px rgba(0, 0, 0, 0.25) !important;
+  }
+}
+
 @media (max-width: 640px) {
   .relative input[type="email"],
   .relative input[type="tel"],
@@ -158,6 +173,24 @@ input, textarea, [contenteditable] {
       z-index: 11;
       pointer-events: auto;
     }
+  }
+  
+  /* Modal sur mobile - DOIT respecter la navbar */
+  .modal-container {
+    position: fixed !important;
+    top: 64px !important;
+    left: 0 !important;
+    right: 0 !important;
+    bottom: 0 !important;
+    z-index: 50 !important;
+    padding: 0 !important;
+  }
+  
+  .modal-content {
+    height: calc(100vh - 64px - env(safe-area-inset-top, 0)) !important;
+    max-height: calc(100vh - 64px - env(safe-area-inset-top, 0)) !important;
+    border-radius: 1.5rem 1.5rem 0 0 !important;
+    margin: 0 !important;
   }
 }
 
@@ -508,10 +541,6 @@ input, textarea, [contenteditable] {
   padding-top: env(safe-area-inset-top);
 }
 
-.modal-container {
-  z-index: 100000 !important;
-}
-
 @media (max-width: 768px) {
   .mobile-container {
     padding: 1rem;
@@ -683,40 +712,6 @@ input, textarea, [contenteditable] {
     touch-action: pan-y;
     overflow-y: auto;
     -webkit-overflow-scrolling: touch;
-  }
-  .modal-container {
-    position: fixed !important;
-    left: 0 !important;
-    right: 0 !important;
-    top: 0 !important;
-    bottom: 0 !important;
-    overflow: hidden !important;
-    touch-action: none !important;
-    z-index: 100000 !important;
-    padding-top: env(safe-area-inset-top, 0) !important;
-    padding-bottom: env(safe-area-inset-bottom, 0) !important;
-    padding-left: env(safe-area-inset-left, 0) !important;
-    padding-right: env(safe-area-inset-right, 0) !important;
-  }
-  .modal-content {
-    position: relative !important;
-    width: 100% !important;
-    max-width: 100% !important;
-    height: calc(100vh - env(safe-area-inset-top, 0) - env(safe-area-inset-bottom, 0)) !important;
-    max-height: calc(100vh - env(safe-area-inset-top, 0) - env(safe-area-inset-bottom, 0)) !important;
-    overflow-y: auto !important;
-    overflow-x: hidden !important;
-    touch-action: pan-y !important;
-    -webkit-overflow-scrolling: touch !important;
-  }
-  .modal-header {
-    position: sticky !important;
-    top: 0 !important;
-    z-index: 10 !important;
-    touch-action: none !important;
-  }
-  .modal-body {
-    touch-action: pan-y !important;
   }
   .mobile-full-width {
     width: 100% !important;

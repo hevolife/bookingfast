@@ -99,6 +99,7 @@ function App() {
         className="main-content-safe scrollable-area" 
         style={{ 
           height: 'calc(100vh - 64px)',
+          paddingTop: 'max(1rem, env(safe-area-inset-top))',
           overflow: 'auto',
           touchAction: 'pan-y',
           WebkitOverflowScrolling: 'touch',
