@@ -142,9 +142,9 @@ export function AdminPage() {
   };
 
   return (
-    <div className="main-content-safe overflow-auto bg-gradient-to-br from-blue-50 via-purple-50 to-pink-50 mobile-optimized">
+    <div className="p-4 sm:p-6 h-full overflow-y-auto bg-gradient-to-br from-blue-50 via-purple-50 to-pink-50 mobile-optimized">
       {/* Header */}
-      <div className="p-4 sm:p-6 mb-6 sm:mb-8">
+      <div className="mb-6 sm:mb-8">
         <div className="flex items-center gap-3 mb-2">
           {activeTab === 'superadmin' && (
             <button
@@ -197,7 +197,7 @@ export function AdminPage() {
       </div>
       
       {/* Content */}
-      <div className={activeTab === 'superadmin' ? '' : 'bg-white rounded-xl sm:rounded-2xl shadow-lg p-4 sm:p-6 mx-4 sm:mx-6 mb-6'}>
+      <div className={activeTab === 'superadmin' ? '' : 'bg-white rounded-xl sm:rounded-2xl shadow-lg p-4 sm:p-6'}>
         {renderContent()}
       </div>
     </div>

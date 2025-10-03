@@ -458,14 +458,7 @@ body {
   padding-top: env(safe-area-inset-top);
 }
 
-.main-content-safe {
-  padding-top: calc(4rem + env(safe-area-inset-top));
-}
-
 @media (max-width: 768px) {
-  .main-content-safe {
-    padding-top: calc(4rem + env(safe-area-inset-top, 0px) + 1rem);
-  }
   .mobile-container {
     padding: 1rem;
     max-width: 100vw;

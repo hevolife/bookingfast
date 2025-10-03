@@ -487,7 +487,8 @@ export function CalendarGrid({ currentDate, onTimeSlotClick, onBookingClick, boo
   return (
     <>
       <div className="bg-gradient-to-br from-blue-50 via-purple-50 to-pink-50">
-        <div className="bg-white/90 backdrop-blur-md border-b border-gray-100 shadow-lg p-4">
+        {/* Header */}
+        <div className="bg-white/90 backdrop-blur-md border-b border-gray-100 p-4 shadow-lg">
           <div className="flex items-center justify-between mb-4">
             <div className="flex items-center gap-3">
               <div>
@@ -521,6 +522,7 @@ export function CalendarGrid({ currentDate, onTimeSlotClick, onBookingClick, boo
             </div>
           </div>
 
+          {/* Navigation de mois */}
           <div className="flex items-center justify-center mb-2">
             <div className="flex items-center gap-2">
               <button
@@ -548,6 +550,7 @@ export function CalendarGrid({ currentDate, onTimeSlotClick, onBookingClick, boo
             </div>
           </div>
 
+          {/* Navigation rapide */}
           <div className="hidden sm:flex gap-1 mb-2 justify-center flex-wrap">
             {quickNavOptions.map((option, index) => (
               <button
@@ -564,6 +567,7 @@ export function CalendarGrid({ currentDate, onTimeSlotClick, onBookingClick, boo
             ))}
           </div>
 
+          {/* Navigation des jours */}
           <div className="flex items-center gap-2">
             <button
               onClick={() => scrollToDays('left')}
@@ -627,7 +631,8 @@ export function CalendarGrid({ currentDate, onTimeSlotClick, onBookingClick, boo
           </div>
         </div>
 
-        <div>
+        {/* Calendrier */}
+        <div className="p-4">
           {isDayClosed() ? (
             <div className="flex items-center justify-center h-64 animate-fadeIn">
               <div className="text-center p-8 bg-white/80 backdrop-blur-sm rounded-3xl shadow-xl">
@@ -654,6 +659,7 @@ export function CalendarGrid({ currentDate, onTimeSlotClick, onBookingClick, boo
             </div>
           ) : (
             <div className="flex overflow-x-hidden">
+              {/* Colonne des heures */}
               <div className="w-20 bg-white/80 backdrop-blur-sm border-r border-gray-100 flex-shrink-0 shadow-lg">
                 {timeSlots.map((slot, index) => (
                   <div
@@ -673,7 +679,9 @@ export function CalendarGrid({ currentDate, onTimeSlotClick, onBookingClick, boo
                 ))}
               </div>
 
+              {/* Zone principale */}
               <div className="flex-1 relative bg-white/60 backdrop-blur-sm overflow-x-hidden">
+                {/* Lignes de grille */}
                 {timeSlots.map((slot, index) => (
                   <div
                     key={slot.time}
@@ -688,6 +696,7 @@ export function CalendarGrid({ currentDate, onTimeSlotClick, onBookingClick, boo
                   />
                 ))}
 
+                {/* Zones cliquables */}
                 {timeSlots.map((slot, index) => (
                   <button
                     key={slot.time}
@@ -717,6 +726,7 @@ export function CalendarGrid({ currentDate, onTimeSlotClick, onBookingClick, boo
                   </button>
                 ))}
 
+                {/* Blocs de service */}
                 <div className="absolute inset-0 z-30 pointer-events-none">
                   {serviceGroups.map((group, groupIndex) => {
                     const { bookings, serviceName, startTime } = group;
@@ -813,6 +823,7 @@ export function CalendarGrid({ currentDate, onTimeSlotClick, onBookingClick, boo
         </div>
       </div>
 
+      {/* Bouton flottant */}
       <button
         onClick={scrollToToday}
         className="fixed bottom-6 right-6 z-40 p-4 bg-gradient-to-r from-green-500 to-emerald-500 text-white rounded-full hover:from-green-600 hover:to-emerald-600 transition-all duration-300 transform hover:scale-110 shadow-2xl border-2 border-white/20 backdrop-blur-sm"
@@ -827,6 +838,7 @@ export function CalendarGrid({ currentDate, onTimeSlotClick, onBookingClick, boo
         </div>
       </button>
 
+      {/* Modal */}
       <ServiceBookingModal
         isOpen={serviceModalOpen}
         onClose={() => setServiceModalOpen(false)}

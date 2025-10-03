@@ -260,8 +260,8 @@ export function DashboardPage() {
 
   return (
     <>
-      <div className="main-content-safe overflow-auto bg-gradient-to-br from-blue-50 via-purple-50 to-pink-50">
-        <div className="p-4 sm:p-6 mb-6 sm:mb-8">
+      <div className="p-4 sm:p-6 h-full overflow-y-auto bg-gradient-to-br from-blue-50 via-purple-50 to-pink-50">
+        <div className="mb-6 sm:mb-8">
           <div className="flex items-center justify-between mb-4">
             <div>
               <h1 className="text-2xl sm:text-3xl font-bold bg-gradient-to-r from-blue-600 to-purple-600 bg-clip-text text-transparent">
@@ -286,7 +286,7 @@ export function DashboardPage() {
           </div>
         </div>
 
-        <div className="px-4 sm:px-6 mb-4 sm:mb-6">
+        <div className="mb-4 sm:mb-6">
           <div className="flex gap-1 sm:gap-2 bg-white rounded-2xl p-2 shadow-lg w-full sm:w-fit overflow-x-auto">
             {[
               { key: 'today', label: 'Aujourd\'hui' },
@@ -308,7 +308,7 @@ export function DashboardPage() {
           </div>
         </div>
 
-        <div className="px-4 sm:px-6 grid grid-cols-2 lg:grid-cols-4 gap-3 sm:gap-6 mb-6 sm:mb-8">
+        <div className="grid grid-cols-2 lg:grid-cols-4 gap-3 sm:gap-6 mb-6 sm:mb-8">
           <PermissionGate permission="view_revenue" showMessage={false} 
             alternative={
               <div className="bg-gradient-to-r from-gray-400 to-gray-500 rounded-xl sm:rounded-2xl p-4 sm:p-6 text-white transform hover:scale-105 transition-all duration-300 shadow-lg">
@@ -412,7 +412,7 @@ export function DashboardPage() {
           </PermissionGate>
         </div>
 
-        <div className="px-4 sm:px-6 grid grid-cols-1 lg:grid-cols-3 gap-4 sm:gap-8 pb-6">
+        <div className="grid grid-cols-1 lg:grid-cols-3 gap-4 sm:gap-8">
           <div className="lg:col-span-2">
             <div className="bg-white rounded-xl sm:rounded-2xl shadow-lg p-4 sm:p-6">
               <div className="flex items-center gap-3 mb-4 sm:mb-6">
