@@ -11,7 +11,7 @@ import { Navbar } from './components/Layout/Navbar';
 import { PluginRoute } from './components/Plugins/PluginRoute';
 import { useAuth } from './contexts/AuthContext';
 
-type Page = 'dashboard' | 'calendar' | 'services' | 'admin' | 'emails' | 'reports' | 'multi-user' | 'pos';
+type Page = 'dashboard' | 'calendar' | 'bookings-list' | 'clients' | 'services' | 'admin' | 'emails' | 'reports' | 'multi-user' | 'pos';
 
 function App() {
   const { user, loading } = useAuth();
@@ -30,7 +30,11 @@ function App() {
       case 'dashboard':
         return <DashboardPage />;
       case 'calendar':
-        return <CalendarPage />;
+        return <CalendarPage view="calendar" />;
+      case 'bookings-list':
+        return <CalendarPage view="list" />;
+      case 'clients':
+        return <CalendarPage view="clients" />;
       case 'services':
         return <ServicesPage />;
       case 'admin':
