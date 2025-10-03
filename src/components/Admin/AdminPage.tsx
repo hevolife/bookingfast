@@ -19,7 +19,6 @@ export function AdminPage() {
   const [isSuperAdmin, setIsSuperAdmin] = useState(false);
   const [checkingAdmin, setCheckingAdmin] = useState(true);
 
-  // Vérifier si l'utilisateur est super admin
   React.useEffect(() => {
     const checkSuperAdmin = async () => {
       setCheckingAdmin(true);
@@ -86,7 +85,6 @@ export function AdminPage() {
     },
   ];
 
-  // Ajouter l'onglet Plugins seulement pour les propriétaires
   if (isOwner) {
     tabs.push({
       id: 'plugins', 
@@ -96,7 +94,6 @@ export function AdminPage() {
     });
   }
 
-  // Ajouter l'onglet Équipe seulement pour les propriétaires
   if (isOwner) {
     tabs.push({
       id: 'team', 
@@ -106,7 +103,6 @@ export function AdminPage() {
     });
   }
 
-  // Ajouter l'onglet Super Admin si l'utilisateur est super admin
   if (isSuperAdmin && !checkingAdmin) {
     console.log('👑 Ajout de l\'onglet Super Admin');
     tabs.push({
@@ -143,7 +139,6 @@ export function AdminPage() {
 
   return (
     <div className="p-4 sm:p-6 h-full overflow-y-auto bg-gradient-to-br from-blue-50 via-purple-50 to-pink-50 mobile-optimized">
-      {/* Header */}
       <div className="mb-6 sm:mb-8">
         <div className="flex items-center gap-3 mb-2">
           {activeTab === 'superadmin' && (
@@ -166,7 +161,6 @@ export function AdminPage() {
           </div>
         </div>
       
-      {/* Navigation - Masquer si on est en mode Super Admin */}
       {activeTab !== 'superadmin' && (
         <div className="mb-6 sm:mb-8">
           <div className="flex flex-col sm:flex-row gap-2 bg-white rounded-2xl p-2 shadow-lg w-full sm:w-fit overflow-x-auto">
@@ -196,7 +190,6 @@ export function AdminPage() {
       )}
       </div>
       
-      {/* Content */}
       <div className={activeTab === 'superadmin' ? '' : 'bg-white rounded-xl sm:rounded-2xl shadow-lg p-4 sm:p-6'}>
         {renderContent()}
       </div>
