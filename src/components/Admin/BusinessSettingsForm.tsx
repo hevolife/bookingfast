@@ -1,5 +1,5 @@
 import React, { useState, useEffect } from 'react';
-import { Save, Building2, Palette, Clock, Euro, Mail, CreditCard, Eye, EyeOff, Globe, Shield, AlertTriangle, CheckCircle } from 'lucide-react';
+import { Save, Building2, Palette, Clock, Euro, Mail, CreditCard, Eye, EyeOff, Globe, Shield, AlertTriangle, CheckCircle, Percent } from 'lucide-react';
 import { useBusinessSettings } from '../../hooks/useBusinessSettings';
 import { BusinessSettings } from '../../types';
 import { Button } from '../UI/Button';
@@ -186,6 +186,98 @@ export function BusinessSettingsForm() {
                 </option>
               ))}
             </select>
+          </div>
+        </div>
+      </div>
+
+      {/* Configuration TVA/Taxe */}
+      <div className="bg-gradient-to-r from-emerald-50 to-teal-50 rounded-xl sm:rounded-2xl p-4 sm:p-6 border border-emerald-200">
+        <h2 className="text-lg sm:text-xl font-bold text-gray-900 mb-4 sm:mb-6 flex items-center gap-3">
+          <Percent className="w-6 h-6 text-emerald-600" />
+          Configuration TVA / Taxe de vente
+        </h2>
+
+        <div className="bg-blue-50 border border-blue-200 rounded-xl p-4 mb-6">
+          <div className="flex items-start gap-3">
+            <div className="w-10 h-10 bg-blue-100 rounded-lg flex items-center justify-center flex-shrink-0">
+              <Percent className="w-5 h-5 text-blue-600" />
+            </div>
+            <div className="flex-1">
+              <h4 className="font-bold text-blue-800 mb-2">💡 Comment ça fonctionne ?</h4>
+              <div className="text-blue-700 text-sm space-y-1">
+                <div>• Configurez votre taux de TVA/taxe (ex: 20% pour la France)</div>
+                <div>• Dans les services, vous entrez le prix <strong>TTC</strong> (toutes taxes comprises)</div>
+                <div>• Le prix <strong>HT</strong> (hors taxes) est calculé automatiquement</div>
+                <div>• Formule: HT = TTC ÷ (1 + taux/100)</div>
+              </div>
+            </div>
+          </div>
+        </div>
+
+        <div className="grid grid-cols-1 sm:grid-cols-2 gap-4 sm:gap-6">
+          <div>
+            <label className="block text-sm font-medium text-gray-700 mb-2">
+              Taux de TVA / Taxe (%)
+            </label>
+            <div className="relative">
+              <input
+                type="number"
+                min="0"
+                max="100"
+                step="0.01"
+                value={formData.tax_rate ?? 20}
+                onChange={(e) => setFormData(prev => ({ 
+                  ...prev, 
+                  tax_rate: e.target.value === '' ? 0 : parseFloat(e.target.value) || 0 
+                }))}
+                className="w-full p-3 pr-12 border border-gray-300 rounded-xl focus:ring-2 focus:ring-emerald-500 focus:border-emerald-500 transition-all duration-300 text-base"
+                placeholder="20"
+              />
+              <div className="absolute right-3 top-1/2 transform -translate-y-1/2 text-gray-500 font-medium">
+                %
+              </div>
+            </div>
+            <div className="text-xs text-gray-500 mt-1">
+              Taux standard en France: 20% | Taux réduit: 5.5% ou 10%
+            </div>
+          </div>
+
+          <div className="bg-gradient-to-r from-emerald-100 to-teal-100 rounded-xl p-4 border border-emerald-300">
+            <div className="text-sm font-medium text-emerald-800 mb-2">
+              📊 Exemple de calcul
+            </div>
+            <div className="space-y-2 text-sm">
+              <div className="flex justify-between">
+                <span className="text-emerald-700">Prix TTC:</span>
+                <span className="font-bold text-emerald-900">120.00€</span>
+              </div>
+              <div className="flex justify-between">
+                <span className="text-emerald-700">Taux TVA:</span>
+                <span className="font-bold text-emerald-900">{formData.tax_rate ?? 20}%</span>
+              </div>
+              <div className="border-t border-emerald-300 pt-2 flex justify-between">
+                <span className="text-emerald-700">Prix HT:</span>
+                <span className="font-bold text-emerald-900">
+                  {(120 / (1 + (formData.tax_rate ?? 20) / 100)).toFixed(2)}€
+                </span>
+              </div>
+              <div className="flex justify-between text-xs">
+                <span className="text-emerald-600">Montant TVA:</span>
+                <span className="font-medium text-emerald-800">
+                  {(120 - (120 / (1 + (formData.tax_rate ?? 20) / 100))).toFixed(2)}€
+                </span>
+              </div>
+            </div>
+          </div>
+        </div>
+
+        <div className="mt-4 bg-yellow-50 border border-yellow-200 rounded-xl p-4">
+          <div className="flex items-start gap-3">
+            <AlertTriangle className="w-5 h-5 text-yellow-600 flex-shrink-0 mt-0.5" />
+            <div className="text-sm text-yellow-800">
+              <strong>Important:</strong> Ce taux s'applique à tous vos services. 
+              Les prix HT seront recalculés automatiquement pour tous les services existants.
+            </div>
           </div>
         </div>
       </div>

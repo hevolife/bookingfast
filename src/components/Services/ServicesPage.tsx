@@ -1,19 +1,23 @@
-import React, { useState } from 'react';
-import { Plus, CreditCard as Edit, Trash2, Package, Save, X, Image, Clock } from 'lucide-react';
+import React, { useState, useEffect } from 'react';
+import { Plus, CreditCard as Edit, Trash2, Package, Save, X, Image, Clock, Calculator } from 'lucide-react';
 import { useServices } from '../../hooks/useServices';
 import { useTeam } from '../../hooks/useTeam';
+import { useBusinessSettings } from '../../hooks/useBusinessSettings';
 import { PermissionGate, UsageLimitIndicator } from '../UI/PermissionGate';
 import { Service } from '../../types';
+import { calculatePriceHT, formatPrice } from '../../lib/taxCalculations';
 
 export function ServicesPage() {
   const { services, loading, addService, updateService, deleteService } = useServices();
   const { hasPermission, getUsageLimits } = useTeam();
+  const { settings } = useBusinessSettings();
   const [isModalOpen, setIsModalOpen] = useState(false);
   const [editingService, setEditingService] = useState<Service | null>(null);
   const [saving, setSaving] = useState(false);
   
   const usageLimits = getUsageLimits();
   const userServicesCount = services.filter(s => s.description !== 'Service personnalisé').length;
+  const taxRate = settings?.tax_rate ?? 20;
   
   const handleAvailabilityChange = (day: string, field: 'closed', value: any) => {
     setFormData(prev => ({
@@ -89,6 +93,14 @@ export function ServicesPage() {
     }
   });
 
+  // Recalculer le prix HT quand le prix TTC change
+  useEffect(() => {
+    if (formData.price_ttc > 0) {
+      const calculatedHT = calculatePriceHT(formData.price_ttc, taxRate);
+      setFormData(prev => ({ ...prev, price_ht: calculatedHT }));
+    }
+  }, [formData.price_ttc, taxRate]);
+
   const resetForm = () => {
     setFormData({
       name: '',
@@ -152,10 +164,16 @@ export function ServicesPage() {
     }
     
     try {
+      // Recalculer le prix HT avant la sauvegarde
+      const finalData = {
+        ...formData,
+        price_ht: calculatePriceHT(formData.price_ttc, taxRate)
+      };
+
       if (editingService) {
-        await updateService(editingService.id, formData);
+        await updateService(editingService.id, finalData);
       } else {
-        await addService(formData);
+        await addService(finalData);
       }
       handleCloseModal();
     } catch (error) {
@@ -188,16 +206,14 @@ export function ServicesPage() {
   }
 
   return (
-    <div 
-      className="p-4 sm:p-6 h-full overflow-y-auto bg-gradient-to-br from-blue-50 via-purple-50 to-pink-50 mobile-optimized"
-      style={{ paddingBottom: 'max(6rem, calc(6rem + env(safe-area-inset-bottom)))' }}
-    >
+    <div className="p-4 sm:p-6 h-full overflow-y-auto bg-gradient-to-br from-blue-50 via-purple-50 to-pink-50 mobile-optimized">
+      {/* Header */}
       <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4 mb-6 sm:mb-8">
         <div>
           <h1 className="text-2xl sm:text-3xl font-bold bg-gradient-to-r from-purple-600 to-pink-600 bg-clip-text text-transparent">
             Services
           </h1>
-          <p className="text-sm sm:text-base text-gray-600 mt-2">Gérez vos services et tarifs</p>
+          <p className="text-sm sm:text-base text-gray-600 mt-2">Gérez vos services et tarifs (TVA: {taxRate}%)</p>
         </div>
         
         <PermissionGate permission="create_service">
@@ -216,6 +232,7 @@ export function ServicesPage() {
         </PermissionGate>
       </div>
 
+      {/* Services Grid */}
       <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4 sm:gap-6">
         {services.filter(service => service.description !== 'Service personnalisé').map((service, index) => (
           <div
@@ -241,15 +258,21 @@ export function ServicesPage() {
               <p className="text-gray-600 text-xs sm:text-sm mb-2 sm:mb-3 line-clamp-2">{service.description}</p>
               
               <div className="space-y-1 sm:space-y-2 text-xs sm:text-sm">
+                <div className="flex justify-between items-center bg-gradient-to-r from-blue-50 to-purple-50 p-2 rounded-lg">
+                  <span className="text-gray-600">Prix TTC:</span>
+                  <span className="font-bold text-green-600 text-base">{formatPrice(service.price_ttc)}</span>
+                </div>
                 <div className="flex justify-between">
                   <span className="text-gray-500">Prix HT:</span>
-                  <span className="font-medium">{service.price_ht.toFixed(2)}€</span>
+                  <span className="font-medium text-gray-700">{formatPrice(service.price_ht)}</span>
                 </div>
-                <div className="flex justify-between">
-                  <span className="text-gray-500">Prix TTC:</span>
-                  <span className="font-bold text-green-600">{service.price_ttc.toFixed(2)}€</span>
+                <div className="flex justify-between text-xs">
+                  <span className="text-gray-400">TVA ({taxRate}%):</span>
+                  <span className="font-medium text-gray-500">
+                    {formatPrice(service.price_ttc - service.price_ht)}
+                  </span>
                 </div>
-                <div className="flex justify-between">
+                <div className="flex justify-between pt-2 border-t border-gray-100">
                   <span className="text-gray-500">Durée:</span>
                   <span className="font-medium">{service.duration_minutes} min</span>
                 </div>
@@ -313,9 +336,11 @@ export function ServicesPage() {
         </div>
       )}
 
+      {/* Modal */}
       {isModalOpen && (
         <div className="fixed inset-0 bg-black/60 backdrop-blur-sm flex items-end sm:items-center justify-center z-50 animate-fadeIn modal-container">
           <div className="bg-white w-full max-w-2xl max-h-[95vh] sm:max-h-[90vh] overflow-y-auto sm:rounded-3xl shadow-2xl transform animate-slideUp modal-content">
+            {/* Header */}
             <div className="bg-gradient-to-r from-purple-600 via-pink-600 to-red-500 p-4 sm:p-6 sm:rounded-t-3xl relative overflow-hidden modal-header">
               <div className="absolute inset-0 bg-gradient-to-r from-transparent via-white/20 to-transparent -skew-x-12 animate-shimmer"></div>
               
@@ -344,6 +369,7 @@ export function ServicesPage() {
               </div>
             </div>
 
+            {/* Form */}
             <form onSubmit={handleSubmit} className="p-4 sm:p-6 space-y-4 sm:space-y-6 modal-body">
               <div className="grid grid-cols-1 sm:grid-cols-2 gap-4 sm:gap-6">
                 <div className="md:col-span-2">
@@ -360,34 +386,58 @@ export function ServicesPage() {
                   />
                 </div>
 
-                <div>
-                  <label className="block text-sm font-medium text-gray-700 mb-2">
-                    Prix HT (€)
-                  </label>
-                  <input
-                    type="number"
-                    step="0.01"
-                    min="0"
-                    value={formData.price_ht === 0 ? '' : formData.price_ht}
-                    onChange={(e) => setFormData(prev => ({ ...prev, price_ht: e.target.value === '' ? 0 : parseFloat(e.target.value) || 0 }))}
-                    required
-                    className="w-full p-3 border border-gray-300 rounded-lg focus:ring-2 focus:ring-purple-500 focus:border-purple-500 transition-all duration-300 mobile-form-input"
-                  />
-                </div>
+                {/* Section Prix avec calcul automatique */}
+                <div className="md:col-span-2 bg-gradient-to-r from-emerald-50 to-teal-50 rounded-xl p-4 border border-emerald-200">
+                  <div className="flex items-center gap-2 mb-4">
+                    <Calculator className="w-5 h-5 text-emerald-600" />
+                    <h3 className="font-bold text-gray-900">Tarification (TVA: {taxRate}%)</h3>
+                  </div>
 
-                <div>
-                  <label className="block text-sm font-medium text-gray-700 mb-2">
-                    Prix TTC (€)
-                  </label>
-                  <input
-                    type="number"
-                    step="0.01"
-                    min="0"
-                    value={formData.price_ttc === 0 ? '' : formData.price_ttc}
-                    onChange={(e) => setFormData(prev => ({ ...prev, price_ttc: e.target.value === '' ? 0 : parseFloat(e.target.value) || 0 }))}
-                    required
-                    className="w-full p-3 border border-gray-300 rounded-lg focus:ring-2 focus:ring-purple-500 focus:border-purple-500 transition-all duration-300 mobile-form-input"
-                  />
+                  <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+                    <div>
+                      <label className="block text-sm font-medium text-gray-700 mb-2">
+                        Prix TTC (€) *
+                      </label>
+                      <input
+                        type="number"
+                        step="0.01"
+                        min="0"
+                        value={formData.price_ttc === 0 ? '' : formData.price_ttc}
+                        onChange={(e) => {
+                          const ttc = e.target.value === '' ? 0 : parseFloat(e.target.value) || 0;
+                          setFormData(prev => ({ 
+                            ...prev, 
+                            price_ttc: ttc
+                          }));
+                        }}
+                        required
+                        className="w-full p-3 border border-gray-300 rounded-lg focus:ring-2 focus:ring-emerald-500 focus:border-emerald-500 transition-all duration-300 mobile-form-input"
+                        placeholder="120.00"
+                      />
+                      <div className="text-xs text-gray-500 mt-1">
+                        Prix toutes taxes comprises
+                      </div>
+                    </div>
+
+                    <div className="bg-white rounded-lg p-3 border border-emerald-300">
+                      <label className="block text-sm font-medium text-gray-700 mb-2">
+                        Prix HT (calculé automatiquement)
+                      </label>
+                      <div className="text-2xl font-bold text-emerald-600">
+                        {formatPrice(formData.price_ht)}
+                      </div>
+                      <div className="text-xs text-gray-500 mt-1">
+                        TVA: {formatPrice(formData.price_ttc - formData.price_ht)}
+                      </div>
+                    </div>
+                  </div>
+
+                  <div className="mt-3 bg-blue-50 border border-blue-200 rounded-lg p-3">
+                    <div className="text-xs text-blue-700">
+                      <strong>💡 Calcul automatique:</strong> Le prix HT est calculé à partir du prix TTC avec la formule: 
+                      HT = TTC ÷ (1 + {taxRate}%)
+                    </div>
+                  </div>
                 </div>
 
                 <div>
@@ -430,9 +480,10 @@ export function ServicesPage() {
                     placeholder="Ex: Jet ski, Vélo, Chambre..."
                   />
                   <div className="text-xs text-gray-500 mt-1">
-                    Ce mot remplacera "participants" dans la réservation (ex: "Nombre de Jet ski")
+                    Ce mot remplacera "participants" dans la réservation
                   </div>
                 </div>
+
                 <div className="md:col-span-2">
                   <label className="block text-sm font-medium text-gray-700 mb-2">
                     URL de l'image (optionnel)
@@ -462,6 +513,7 @@ export function ServicesPage() {
                   />
                 </div>
 
+                {/* Horaires de disponibilité */}
                 <div className="md:col-span-2">
                   <label className="block text-sm font-medium text-gray-700 mb-4">
                     Horaires de disponibilité du service
@@ -547,6 +599,7 @@ export function ServicesPage() {
                 </div>
               </div>
 
+              {/* Actions */}
               <div className="flex flex-col sm:flex-row gap-3 pt-4">
                 <button
                   type="button"

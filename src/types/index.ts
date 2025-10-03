@@ -60,7 +60,6 @@ export interface Booking {
   payment_link?: string;
   transactions?: Transaction[];
   booking_status: 'pending' | 'confirmed' | 'cancelled';
-  assigned_user_id?: string | null;
   custom_service_data?: {
     name: string;
     price: number;
@@ -103,6 +102,7 @@ export interface BusinessSettings {
   stripe_secret_key?: string;
   stripe_webhook_secret?: string;
   timezone: string;
+  tax_rate?: number; // Nouveau champ pour le taux de TVA (ex: 20 pour 20%)
   created_at?: string;
   updated_at?: string;
   iframe_services?: string[]; // IDs des services visibles sur l'iframe
