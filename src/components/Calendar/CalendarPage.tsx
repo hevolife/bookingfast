@@ -137,7 +137,7 @@ export function CalendarPage({ view = 'calendar' }: CalendarPageProps) {
       {canViewTeamFilter && isMultiUserActive && teamMembers.length > 0 && view === 'calendar' && (
         <div className="bg-white border-b border-gray-200 px-4 py-3">
           <div className="flex items-center gap-3">
-            <div className="flex items-center gap-2 text-gray-700 flex-shrink-0">
+            <div className="hidden md:flex items-center gap-2 text-gray-700 flex-shrink-0">
               <UserCheck className="w-5 h-5 text-purple-600" />
               <span className="font-medium text-sm">Filtrer par membre :</span>
             </div>
@@ -171,7 +171,7 @@ export function CalendarPage({ view = 'calendar' }: CalendarPageProps) {
                   title="Réinitialiser le filtre"
                 >
                   <X className="w-4 h-4" />
-                  Réinitialiser
+                  <span className="hidden md:inline">Réinitialiser</span>
                 </button>
               )}
             </div>
