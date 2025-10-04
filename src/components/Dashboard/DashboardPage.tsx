@@ -18,7 +18,10 @@ import {
   Award,
   Crown,
   AlertTriangle,
-  Settings
+  Settings,
+  Bell,
+  X,
+  Check
 } from 'lucide-react';
 import { useBookings } from '../../hooks/useBookings';
 import { useServices } from '../../hooks/useServices';
@@ -28,6 +31,7 @@ import { Booking, Service } from '../../types';
 import { getBusinessTimezone, getCurrentDateInTimezone, formatInBusinessTimezone } from '../../lib/timezone';
 import { useBusinessSettings } from '../../hooks/useBusinessSettings';
 import { Modal } from '../UI/Modal';
+import { useTeamInvitations } from '../../hooks/useTeamInvitations';
 
 interface DashboardStats {
   todayRevenue: number;
@@ -47,9 +51,12 @@ export function DashboardPage() {
   const { services, loading: servicesLoading } = useServices();
   const { hasPermission, getUserRoleInfo, getUsageLimits, canViewFinancialData } = useTeam();
   const { settings } = useBusinessSettings();
+  const { pendingInvitations, acceptInvitation, rejectInvitation, loading: invitationsLoading } = useTeamInvitations();
   const [selectedPeriod, setSelectedPeriod] = useState<'today' | 'week' | 'month'>('today');
   const [selectedBooking, setSelectedBooking] = useState<Booking | null>(null);
   const [showBookingModal, setShowBookingModal] = useState(false);
+  const [showInvitationsModal, setShowInvitationsModal] = useState(false);
+  const [processingInvitation, setProcessingInvitation] = useState<string | null>(null);
   
   const userRole = getUserRoleInfo();
   const usageLimits = getUsageLimits();
@@ -198,6 +205,30 @@ export function DashboardPage() {
     window.open(`tel:${phoneNumber}`, '_self');
   };
 
+  const handleAcceptInvitation = async (invitationId: string) => {
+    setProcessingInvitation(invitationId);
+    try {
+      await acceptInvitation(invitationId);
+      alert('✅ Invitation acceptée ! Vous faites maintenant partie de l\'équipe.');
+    } catch (error) {
+      alert(`Erreur: ${error instanceof Error ? error.message : 'Erreur inconnue'}`);
+    } finally {
+      setProcessingInvitation(null);
+    }
+  };
+
+  const handleRejectInvitation = async (invitationId: string) => {
+    setProcessingInvitation(invitationId);
+    try {
+      await rejectInvitation(invitationId);
+      alert('Invitation refusée');
+    } catch (error) {
+      alert(`Erreur: ${error instanceof Error ? error.message : 'Erreur inconnue'}`);
+    } finally {
+      setProcessingInvitation(null);
+    }
+  };
+
   const getRoleIcon = (roleKey: string) => {
     switch (roleKey) {
       case 'owner': return Crown;
@@ -264,6 +295,32 @@ export function DashboardPage() {
         className="p-4 sm:p-6 h-full overflow-y-auto bg-gradient-to-br from-blue-50 via-purple-50 to-pink-50"
         style={{ paddingBottom: 'max(6rem, calc(6rem + env(safe-area-inset-bottom)))' }}
       >
+        {/* Notifications d'invitations */}
+        {pendingInvitations.length > 0 && (
+          <div className="mb-6 bg-gradient-to-r from-orange-50 to-pink-50 border-2 border-orange-200 rounded-2xl p-4 animate-fadeIn">
+            <div className="flex items-start gap-3">
+              <div className="w-10 h-10 bg-gradient-to-r from-orange-500 to-pink-500 rounded-xl flex items-center justify-center flex-shrink-0">
+                <Bell className="w-5 h-5 text-white" />
+              </div>
+              <div className="flex-1">
+                <h3 className="font-bold text-orange-800 mb-1">
+                  {pendingInvitations.length} invitation(s) en attente
+                </h3>
+                <p className="text-sm text-orange-700 mb-3">
+                  Vous avez été invité à rejoindre {pendingInvitations.length === 1 ? 'une équipe' : 'des équipes'}
+                </p>
+                <button
+                  onClick={() => setShowInvitationsModal(true)}
+                  className="bg-gradient-to-r from-orange-500 to-pink-500 text-white px-4 py-2 rounded-lg hover:from-orange-600 hover:to-pink-600 transition-all duration-300 font-medium text-sm flex items-center gap-2"
+                >
+                  <Eye className="w-4 h-4" />
+                  Voir les invitations
+                </button>
+              </div>
+            </div>
+          </div>
+        )}
+
         <div className="mb-6 sm:mb-8">
           <div className="flex items-center justify-between mb-4">
             <div>
@@ -564,6 +621,71 @@ export function DashboardPage() {
         </div>
       </div>
       
+      {showInvitationsModal && (
+        <Modal
+          isOpen={showInvitationsModal}
+          onClose={() => setShowInvitationsModal(false)}
+          title="Invitations en attente"
+          size="md"
+        >
+          <div className="space-y-4">
+            {pendingInvitations.map((invitation) => (
+              <div
+                key={invitation.id}
+                className="bg-gradient-to-r from-blue-50 to-cyan-50 rounded-xl p-4 border-2 border-blue-200"
+              >
+                <div className="flex items-start gap-3 mb-3">
+                  <div className="w-10 h-10 bg-gradient-to-r from-blue-500 to-cyan-500 rounded-lg flex items-center justify-center text-white font-bold">
+                    {invitation.email.charAt(0).toUpperCase()}
+                  </div>
+                  <div className="flex-1">
+                    <h4 className="font-bold text-gray-900">Invitation d'équipe</h4>
+                    <p className="text-sm text-gray-600">De: {invitation.email}</p>
+                    <p className="text-xs text-gray-500 mt-1">
+                      Rôle: {invitation.role_name} • {invitation.permissions.length} permissions
+                    </p>
+                    <p className="text-xs text-gray-500">
+                      Expire le: {new Date(invitation.expires_at).toLocaleDateString('fr-FR')}
+                    </p>
+                  </div>
+                </div>
+                
+                <div className="flex gap-2">
+                  <button
+                    onClick={() => handleAcceptInvitation(invitation.id)}
+                    disabled={processingInvitation === invitation.id}
+                    className="flex-1 bg-gradient-to-r from-green-500 to-emerald-500 text-white px-4 py-2 rounded-lg hover:from-green-600 hover:to-emerald-600 transition-all duration-300 font-medium text-sm flex items-center justify-center gap-2 disabled:opacity-50"
+                  >
+                    {processingInvitation === invitation.id ? (
+                      <div className="w-4 h-4 border-2 border-white/30 border-t-white rounded-full animate-spin"></div>
+                    ) : (
+                      <>
+                        <Check className="w-4 h-4" />
+                        Accepter
+                      </>
+                    )}
+                  </button>
+                  <button
+                    onClick={() => handleRejectInvitation(invitation.id)}
+                    disabled={processingInvitation === invitation.id}
+                    className="flex-1 bg-gradient-to-r from-red-500 to-pink-500 text-white px-4 py-2 rounded-lg hover:from-red-600 hover:to-pink-600 transition-all duration-300 font-medium text-sm flex items-center justify-center gap-2 disabled:opacity-50"
+                  >
+                    {processingInvitation === invitation.id ? (
+                      <div className="w-4 h-4 border-2 border-white/30 border-t-white rounded-full animate-spin"></div>
+                    ) : (
+                      <>
+                        <X className="w-4 h-4" />
+                        Refuser
+                      </>
+                    )}
+                  </button>
+                </div>
+              </div>
+            ))}
+          </div>
+        </Modal>
+      )}
+
       {showBookingModal && selectedBooking && (
         <Modal
           isOpen={showBookingModal}

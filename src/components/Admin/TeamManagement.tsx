@@ -1,5 +1,5 @@
 import React, { useState } from 'react';
-import { Users, Plus, Edit, Trash2, Shield, Mail, Save, X, AlertTriangle, UserPlus, Eye, EyeOff, Crown, Star, Award, Settings, Building2, Zap, TrendingUp, Key } from 'lucide-react';
+import { Users, Plus, Edit, Trash2, Shield, Mail, Save, X, AlertTriangle, UserPlus, Eye, Crown, Star, Award, Settings, Building2, Zap, TrendingUp, Key, Clock } from 'lucide-react';
 import { useTeam } from '../../hooks/useTeam';
 import { useTeamLimit } from '../../hooks/useTeamLimit';
 import { usePlugins } from '../../hooks/usePlugins';
@@ -32,7 +32,7 @@ export function TeamManagement() {
     refetch: refetchStats
   } = useTeamLimit();
 
-  const { subscribeToPlugin, createPluginSubscription, plugins } = usePlugins();
+  const { subscribeToPlugin, plugins } = usePlugins();
   
   const [showMemberModal, setShowMemberModal] = useState(false);
   const [editingMember, setEditingMember] = useState<any>(null);
@@ -40,7 +40,6 @@ export function TeamManagement() {
   const [saving, setSaving] = useState(false);
   const [showDeleteModal, setShowDeleteModal] = useState(false);
   const [memberToDelete, setMemberToDelete] = useState<any>(null);
-  const [showPassword, setShowPassword] = useState(false);
   const [selectedRole, setSelectedRole] = useState<string>('employee');
   const [showUpgradeModal, setShowUpgradeModal] = useState(false);
   const [showPluginPermissionsModal, setShowPluginPermissionsModal] = useState(false);
@@ -48,7 +47,6 @@ export function TeamManagement() {
 
   const [memberFormData, setMemberFormData] = useState({
     email: '',
-    password: '',
     full_name: '',
     role_name: 'employee',
     permissions: [] as string[]
@@ -60,8 +58,8 @@ export function TeamManagement() {
   );
 
   const handleInviteMember = async () => {
-    if (!memberFormData.email || !memberFormData.password) {
-      alert('Email et mot de passe requis');
+    if (!memberFormData.email) {
+      alert('Email requis');
       return;
     }
 
@@ -78,7 +76,7 @@ export function TeamManagement() {
       setShowMemberModal(false);
       resetForm();
       await refetchStats();
-      alert('Membre invité avec succès !');
+      alert('✅ Invitation envoyée ! Le membre recevra une notification sur son dashboard.');
     } catch (error) {
       alert(`Erreur: ${error instanceof Error ? error.message : 'Erreur inconnue'}`);
     } finally {
@@ -152,7 +150,6 @@ export function TeamManagement() {
   const resetForm = () => {
     setMemberFormData({
       email: '',
-      password: '',
       full_name: '',
       role_name: 'employee',
       permissions: []
@@ -545,7 +542,6 @@ export function TeamManagement() {
                           setEditingMember(member);
                           setMemberFormData({
                             email: member.email || '',
-                            password: '',
                             full_name: member.full_name || '',
                             role_name: member.role_name || 'employee',
                             permissions: member.permissions || []
@@ -702,56 +698,48 @@ export function TeamManagement() {
           <div className="space-y-6">
             {!editingMember && (
               <>
-                <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
-                  <div>
-                    <label className="block text-sm font-medium text-gray-700 mb-2">
-                      Email *
-                    </label>
-                    <input
-                      type="email"
-                      value={memberFormData.email}
-                      onChange={(e) => setMemberFormData(prev => ({ ...prev, email: e.target.value.toLowerCase() }))}
-                      required
-                      className="w-full p-3 border border-gray-300 rounded-xl focus:ring-2 focus:ring-blue-500 focus:border-blue-500 transition-all duration-300"
-                      placeholder="membre@email.com"
-                    />
-                  </div>
-                  
-                  <div>
-                    <label className="block text-sm font-medium text-gray-700 mb-2">
-                      Mot de passe *
-                    </label>
-                    <div className="relative">
-                      <input
-                        type={showPassword ? 'text' : 'password'}
-                        value={memberFormData.password}
-                        onChange={(e) => setMemberFormData(prev => ({ ...prev, password: e.target.value }))}
-                        required
-                        minLength={6}
-                        className="w-full p-3 pr-12 border border-gray-300 rounded-xl focus:ring-2 focus:ring-blue-500 focus:border-blue-500 transition-all duration-300"
-                        placeholder="Minimum 6 caractères"
-                      />
-                      <button
-                        type="button"
-                        onClick={() => setShowPassword(!showPassword)}
-                        className="absolute right-3 top-1/2 transform -translate-y-1/2 text-gray-400 hover:text-gray-600"
-                      >
-                        {showPassword ? <EyeOff className="w-5 h-5" /> : <Eye className="w-5 h-5" />}
-                      </button>
+                <div className="bg-blue-50 border border-blue-200 rounded-xl p-4">
+                  <div className="flex items-start gap-3">
+                    <Clock className="w-5 h-5 text-blue-600 flex-shrink-0 mt-0.5" />
+                    <div className="text-sm text-blue-800">
+                      <p className="font-medium mb-1">💡 Comment ça marche ?</p>
+                      <ol className="list-decimal list-inside space-y-1 text-blue-700">
+                        <li>Entrez l'email d'un utilisateur BookingFast existant</li>
+                        <li>Le membre recevra une notification sur son dashboard</li>
+                        <li>Il pourra accepter ou refuser l'invitation</li>
+                        <li>Une fois acceptée, il rejoindra votre équipe</li>
+                      </ol>
                     </div>
                   </div>
+                </div>
+
+                <div>
+                  <label className="block text-sm font-medium text-gray-700 mb-2">
+                    Email du membre *
+                  </label>
+                  <input
+                    type="email"
+                    value={memberFormData.email}
+                    onChange={(e) => setMemberFormData(prev => ({ ...prev, email: e.target.value.toLowerCase() }))}
+                    required
+                    className="w-full p-3 border border-gray-300 rounded-xl focus:ring-2 focus:ring-blue-500 focus:border-blue-500 transition-all duration-300"
+                    placeholder="membre@email.com"
+                  />
+                  <p className="text-xs text-gray-500 mt-1">
+                    ⚠️ L'utilisateur doit déjà avoir un compte BookingFast
+                  </p>
                 </div>
                 
                 <div>
                   <label className="block text-sm font-medium text-gray-700 mb-2">
-                    Nom complet
+                    Nom complet (optionnel)
                   </label>
                   <input
                     type="text"
                     value={memberFormData.full_name}
                     onChange={(e) => setMemberFormData(prev => ({ ...prev, full_name: e.target.value }))}
                     className="w-full p-3 border border-gray-300 rounded-xl focus:ring-2 focus:ring-blue-500 focus:border-blue-500 transition-all duration-300"
-                    placeholder="Nom complet (optionnel)"
+                    placeholder="Jean Dupont"
                   />
                 </div>
               </>
@@ -879,18 +867,18 @@ export function TeamManagement() {
               </button>
               <button
                 onClick={editingMember ? handleUpdatePermissions : handleInviteMember}
-                disabled={saving || (!editingMember && (!memberFormData.email || !memberFormData.password))}
+                disabled={saving || (!editingMember && !memberFormData.email)}
                 className="flex-1 bg-gradient-to-r from-blue-600 to-purple-600 text-white px-4 py-3 rounded-xl hover:from-blue-700 hover:to-purple-700 disabled:opacity-50 disabled:cursor-not-allowed transition-all duration-300 font-medium flex items-center justify-center gap-2"
               >
                 {saving ? (
                   <>
                     <div className="w-4 h-4 border-2 border-white/30 border-t-white rounded-full animate-spin"></div>
-                    Sauvegarde...
+                    {editingMember ? 'Sauvegarde...' : 'Envoi...'}
                   </>
                 ) : (
                   <>
-                    <Save className="w-4 h-4" />
-                    {editingMember ? 'Modifier' : 'Inviter'}
+                    <Mail className="w-4 h-4" />
+                    {editingMember ? 'Modifier' : 'Envoyer l\'invitation'}
                   </>
                 )}
               </button>

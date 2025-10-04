@@ -13,6 +13,7 @@ export interface TeamMember {
   is_active: boolean;
   created_at: string;
   updated_at: string;
+  full_name?: string;
 }
 
 export function useTeamMembers() {
@@ -34,17 +35,37 @@ export function useTeamMembers() {
     }
 
     try {
+      console.log('🔍 Récupération membres équipe pour:', user.id);
+
+      // Récupérer tous les membres de l'équipe (owner_id = user.id)
       const { data, error } = await supabase
         .from('team_members')
-        .select('*')
+        .select('id, user_id, owner_id, firstname, lastname, email, phone, full_name, is_active, created_at, updated_at')
         .eq('owner_id', user.id)
         .eq('is_active', true)
         .order('firstname');
 
-      if (error) throw error;
-      setTeamMembers(data || []);
+      if (error) {
+        console.error('❌ Erreur récupération membres:', error);
+        throw error;
+      }
+
+      console.log('✅ Membres récupérés:', data);
+
+      // Enrichir les données si nécessaire
+      const enrichedMembers = data.map(member => ({
+        ...member,
+        // Utiliser full_name si firstname/lastname sont vides
+        firstname: member.firstname || member.full_name?.split(' ')[0] || '',
+        lastname: member.lastname || member.full_name?.split(' ').slice(1).join(' ') || '',
+        // S'assurer que l'email est présent
+        email: member.email || ''
+      }));
+
+      console.log('📊 Membres enrichis:', enrichedMembers);
+      setTeamMembers(enrichedMembers);
     } catch (err) {
-      console.error('Erreur chargement membres équipe:', err);
+      console.error('❌ Erreur chargement membres équipe:', err);
       setTeamMembers([]);
     } finally {
       setLoading(false);
