@@ -53,7 +53,7 @@ export function IframeBookingPage() {
     try {
       setError(null);
       
-      if (!isSupabaseConfigured()) {
+      if (!isSupabaseConfigured) {
         console.log('🎭 Mode démo - données par défaut');
         const demoData: PublicBookingData = {
           user: { id: userId, email: 'demo@example.com', full_name: 'Démo Utilisateur' },
@@ -140,6 +140,12 @@ export function IframeBookingPage() {
       // Filtrer les services selon la configuration iframe
       let filteredServices = result.services || [];
       
+      // 🚫 BLOQUER LES SERVICES PERSONNALISÉS
+      filteredServices = filteredServices.filter(service => 
+        service.description !== 'Service personnalisé'
+      );
+      console.log('🚫 Services personnalisés filtrés');
+      
       if (allowedServices.length > 0) {
         // Si des services spécifiques sont demandés via l'URL
         filteredServices = filteredServices.filter(service => 
@@ -153,7 +159,7 @@ export function IframeBookingPage() {
         );
         console.log('⚙️ Services filtrés par paramètres:', filteredServices.length, 'sur', result.services?.length || 0);
       }
-      // Sinon, afficher tous les services
+      // Sinon, afficher tous les services (sauf personnalisés)
       
       setData({
         ...result,
@@ -337,7 +343,7 @@ export function IframeBookingPage() {
         ? data.settings.deposit_fixed_amount || 20
         : (totalAmount * depositPercentage) / 100;
       
-      if (isSupabaseConfigured()) {
+      if (isSupabaseConfigured) {
         // Vérifier que Stripe est configuré
         if (!data.settings?.stripe_enabled || !data.settings?.stripe_public_key || !data.settings?.stripe_secret_key) {
           throw new Error('Le paiement en ligne n\'est pas configuré. Contactez l\'établissement.');
@@ -469,10 +475,12 @@ export function IframeBookingPage() {
 
   if (loading) {
     return (
-      <div className="min-h-screen bg-gradient-to-br from-blue-50 via-purple-50 to-pink-50 flex items-center justify-center p-4">
+      <div className="min-h-screen bg-white flex items-center justify-center p-4">
         <div className="text-center">
-          <div className="w-16 h-16 border-4 border-purple-200 rounded-full animate-spin mx-auto mb-4"></div>
-          <div className="absolute top-0 left-0 w-16 h-16 border-4 border-purple-600 rounded-full animate-spin border-t-transparent mx-auto"></div>
+          <div className="relative w-16 h-16 mx-auto mb-4">
+            <div className="w-16 h-16 border-4 border-purple-200 rounded-full animate-spin"></div>
+            <div className="absolute top-0 left-0 w-16 h-16 border-4 border-purple-600 rounded-full animate-spin border-t-transparent"></div>
+          </div>
           <p className="text-gray-600 text-lg">Chargement...</p>
         </div>
       </div>
@@ -481,8 +489,8 @@ export function IframeBookingPage() {
 
   if (error || !data) {
     return (
-      <div className="min-h-screen bg-gradient-to-br from-red-50 to-pink-50 flex items-center justify-center p-4">
-        <div className="text-center p-8 bg-white rounded-3xl shadow-xl max-w-md">
+      <div className="min-h-screen bg-white flex items-center justify-center p-4">
+        <div className="text-center p-8 bg-white rounded-3xl shadow-xl max-w-md border border-gray-200">
           <div className="w-16 h-16 bg-red-100 rounded-full flex items-center justify-center mx-auto mb-4">
             <Package className="w-8 h-8 text-red-500" />
           </div>
@@ -501,7 +509,7 @@ export function IframeBookingPage() {
   ];
 
   return (
-    <div className="min-h-screen bg-transparent">
+    <div className="min-h-screen bg-white">
       {/* Main Content */}
       <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-4 sm:py-6">
         {/* Progress Indicator - Compact */}
@@ -540,7 +548,7 @@ export function IframeBookingPage() {
                 <div
                   key={service.id}
                   onClick={() => handleServiceSelect(service)}
-                  className="group bg-white rounded-2xl sm:rounded-3xl shadow-lg hover:shadow-2xl transition-all duration-500 cursor-pointer transform hover:scale-[1.02] overflow-hidden animate-fadeIn"
+                  className="group bg-white rounded-2xl sm:rounded-3xl shadow-lg hover:shadow-2xl transition-all duration-500 cursor-pointer transform hover:scale-[1.02] overflow-hidden animate-fadeIn border border-gray-100"
                   style={{ animationDelay: `${index * 150}ms` }}
                 >
                   {/* Service Image */}
@@ -631,7 +639,7 @@ export function IframeBookingPage() {
 
             <div className="grid grid-cols-1 lg:grid-cols-2 gap-6 sm:gap-8">
               {/* Date Selection */}
-              <div className="bg-white rounded-2xl sm:rounded-3xl shadow-lg p-6 sm:p-8 relative">
+              <div className="bg-white rounded-2xl sm:rounded-3xl shadow-lg p-6 sm:p-8 relative border border-gray-100">
                 <h3 className="text-lg sm:text-xl font-bold text-gray-900 mb-4 sm:mb-6 flex items-center gap-2">
                   <Calendar className="w-5 h-5 sm:w-6 sm:h-6 text-blue-600" />
                   Sélectionnez une date
@@ -646,7 +654,7 @@ export function IframeBookingPage() {
               </div>
 
               {/* Time Selection */}
-              <div className="bg-white rounded-2xl sm:rounded-3xl shadow-lg p-6 sm:p-8">
+              <div className="bg-white rounded-2xl sm:rounded-3xl shadow-lg p-6 sm:p-8 border border-gray-100">
                 <h3 className="text-lg sm:text-xl font-bold text-gray-900 mb-4 sm:mb-6 flex items-center gap-2">
                   <Clock className="w-5 h-5 sm:w-6 sm:h-6 text-purple-600" />
                   Choisissez l'heure
@@ -729,7 +737,7 @@ export function IframeBookingPage() {
             </div>
 
             <div className="max-w-2xl mx-auto">
-              <div className="bg-white rounded-2xl sm:rounded-3xl shadow-lg p-6 sm:p-8">
+              <div className="bg-white rounded-2xl sm:rounded-3xl shadow-lg p-6 sm:p-8 border border-gray-100">
                 <div className="grid grid-cols-1 sm:grid-cols-2 gap-4 sm:gap-6">
                   <div>
                     <label className="block text-sm font-medium text-gray-700 mb-2">
@@ -862,7 +870,7 @@ export function IframeBookingPage() {
             </div>
 
             <div className="max-w-2xl mx-auto">
-              <div className="bg-white rounded-2xl sm:rounded-3xl shadow-lg overflow-hidden">
+              <div className="bg-white rounded-2xl sm:rounded-3xl shadow-lg overflow-hidden border border-gray-100">
                 {/* Service Summary */}
                 <div className="bg-gradient-to-r from-blue-50 to-purple-50 p-6 sm:p-8 border-b border-gray-200">
                   <div className="flex items-center gap-4">
@@ -1039,7 +1047,7 @@ export function IframeBookingPage() {
           </div>
         )}
 
-        {/* Step 4: Success */}
+        {/* Step 5: Success */}
         {currentStep === 5 && (
           <div className="text-center space-y-6 sm:space-y-8">
             <div className="w-20 h-20 sm:w-24 sm:h-24 bg-gradient-to-r from-green-500 to-emerald-500 rounded-full flex items-center justify-center mx-auto animate-bounce">
@@ -1055,7 +1063,7 @@ export function IframeBookingPage() {
               </p>
             </div>
 
-            <div className="bg-white rounded-2xl sm:rounded-3xl shadow-lg p-6 sm:p-8 max-w-md mx-auto">
+            <div className="bg-white rounded-2xl sm:rounded-3xl shadow-lg p-6 sm:p-8 max-w-md mx-auto border border-gray-100">
               <h3 className="font-bold text-gray-900 mb-4">Récapitulatif</h3>
               <div className="space-y-2 text-sm">
                 <div className="flex justify-between">
