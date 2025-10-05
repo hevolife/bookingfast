@@ -34,7 +34,6 @@ export function ClientSearch({ onClientSelect, selectedClient }: ClientSearchPro
   const handleEditClientSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
     e.stopPropagation();
-    e.stopPropagation();
     
     if (!selectedClient) return;
     
@@ -351,12 +350,6 @@ export function ClientSearch({ onClientSelect, selectedClient }: ClientSearchPro
           <form 
             onSubmit={handleEditClientSubmit}
             className="space-y-4"
-            onClick={(e) => {
-              e.stopPropagation();
-            }}
-            onClick={(e) => {
-              e.stopPropagation();
-            }}
           >
             <div className="grid grid-cols-1 sm:grid-cols-2 gap-3 sm:gap-4">
               <div>
@@ -436,11 +429,6 @@ export function ClientSearch({ onClientSelect, selectedClient }: ClientSearchPro
               </button>
               <button
                 type="submit"
-                onClick={(e) => {
-                  e.preventDefault();
-                  e.stopPropagation();
-                  handleEditClientSubmit(e);
-                }}
                 disabled={saving || !editClientData.firstname || !editClientData.lastname || !editClientData.email || !editClientData.phone}
                 className="flex-1 bg-gradient-to-r from-green-600 to-emerald-600 text-white px-4 py-3 rounded-xl hover:from-green-700 hover:to-emerald-700 disabled:opacity-50 disabled:cursor-not-allowed transition-all duration-300 font-medium flex items-center justify-center gap-2 text-base"
               >
@@ -499,9 +487,6 @@ export function ClientSearch({ onClientSelect, selectedClient }: ClientSearchPro
           <form 
             onSubmit={handleNewClientSubmit}
             className="space-y-4"
-            onClick={(e) => {
-              e.stopPropagation();
-            }}
           >
             <div className="grid grid-cols-1 sm:grid-cols-2 gap-3 sm:gap-4">
               <div>
@@ -581,11 +566,6 @@ export function ClientSearch({ onClientSelect, selectedClient }: ClientSearchPro
               </button>
               <button
                 type="submit"
-                onClick={(e) => {
-                  e.preventDefault();
-                  e.stopPropagation();
-                  handleNewClientSubmit(e);
-                }}
                 disabled={saving || !newClientData.firstname || !newClientData.lastname || !newClientData.email || !newClientData.phone}
                 className="flex-1 bg-gradient-to-r from-blue-600 to-purple-600 text-white px-4 py-3 rounded-xl hover:from-blue-700 hover:to-purple-700 disabled:opacity-50 disabled:cursor-not-allowed transition-all duration-300 font-medium flex items-center justify-center gap-2 text-base"
               >

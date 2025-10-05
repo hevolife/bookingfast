@@ -13,6 +13,9 @@ export const supabase = (supabaseUrl && supabaseAnonKey)
     })
   : null;
 
+// Check if Supabase is properly configured
+export const isSupabaseConfigured = !!(supabaseUrl && supabaseAnonKey);
+
 // Fonction utilitaire pour détecter les erreurs réseau
 export function isNetworkError(error: any): boolean {
   if (!error) return false;

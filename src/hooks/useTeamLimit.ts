@@ -19,8 +19,8 @@ export function useTeamLimit() {
   });
   const [loading, setLoading] = useState(true);
 
-  const fetchTeamStats = async () => {
-    if (!user || !supabase) {
+  const fetchStats = async () => {
+    if (!supabase || !user) {
       setStats({
         currentMembers: 0,
         memberLimit: 10,
@@ -32,81 +32,69 @@ export function useTeamLimit() {
     }
 
     try {
-      console.log('📊 Chargement statistiques équipe pour:', user.id);
+      // Check for Enterprise Pack subscription
+      const { data: enterpriseSubscription } = await supabase
+        .from('subscriptions')
+        .select('plugin_slug')
+        .eq('user_id', user.id)
+        .eq('plugin_slug', 'entreprisepack')
+        .in('status', ['active', 'trial'])
+        .maybeSingle();
 
-      const { data, error } = await supabase
-        .rpc('get_team_stats', { p_owner_id: user.id });
+      const hasEnterprise = !!enterpriseSubscription;
+      const limit = hasEnterprise ? 50 : 10;
 
-      if (error) {
-        console.error('❌ Erreur chargement stats:', error);
-        throw error;
-      }
+      // Count current team members
+      const { count: memberCount } = await supabase
+        .from('team_members')
+        .select('*', { count: 'exact', head: true })
+        .eq('owner_id', user.id)
+        .eq('is_active', true);
 
-      if (data && data.length > 0) {
-        const statsData = data[0];
-        console.log('✅ Stats équipe:', statsData);
-        
-        setStats({
-          currentMembers: statsData.current_members || 0,
-          memberLimit: statsData.member_limit || 10,
-          availableSlots: statsData.available_slots || 10,
-          hasEnterprisePack: statsData.has_enterprise_pack || false
-        });
-      }
-    } catch (err) {
-      console.error('❌ Erreur récupération stats équipe:', err);
+      const current = memberCount || 0;
+
+      setStats({
+        currentMembers: current,
+        memberLimit: limit,
+        availableSlots: Math.max(0, limit - current),
+        hasEnterprisePack: hasEnterprise
+      });
+    } catch (error) {
+      console.error('Error fetching team stats:', error);
+      setStats({
+        currentMembers: 0,
+        memberLimit: 10,
+        availableSlots: 10,
+        hasEnterprisePack: false
+      });
     } finally {
       setLoading(false);
     }
   };
 
+  useEffect(() => {
+    fetchStats();
+  }, [user]);
+
   const canAddMember = async (): Promise<boolean> => {
-    if (!user || !supabase) {
-      return false;
-    }
-
-    try {
-      const { data, error } = await supabase
-        .rpc('can_add_team_member', { p_owner_id: user.id });
-
-      if (error) {
-        console.error('❌ Erreur vérification limite:', error);
-        return false;
-      }
-
-      console.log('🔍 Peut ajouter membre:', data);
-      return data === true;
-    } catch (err) {
-      console.error('❌ Erreur vérification limite:', err);
-      return false;
-    }
-  };
-
-  const getTeamLimit = (): number => {
-    return stats.memberLimit;
+    await fetchStats();
+    return stats.availableSlots > 0;
   };
 
   const isAtLimit = (): boolean => {
-    return stats.availableSlots <= 0;
+    return stats.availableSlots === 0;
   };
 
   const needsUpgrade = (): boolean => {
-    return !stats.hasEnterprisePack && stats.currentMembers >= 8; // Alerte à 80%
+    return !stats.hasEnterprisePack && stats.currentMembers >= stats.memberLimit * 0.8;
   };
-
-  useEffect(() => {
-    if (user) {
-      fetchTeamStats();
-    }
-  }, [user?.id]);
 
   return {
     stats,
     loading,
     canAddMember,
-    getTeamLimit,
     isAtLimit,
     needsUpgrade,
-    refetch: fetchTeamStats
+    refetch: fetchStats
   };
 }
