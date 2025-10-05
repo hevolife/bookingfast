@@ -1,5 +1,5 @@
 import React, { useState, useEffect } from 'react';
-import { Save, Building2, Palette, Clock, Euro, Mail, CreditCard, Eye, EyeOff, Globe, Shield, AlertTriangle, CheckCircle, Percent } from 'lucide-react';
+import { Save, Building2, Palette, Clock, Euro, Mail, CreditCard, Eye, EyeOff, Globe, Shield, AlertTriangle, CheckCircle, Percent, Trash2, RefreshCw } from 'lucide-react';
 import { useBusinessSettings } from '../../hooks/useBusinessSettings';
 import { BusinessSettings } from '../../types';
 import { Button } from '../UI/Button';
@@ -14,6 +14,8 @@ export function BusinessSettingsForm() {
   const [showBrevoKey, setShowBrevoKey] = useState(false);
   const [testingStripe, setTestingStripe] = useState(false);
   const [stripeTestResult, setStripeTestResult] = useState<string | null>(null);
+  const [clearingCache, setClearingCache] = useState(false);
+  const [cacheCleared, setCacheCleared] = useState(false);
 
   useEffect(() => {
     if (settings) {
@@ -126,6 +128,51 @@ export function BusinessSettingsForm() {
       setStripeTestResult('❌ Erreur lors du test de connexion');
     } finally {
       setTestingStripe(false);
+    }
+  };
+
+  const handleClearCache = async () => {
+    // Demander confirmation
+    const confirmed = window.confirm(
+      '⚠️ Êtes-vous sûr de vouloir vider le cache ?\n\n' +
+      'Cette action va :\n' +
+      '• Supprimer toutes les données en cache\n' +
+      '• Recharger l\'application\n' +
+      '• Vous devrez peut-être vous reconnecter\n\n' +
+      'Continuer ?'
+    );
+
+    if (!confirmed) return;
+
+    setClearingCache(true);
+
+    try {
+      // Vider le localStorage
+      localStorage.clear();
+      
+      // Vider le sessionStorage
+      sessionStorage.clear();
+      
+      // Vider le cache du service worker si disponible
+      if ('caches' in window) {
+        const cacheNames = await caches.keys();
+        await Promise.all(
+          cacheNames.map(cacheName => caches.delete(cacheName))
+        );
+      }
+
+      // Afficher le succès
+      setCacheCleared(true);
+      
+      // Recharger la page après 2 secondes
+      setTimeout(() => {
+        window.location.reload();
+      }, 2000);
+      
+    } catch (error) {
+      console.error('Erreur lors du vidage du cache:', error);
+      alert('❌ Erreur lors du vidage du cache. Veuillez réessayer.');
+      setClearingCache(false);
     }
   };
 
@@ -684,6 +731,82 @@ export function BusinessSettingsForm() {
                 >
                   Tester la connexion
                 </button>
+              </div>
+            </div>
+          )}
+        </div>
+      </div>
+
+      {/* Gestion du Cache */}
+      <div className="bg-gradient-to-r from-red-50 to-orange-50 rounded-xl sm:rounded-2xl p-4 sm:p-6 border border-red-200">
+        <h2 className="text-lg sm:text-xl font-bold text-gray-900 mb-4 sm:mb-6 flex items-center gap-3">
+          <Trash2 className="w-6 h-6 text-red-600" />
+          Gestion du Cache
+        </h2>
+
+        <div className="space-y-4">
+          <div className="bg-yellow-50 border border-yellow-200 rounded-xl p-4">
+            <div className="flex items-start gap-3">
+              <AlertTriangle className="w-5 h-5 text-yellow-600 flex-shrink-0 mt-0.5" />
+              <div className="flex-1">
+                <h4 className="font-bold text-yellow-800 mb-2">⚠️ Action irréversible</h4>
+                <div className="text-yellow-700 text-sm space-y-1">
+                  <div>• Supprime toutes les données en cache de l'application</div>
+                  <div>• Recharge automatiquement la page</div>
+                  <div>• Vous devrez peut-être vous reconnecter</div>
+                  <div>• Utile en cas de problèmes d'affichage ou de données obsolètes</div>
+                </div>
+              </div>
+            </div>
+          </div>
+
+          <div className="flex items-center justify-between bg-white rounded-xl p-4 border border-red-200">
+            <div className="flex-1">
+              <h3 className="font-bold text-gray-900 mb-1">Vider le cache de l'application</h3>
+              <p className="text-sm text-gray-600">
+                Supprime toutes les données temporaires et recharge l'application
+              </p>
+            </div>
+            
+            <button
+              type="button"
+              onClick={handleClearCache}
+              disabled={clearingCache || cacheCleared}
+              className={`flex items-center gap-2 px-6 py-3 rounded-xl font-bold transition-all duration-300 transform hover:scale-105 ${
+                cacheCleared
+                  ? 'bg-green-500 text-white cursor-not-allowed'
+                  : clearingCache
+                  ? 'bg-gray-400 text-white cursor-not-allowed'
+                  : 'bg-gradient-to-r from-red-600 to-orange-600 text-white hover:from-red-700 hover:to-orange-700 shadow-lg'
+              }`}
+            >
+              {cacheCleared ? (
+                <>
+                  <CheckCircle className="w-5 h-5" />
+                  Cache vidé !
+                </>
+              ) : clearingCache ? (
+                <>
+                  <RefreshCw className="w-5 h-5 animate-spin" />
+                  Vidage en cours...
+                </>
+              ) : (
+                <>
+                  <Trash2 className="w-5 h-5" />
+                  Vider le cache
+                </>
+              )}
+            </button>
+          </div>
+
+          {cacheCleared && (
+            <div className="bg-green-50 border border-green-200 rounded-xl p-4 animate-fadeIn">
+              <div className="flex items-center gap-3">
+                <CheckCircle className="w-5 h-5 text-green-600" />
+                <div className="text-green-800">
+                  <strong>✅ Cache vidé avec succès !</strong>
+                  <div className="text-sm mt-1">L'application va se recharger dans quelques instants...</div>
+                </div>
               </div>
             </div>
           )}
