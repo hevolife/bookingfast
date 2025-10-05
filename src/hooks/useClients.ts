@@ -1,5 +1,5 @@
 import { useState, useEffect } from 'react';
-import { supabase, isSupabaseConfigured } from '../lib/supabase';
+import { supabase } from '../lib/supabase';
 import type { Client } from '../types';
 import { useAuth } from '../contexts/AuthContext';
 
@@ -16,7 +16,7 @@ export function useClients() {
       return;
     }
 
-    if (!isSupabaseConfigured()) {
+    if (!supabase) {
       setClients([]);
       setError(null);
       return;
@@ -68,7 +68,7 @@ export function useClients() {
   };
 
   const searchClients = async (query: string): Promise<Client[]> => {
-    if (!query.trim() || !isSupabaseConfigured() || !user) return [];
+    if (!query.trim() || !supabase || !user) return [];
 
     try {
       const { data, error } = await supabase
@@ -96,7 +96,7 @@ export function useClients() {
       throw new Error('Utilisateur non trouvé');
     }
 
-    if (!isSupabaseConfigured()) {
+    if (!supabase) {
       const demoClient: Client = {
         id: `demo-${Date.now()}`,
         user_id: user.id,
@@ -188,7 +188,7 @@ export function useClients() {
   };
 
   const updateClient = async (clientId: string, updates: Partial<Client>): Promise<Client> => {
-    if (!isSupabaseConfigured()) {
+    if (!supabase) {
       // Mode démo - mettre à jour localement
       const updatedClient = {
         ...clients.find(c => c.id === clientId)!,
@@ -227,7 +227,7 @@ export function useClients() {
   };
 
   const deleteClient = async (clientId: string) => {
-    if (!isSupabaseConfigured()) {
+    if (!supabase) {
       throw new Error('Supabase non configuré');
     }
 

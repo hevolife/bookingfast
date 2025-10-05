@@ -1,6 +1,6 @@
 import React, { useEffect, useState } from 'react';
 import { useNavigate } from 'react-router-dom';
-import { Lock, Sparkles, ArrowRight, Loader2 } from 'lucide-react';
+import { Lock, Sparkles, ArrowRight } from 'lucide-react';
 import { usePluginPermissions } from '../../hooks/usePluginPermissions';
 import { LoadingSpinner } from '../UI/LoadingSpinner';
 
@@ -33,7 +33,7 @@ export function PluginRoute({ pluginSlug, children }: PluginRouteProps) {
     };
 
     verifyAccess();
-  }, [pluginSlug]);
+  }, [pluginSlug, checkPluginAccess]);
 
   if (loading) {
     return (

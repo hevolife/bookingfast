@@ -1,5 +1,5 @@
 import { useState, useEffect } from 'react';
-import { supabase, isSupabaseConfigured } from '../lib/supabase';
+import { supabase } from '../lib/supabase';
 import { useAuth } from '../contexts/AuthContext';
 import { TeamMember, TeamInvitation } from '../types/team';
 import { Booking } from '../types';
@@ -32,7 +32,7 @@ export function useTeam() {
   }, [user]);
 
   const checkOwnerStatus = async () => {
-    if (!isSupabaseConfigured() || !user) {
+    if (!supabase || !user) {
       setIsOwner(true);
       return;
     }
@@ -57,7 +57,7 @@ export function useTeam() {
   };
 
   const fetchTeamData = async () => {
-    if (!isSupabaseConfigured() || !user) {
+    if (!supabase || !user) {
       setTeamMembers([]);
       setUserPermissions([]);
       setLoading(false);
@@ -214,7 +214,7 @@ export function useTeam() {
     role_name: string;
     permissions: string[];
   }) => {
-    if (!isSupabaseConfigured() || !user) {
+    if (!supabase || !user) {
       throw new Error('Supabase non configuré');
     }
 
@@ -299,7 +299,7 @@ export function useTeam() {
     permissions: string[],
     roleName: string
   ) => {
-    if (!isSupabaseConfigured() || !user) {
+    if (!supabase || !user) {
       throw new Error('Supabase non configuré');
     }
 
@@ -328,7 +328,7 @@ export function useTeam() {
   };
 
   const removeMember = async (memberId: string) => {
-    if (!isSupabaseConfigured() || !user) {
+    if (!supabase || !user) {
       throw new Error('Supabase non configuré');
     }
 

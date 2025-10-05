@@ -1,7 +1,7 @@
 import React, { useState, useEffect } from 'react';
 import { Crown, Clock, CreditCard, Gift, Zap, CheckCircle, Star, AlertTriangle, Calendar, User, Settings, Key, Sparkles, ExternalLink } from 'lucide-react';
 import { useAuth } from '../../contexts/AuthContext';
-import { supabase, isSupabaseConfigured } from '../../lib/supabase';
+import { supabase } from '../../lib/supabase';
 import { AccessCodeRedemption } from '../Auth/AccessCodeRedemption';
 import { Button } from '../UI/Button';
 import { Modal } from '../UI/Modal';
@@ -22,7 +22,7 @@ export function SubscriptionStatus() {
   }, [user]);
 
   const loadSubscriptionPlans = async () => {
-    if (!isSupabaseConfigured()) {
+    if (!supabase) {
       const defaultPlans = [
         {
           id: 'monthly',
@@ -61,7 +61,7 @@ export function SubscriptionStatus() {
   };
 
   const loadUserStatus = async () => {
-    if (!user || !isSupabaseConfigured()) {
+    if (!user || !supabase) {
       setLoading(false);
       return;
     }
@@ -181,7 +181,7 @@ export function SubscriptionStatus() {
   };
 
   const handleSubscribe = async (planId: string) => {
-    if (!user || !isSupabaseConfigured()) return;
+    if (!user || !supabase) return;
 
     try {
       const plan = subscriptionPlans.find(p => p.id === planId);

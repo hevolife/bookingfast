@@ -1,14 +1,20 @@
 import { createClient } from '@supabase/supabase-js';
-import type { Database } from '../types/supabase';
 
 const supabaseUrl = import.meta.env.VITE_SUPABASE_URL;
 const supabaseAnonKey = import.meta.env.VITE_SUPABASE_ANON_KEY;
 
-export const isSupabaseConfigured = () => {
-  return !!(supabaseUrl && supabaseAnonKey && supabaseUrl !== '' && supabaseAnonKey !== '');
-};
+export const supabase = (supabaseUrl && supabaseAnonKey)
+  ? createClient(supabaseUrl, supabaseAnonKey, {
+      auth: {
+        persistSession: true,
+        autoRefreshToken: true,
+        detectSessionInUrl: true
+      }
+    })
+  : null;
 
-export const isNetworkError = (error: any): boolean => {
+// Fonction utilitaire pour détecter les erreurs réseau
+export function isNetworkError(error: any): boolean {
   if (!error) return false;
   
   const errorMessage = error.message?.toLowerCase() || '';
@@ -18,16 +24,20 @@ export const isNetworkError = (error: any): boolean => {
     errorMessage.includes('network') ||
     errorMessage.includes('fetch') ||
     errorMessage.includes('connection') ||
+    errorMessage.includes('timeout') ||
     errorCode === 'network_error' ||
-    errorCode === 'fetch_error'
+    errorCode === 'fetch_error' ||
+    error.name === 'NetworkError' ||
+    error.name === 'TypeError' && errorMessage.includes('failed to fetch')
   );
-};
+}
 
-export const retryRequest = async <T>(
+// Fonction utilitaire pour réessayer une requête en cas d'erreur réseau
+export async function retryRequest<T>(
   requestFn: () => Promise<T>,
   maxRetries: number = 3,
   delayMs: number = 1000
-): Promise<T> => {
+): Promise<T> {
   let lastError: any;
   
   for (let attempt = 0; attempt < maxRetries; attempt++) {
@@ -46,38 +56,4 @@ export const retryRequest = async <T>(
   }
   
   throw lastError;
-};
-
-if (!supabaseUrl || !supabaseAnonKey) {
-  console.warn('⚠️ Supabase environment variables are missing. Running in demo mode.');
 }
-
-export const supabase = createClient<Database>(
-  supabaseUrl || 'https://placeholder.supabase.co',
-  supabaseAnonKey || 'placeholder-key',
-  {
-    auth: {
-      persistSession: true,
-      autoRefreshToken: true,
-      detectSessionInUrl: true,
-      storage: window.localStorage,
-      storageKey: 'supabase.auth.token',
-      flowType: 'pkce'
-    },
-    global: {
-      headers: {
-        'Cache-Control': 'no-store, no-cache, must-revalidate, proxy-revalidate',
-        'Pragma': 'no-cache',
-        'Expires': '0'
-      }
-    },
-    db: {
-      schema: 'public'
-    },
-    realtime: {
-      params: {
-        eventsPerSecond: 10
-      }
-    }
-  }
-);

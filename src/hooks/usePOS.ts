@@ -1,5 +1,5 @@
 import { useState, useEffect } from 'react';
-import { supabase, isSupabaseConfigured } from '../lib/supabase';
+import { supabase } from '../lib/supabase';
 import { useAuth } from '../contexts/AuthContext';
 import { useServices } from './useServices';
 import { POSCategory, POSProduct, POSTransaction, POSSettings, CartItem } from '../types/pos';
@@ -34,7 +34,7 @@ export function usePOS() {
   };
 
   const fetchCategories = async () => {
-    if (!isSupabaseConfigured() || !user) return;
+    if (!supabase || !user) return;
 
     try {
       const { data, error } = await supabase
@@ -66,7 +66,7 @@ export function usePOS() {
   };
 
   const fetchProducts = async () => {
-    if (!isSupabaseConfigured() || !user) return;
+    if (!supabase || !user) return;
 
     try {
       const { data, error } = await supabase
@@ -114,7 +114,7 @@ export function usePOS() {
   };
 
   const fetchTransactions = async () => {
-    if (!isSupabaseConfigured() || !user) return;
+    if (!supabase || !user) return;
 
     try {
       const { data, error } = await supabase
@@ -132,7 +132,7 @@ export function usePOS() {
   };
 
   const fetchSettings = async () => {
-    if (!isSupabaseConfigured() || !user) return;
+    if (!supabase || !user) return;
 
     try {
       const { data, error } = await supabase
@@ -229,7 +229,7 @@ export function usePOS() {
     phone?: string;
     notes?: string;
   }) => {
-    if (!isSupabaseConfigured() || !user || cart.length === 0) {
+    if (!supabase || !user || cart.length === 0) {
       throw new Error('Panier vide ou configuration invalide');
     }
 
@@ -287,7 +287,7 @@ export function usePOS() {
   };
 
   const createProduct = async (product: Partial<POSProduct>) => {
-    if (!isSupabaseConfigured() || !user) throw new Error('Configuration invalide');
+    if (!supabase || !user) throw new Error('Configuration invalide');
 
     try {
       const { data, error } = await supabase
@@ -306,7 +306,7 @@ export function usePOS() {
   };
 
   const updateProduct = async (id: string, updates: Partial<POSProduct>) => {
-    if (!isSupabaseConfigured()) throw new Error('Configuration invalide');
+    if (!supabase) throw new Error('Configuration invalide');
 
     try {
       const { error } = await supabase
@@ -323,7 +323,7 @@ export function usePOS() {
   };
 
   const deleteProduct = async (id: string) => {
-    if (!isSupabaseConfigured()) throw new Error('Configuration invalide');
+    if (!supabase) throw new Error('Configuration invalide');
 
     try {
       const { error } = await supabase
@@ -340,7 +340,7 @@ export function usePOS() {
   };
 
   const createCategory = async (category: Partial<POSCategory>) => {
-    if (!isSupabaseConfigured() || !user) throw new Error('Configuration invalide');
+    if (!supabase || !user) throw new Error('Configuration invalide');
 
     try {
       const { data, error } = await supabase
@@ -359,7 +359,7 @@ export function usePOS() {
   };
 
   const updateCategory = async (id: string, updates: Partial<POSCategory>) => {
-    if (!isSupabaseConfigured()) throw new Error('Configuration invalide');
+    if (!supabase) throw new Error('Configuration invalide');
 
     try {
       const { error } = await supabase
@@ -376,7 +376,7 @@ export function usePOS() {
   };
 
   const deleteCategory = async (id: string) => {
-    if (!isSupabaseConfigured()) throw new Error('Configuration invalide');
+    if (!supabase) throw new Error('Configuration invalide');
 
     try {
       const { error } = await supabase
@@ -393,7 +393,7 @@ export function usePOS() {
   };
 
   const updateSettings = async (updates: Partial<POSSettings>) => {
-    if (!isSupabaseConfigured() || !user) throw new Error('Configuration invalide');
+    if (!supabase || !user) throw new Error('Configuration invalide');
 
     try {
       const { error } = await supabase

@@ -1,5 +1,5 @@
 import { useState, useEffect } from 'react';
-import { supabase, isSupabaseConfigured } from '../lib/supabase';
+import { supabase } from '../lib/supabase';
 import { useAuth } from '../contexts/AuthContext';
 import { Affiliate, AffiliateReferral, AffiliateCommission, AffiliateSettings } from '../types/affiliate';
 
@@ -13,7 +13,7 @@ export function useAffiliate() {
   const [error, setError] = useState<string | null>(null);
 
   const enrichWithUserData = async (referrals: any[]) => {
-    if (!referrals.length) return referrals;
+    if (!referrals.length || !supabase) return referrals;
 
     // Collecter tous les IDs utilisateur uniques
     const userIds = [...new Set(referrals.map(r => r.referred_user_id).filter(Boolean))];
@@ -39,7 +39,7 @@ export function useAffiliate() {
   };
 
   const enrichCommissionsWithUserData = async (commissions: any[]) => {
-    if (!commissions.length) return commissions;
+    if (!commissions.length || !supabase) return commissions;
 
     // Collecter tous les IDs utilisateur uniques depuis les referrals
     const userIds = [...new Set(
@@ -72,7 +72,7 @@ export function useAffiliate() {
   };
 
   const fetchAffiliateData = async () => {
-    if (!user || !session || !isSupabaseConfigured()) {
+    if (!user || !session || !supabase) {
       setLoading(false);
       return;
     }
@@ -180,7 +180,7 @@ export function useAffiliate() {
   };
 
   const createAffiliateAccount = async () => {
-    if (!user || !session || !isSupabaseConfigured()) {
+    if (!user || !session || !supabase) {
       throw new Error('Utilisateur non connecté ou Supabase non configuré');
     }
 

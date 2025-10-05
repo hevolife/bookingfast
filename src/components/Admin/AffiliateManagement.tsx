@@ -1,16 +1,19 @@
 import React, { useState } from 'react';
 import { Share2, Copy, Code, DollarSign, Users, TrendingUp, ExternalLink, Eye, Gift, Sparkles, Crown, Link } from 'lucide-react';
 import { useAffiliate } from '../../hooks/useAffiliate';
+import { useAuth } from '../../contexts/AuthContext';
 import { Modal } from '../UI/Modal';
 import { Button } from '../UI/Button';
 import { LoadingSpinner } from '../UI/LoadingSpinner';
 
 export function AffiliateManagement() {
+  const { user, isAuthenticated } = useAuth();
   const { affiliate, referrals, commissions, settings, loading, error, createAffiliateAccount, getAffiliateLink, getAffiliateHtmlCode } = useAffiliate();
   const [showHtmlModal, setShowHtmlModal] = useState(false);
   const [showStatsModal, setShowStatsModal] = useState(false);
   const [copiedLink, setCopiedLink] = useState(false);
   const [copiedHtml, setCopiedHtml] = useState(false);
+  const [creating, setCreating] = useState(false);
 
   const copyToClipboard = async (text: string, type: 'link' | 'html') => {
     try {
@@ -25,6 +28,23 @@ export function AffiliateManagement() {
     } catch (err) {
       console.error('Erreur copie:', err);
       alert('Erreur lors de la copie');
+    }
+  };
+
+  const handleCreateAccount = async () => {
+    if (!isAuthenticated || !user) {
+      alert('Vous devez être connecté pour activer le programme d\'affiliation');
+      return;
+    }
+
+    setCreating(true);
+    try {
+      await createAffiliateAccount();
+    } catch (err) {
+      console.error('Erreur création compte:', err);
+      alert(err instanceof Error ? err.message : 'Erreur lors de la création du compte');
+    } finally {
+      setCreating(false);
     }
   };
 
@@ -49,7 +69,6 @@ export function AffiliateManagement() {
       </div>
     );
   }
-
 
   if (error) {
     return (
@@ -91,12 +110,28 @@ export function AffiliateManagement() {
           </div>
           
           <Button
-            onClick={createAffiliateAccount}
+            onClick={handleCreateAccount}
+            disabled={creating || !isAuthenticated}
             className="bg-gradient-to-r from-purple-600 to-pink-600 hover:from-purple-700 hover:to-pink-700"
           >
-            <Gift className="w-5 h-5" />
-            Activer mon programme d'affiliation
+            {creating ? (
+              <>
+                <LoadingSpinner size="sm" />
+                Activation en cours...
+              </>
+            ) : (
+              <>
+                <Gift className="w-5 h-5" />
+                Activer mon programme d'affiliation
+              </>
+            )}
           </Button>
+          
+          {!isAuthenticated && (
+            <p className="text-sm text-red-600 mt-4">
+              Vous devez être connecté pour activer le programme d'affiliation
+            </p>
+          )}
         </div>
       </div>
     );

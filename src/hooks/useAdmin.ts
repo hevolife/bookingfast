@@ -1,5 +1,5 @@
 import { useState, useEffect } from 'react';
-import { supabase, isSupabaseConfigured } from '../lib/supabase';
+import { supabase } from '../lib/supabase';
 import { User, SubscriptionPlan, UserSubscription, AccessCode, CodeRedemption } from '../types/admin';
 import { useAuth } from '../contexts/AuthContext';
 
@@ -14,7 +14,7 @@ export function useAdmin() {
   const [error, setError] = useState<string | null>(null);
 
   const isSuperAdmin = async (): Promise<boolean> => {
-    if (!isSupabaseConfigured() || !currentUser) return false;
+    if (!supabase || !currentUser) return false;
     
     try {
       const { data, error } = await supabase
@@ -34,7 +34,7 @@ export function useAdmin() {
     try {
       console.log('🔄 Chargement des utilisateurs...');
       
-      if (!isSupabaseConfigured()) {
+      if (!supabase) {
         throw new Error('Supabase non configuré');
       }
       
@@ -95,7 +95,7 @@ export function useAdmin() {
   
   const fetchSubscriptions = async () => {
     try {
-      if (!isSupabaseConfigured()) {
+      if (!supabase) {
         setSubscriptions([]);
         return;
       }
@@ -111,7 +111,7 @@ export function useAdmin() {
 
   const fetchSubscriptionPlans = async () => {
     try {
-      if (!isSupabaseConfigured()) {
+      if (!supabase) {
         const defaultPlans: SubscriptionPlan[] = [
           {
             id: 'monthly',
@@ -160,7 +160,7 @@ export function useAdmin() {
   };
 
   const updateUserStatus = async (userId: string, updates: Partial<User>) => {
-    if (!isSupabaseConfigured()) throw new Error('Supabase non configuré');
+    if (!supabase) throw new Error('Supabase non configuré');
     
     try {
       const { data, error } = await supabase
@@ -185,7 +185,7 @@ export function useAdmin() {
 
   const fetchAccessCodes = async () => {
     try {
-      if (!isSupabaseConfigured()) {
+      if (!supabase) {
         setAccessCodes([]);
         return;
       }
@@ -212,7 +212,7 @@ export function useAdmin() {
 
   const fetchRedemptions = async () => {
     try {
-      if (!isSupabaseConfigured()) {
+      if (!supabase) {
         setRedemptions([]);
         return;
       }
@@ -288,7 +288,7 @@ export function useAdmin() {
   };
 
   const createAccessCode = async (codeData: Omit<AccessCode, 'id' | 'created_at' | 'updated_at' | 'current_uses'>) => {
-    if (!isSupabaseConfigured()) throw new Error('Supabase non configuré');
+    if (!supabase) throw new Error('Supabase non configuré');
     
     try {
       const { data, error } = await supabase
@@ -313,7 +313,7 @@ export function useAdmin() {
   };
 
   const redeemAccessCode = async (code: string) => {
-    if (!isSupabaseConfigured()) throw new Error('Supabase non configuré');
+    if (!supabase) throw new Error('Supabase non configuré');
     if (!currentUser) throw new Error('Utilisateur non connecté');
     
     try {
@@ -457,7 +457,7 @@ export function useAdmin() {
   };
 
   const deleteUser = async (userId: string) => {
-    if (!isSupabaseConfigured()) throw new Error('Supabase non configuré');
+    if (!supabase) throw new Error('Supabase non configuré');
     
     try {
       const { data: { session } } = await supabase.auth.getSession();
@@ -505,7 +505,7 @@ export function useAdmin() {
   };
 
   const createSubscription = async (userId: string, planId: string) => {
-    if (!isSupabaseConfigured()) throw new Error('Supabase non configuré');
+    if (!supabase) throw new Error('Supabase non configuré');
     
     try {
       const { data, error } = await supabase
@@ -539,7 +539,7 @@ export function useAdmin() {
   };
 
   const cancelSubscription = async (subscriptionId: string) => {
-    if (!isSupabaseConfigured()) throw new Error('Supabase non configuré');
+    if (!supabase) throw new Error('Supabase non configuré');
     
     try {
       const { data, error } = await supabase
@@ -568,7 +568,7 @@ export function useAdmin() {
   };
 
   const checkUserAccess = async (userId: string): Promise<boolean> => {
-    if (!isSupabaseConfigured()) return true; // Mode démo
+    if (!supabase) return true; // Mode démo
     
     try {
       const { data, error } = await supabase.rpc('check_user_access', { user_id: userId });

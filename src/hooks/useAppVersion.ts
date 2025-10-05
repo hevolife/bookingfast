@@ -17,7 +17,7 @@ export function useAppVersion() {
   const [error, setError] = useState<string | null>(null);
 
   const fetchCurrentVersion = async () => {
-    if (!isSupabaseConfigured()) {
+    if (!isSupabaseConfigured) {
       // Version par défaut en mode démo
       const defaultVersion: AppVersion = {
         id: 'demo',
@@ -36,7 +36,7 @@ export function useAppVersion() {
     try {
       setError(null);
       
-      const { data, error: fetchError } = await supabase
+      const { data, error: fetchError } = await supabase!
         .from('app_versions')
         .select('*')
         .eq('is_current', true)

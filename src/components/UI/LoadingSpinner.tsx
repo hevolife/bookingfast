@@ -1,4 +1,5 @@
 import React from 'react';
+import { Loader2 } from 'lucide-react';
 
 interface LoadingSpinnerProps {
   size?: 'sm' | 'md' | 'lg';
@@ -13,9 +14,9 @@ export function LoadingSpinner({ size = 'md', className = '' }: LoadingSpinnerPr
   };
 
   return (
-    <div className={`relative ${sizeClasses[size]} ${className}`}>
-      <div className={`${sizeClasses[size]} border-4 border-purple-200 rounded-full animate-spin`}></div>
-      <div className={`absolute top-0 left-0 ${sizeClasses[size]} border-4 border-purple-600 rounded-full animate-spin border-t-transparent`}></div>
-    </div>
+    <Loader2 
+      className={`${sizeClasses[size]} animate-spin text-purple-600 ${className}`}
+      aria-label="Chargement en cours"
+    />
   );
 }

@@ -1,5 +1,5 @@
 import { useState, useEffect } from 'react';
-import { supabase, isSupabaseConfigured, isNetworkError, retryRequest } from '../lib/supabase';
+import { supabase, isNetworkError, retryRequest } from '../lib/supabase';
 import { Service } from '../types';
 import { useAuth } from '../contexts/AuthContext';
 
@@ -33,7 +33,7 @@ export function useServices() {
       return;
     }
 
-    if (!isSupabaseConfigured()) {
+    if (!supabase) {
       const defaultServices = [
         {
           id: 'demo-1',
@@ -227,7 +227,7 @@ export function useServices() {
       console.log('🔍 Recherche service personnalisé existant pour user:', user.id);
       
       // Chercher un service personnalisé existant pour cet utilisateur
-      const { data: existingServices, error: searchError } = await supabase
+      const { data: existingServices, error: searchError } = await supabase!
         .from('services')
         .select('*')
         .eq('user_id', user.id)
@@ -261,7 +261,7 @@ export function useServices() {
 
       console.log('📤 Données service à créer:', customServiceData);
 
-      const { data: newService, error: createError } = await supabase
+      const { data: newService, error: createError } = await supabase!
         .from('services')
         .insert([customServiceData])
         .select()
@@ -285,7 +285,7 @@ export function useServices() {
   };
 
   const addService = async (service: Omit<Service, 'id' | 'created_at' | 'updated_at'>) => {
-    if (!isSupabaseConfigured()) {
+    if (!supabase) {
       throw new Error('Supabase non configuré');
     }
 
@@ -318,7 +318,7 @@ export function useServices() {
   };
 
   const updateService = async (id: string, updates: Partial<Service>) => {
-    if (!isSupabaseConfigured()) {
+    if (!supabase) {
       throw new Error('Supabase non configuré');
     }
 
@@ -348,7 +348,7 @@ export function useServices() {
   };
 
   const deleteService = async (id: string) => {
-    if (!isSupabaseConfigured()) {
+    if (!supabase) {
       throw new Error('Supabase non configuré');
     }
 

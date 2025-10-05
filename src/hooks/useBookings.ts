@@ -1,5 +1,5 @@
 import { useState, useEffect } from 'react';
-import { supabase, isSupabaseConfigured } from '../lib/supabase';
+import { supabase } from '../lib/supabase';
 import { Booking } from '../types';
 import { useAuth } from '../contexts/AuthContext';
 import { useBusinessSettings } from './useBusinessSettings';
@@ -8,7 +8,7 @@ import { notificationEvents } from '../lib/notificationEvents';
 import { triggerWorkflow } from '../lib/workflowEngine';
 
 const checkAndUpdateExpiredPaymentLinks = async (bookings: Booking[], settings?: any): Promise<Booking[]> => {
-  if (!isSupabaseConfigured()) return bookings;
+  if (!supabase) return bookings;
 
   const now = Date.now();
   const expiryMinutes = settings?.payment_link_expiry_minutes || 30;
@@ -116,7 +116,7 @@ export function useBookings(date?: string) {
       return;
     }
 
-    if (!isSupabaseConfigured()) {
+    if (!supabase) {
       console.log('⚠️ Supabase non configuré - mode démo');
       setBookings([]);
       setLoading(false);
@@ -247,7 +247,7 @@ export function useBookings(date?: string) {
   };
 
   const addBooking = async (booking: Omit<Booking, 'id' | 'created_at' | 'updated_at'>) => {
-    if (!isSupabaseConfigured() || !user) {
+    if (!supabase || !user) {
       throw new Error('Supabase non configuré');
     }
 
@@ -361,7 +361,7 @@ export function useBookings(date?: string) {
   };
 
   const updateBooking = async (id: string, updates: Partial<Booking>) => {
-    if (!isSupabaseConfigured() || !user) {
+    if (!supabase || !user) {
       throw new Error('Supabase non configuré');
     }
 
@@ -457,7 +457,7 @@ export function useBookings(date?: string) {
   };
 
   const deleteBooking = async (id: string) => {
-    if (!isSupabaseConfigured() || !user) {
+    if (!supabase || !user) {
       throw new Error('Supabase non configuré');
     }
 

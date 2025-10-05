@@ -1,115 +1,103 @@
-export interface Service {
+export interface Booking {
   id: string;
-  user_id?: string;
-  name: string;
-  price_ht: number;
-  price_ttc: number;
-  image_url?: string;
-  description: string;
-  duration_minutes: number;
-  capacity: number;
-  unit_name?: string;
-  availability_hours?: {
-    [key: string]: {
-      ranges: Array<{
-        start: string;
-        end: string;
-      }>;
-      closed: boolean;
-    };
-  };
-  created_at?: string;
-  updated_at?: string;
+  client_id: string;
+  service_id: string;
+  team_member_id?: string;
+  start_time: string;
+  end_time: string;
+  status: 'confirmed' | 'pending' | 'cancelled';
+  notes?: string;
+  created_at: string;
+  updated_at: string;
 }
 
 export interface Client {
   id: string;
-  user_id?: string;
-  firstname: string;
-  lastname: string;
+  user_id: string;
+  full_name: string;
   email: string;
-  phone: string;
-  created_at?: string;
-  updated_at?: string;
+  phone?: string;
+  notes?: string;
+  created_at: string;
+  updated_at: string;
 }
 
-export interface Transaction {
+export interface Service {
   id: string;
-  amount: number;
-  method: 'cash' | 'card' | 'transfer' | 'stripe';
-  note: string;
-  status?: 'pending' | 'completed' | 'cancelled';
+  user_id: string;
+  name: string;
+  description?: string;
+  duration: number;
+  price_ht: number;
+  price_ttc: number;
+  tax_rate: number;
+  color: string;
+  is_active: boolean;
+  created_at: string;
+  updated_at: string;
+}
+
+export interface TeamMember {
+  id: string;
+  user_id: string;
+  team_id: string;
+  role: 'owner' | 'admin' | 'member';
+  full_name: string;
+  email: string;
   created_at: string;
 }
 
-export interface Booking {
+export interface Plugin {
+  slug: string;
+  name: string;
+  description: string;
+  icon: string;
+  price: number;
+  features: string[];
+  is_active: boolean;
+}
+
+export interface PluginPermission {
   id: string;
-  user_id?: string;
-  service_id: string;
-  date: string;
-  time: string;
-  duration_minutes: number;
+  team_id: string;
+  plugin_slug: string;
+  allowed_roles: string[];
+  created_at: string;
+}
+
+export interface Product {
+  id: string;
+  user_id: string;
+  name: string;
+  description?: string;
+  price_ht: number;
+  price_ttc: number;
+  tax_rate: number;
+  stock_quantity: number;
+  is_active: boolean;
+  created_at: string;
+  updated_at: string;
+}
+
+export interface Sale {
+  id: string;
+  user_id: string;
+  total_ht: number;
+  total_ttc: number;
+  tax_amount: number;
+  payment_method: 'cash' | 'card' | 'transfer';
+  status: 'completed' | 'pending' | 'cancelled';
+  created_at: string;
+}
+
+export interface SaleItem {
+  id: string;
+  sale_id: string;
+  product_id: string;
   quantity: number;
-  client_name: string;
-  client_firstname: string;
-  client_email: string;
-  client_phone: string;
-  total_amount: number;
-  payment_status: 'pending' | 'partial' | 'completed';
-  payment_amount?: number;
-  payment_link?: string;
-  transactions?: Transaction[];
-  booking_status: 'pending' | 'confirmed' | 'cancelled';
-  custom_service_data?: {
-    name: string;
-    price: number;
-    duration: number;
-  } | null;
-  created_at?: string;
-  updated_at?: string;
-  service?: Service;
-}
-
-export interface BusinessSettings {
-  id: string;
-  user_id?: string;
-  business_name: string;
-  primary_color: string;
-  secondary_color: string;
-  logo_url?: string;
-  opening_hours: {
-    [key: string]: {
-      ranges: Array<{
-        start: string;
-        end: string;
-      }>;
-      closed: boolean;
-    };
-  };
-  buffer_minutes: number;
-  default_deposit_percentage: number;
-  deposit_type: 'percentage' | 'fixed_amount';
-  deposit_fixed_amount: number;
-  minimum_booking_delay_hours: number;
-  payment_link_expiry_minutes?: number;
-  email_notifications: boolean;
-  brevo_api_key?: string;
-  brevo_sender_email?: string;
-  brevo_sender_name?: string;
-  brevo_enabled: boolean;
-  stripe_enabled?: boolean;
-  stripe_public_key?: string;
-  stripe_secret_key?: string;
-  stripe_webhook_secret?: string;
-  timezone: string;
-  tax_rate?: number; // Nouveau champ pour le taux de TVA (ex: 20 pour 20%)
-  created_at?: string;
-  updated_at?: string;
-  iframe_services?: string[]; // IDs des services visibles sur l'iframe
-}
-
-export interface TimeSlot {
-  time: string;
-  available: boolean;
-  booking?: Booking;
+  unit_price_ht: number;
+  unit_price_ttc: number;
+  tax_rate: number;
+  subtotal_ht: number;
+  subtotal_ttc: number;
 }

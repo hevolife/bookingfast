@@ -3,7 +3,6 @@ import { useSearchParams } from 'react-router-dom';
 import { Mail, Lock, Eye, EyeOff, LogIn, UserPlus, Building2, Sparkles, Key, Gift, RotateCcw } from 'lucide-react';
 import { useAuth } from '../../contexts/AuthContext';
 import { useNavigate } from 'react-router-dom';
-import { isSupabaseConfigured } from '../../lib/supabase';
 import { AccessCodeRedemption } from './AccessCodeRedemption';
 import { useAppVersion } from '../../hooks/useAppVersion';
 import { ForgotPasswordModal } from './ForgotPasswordModal';
@@ -88,15 +87,15 @@ export function LoginPage() {
   };
 
   return (
-    <div className="min-h-screen bg-gradient-to-br from-blue-50 via-purple-50 to-pink-50 overflow-y-auto p-4">
+    <div className="min-h-screen-safe bg-gradient-to-br from-blue-50 via-purple-50 to-pink-50 flex items-center justify-center p-4 safe-all">
       {/* Background decorations */}
-      <div className="absolute inset-0 overflow-hidden pointer-events-none">
+      <div className="absolute inset-0 overflow-hidden">
         <div className="absolute -top-40 -right-40 w-80 h-80 bg-gradient-to-r from-purple-400 to-pink-400 rounded-full opacity-20 animate-float"></div>
         <div className="absolute -bottom-40 -left-40 w-80 h-80 bg-gradient-to-r from-blue-400 to-cyan-400 rounded-full opacity-20 animate-float" style={{ animationDelay: '2s' }}></div>
         <div className="absolute top-1/2 left-1/2 transform -translate-x-1/2 -translate-y-1/2 w-60 h-60 bg-gradient-to-r from-green-400 to-emerald-400 rounded-full opacity-10 animate-float" style={{ animationDelay: '4s' }}></div>
       </div>
 
-      <div className="relative z-10 w-full max-w-md mx-auto py-8">
+      <div className="relative z-10 w-full max-w-md">
         {/* Logo et titre */}
         <div className="text-center mb-8">
           <div className="w-20 h-20 bg-gradient-to-r from-blue-600 to-purple-600 rounded-3xl flex items-center justify-center mx-auto mb-6 shadow-2xl animate-glow">

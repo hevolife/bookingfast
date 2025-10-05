@@ -1,5 +1,5 @@
 import { useState, useEffect } from 'react';
-import { supabase, isSupabaseConfigured } from '../lib/supabase';
+import { supabase } from '../lib/supabase';
 import { Plugin, PluginSubscription, UserPlugin } from '../types/plugin';
 import { useAuth } from '../contexts/AuthContext';
 
@@ -13,7 +13,7 @@ export function usePlugins() {
 
   const fetchPlugins = async () => {
     try {
-      if (!isSupabaseConfigured()) {
+      if (!supabase) {
         setPlugins([]);
         return;
       }
@@ -35,7 +35,7 @@ export function usePlugins() {
 
   const fetchUserSubscriptions = async () => {
     try {
-      if (!isSupabaseConfigured() || !user) {
+      if (!supabase || !user) {
         setUserSubscriptions([]);
         return;
       }
@@ -58,7 +58,7 @@ export function usePlugins() {
 
   const fetchUserPlugins = async () => {
     try {
-      if (!isSupabaseConfigured() || !user) {
+      if (!supabase || !user) {
         setUserPlugins([]);
         return;
       }
@@ -89,7 +89,7 @@ export function usePlugins() {
   };
 
   const hasPluginAccess = async (pluginSlug: string): Promise<boolean> => {
-    if (!isSupabaseConfigured() || !user) return false;
+    if (!supabase || !user) return false;
 
     try {
       const { data, error } = await supabase.rpc('check_plugin_access', {
@@ -109,7 +109,7 @@ export function usePlugins() {
     pluginId: string,
     activatedFeatures: string[] = []
   ): Promise<PluginSubscription> => {
-    if (!isSupabaseConfigured() || !user) {
+    if (!supabase || !user) {
       throw new Error('Configuration invalide');
     }
 
@@ -185,7 +185,7 @@ export function usePlugins() {
     pluginId: string,
     subscriptionId: string
   ): Promise<{ url: string }> => {
-    if (!isSupabaseConfigured() || !user) {
+    if (!supabase || !user) {
       throw new Error('Configuration invalide');
     }
 
@@ -215,7 +215,7 @@ export function usePlugins() {
     subscriptionId: string,
     activatedFeatures: string[]
   ) => {
-    if (!isSupabaseConfigured()) throw new Error('Supabase non configuré');
+    if (!supabase) throw new Error('Supabase non configuré');
 
     try {
       const { error } = await supabase
@@ -240,7 +240,7 @@ export function usePlugins() {
     pluginId: string,
     settings: Record<string, any>
   ) => {
-    if (!isSupabaseConfigured() || !user) {
+    if (!supabase || !user) {
       throw new Error('Configuration invalide');
     }
 
@@ -264,7 +264,7 @@ export function usePlugins() {
   };
 
   const cancelSubscription = async (subscriptionId: string) => {
-    if (!isSupabaseConfigured()) throw new Error('Supabase non configuré');
+    if (!supabase) throw new Error('Supabase non configuré');
 
     try {
       const { error } = await supabase

@@ -1,5 +1,5 @@
 import { useState, useEffect } from 'react';
-import { supabase, isSupabaseConfigured } from '../lib/supabase';
+import { supabase } from '../lib/supabase';
 import { useAuth } from '../contexts/AuthContext';
 
 export interface MultiUserSetting {
@@ -17,7 +17,7 @@ export function useMultiUserSettings() {
   const [loading, setLoading] = useState(true);
 
   const fetchSettings = async () => {
-    if (!user || !isSupabaseConfigured()) {
+    if (!user || !supabase) {
       setSettings([]);
       setLoading(false);
       return;
@@ -47,7 +47,7 @@ export function useMultiUserSettings() {
   };
 
   const updateSetting = async (teamMemberId: string, canViewOnlyAssigned: boolean) => {
-    if (!user || !isSupabaseConfigured()) {
+    if (!user || !supabase) {
       throw new Error('Utilisateur non connecté ou Supabase non configuré');
     }
 

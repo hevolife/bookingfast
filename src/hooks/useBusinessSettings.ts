@@ -16,7 +16,7 @@ export function useBusinessSettings() {
       return;
     }
 
-    if (!isSupabaseConfigured()) {
+    if (!isSupabaseConfigured) {
       const defaultSettings: BusinessSettings = {
         id: 'default-anonymous',
         user_id: user?.id || 'demo', 
@@ -62,7 +62,7 @@ export function useBusinessSettings() {
       
       // Vérifier si l'utilisateur est membre d'une équipe
       try {
-        const { data: membershipData, error: membershipError } = await supabase
+        const { data: membershipData, error: membershipError } = await supabase!
           .from('team_members')
           .select('owner_id')
           .eq('user_id', user.id)
@@ -79,7 +79,7 @@ export function useBusinessSettings() {
         console.warn('⚠️ Erreur vérification équipe, utilisation ID utilisateur:', teamError);
       }
 
-      const supabaseQuery = supabase
+      const supabaseQuery = supabase!
         .from('business_settings')
         .select('*')
         .eq('user_id', targetUserId)
@@ -182,7 +182,7 @@ export function useBusinessSettings() {
   };
 
   const updateSettings = async (newSettings: Partial<BusinessSettings>) => {
-    if (!isSupabaseConfigured()) {
+    if (!isSupabaseConfigured) {
       throw new Error('Supabase non configuré');
     }
 
@@ -191,7 +191,7 @@ export function useBusinessSettings() {
         throw new Error('Aucun paramètre à mettre à jour');
       }
 
-      const { data, error } = await supabase
+      const { data, error } = await supabase!
         .from('business_settings')
         .update({
           ...newSettings,

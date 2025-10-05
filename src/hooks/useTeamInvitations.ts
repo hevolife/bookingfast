@@ -15,14 +15,14 @@ export function useTeamInvitations() {
   }, [user]);
 
   const fetchInvitations = async () => {
-    if (!isSupabaseConfigured() || !user) {
+    if (!isSupabaseConfigured || !user) {
       setPendingInvitations([]);
       setLoading(false);
       return;
     }
 
     try {
-      const { data, error } = await supabase
+      const { data, error } = await supabase!
         .from('team_invitations')
         .select('*')
         .eq('email', user.email)
@@ -42,12 +42,12 @@ export function useTeamInvitations() {
   };
 
   const acceptInvitation = async (invitationId: string) => {
-    if (!isSupabaseConfigured() || !user) {
+    if (!isSupabaseConfigured || !user) {
       throw new Error('Supabase non configuré');
     }
 
     try {
-      const { error } = await supabase.rpc('accept_team_invitation', {
+      const { error } = await supabase!.rpc('accept_team_invitation', {
         invitation_id: invitationId
       });
 
@@ -61,12 +61,12 @@ export function useTeamInvitations() {
   };
 
   const rejectInvitation = async (invitationId: string) => {
-    if (!isSupabaseConfigured() || !user) {
+    if (!isSupabaseConfigured || !user) {
       throw new Error('Supabase non configuré');
     }
 
     try {
-      const { error } = await supabase
+      const { error } = await supabase!
         .from('team_invitations')
         .update({ 
           status: 'rejected',

@@ -1,4 +1,4 @@
-import React, { useEffect, useState, useCallback } from 'react';
+import React, { useEffect, useState } from 'react';
 import { Lock, Sparkles, ArrowRight } from 'lucide-react';
 import { usePluginPermissions } from '../../hooks/usePluginPermissions';
 import { LoadingSpinner } from '../UI/LoadingSpinner';
@@ -18,13 +18,15 @@ export function PluginGuard({ pluginSlug, children }: PluginGuardProps) {
 
     const verifyAccess = async () => {
       try {
+        console.log(`🔒 PluginGuard - Vérification accès: ${pluginSlug}`);
         const access = await checkPluginAccess(pluginSlug);
+        console.log(`🔒 PluginGuard - Résultat: ${access}`);
         if (mounted) {
           setHasAccess(access);
           setLoading(false);
         }
       } catch (error) {
-        console.error('Erreur vérification accès plugin:', error);
+        console.error('❌ Erreur vérification accès plugin:', error);
         if (mounted) {
           setHasAccess(false);
           setLoading(false);
@@ -37,7 +39,7 @@ export function PluginGuard({ pluginSlug, children }: PluginGuardProps) {
     return () => {
       mounted = false;
     };
-  }, [pluginSlug]); // Retiré checkPluginAccess des dépendances
+  }, [pluginSlug, checkPluginAccess]);
 
   if (loading) {
     return (
@@ -74,6 +76,9 @@ export function PluginGuard({ pluginSlug, children }: PluginGuardProps) {
                   </h3>
                   <p className="text-gray-600">
                     Ce plugin n'est pas activé sur votre compte. Rendez-vous dans la marketplace pour l'activer.
+                  </p>
+                  <p className="text-sm text-gray-500 mt-2">
+                    Plugin: <code className="bg-gray-100 px-2 py-1 rounded">{pluginSlug}</code>
                   </p>
                 </div>
               </div>

@@ -52,6 +52,5 @@ export function ProtectedRoute({ children }: ProtectedRouteProps) {
     return null;
   }
 
-  console.log('✅ Utilisateur authentifié - affichage du contenu protégé');
   return <>{children}</>;
 }

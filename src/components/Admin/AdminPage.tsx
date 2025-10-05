@@ -10,7 +10,7 @@ import { IframeSettings } from './IframeSettings';
 import { TeamManagement } from './TeamManagement';
 import { PluginsPage } from '../Plugins/PluginsPage';
 import { SuperAdminPanel } from '../SuperAdmin/SuperAdminPanel';
-import { supabase, isSupabaseConfigured } from '../../lib/supabase';
+import { supabase } from '../../lib/supabase';
 
 export function AdminPage() {
   const { user } = useAuth();
@@ -23,7 +23,7 @@ export function AdminPage() {
   React.useEffect(() => {
     const checkSuperAdmin = async () => {
       setCheckingAdmin(true);
-      if (!user || !isSupabaseConfigured()) {
+      if (!user || !supabase) {
         console.log('🔍 Pas d\'utilisateur ou Supabase non configuré - pas de super admin');
         setIsSuperAdmin(false);
         setCheckingAdmin(false);

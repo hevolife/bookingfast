@@ -1,80 +1,77 @@
 import { useState, useEffect } from 'react';
-import { supabase, isSupabaseConfigured } from '../lib/supabase';
+import { supabase } from '../lib/supabase';
 import { useAuth } from '../contexts/AuthContext';
 
 export interface TeamMember {
   id: string;
   user_id: string;
-  owner_id: string;
-  firstname: string;
-  lastname: string;
+  full_name: string;
   email: string;
-  phone: string;
-  is_active: boolean;
-  created_at: string;
-  updated_at: string;
-  full_name?: string;
+  role: 'owner' | 'admin' | 'member';
 }
 
 export function useTeamMembers() {
   const { user } = useAuth();
   const [teamMembers, setTeamMembers] = useState<TeamMember[]>([]);
   const [loading, setLoading] = useState(true);
+  const [error, setError] = useState<Error | null>(null);
 
   useEffect(() => {
-    if (user) {
-      fetchTeamMembers();
-    }
-  }, [user]);
-
-  const fetchTeamMembers = async () => {
-    if (!isSupabaseConfigured() || !user) {
-      setTeamMembers([]);
-      setLoading(false);
-      return;
-    }
-
-    try {
-      console.log('🔍 Récupération membres équipe pour:', user.id);
-
-      // Récupérer tous les membres de l'équipe (owner_id = user.id)
-      const { data, error } = await supabase
-        .from('team_members')
-        .select('id, user_id, owner_id, firstname, lastname, email, phone, full_name, is_active, created_at, updated_at')
-        .eq('owner_id', user.id)
-        .eq('is_active', true)
-        .order('firstname');
-
-      if (error) {
-        console.error('❌ Erreur récupération membres:', error);
-        throw error;
+    const fetchTeamMembers = async () => {
+      if (!user) {
+        setTeamMembers([]);
+        setLoading(false);
+        return;
       }
 
-      console.log('✅ Membres récupérés:', data);
+      try {
+        setLoading(true);
+        setError(null);
 
-      // Enrichir les données si nécessaire
-      const enrichedMembers = data.map(member => ({
-        ...member,
-        // Utiliser full_name si firstname/lastname sont vides
-        firstname: member.firstname || member.full_name?.split(' ')[0] || '',
-        lastname: member.lastname || member.full_name?.split(' ').slice(1).join(' ') || '',
-        // S'assurer que l'email est présent
-        email: member.email || ''
-      }));
+        const { data: currentMember, error: memberError } = await supabase
+          .from('team_members')
+          .select('team_id')
+          .eq('user_id', user.id)
+          .single();
 
-      console.log('📊 Membres enrichis:', enrichedMembers);
-      setTeamMembers(enrichedMembers);
-    } catch (err) {
-      console.error('❌ Erreur chargement membres équipe:', err);
-      setTeamMembers([]);
-    } finally {
-      setLoading(false);
-    }
-  };
+        if (memberError) throw memberError;
 
-  return {
-    teamMembers,
-    loading,
-    refetch: fetchTeamMembers
-  };
+        const { data: members, error: membersError } = await supabase
+          .from('team_members')
+          .select(`
+            id,
+            user_id,
+            role,
+            profiles:user_id (
+              full_name,
+              email
+            )
+          `)
+          .eq('team_id', currentMember.team_id)
+          .order('created_at', { ascending: true });
+
+        if (membersError) throw membersError;
+
+        const formattedMembers: TeamMember[] = members.map(member => ({
+          id: member.id,
+          user_id: member.user_id,
+          full_name: member.profiles?.full_name || 'Utilisateur',
+          email: member.profiles?.email || '',
+          role: member.role
+        }));
+
+        setTeamMembers(formattedMembers);
+      } catch (err) {
+        console.error('❌ Erreur chargement membres équipe:', err);
+        setError(err instanceof Error ? err : new Error('Erreur inconnue'));
+        setTeamMembers([]);
+      } finally {
+        setLoading(false);
+      }
+    };
+
+    fetchTeamMembers();
+  }, [user]);
+
+  return { teamMembers, loading, error };
 }

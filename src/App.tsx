@@ -1,5 +1,4 @@
 import React, { useState } from 'react';
-import { Routes, Route, Navigate } from 'react-router-dom';
 import { TeamProvider } from './contexts/TeamContext';
 import { Navbar } from './components/Layout/Navbar';
 import { CalendarPage } from './components/Calendar/CalendarPage';

@@ -1,5 +1,5 @@
 import { useState, useEffect } from 'react';
-import { supabase, isSupabaseConfigured } from '../lib/supabase';
+import { supabase } from '../lib/supabase';
 import { EmailWorkflow, EmailTemplate } from '../types/email';
 import { useAuth } from '../contexts/AuthContext';
 
@@ -232,7 +232,7 @@ export function useEmailWorkflows() {
       return;
     }
 
-    if (!isSupabaseConfigured()) {
+    if (!supabase) {
       setWorkflows(getDefaultWorkflows(user.id));
       setLoading(false);
       return;
@@ -283,7 +283,7 @@ export function useEmailWorkflows() {
       return;
     }
 
-    if (!isSupabaseConfigured()) {
+    if (!supabase) {
       setTemplates(getDefaultTemplates(user.id));
       return;
     }
@@ -324,7 +324,7 @@ export function useEmailWorkflows() {
       throw new Error('Utilisateur non connecté');
     }
 
-    if (!isSupabaseConfigured()) {
+    if (!supabase) {
       const newWorkflow: EmailWorkflow = {
         id: `demo-${Date.now()}-${user.id}`,
         user_id: user.id,
@@ -378,7 +378,7 @@ export function useEmailWorkflows() {
       throw new Error('Utilisateur non connecté');
     }
 
-    if (!isSupabaseConfigured()) {
+    if (!supabase) {
       const updatedWorkflows = workflows.map(w => 
         w.id === id ? { ...w, ...updates, updated_at: new Date().toISOString() } : w
       );
@@ -417,7 +417,7 @@ export function useEmailWorkflows() {
       throw new Error('Utilisateur non connecté');
     }
 
-    if (!isSupabaseConfigured()) {
+    if (!supabase) {
       const updatedWorkflows = workflows.filter(w => w.id !== id);
       setWorkflows(updatedWorkflows);
       return;
@@ -446,7 +446,7 @@ export function useEmailWorkflows() {
       throw new Error('Utilisateur non connecté');
     }
 
-    if (!isSupabaseConfigured()) {
+    if (!supabase) {
       const newTemplate: EmailTemplate = {
         id: `template-${Date.now()}-${user.id}`,
         name: template.name || '',
@@ -495,7 +495,7 @@ export function useEmailWorkflows() {
       throw new Error('Utilisateur non connecté');
     }
 
-    if (!isSupabaseConfigured()) {
+    if (!supabase) {
       const updatedTemplates = templates.map(t => 
         t.id === id ? { ...t, ...updates, updated_at: new Date().toISOString() } : t
       );
@@ -534,7 +534,7 @@ export function useEmailWorkflows() {
       throw new Error('Utilisateur non connecté');
     }
 
-    if (!isSupabaseConfigured()) {
+    if (!supabase) {
       const updatedTemplates = templates.filter(t => t.id !== id);
       setTemplates(updatedTemplates);
       return;

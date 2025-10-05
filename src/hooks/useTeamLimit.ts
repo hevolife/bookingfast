@@ -1,5 +1,5 @@
 import { useState, useEffect } from 'react';
-import { supabase, isSupabaseConfigured } from '../lib/supabase';
+import { supabase } from '../lib/supabase';
 import { useAuth } from '../contexts/AuthContext';
 
 interface TeamStats {
@@ -20,7 +20,7 @@ export function useTeamLimit() {
   const [loading, setLoading] = useState(true);
 
   const fetchTeamStats = async () => {
-    if (!user || !isSupabaseConfigured()) {
+    if (!user || !supabase) {
       setStats({
         currentMembers: 0,
         memberLimit: 10,
@@ -61,7 +61,7 @@ export function useTeamLimit() {
   };
 
   const canAddMember = async (): Promise<boolean> => {
-    if (!user || !isSupabaseConfigured()) {
+    if (!user || !supabase) {
       return false;
     }
 
