@@ -1,60 +1,54 @@
-import React, { useState } from 'react';
+import React, { useState, lazy, Suspense } from 'react';
 import { TeamProvider } from './contexts/TeamContext';
 import { Navbar } from './components/Layout/Navbar';
-import { CalendarPage } from './components/Calendar/CalendarPage';
-import { ClientsPage } from './components/Clients/ClientsPage';
-import { DashboardPage } from './components/Dashboard/DashboardPage';
-import { ServicesPage } from './components/Services/ServicesPage';
-import { EmailWorkflowPage } from './components/EmailWorkflow/EmailWorkflowPage';
-import { AdminPage } from './components/Admin/AdminPage';
-import { ReportsPage } from './components/Reports/ReportsPage';
-import { MultiUserSettingsPage } from './components/MultiUser/MultiUserSettingsPage';
-import { POSPage } from './components/POS/POSPage';
-import { PluginsPage } from './components/Plugins/PluginsPage';
-import { PluginGuard } from './components/Plugins/PluginGuard';
+import { LoadingSpinner } from './components/UI/LoadingSpinner';
+
+// Lazy load pages for better code splitting
+const DashboardPage = lazy(() => import('./components/Dashboard/DashboardPage').then(m => ({ default: m.DashboardPage })));
+const CalendarPage = lazy(() => import('./components/Calendar/CalendarPage').then(m => ({ default: m.CalendarPage })));
+const ClientsPage = lazy(() => import('./components/Clients/ClientsPage').then(m => ({ default: m.ClientsPage })));
+const ServicesPage = lazy(() => import('./components/Services/ServicesPage').then(m => ({ default: m.ServicesPage })));
+const EmailWorkflowPage = lazy(() => import('./components/EmailWorkflow/EmailWorkflowPage').then(m => ({ default: m.EmailWorkflowPage })));
+const AdminPage = lazy(() => import('./components/Admin/AdminPage').then(m => ({ default: m.AdminPage })));
+const ReportsPage = lazy(() => import('./components/Reports/ReportsPage').then(m => ({ default: m.ReportsPage })));
+const MultiUserSettingsPage = lazy(() => import('./components/MultiUser/MultiUserSettingsPage').then(m => ({ default: m.MultiUserSettingsPage })));
+const POSPage = lazy(() => import('./components/POS/POSPage').then(m => ({ default: m.POSPage })));
+const PluginsPage = lazy(() => import('./components/Plugins/PluginsPage').then(m => ({ default: m.PluginsPage })));
+const PluginGuard = lazy(() => import('./components/Plugins/PluginGuard').then(m => ({ default: m.PluginGuard })));
+
+type PageType = 'dashboard' | 'calendar' | 'bookings-list' | 'clients' | 'services' | 'emails' | 'admin' | 'reports' | 'multi-user' | 'pos' | 'plugins';
 
 function App() {
-  const [currentPage, setCurrentPage] = useState('dashboard');
+  const [currentPage, setCurrentPage] = useState<PageType>('dashboard');
 
   const renderPage = () => {
-    switch (currentPage) {
-      case 'dashboard':
-        return <DashboardPage />;
-      case 'calendar':
-        return <CalendarPage />;
-      case 'bookings-list':
-        return <CalendarPage view="list" />;
-      case 'clients':
-        return <ClientsPage />;
-      case 'services':
-        return <ServicesPage />;
-      case 'emails':
-        return <EmailWorkflowPage />;
-      case 'admin':
-        return <AdminPage />;
-      case 'reports':
-        return (
-          <PluginGuard pluginSlug="reports">
-            <ReportsPage />
-          </PluginGuard>
-        );
-      case 'multi-user':
-        return (
-          <PluginGuard pluginSlug="multi-user">
-            <MultiUserSettingsPage />
-          </PluginGuard>
-        );
-      case 'pos':
-        return (
-          <PluginGuard pluginSlug="pos">
-            <POSPage />
-          </PluginGuard>
-        );
-      case 'plugins':
-        return <PluginsPage />;
-      default:
-        return <DashboardPage />;
-    }
+    const pageComponents: Record<PageType, React.ReactNode> = {
+      dashboard: <DashboardPage />,
+      calendar: <CalendarPage />,
+      'bookings-list': <CalendarPage view="list" />,
+      clients: <ClientsPage />,
+      services: <ServicesPage />,
+      emails: <EmailWorkflowPage />,
+      admin: <AdminPage />,
+      reports: (
+        <PluginGuard pluginSlug="reports">
+          <ReportsPage />
+        </PluginGuard>
+      ),
+      'multi-user': (
+        <PluginGuard pluginSlug="multi-user">
+          <MultiUserSettingsPage />
+        </PluginGuard>
+      ),
+      pos: (
+        <PluginGuard pluginSlug="pos">
+          <POSPage />
+        </PluginGuard>
+      ),
+      plugins: <PluginsPage />
+    };
+
+    return pageComponents[currentPage] || <DashboardPage />;
   };
 
   return (
@@ -69,7 +63,9 @@ function App() {
             touchAction: 'pan-y'
           }}
         >
-          {renderPage()}
+          <Suspense fallback={<LoadingSpinner />}>
+            {renderPage()}
+          </Suspense>
         </main>
       </div>
     </TeamProvider>

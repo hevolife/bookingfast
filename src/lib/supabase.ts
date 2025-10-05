@@ -1,22 +1,47 @@
-import { createClient } from '@supabase/supabase-js';
+import { createClient, SupabaseClient } from '@supabase/supabase-js';
 
 const supabaseUrl = import.meta.env.VITE_SUPABASE_URL;
 const supabaseAnonKey = import.meta.env.VITE_SUPABASE_ANON_KEY;
 
-export const supabase = (supabaseUrl && supabaseAnonKey)
-  ? createClient(supabaseUrl, supabaseAnonKey, {
-      auth: {
-        persistSession: true,
-        autoRefreshToken: true,
-        detectSessionInUrl: true
+// Singleton instance
+let supabaseInstance: SupabaseClient | null = null;
+
+function createSupabaseClient() {
+  if (!supabaseUrl || !supabaseAnonKey) {
+    return null;
+  }
+
+  return createClient(supabaseUrl, supabaseAnonKey, {
+    auth: {
+      persistSession: true,
+      autoRefreshToken: true,
+      detectSessionInUrl: true,
+      storage: window.localStorage,
+      storageKey: 'bookingfast-auth'
+    },
+    global: {
+      headers: {
+        'x-client-info': 'bookingfast-web'
       }
-    })
-  : null;
+    },
+    db: {
+      schema: 'public'
+    },
+    realtime: {
+      params: {
+        eventsPerSecond: 10
+      }
+    }
+  });
+}
+
+// Export singleton instance
+export const supabase = supabaseInstance || (supabaseInstance = createSupabaseClient());
 
 // Check if Supabase is properly configured
 export const isSupabaseConfigured = !!(supabaseUrl && supabaseAnonKey);
 
-// Fonction utilitaire pour détecter les erreurs réseau
+// Network error detection utility
 export function isNetworkError(error: any): boolean {
   if (!error) return false;
   
@@ -31,15 +56,15 @@ export function isNetworkError(error: any): boolean {
     errorCode === 'network_error' ||
     errorCode === 'fetch_error' ||
     error.name === 'NetworkError' ||
-    error.name === 'TypeError' && errorMessage.includes('failed to fetch')
+    (error.name === 'TypeError' && errorMessage.includes('failed to fetch'))
   );
 }
 
-// Fonction utilitaire pour réessayer une requête en cas d'erreur réseau
+// Retry request utility with exponential backoff
 export async function retryRequest<T>(
   requestFn: () => Promise<T>,
   maxRetries: number = 3,
-  delayMs: number = 1000
+  initialDelayMs: number = 1000
 ): Promise<T> {
   let lastError: any;
   
@@ -53,10 +78,44 @@ export async function retryRequest<T>(
         throw error;
       }
       
-      console.warn(`🔄 Tentative ${attempt + 1}/${maxRetries} échouée, nouvelle tentative dans ${delayMs}ms...`);
-      await new Promise(resolve => setTimeout(resolve, delayMs * (attempt + 1)));
+      const delay = initialDelayMs * Math.pow(2, attempt);
+      console.warn(`🔄 Retry ${attempt + 1}/${maxRetries} after ${delay}ms...`);
+      await new Promise(resolve => setTimeout(resolve, delay));
     }
   }
   
   throw lastError;
+}
+
+// Query cache utility
+const queryCache = new Map<string, { data: any; timestamp: number }>();
+const CACHE_TTL = 5 * 60 * 1000; // 5 minutes
+
+export function getCachedQuery<T>(key: string): T | null {
+  const cached = queryCache.get(key);
+  if (!cached) return null;
+  
+  if (Date.now() - cached.timestamp > CACHE_TTL) {
+    queryCache.delete(key);
+    return null;
+  }
+  
+  return cached.data as T;
+}
+
+export function setCachedQuery(key: string, data: any): void {
+  queryCache.set(key, { data, timestamp: Date.now() });
+}
+
+export function clearQueryCache(pattern?: string): void {
+  if (!pattern) {
+    queryCache.clear();
+    return;
+  }
+  
+  for (const key of queryCache.keys()) {
+    if (key.includes(pattern)) {
+      queryCache.delete(key);
+    }
+  }
 }
