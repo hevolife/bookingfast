@@ -25,18 +25,25 @@ export function PaymentPage() {
   // Vérifier si le lien de paiement existe encore
   useEffect(() => {
     const checkPaymentLinkStatus = async () => {
+      console.log('🔍 Début vérification lien de paiement');
+      console.log('📊 Paramètres URL:', { email, date, time, amount, userId });
+
+      // Vérifier d'abord les paramètres requis
       if (!email || !date || !time) {
+        console.warn('⚠️ Paramètres manquants dans l\'URL');
         setCheckingStatus(false);
         return;
       }
 
       if (!isSupabaseConfigured()) {
-        // En mode démo, toujours autoriser l'accès
+        console.log('🎭 Mode démo - autorisation automatique');
         setCheckingStatus(false);
         return;
       }
 
       try {
+        console.log('🔎 Recherche réservation:', { email, date, time });
+        
         // Rechercher la réservation correspondante
         const { data: booking, error } = await supabase
           .from('bookings')
@@ -44,36 +51,45 @@ export function PaymentPage() {
           .eq('client_email', email)
           .eq('date', date)
           .eq('time', time)
-          .single();
+          .maybeSingle(); // Utiliser maybeSingle() au lieu de single()
 
-        if (error || !booking) {
-          console.warn('⚠️ Réservation non trouvée, mais autorisation du lien pour les clients externes');
-          // Ne pas bloquer pour les clients externes - ils peuvent avoir un lien valide
+        if (error) {
+          console.error('❌ Erreur Supabase:', error);
+          // Ne pas bloquer pour les erreurs de requête
+          console.log('✅ Autorisation du lien malgré l\'erreur (client externe possible)');
           setCheckingStatus(false);
           return;
         }
 
-        // Si la réservation est déjà entièrement payée, marquer comme supprimé
+        if (!booking) {
+          console.log('⚠️ Réservation non trouvée - autorisation pour client externe');
+          setCheckingStatus(false);
+          return;
+        }
+
+        console.log('📦 Réservation trouvée:', booking);
+
+        // Si la réservation est déjà entièrement payée
         if (booking.payment_status === 'completed' && 
             (booking.payment_amount || 0) >= booking.total_amount) {
           console.log('💰 Réservation déjà entièrement payée');
-          setIsDeleted(true); // Cela déclenchera l'affichage "Paiement validé"
+          setIsDeleted(true);
           setCheckingStatus(false);
           return;
         }
         
-        // Vérifier aussi si le montant demandé a déjà été payé
+        // Vérifier si le montant demandé a déjà été payé
         const requestedAmount = parseFloat(amount || '0');
         const alreadyPaid = (booking.payment_amount || 0);
         
         if (requestedAmount > 0 && alreadyPaid >= requestedAmount) {
           console.log('💰 Montant demandé déjà payé:', { requestedAmount, alreadyPaid });
-          setIsDeleted(true); // Afficher "Paiement validé"
+          setIsDeleted(true);
           setCheckingStatus(false);
           return;
         }
         
-        // Vérifier si il y a des transactions Stripe complétées pour ce montant
+        // Vérifier les transactions Stripe
         const stripeTransactions = booking.transactions?.filter(t => 
           t.method === 'stripe' && 
           t.status === 'completed' &&
@@ -81,24 +97,26 @@ export function PaymentPage() {
         ) || [];
         
         if (stripeTransactions.length > 0) {
-          console.log('💰 Transaction Stripe déjà complétée pour ce montant');
-          setIsDeleted(true); // Afficher "Paiement validé"
+          console.log('💰 Transaction Stripe déjà complétée');
+          setIsDeleted(true);
           setCheckingStatus(false);
           return;
         }
         
-        // Sinon, autoriser l'accès au lien de paiement
-        console.log('✅ Lien de paiement autorisé');
+        console.log('✅ Lien de paiement valide et autorisé');
+        setCheckingStatus(false);
+        
       } catch (error) {
-        console.warn('⚠️ Erreur vérification lien, mais autorisation pour les clients externes:', error);
-        // En cas d'erreur, autoriser quand même l'accès pour les clients externes
-      } finally {
+        console.error('❌ Erreur lors de la vérification:', error);
+        // En cas d'erreur, autoriser quand même l'accès
+        console.log('✅ Autorisation du lien malgré l\'erreur');
         setCheckingStatus(false);
       }
     };
 
     checkPaymentLinkStatus();
   }, [email, date, time, amount]);
+
   // Calculer le temps restant
   useEffect(() => {
     if (!expiresAt) return;
@@ -123,20 +141,6 @@ export function PaymentPage() {
     const minutes = Math.floor(ms / 60000);
     const seconds = Math.floor((ms % 60000) / 1000);
     return `${minutes.toString().padStart(2, '0')}:${seconds.toString().padStart(2, '0')}`;
-  };
-
-  const formatTimeLeftReadable = (ms: number) => {
-    const hours = Math.floor(ms / 3600000);
-    const minutes = Math.floor((ms % 3600000) / 60000);
-    const seconds = Math.floor((ms % 60000) / 1000);
-    
-    if (hours > 0) {
-      return `${hours}h ${minutes}min ${seconds}s`;
-    } else if (minutes > 0) {
-      return `${minutes}min ${seconds}s`;
-    } else {
-      return `${seconds}s`;
-    }
   };
 
   // Affichage pendant la vérification
@@ -193,6 +197,7 @@ export function PaymentPage() {
       </div>
     );
   }
+
   // Vérifier si le lien est valide
   if (!amount || !service || !client || !email || !date || !time) {
     return (
