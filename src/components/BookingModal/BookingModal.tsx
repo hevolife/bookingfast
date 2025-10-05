@@ -18,6 +18,7 @@ import { TeamMemberSelector } from './TeamMemberSelector';
 import { useAuth } from '../../contexts/AuthContext';
 import { bookingEvents } from '../../lib/bookingEvents';
 import { triggerWorkflow, sendConfirmationEmail } from '../../lib/workflowEngine';
+import { calculateDepositAmount } from '../../lib/depositCalculations';
 
 interface BookingModalProps {
   isOpen: boolean;
@@ -150,6 +151,22 @@ export function BookingModal({
     return transactions
       .filter(transaction => transaction.status !== 'pending' && transaction.status !== 'cancelled')
       .reduce((sum, transaction) => sum + transaction.amount, 0);
+  };
+
+  // Calcul de l'acompte suggéré avec la nouvelle logique
+  const calculateSuggestedDeposit = () => {
+    if (!settings) return 0;
+
+    const totalAmount = calculateTotalAmount();
+    
+    return calculateDepositAmount({
+      totalAmount,
+      depositPercentage: settings.default_deposit_percentage || 30,
+      depositFixedAmount: settings.deposit_fixed_amount || 20,
+      depositType: settings.deposit_type || 'percentage',
+      quantity,
+      multiplyByUnits: settings.multiply_deposit_by_units ?? true
+    });
   };
 
   const handleAddTransaction = (transaction: Omit<Transaction, 'id' | 'created_at'>) => {
@@ -385,11 +402,12 @@ export function BookingModal({
 
   const totalAmount = calculateTotalAmount();
   const currentPaid = calculateCurrentPaid();
+  const suggestedDeposit = calculateSuggestedDeposit();
 
   // Obtenir le nom d'unité du service sélectionné
   const getUnitName = () => {
     if (isCustomService) {
-      return 'participants'; // Par défaut pour les services personnalisés
+      return 'participants';
     }
     if (selectedService?.unit_name && selectedService.unit_name !== 'personnes') {
       return selectedService.unit_name;
@@ -401,7 +419,6 @@ export function BookingModal({
   const getPluralUnitName = (qty: number) => {
     const unitName = getUnitName();
     if (qty <= 1) {
-      // Retirer le 's' final si présent et ajouter (s) après
       return `${unitName.replace(/s$/, '')}(s)`;
     }
     return `${unitName}(s)`;
@@ -707,6 +724,12 @@ export function BookingModal({
                       <span className="text-gray-900">Total</span>
                       <span className="text-green-600">{totalAmount.toFixed(2)}€</span>
                     </div>
+                    {suggestedDeposit > 0 && (
+                      <div className="flex justify-between text-sm bg-blue-50 p-2 rounded-lg">
+                        <span className="text-blue-700">Acompte suggéré</span>
+                        <span className="font-bold text-blue-800">{suggestedDeposit.toFixed(2)}€</span>
+                      </div>
+                    )}
                   </div>
                 </div>
               )}
@@ -771,6 +794,7 @@ export function BookingModal({
                 <PaymentSection
                   totalAmount={totalAmount}
                   currentPaid={currentPaid}
+                  suggestedDeposit={suggestedDeposit}
                   transactions={transactions}
                   onAddTransaction={handleAddTransaction}
                   onDeleteTransaction={handleDeleteTransaction}

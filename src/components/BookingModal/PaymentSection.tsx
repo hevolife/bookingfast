@@ -8,6 +8,7 @@ import { useAuth } from '../../contexts/AuthContext';
 interface PaymentSectionProps {
   totalAmount: number;
   currentPaid: number;
+  suggestedDeposit: number;
   transactions: Transaction[];
   onAddTransaction: (transaction: Omit<Transaction, 'id' | 'created_at'>) => void;
   onDeleteTransaction: (transactionId: string) => void;
@@ -55,7 +56,7 @@ function PaymentLinkTimer({ createdAt, expiryMinutes = 30 }: { createdAt: string
     );
   }
 
-  const isWarning = timeLeft < 5 * 60 * 1000; // Moins de 5 minutes
+  const isWarning = timeLeft < 5 * 60 * 1000;
 
   return (
     <div className={`flex items-center gap-1 text-xs font-bold ${
@@ -70,6 +71,7 @@ function PaymentLinkTimer({ createdAt, expiryMinutes = 30 }: { createdAt: string
 export function PaymentSection({
   totalAmount,
   currentPaid,
+  suggestedDeposit,
   transactions,
   onAddTransaction,
   onDeleteTransaction,
@@ -99,7 +101,6 @@ export function PaymentSection({
   const remainingAmount = totalAmount - currentPaid;
   const isFullyPaid = remainingAmount <= 0;
   
-  // Vérifier si Stripe est vraiment configuré
   const isStripeConfigured = !!(
     settings?.stripe_enabled === true && 
     settings?.stripe_public_key && 
@@ -108,12 +109,6 @@ export function PaymentSection({
     settings?.stripe_secret_key.trim() !== ''
   );
   
-  console.log('🔍 Vérification Stripe:', {
-    stripe_enabled: settings?.stripe_enabled,
-    has_public_key: !!(settings?.stripe_public_key && settings.stripe_public_key.trim() !== ''),
-    has_secret_key: !!(settings?.stripe_secret_key && settings.stripe_secret_key.trim() !== ''),
-    isStripeConfigured
-  });
   const handleAddTransaction = () => {
     if (newTransaction.amount <= 0) return;
     
@@ -136,7 +131,6 @@ export function PaymentSection({
       console.warn('⚠️ Stripe non configuré - génération du lien quand même');
     }
     
-    // Appeler la fonction de génération de lien qui gère le workflow
     onGeneratePaymentLink(paymentLinkAmount);
     
     setPaymentLinkAmount(0);
@@ -147,14 +141,12 @@ export function PaymentSection({
     const transaction = transactions.find(t => t.id === transactionId);
     
     if (transaction && transaction.method === 'stripe' && transaction.status === 'pending') {
-      // Pour les liens de paiement, marquer comme supprimé au lieu de supprimer
       const updatedTransactions = transactions.map(t => 
         t.id === transactionId 
           ? { ...t, status: 'cancelled' as const, note: t.note.replace('En attente', 'Supprimé') }
           : t
       );
       
-      // Mettre à jour les transactions avec le statut "cancelled"
       transactions.forEach((t, index) => {
         if (t.id === transactionId) {
           onDeleteTransaction(transactionId);
@@ -169,7 +161,6 @@ export function PaymentSection({
     if (transaction.method !== 'stripe' || transaction.status !== 'pending') return;
     
     try {
-      // Récupérer le lien complet depuis la note de la transaction
       const noteMatch = transaction.note.match(/Lien: (https?:\/\/[^\s)]+)/);
       let fullPaymentLink = '';
       
@@ -177,23 +168,18 @@ export function PaymentSection({
         fullPaymentLink = noteMatch[1];
         console.log('🔗 Lien trouvé dans la note:', fullPaymentLink);
       } else {
-        // Fallback: reconstituer le lien complet avec TOUS les paramètres
         console.log('🔄 Reconstitution du lien complet...');
         const expiryMinutes = settings?.payment_link_expiry_minutes || 30;
         const expiresAt = new Date(transaction.created_at).getTime() + (expiryMinutes * 60 * 1000);
         const paymentUrl = new URL('/payment', window.location.origin);
         
-        // Ajouter TOUS les paramètres nécessaires
         paymentUrl.searchParams.set('amount', transaction.amount.toString());
         paymentUrl.searchParams.set('service', serviceName);
-        paymentUrl.searchParams.set('client', `${selectedClient?.firstname || ''} ${selectedClient?.lastname || ''}`);
         paymentUrl.searchParams.set('email', clientEmail);
-        paymentUrl.searchParams.set('phone', selectedClient?.phone || '');
         paymentUrl.searchParams.set('date', bookingDate);
         paymentUrl.searchParams.set('time', bookingTime);
         paymentUrl.searchParams.set('expires', expiresAt.toString());
         
-        // Ajouter l'user_id si disponible
         if (user?.id) {
           paymentUrl.searchParams.set('user_id', user.id);
         }
@@ -210,9 +196,7 @@ export function PaymentSection({
     }
   };
 
-  // Fonction pour nettoyer le texte de la note (enlever les IDs de session)
   const cleanTransactionNote = (note: string) => {
-    // Supprimer les références aux sessions Stripe et aux liens de paiement
     return note
       .replace(/\s*-\s*Session:\s*cs_[a-zA-Z0-9_]+/g, '')
       .replace(/\s*\(Session:\s*cs_[a-zA-Z0-9_]+\)/g, '')
@@ -299,6 +283,22 @@ export function PaymentSection({
             {((currentPaid / totalAmount) * 100).toFixed(0)}% payé
           </div>
         </div>
+
+        {/* Acompte suggéré */}
+        {suggestedDeposit > 0 && currentPaid === 0 && (
+          <div className="mt-3 bg-blue-50 border border-blue-200 rounded-xl p-3">
+            <div className="flex items-center justify-between">
+              <div className="flex items-center gap-2">
+                <Calculator className="w-4 h-4 text-blue-600" />
+                <span className="text-sm font-medium text-blue-800">Acompte suggéré</span>
+              </div>
+              <span className="text-lg font-bold text-blue-900">{suggestedDeposit.toFixed(2)}€</span>
+            </div>
+            <div className="text-xs text-blue-600 mt-1">
+              Basé sur vos paramètres ({settings?.deposit_type === 'percentage' ? `${settings?.default_deposit_percentage}%` : `${settings?.deposit_fixed_amount}€`})
+            </div>
+          </div>
+        )}
       </div>
 
       {/* Actions de paiement */}
@@ -309,6 +309,9 @@ export function PaymentSection({
             onClick={() => {
               setShowAddTransaction(!showAddTransaction);
               setShowPaymentLink(false);
+              if (!showAddTransaction && suggestedDeposit > 0 && currentPaid === 0) {
+                setNewTransaction(prev => ({ ...prev, amount: suggestedDeposit }));
+              }
             }}
             className={`px-4 py-4 rounded-2xl transition-all duration-300 flex items-center justify-center gap-3 text-base font-bold transform hover:scale-105 shadow-lg ${
               showAddTransaction 
@@ -326,7 +329,8 @@ export function PaymentSection({
               setShowPaymentLink(!showPaymentLink);
               setShowAddTransaction(false);
               if (!showPaymentLink) {
-                setPaymentLinkAmount(remainingAmount);
+                const amountToSet = suggestedDeposit > 0 && currentPaid === 0 ? suggestedDeposit : remainingAmount;
+                setPaymentLinkAmount(amountToSet);
               }
             }}
             className={`px-4 py-4 rounded-2xl transition-all duration-300 flex items-center justify-center gap-3 text-base font-bold transform hover:scale-105 shadow-lg ${
@@ -344,7 +348,6 @@ export function PaymentSection({
       {/* Section Ajouter Transaction (Expandable) */}
       {showAddTransaction && (
         <div className="bg-white border-2 border-blue-200 rounded-2xl p-6 space-y-6 animate-slideDown shadow-lg">
-          {/* Header */}
           <div className="flex items-center justify-between">
             <div className="flex items-center gap-3">
               <div className="w-10 h-10 bg-gradient-to-r from-blue-500 to-cyan-500 rounded-xl flex items-center justify-center text-white">
@@ -364,7 +367,6 @@ export function PaymentSection({
             </button>
           </div>
 
-          {/* Stats rapides */}
           <div className="grid grid-cols-2 gap-3">
             <div className="bg-gradient-to-r from-blue-50 to-cyan-50 border border-blue-200 rounded-xl p-3">
               <div className="text-blue-600 text-xs font-medium">Montant total</div>
@@ -376,7 +378,6 @@ export function PaymentSection({
             </div>
           </div>
 
-          {/* Montant */}
           <div>
             <label className="block text-sm font-bold text-gray-800 mb-3 flex items-center gap-2">
               <Euro className="w-4 h-4 text-green-600 flex-shrink-0" />
@@ -402,16 +403,16 @@ export function PaymentSection({
               />
             </div>
             
-            {/* Suggestions de montants */}
             <div className="flex flex-wrap gap-2">
               {[
-                { label: 'Restant', value: remainingAmount },
-                { label: '50%', value: totalAmount * 0.5 },
-                { label: '30%', value: totalAmount * 0.3 },
-                { label: '20€', value: 20 },
-                { label: '50€', value: 50 },
-                { label: '100€', value: 100 }
-              ].filter(item => item.value <= remainingAmount && item.value > 0).map((item, index) => (
+                { label: 'Acompte suggéré', value: suggestedDeposit, show: suggestedDeposit > 0 && currentPaid === 0 },
+                { label: 'Restant', value: remainingAmount, show: true },
+                { label: '50%', value: totalAmount * 0.5, show: true },
+                { label: '30%', value: totalAmount * 0.3, show: true },
+                { label: '20€', value: 20, show: true },
+                { label: '50€', value: 50, show: true },
+                { label: '100€', value: 100, show: true }
+              ].filter(item => item.show && item.value <= remainingAmount && item.value > 0).map((item, index) => (
                 <button
                   key={index}
                   type="button"
@@ -424,7 +425,6 @@ export function PaymentSection({
             </div>
           </div>
 
-          {/* Mode de paiement */}
           <div>
             <label className="block text-sm font-bold text-gray-800 mb-3 flex items-center gap-2">
               <CreditCard className="w-4 h-4 text-purple-600" />
@@ -457,7 +457,6 @@ export function PaymentSection({
             </div>
           </div>
 
-          {/* Note */}
           <div>
             <label className="block text-sm font-bold text-gray-800 mb-3">
               Note (optionnel)
@@ -478,7 +477,6 @@ export function PaymentSection({
             </div>
           </div>
 
-          {/* Actions */}
           <div className="flex gap-3 pt-4 border-t border-gray-200">
             <button
               type="button"
@@ -503,7 +501,6 @@ export function PaymentSection({
       {/* Section Lien de Paiement (Expandable) */}
       {showPaymentLink && (
         <div className="bg-white border-2 border-purple-200 rounded-2xl p-6 space-y-6 animate-slideDown shadow-lg">
-          {/* Header */}
           <div className="flex items-center justify-between">
             <div className="flex items-center gap-3">
               <div className="w-10 h-10 bg-gradient-to-r from-purple-500 to-pink-500 rounded-xl flex items-center justify-center text-white">
@@ -523,7 +520,6 @@ export function PaymentSection({
             </button>
           </div>
 
-          {/* Timer d'expiration */}
           <div className="bg-gradient-to-r from-purple-50 to-pink-50 border border-purple-200 rounded-xl p-3">
             <div className="flex items-center gap-2 text-purple-700">
               <Clock className="w-4 h-4" />
@@ -533,7 +529,6 @@ export function PaymentSection({
             </div>
           </div>
 
-          {/* Informations de la réservation */}
           <div className="bg-gradient-to-r from-blue-50 to-purple-50 border border-blue-200 rounded-xl p-4">
             <div className="flex items-center gap-2 mb-3">
               <User className="w-5 h-5 text-blue-600" />
@@ -555,7 +550,6 @@ export function PaymentSection({
             </div>
           </div>
 
-          {/* Montant */}
           <div>
             <label className="block text-sm font-bold text-gray-800 mb-3 flex items-center gap-2">
               <Euro className="w-4 h-4 text-green-600 flex-shrink-0" />
@@ -578,16 +572,16 @@ export function PaymentSection({
               />
             </div>
             
-            {/* Suggestions de montants */}
             <div className="flex flex-wrap gap-2">
               {[
-                { label: 'Montant restant', value: remainingAmount },
-                { label: 'Acompte 30%', value: totalAmount * 0.3 },
-                { label: 'Acompte 50%', value: totalAmount * 0.5 },
-                { label: '20€', value: 20 },
-                { label: '50€', value: 50 },
-                { label: '100€', value: 100 }
-              ].filter(item => item.value <= remainingAmount && item.value > 0).map((item, index) => (
+                { label: 'Acompte suggéré', value: suggestedDeposit, show: suggestedDeposit > 0 && currentPaid === 0 },
+                { label: 'Montant restant', value: remainingAmount, show: true },
+                { label: 'Acompte 30%', value: totalAmount * 0.3, show: true },
+                { label: 'Acompte 50%', value: totalAmount * 0.5, show: true },
+                { label: '20€', value: 20, show: true },
+                { label: '50€', value: 50, show: true },
+                { label: '100€', value: 100, show: true }
+              ].filter(item => item.show && item.value <= remainingAmount && item.value > 0).map((item, index) => (
                 <button
                   key={index}
                   type="button"
@@ -600,7 +594,6 @@ export function PaymentSection({
             </div>
           </div>
 
-          {/* Guide d'utilisation */}
           <div className="bg-gradient-to-r from-blue-50 to-cyan-50 border border-blue-200 rounded-xl p-4">
             <div className="flex items-center gap-2 mb-2">
               <div className="w-5 h-5 bg-gradient-to-r from-blue-500 to-cyan-500 rounded-full flex items-center justify-center">
@@ -616,7 +609,6 @@ export function PaymentSection({
             </div>
           </div>
 
-          {/* Actions */}
           <div className="flex gap-3 pt-4 border-t border-gray-200">
             <button
               type="button"
@@ -677,7 +669,6 @@ export function PaymentSection({
                     }`}>
                       {getTransactionStatusLabel(transaction)}
                     </span>
-                    {/* Timer pour les liens de paiement */}
                     {transaction.method === 'stripe' && transaction.status === 'pending' && (
                       <PaymentLinkTimer 
                         createdAt={transaction.created_at} 
@@ -700,7 +691,6 @@ export function PaymentSection({
                 </div>
                 
                 <div className="flex gap-2">
-                  {/* Bouton copier lien - seulement pour les liens Stripe en attente */}
                   {transaction.method === 'stripe' && transaction.status === 'pending' && (
                     <button
                       type="button"

@@ -1,5 +1,5 @@
 import React, { useState, useEffect } from 'react';
-import { Save, Building2, Palette, Clock, Euro, Mail, CreditCard, Eye, EyeOff, Globe, Shield, AlertTriangle, CheckCircle, Percent } from 'lucide-react';
+import { Save, Building2, Palette, Clock, Euro, Mail, CreditCard, Eye, EyeOff, Globe, Shield, AlertTriangle, CheckCircle, Percent, Calculator } from 'lucide-react';
 import { useBusinessSettings } from '../../hooks/useBusinessSettings';
 import { BusinessSettings } from '../../types';
 import { Button } from '../UI/Button';
@@ -458,6 +458,55 @@ export function BusinessSettingsForm() {
                 />
               </div>
             )}
+          </div>
+
+          {/* NOUVELLE OPTION : Multiplication de l'acompte par les unités */}
+          <div className="mt-6 bg-gradient-to-r from-blue-50 to-indigo-50 rounded-xl p-4 border border-blue-200">
+            <div className="flex items-start gap-3">
+              <div className="w-10 h-10 bg-blue-100 rounded-lg flex items-center justify-center flex-shrink-0">
+                <Calculator className="w-5 h-5 text-blue-600" />
+              </div>
+              <div className="flex-1">
+                <h4 className="font-bold text-blue-800 mb-2">Calcul de l'acompte pour les réservations multiples</h4>
+                
+                <label className="flex items-start gap-3 cursor-pointer group">
+                  <input
+                    type="checkbox"
+                    checked={formData.multiply_deposit_by_units ?? true}
+                    onChange={(e) => setFormData(prev => ({ 
+                      ...prev, 
+                      multiply_deposit_by_units: e.target.checked 
+                    }))}
+                    className="w-5 h-5 text-blue-600 rounded focus:ring-blue-500 mt-0.5 flex-shrink-0"
+                  />
+                  <div className="flex-1">
+                    <span className="text-sm font-medium text-blue-900 group-hover:text-blue-700">
+                      Multiplier l'acompte par le nombre d'unités
+                    </span>
+                    <div className="text-xs text-blue-700 mt-1 space-y-1">
+                      <div className="font-medium">
+                        {formData.multiply_deposit_by_units ?? true ? '✅ Activé' : '❌ Désactivé'}
+                      </div>
+                      {formData.multiply_deposit_by_units ?? true ? (
+                        <div className="bg-blue-100 rounded-lg p-2 mt-2">
+                          <div className="font-medium mb-1">Exemple avec 3 participants :</div>
+                          <div>• Prix unitaire : 100€</div>
+                          <div>• Acompte : 30%</div>
+                          <div>• <strong>Calcul : 3 × (30% × 100€) = 90€</strong></div>
+                        </div>
+                      ) : (
+                        <div className="bg-blue-100 rounded-lg p-2 mt-2">
+                          <div className="font-medium mb-1">Exemple avec 3 participants :</div>
+                          <div>• Prix unitaire : 100€</div>
+                          <div>• Acompte : 30%</div>
+                          <div>• <strong>Calcul : 30% × 100€ = 30€ (fixe)</strong></div>
+                        </div>
+                      )}
+                    </div>
+                  </div>
+                </label>
+              </div>
+            </div>
           </div>
         </div>
       </div>
