@@ -9,14 +9,8 @@ export default defineConfig({
   },
   build: {
     target: 'esnext',
-    minify: 'terser',
-    terserOptions: {
-      compress: {
-        drop_console: true,
-        drop_debugger: true,
-        pure_funcs: ['console.log', 'console.info', 'console.debug']
-      }
-    },
+    minify: 'esbuild', // Changé de 'terser' à 'esbuild' pour éviter les problèmes
+    sourcemap: true, // Activé pour le débogage
     rollupOptions: {
       output: {
         manualChunks: {
@@ -30,8 +24,7 @@ export default defineConfig({
         assetFileNames: 'assets/[name]-[hash].[ext]'
       }
     },
-    chunkSizeWarningLimit: 1000,
-    sourcemap: false
+    chunkSizeWarningLimit: 1000
   },
   server: {
     port: 5173,

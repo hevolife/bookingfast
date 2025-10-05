@@ -53,7 +53,7 @@ export function IframeBookingPage() {
     try {
       setError(null);
       
-      if (!isSupabaseConfigured()) {
+      if (!isSupabaseConfigured) {
         console.log('🎭 Mode démo - données par défaut');
         const demoData: PublicBookingData = {
           user: { id: userId, email: 'demo@example.com', full_name: 'Démo Utilisateur' },
@@ -337,7 +337,7 @@ export function IframeBookingPage() {
         ? data.settings.deposit_fixed_amount || 20
         : (totalAmount * depositPercentage) / 100;
       
-      if (isSupabaseConfigured()) {
+      if (isSupabaseConfigured) {
         // Vérifier que Stripe est configuré
         if (!data.settings?.stripe_enabled || !data.settings?.stripe_public_key || !data.settings?.stripe_secret_key) {
           throw new Error('Le paiement en ligne n\'est pas configuré. Contactez l\'établissement.');

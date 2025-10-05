@@ -35,7 +35,7 @@ export function PaymentPage() {
         return;
       }
 
-      if (!isSupabaseConfigured()) {
+      if (!isSupabaseConfigured) {
         console.log('🎭 Mode démo - autorisation automatique');
         setCheckingStatus(false);
         return;
@@ -51,7 +51,7 @@ export function PaymentPage() {
           .eq('client_email', email)
           .eq('date', date)
           .eq('time', time)
-          .maybeSingle(); // Utiliser maybeSingle() au lieu de single()
+          .maybeSingle();
 
         if (error) {
           console.error('❌ Erreur Supabase:', error);
@@ -262,7 +262,7 @@ export function PaymentPage() {
         }
       });
 
-      if (isSupabaseConfigured()) {
+      if (isSupabaseConfigured) {
         // Appel à la fonction Supabase Edge Function
         const supabaseUrl = import.meta.env.VITE_SUPABASE_URL;
         const response = await fetch(`${supabaseUrl}/functions/v1/stripe-checkout`, {
