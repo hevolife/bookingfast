@@ -6,7 +6,6 @@ import { supabase, isSupabaseConfigured } from '../../lib/supabase';
 import { getBusinessTimezone, getCurrentDateInTimezone, formatInBusinessTimezone } from '../../lib/timezone';
 import { validateBookingDateTime, getNextAvailableDateTime } from '../../lib/bookingValidation';
 import { DatePicker } from './DatePicker';
-import { calculateDepositAmount } from '../../lib/depositCalculations';
 
 interface PublicBookingData {
   user: any;
@@ -54,7 +53,7 @@ export function IframeBookingPage() {
     try {
       setError(null);
       
-      if (!isSupabaseConfigured) {
+      if (!isSupabaseConfigured()) {
         console.log('🎭 Mode démo - données par défaut');
         const demoData: PublicBookingData = {
           user: { id: userId, email: 'demo@example.com', full_name: 'Démo Utilisateur' },
@@ -109,8 +108,7 @@ export function IframeBookingPage() {
             stripe_public_key: '',
             stripe_secret_key: '',
             stripe_webhook_secret: '',
-            timezone: 'Europe/Paris',
-            multiply_deposit_by_units: true
+            timezone: 'Europe/Paris'
           },
           bookings: []
         };
@@ -139,28 +137,23 @@ export function IframeBookingPage() {
         throw new Error(result.error || 'Erreur lors de la récupération des données');
       }
 
-      // 🚫 FILTRER LES SERVICES PERSONNALISÉS - ILS NE DOIVENT PAS APPARAÎTRE SUR LA PAGE PUBLIQUE
-      let filteredServices = (result.services || []).filter(service => 
-        service.description !== 'Service personnalisé'
-      );
+      // Filtrer les services selon la configuration iframe
+      let filteredServices = result.services || [];
       
-      console.log('🔍 Services avant filtrage personnalisés:', result.services?.length || 0);
-      console.log('✅ Services après filtrage personnalisés:', filteredServices.length);
-      
-      // Appliquer les filtres d'URL ou de paramètres
       if (allowedServices.length > 0) {
         // Si des services spécifiques sont demandés via l'URL
         filteredServices = filteredServices.filter(service => 
           allowedServices.includes(service.id)
         );
-        console.log('🎯 Services filtrés par URL:', filteredServices.length);
+        console.log('🎯 Services filtrés par URL:', filteredServices.length, 'sur', result.services?.length || 0);
       } else if (result.settings?.iframe_services && result.settings.iframe_services.length > 0) {
         // Si des services sont configurés dans les paramètres
         filteredServices = filteredServices.filter(service => 
           result.settings.iframe_services.includes(service.id)
         );
-        console.log('⚙️ Services filtrés par paramètres:', filteredServices.length);
+        console.log('⚙️ Services filtrés par paramètres:', filteredServices.length, 'sur', result.services?.length || 0);
       }
+      // Sinon, afficher tous les services
       
       setData({
         ...result,
@@ -339,26 +332,12 @@ export function IframeBookingPage() {
     try {
       // 💳 PAIEMENT OBLIGATOIRE - Rediriger directement vers Stripe SANS créer la réservation
       const totalAmount = selectedService.price_ttc * quantity;
+      const depositPercentage = data.settings?.default_deposit_percentage || 30;
+      const depositAmount = data.settings?.deposit_type === 'fixed_amount' 
+        ? data.settings.deposit_fixed_amount || 20
+        : (totalAmount * depositPercentage) / 100;
       
-      // 🔢 CALCUL CORRECT DE L'ACOMPTE avec multiplication par quantité
-      const depositAmount = calculateDepositAmount({
-        totalAmount,
-        depositPercentage: data.settings?.default_deposit_percentage || 30,
-        depositFixedAmount: data.settings?.deposit_fixed_amount || 20,
-        depositType: data.settings?.deposit_type || 'percentage',
-        quantity,
-        multiplyByUnits: data.settings?.multiply_deposit_by_units ?? true
-      });
-      
-      console.log('💰 Calcul acompte:', {
-        totalAmount,
-        quantity,
-        depositAmount,
-        depositType: data.settings?.deposit_type,
-        multiplyByUnits: data.settings?.multiply_deposit_by_units
-      });
-      
-      if (isSupabaseConfigured) {
+      if (isSupabaseConfigured()) {
         // Vérifier que Stripe est configuré
         if (!data.settings?.stripe_enabled || !data.settings?.stripe_public_key || !data.settings?.stripe_secret_key) {
           throw new Error('Le paiement en ligne n\'est pas configuré. Contactez l\'établissement.');
@@ -490,11 +469,10 @@ export function IframeBookingPage() {
 
   if (loading) {
     return (
-      <div className="min-h-screen bg-white flex items-center justify-center p-4">
+      <div className="min-h-screen bg-gradient-to-br from-blue-50 via-purple-50 to-pink-50 flex items-center justify-center p-4">
         <div className="text-center">
-          <div className="w-16 h-16 border-4 border-purple-200 rounded-full animate-spin mx-auto mb-4 relative">
-            <div className="absolute top-0 left-0 w-16 h-16 border-4 border-purple-600 rounded-full animate-spin border-t-transparent"></div>
-          </div>
+          <div className="w-16 h-16 border-4 border-purple-200 rounded-full animate-spin mx-auto mb-4"></div>
+          <div className="absolute top-0 left-0 w-16 h-16 border-4 border-purple-600 rounded-full animate-spin border-t-transparent mx-auto"></div>
           <p className="text-gray-600 text-lg">Chargement...</p>
         </div>
       </div>
@@ -503,7 +481,7 @@ export function IframeBookingPage() {
 
   if (error || !data) {
     return (
-      <div className="min-h-screen bg-white flex items-center justify-center p-4">
+      <div className="min-h-screen bg-gradient-to-br from-red-50 to-pink-50 flex items-center justify-center p-4">
         <div className="text-center p-8 bg-white rounded-3xl shadow-xl max-w-md">
           <div className="w-16 h-16 bg-red-100 rounded-full flex items-center justify-center mx-auto mb-4">
             <Package className="w-8 h-8 text-red-500" />
@@ -523,7 +501,7 @@ export function IframeBookingPage() {
   ];
 
   return (
-    <div className="min-h-screen bg-white">
+    <div className="min-h-screen bg-transparent">
       {/* Main Content */}
       <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-4 sm:py-6">
         {/* Progress Indicator - Compact */}
@@ -981,7 +959,7 @@ export function IframeBookingPage() {
                         <div className="text-lg font-medium text-gray-700">💳 Acompte obligatoire</div>
                         <div className="text-sm text-gray-500">
                           {data.settings?.deposit_type === 'fixed_amount' 
-                            ? `Montant fixe de ${data.settings.deposit_fixed_amount}€${data.settings.multiply_deposit_by_units ? ' × ' + quantity + ' unités' : ''}`
+                            ? `Montant fixe de ${data.settings.deposit_fixed_amount}€`
                             : `${data.settings?.default_deposit_percentage || 30}% du total`
                           }
                         </div>
@@ -989,14 +967,10 @@ export function IframeBookingPage() {
                       <span className="text-2xl sm:text-3xl font-bold text-blue-600">
                         {(() => {
                           const totalAmount = selectedService.price_ttc * quantity;
-                          const depositAmount = calculateDepositAmount({
-                            totalAmount,
-                            depositPercentage: data.settings?.default_deposit_percentage || 30,
-                            depositFixedAmount: data.settings?.deposit_fixed_amount || 20,
-                            depositType: data.settings?.deposit_type || 'percentage',
-                            quantity,
-                            multiplyByUnits: data.settings?.multiply_deposit_by_units ?? true
-                          });
+                          const depositPercentage = data.settings?.default_deposit_percentage || 30;
+                          const depositAmount = data.settings?.deposit_type === 'fixed_amount' 
+                            ? data.settings.deposit_fixed_amount || 20
+                            : (totalAmount * depositPercentage) / 100;
                           return depositAmount.toFixed(2);
                         })()}€
                       </span>
@@ -1011,14 +985,10 @@ export function IframeBookingPage() {
                         <span className="font-medium">
                           {(() => {
                             const totalAmount = selectedService.price_ttc * quantity;
-                            const depositAmount = calculateDepositAmount({
-                              totalAmount,
-                              depositPercentage: data.settings?.default_deposit_percentage || 30,
-                              depositFixedAmount: data.settings?.deposit_fixed_amount || 20,
-                              depositType: data.settings?.deposit_type || 'percentage',
-                              quantity,
-                              multiplyByUnits: data.settings?.multiply_deposit_by_units ?? true
-                            });
+                            const depositPercentage = data.settings?.default_deposit_percentage || 30;
+                            const depositAmount = data.settings?.deposit_type === 'fixed_amount' 
+                              ? data.settings.deposit_fixed_amount || 20
+                              : (totalAmount * depositPercentage) / 100;
                             return (totalAmount - depositAmount).toFixed(2);
                           })()}€
                         </span>
