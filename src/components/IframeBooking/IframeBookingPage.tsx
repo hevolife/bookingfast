@@ -469,10 +469,12 @@ export function IframeBookingPage() {
 
   if (loading) {
     return (
-      <div className="min-h-screen bg-gradient-to-br from-blue-50 via-purple-50 to-pink-50 flex items-center justify-center p-4">
+      <div className="min-h-screen bg-transparent flex items-center justify-center p-4">
         <div className="text-center">
-          <div className="w-16 h-16 border-4 border-purple-200 rounded-full animate-spin mx-auto mb-4"></div>
-          <div className="absolute top-0 left-0 w-16 h-16 border-4 border-purple-600 rounded-full animate-spin border-t-transparent mx-auto"></div>
+          <div className="relative w-16 h-16 mx-auto mb-4">
+            <div className="absolute inset-0 border-4 border-purple-200 rounded-full animate-spin"></div>
+            <div className="absolute inset-0 border-4 border-purple-600 rounded-full animate-spin border-t-transparent"></div>
+          </div>
           <p className="text-gray-600 text-lg">Chargement...</p>
         </div>
       </div>
@@ -481,8 +483,8 @@ export function IframeBookingPage() {
 
   if (error || !data) {
     return (
-      <div className="min-h-screen bg-gradient-to-br from-red-50 to-pink-50 flex items-center justify-center p-4">
-        <div className="text-center p-8 bg-white rounded-3xl shadow-xl max-w-md">
+      <div className="min-h-screen bg-transparent flex items-center justify-center p-4">
+        <div className="text-center p-8 bg-white/95 backdrop-blur-sm rounded-3xl shadow-xl max-w-md">
           <div className="w-16 h-16 bg-red-100 rounded-full flex items-center justify-center mx-auto mb-4">
             <Package className="w-8 h-8 text-red-500" />
           </div>
@@ -510,17 +512,15 @@ export function IframeBookingPage() {
             {steps.map((step) => (
               <div key={step.id} className={`w-8 h-8 rounded-full flex items-center justify-center text-sm font-bold transition-all duration-300 ${
                 currentStep >= step.id
-                  ? 'bg-gradient-to-r from-blue-500 to-purple-500 text-white'
+                  ? 'bg-gradient-to-r from-blue-500 to-purple-500 text-white shadow-lg'
                   : currentStep === step.id
                   ? 'bg-blue-100 text-blue-600 ring-2 ring-blue-500'
-                  : 'bg-gray-100 text-gray-400'
+                  : 'bg-white/80 backdrop-blur-sm text-gray-400'
               }`}>
                 {currentStep > step.id ? <Check className="w-4 h-4" /> : step.id}
               </div>
             ))}
           </div>
-          
-          {/* Business name - Compact */}
         </div>
 
         {/* Step 1: Service Selection */}
@@ -540,7 +540,7 @@ export function IframeBookingPage() {
                 <div
                   key={service.id}
                   onClick={() => handleServiceSelect(service)}
-                  className="group bg-white rounded-2xl sm:rounded-3xl shadow-lg hover:shadow-2xl transition-all duration-500 cursor-pointer transform hover:scale-[1.02] overflow-hidden animate-fadeIn"
+                  className="group bg-white/95 backdrop-blur-sm rounded-2xl sm:rounded-3xl shadow-lg hover:shadow-2xl transition-all duration-500 cursor-pointer transform hover:scale-[1.02] overflow-hidden animate-fadeIn"
                   style={{ animationDelay: `${index * 150}ms` }}
                 >
                   {/* Service Image */}
@@ -631,7 +631,7 @@ export function IframeBookingPage() {
 
             <div className="grid grid-cols-1 lg:grid-cols-2 gap-6 sm:gap-8">
               {/* Date Selection */}
-              <div className="bg-white rounded-2xl sm:rounded-3xl shadow-lg p-6 sm:p-8 relative">
+              <div className="bg-white/95 backdrop-blur-sm rounded-2xl sm:rounded-3xl shadow-lg p-6 sm:p-8 relative">
                 <h3 className="text-lg sm:text-xl font-bold text-gray-900 mb-4 sm:mb-6 flex items-center gap-2">
                   <Calendar className="w-5 h-5 sm:w-6 sm:h-6 text-blue-600" />
                   Sélectionnez une date
@@ -646,7 +646,7 @@ export function IframeBookingPage() {
               </div>
 
               {/* Time Selection */}
-              <div className="bg-white rounded-2xl sm:rounded-3xl shadow-lg p-6 sm:p-8">
+              <div className="bg-white/95 backdrop-blur-sm rounded-2xl sm:rounded-3xl shadow-lg p-6 sm:p-8">
                 <h3 className="text-lg sm:text-xl font-bold text-gray-900 mb-4 sm:mb-6 flex items-center gap-2">
                   <Clock className="w-5 h-5 sm:w-6 sm:h-6 text-purple-600" />
                   Choisissez l'heure
@@ -697,7 +697,7 @@ export function IframeBookingPage() {
             <div className="flex justify-between pt-6">
               <button
                 onClick={() => setCurrentStep(1)}
-                className="flex items-center gap-2 px-6 py-3 bg-gray-500 text-white rounded-xl hover:bg-gray-600 transition-colors"
+                className="flex items-center gap-2 px-6 py-3 bg-gray-500 text-white rounded-xl hover:bg-gray-600 transition-colors shadow-lg"
               >
                 <ArrowLeft className="w-4 h-4" />
                 Retour
@@ -729,7 +729,7 @@ export function IframeBookingPage() {
             </div>
 
             <div className="max-w-2xl mx-auto">
-              <div className="bg-white rounded-2xl sm:rounded-3xl shadow-lg p-6 sm:p-8">
+              <div className="bg-white/95 backdrop-blur-sm rounded-2xl sm:rounded-3xl shadow-lg p-6 sm:p-8">
                 <div className="grid grid-cols-1 sm:grid-cols-2 gap-4 sm:gap-6">
                   <div>
                     <label className="block text-sm font-medium text-gray-700 mb-2">
@@ -739,7 +739,7 @@ export function IframeBookingPage() {
                       type="text"
                       value={clientData.firstname}
                       onChange={(e) => setClientData(prev => ({ ...prev, firstname: e.target.value }))}
-                      className="w-full p-3 sm:p-4 border border-gray-300 rounded-xl focus:ring-2 focus:ring-blue-500 focus:border-blue-500 transition-all duration-300 text-base"
+                      className="w-full p-3 sm:p-4 border border-gray-300 rounded-xl focus:ring-2 focus:ring-blue-500 focus:border-blue-500 transition-all duration-300 text-base bg-white"
                       placeholder="Votre prénom"
                       required
                     />
@@ -753,7 +753,7 @@ export function IframeBookingPage() {
                       type="text"
                       value={clientData.lastname}
                       onChange={(e) => setClientData(prev => ({ ...prev, lastname: e.target.value }))}
-                      className="w-full p-3 sm:p-4 border border-gray-300 rounded-xl focus:ring-2 focus:ring-blue-500 focus:border-blue-500 transition-all duration-300 text-base"
+                      className="w-full p-3 sm:p-4 border border-gray-300 rounded-xl focus:ring-2 focus:ring-blue-500 focus:border-blue-500 transition-all duration-300 text-base bg-white"
                       placeholder="Votre nom"
                       required
                     />
@@ -769,7 +769,7 @@ export function IframeBookingPage() {
                         type="email"
                         value={clientData.email}
                         onChange={(e) => setClientData(prev => ({ ...prev, email: e.target.value }))}
-                        className="w-full pl-12 pr-4 p-3 sm:p-4 border border-gray-300 rounded-xl focus:ring-2 focus:ring-blue-500 focus:border-blue-500 transition-all duration-300 text-base"
+                        className="w-full pl-12 pr-4 p-3 sm:p-4 border border-gray-300 rounded-xl focus:ring-2 focus:ring-blue-500 focus:border-blue-500 transition-all duration-300 text-base bg-white"
                         placeholder="votre@email.com"
                         required
                       />
@@ -786,7 +786,7 @@ export function IframeBookingPage() {
                         type="tel"
                         value={clientData.phone}
                         onChange={(e) => setClientData(prev => ({ ...prev, phone: e.target.value }))}
-                        className="w-full pl-12 pr-4 p-3 sm:p-4 border border-gray-300 rounded-xl focus:ring-2 focus:ring-blue-500 focus:border-blue-500 transition-all duration-300 text-base"
+                        className="w-full pl-12 pr-4 p-3 sm:p-4 border border-gray-300 rounded-xl focus:ring-2 focus:ring-blue-500 focus:border-blue-500 transition-all duration-300 text-base bg-white"
                         placeholder="06 12 34 56 78"
                         required
                       />
@@ -831,7 +831,7 @@ export function IframeBookingPage() {
             <div className="flex justify-between max-w-2xl mx-auto">
               <button
                 onClick={() => setCurrentStep(2)}
-                className="flex items-center gap-2 px-6 py-3 bg-gray-500 text-white rounded-xl hover:bg-gray-600 transition-colors"
+                className="flex items-center gap-2 px-6 py-3 bg-gray-500 text-white rounded-xl hover:bg-gray-600 transition-colors shadow-lg"
               >
                 <ArrowLeft className="w-4 h-4" />
                 Retour
@@ -862,7 +862,7 @@ export function IframeBookingPage() {
             </div>
 
             <div className="max-w-2xl mx-auto">
-              <div className="bg-white rounded-2xl sm:rounded-3xl shadow-lg overflow-hidden">
+              <div className="bg-white/95 backdrop-blur-sm rounded-2xl sm:rounded-3xl shadow-lg overflow-hidden">
                 {/* Service Summary */}
                 <div className="bg-gradient-to-r from-blue-50 to-purple-50 p-6 sm:p-8 border-b border-gray-200">
                   <div className="flex items-center gap-4">
@@ -1012,7 +1012,7 @@ export function IframeBookingPage() {
             <div className="flex justify-between max-w-2xl mx-auto">
               <button
                 onClick={() => setCurrentStep(3)}
-                className="flex items-center gap-2 px-6 py-3 bg-gray-500 text-white rounded-xl hover:bg-gray-600 transition-colors"
+                className="flex items-center gap-2 px-6 py-3 bg-gray-500 text-white rounded-xl hover:bg-gray-600 transition-colors shadow-lg"
               >
                 <ArrowLeft className="w-4 h-4" />
                 Retour
@@ -1039,10 +1039,10 @@ export function IframeBookingPage() {
           </div>
         )}
 
-        {/* Step 4: Success */}
+        {/* Step 5: Success */}
         {currentStep === 5 && (
           <div className="text-center space-y-6 sm:space-y-8">
-            <div className="w-20 h-20 sm:w-24 sm:h-24 bg-gradient-to-r from-green-500 to-emerald-500 rounded-full flex items-center justify-center mx-auto animate-bounce">
+            <div className="w-20 h-20 sm:w-24 sm:h-24 bg-gradient-to-r from-green-500 to-emerald-500 rounded-full flex items-center justify-center mx-auto animate-bounce shadow-lg">
               <Check className="w-10 h-10 sm:w-12 sm:h-12 text-white" />
             </div>
             
@@ -1055,7 +1055,7 @@ export function IframeBookingPage() {
               </p>
             </div>
 
-            <div className="bg-white rounded-2xl sm:rounded-3xl shadow-lg p-6 sm:p-8 max-w-md mx-auto">
+            <div className="bg-white/95 backdrop-blur-sm rounded-2xl sm:rounded-3xl shadow-lg p-6 sm:p-8 max-w-md mx-auto">
               <h3 className="font-bold text-gray-900 mb-4">Récapitulatif</h3>
               <div className="space-y-2 text-sm">
                 <div className="flex justify-between">
