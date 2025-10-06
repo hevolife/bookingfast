@@ -40,13 +40,25 @@ export function TeamProvider({ children }: { children: React.ReactNode }) {
     try {
       setLoading(true);
 
+      // Récupérer le membre actuel avec maybeSingle pour éviter les erreurs 400
       const { data: currentMember, error: memberError } = await supabase
         .from('team_members')
         .select('team_id, role')
         .eq('user_id', user.id)
-        .single();
+        .maybeSingle();
 
-      if (memberError) throw memberError;
+      if (memberError) {
+        console.error('❌ Erreur récupération membre:', memberError);
+        throw memberError;
+      }
+
+      if (!currentMember) {
+        console.log('ℹ️ Utilisateur pas dans une équipe');
+        setTeamMembers([]);
+        setCurrentUserRole(null);
+        setLoading(false);
+        return;
+      }
 
       setCurrentUserRole(currentMember.role);
 
@@ -66,9 +78,12 @@ export function TeamProvider({ children }: { children: React.ReactNode }) {
         .eq('team_id', currentMember.team_id)
         .order('created_at', { ascending: true });
 
-      if (membersError) throw membersError;
+      if (membersError) {
+        console.error('❌ Erreur récupération membres:', membersError);
+        throw membersError;
+      }
 
-      const formattedMembers = members.map(member => ({
+      const formattedMembers = (members || []).map(member => ({
         id: member.id,
         user_id: member.user_id,
         team_id: member.team_id,

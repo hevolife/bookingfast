@@ -21,14 +21,21 @@ interface GoogleCalendarEvent {
 export class GoogleCalendarService {
   private static async getAccessToken(userId: string): Promise<string | null> {
     try {
+      console.log('🔑 Récupération token pour user:', userId);
+
       const { data, error } = await supabase
         .from('google_calendar_tokens')
         .select('access_token, token_expiry, refresh_token')
         .eq('user_id', userId)
-        .single();
+        .maybeSingle();
 
-      if (error || !data) {
-        console.error('❌ Token non trouvé:', error);
+      if (error) {
+        console.error('❌ Erreur récupération token:', error);
+        return null;
+      }
+
+      if (!data) {
+        console.log('ℹ️ Aucun token trouvé');
         return null;
       }
 
@@ -76,13 +83,18 @@ export class GoogleCalendarService {
       const newExpiry = new Date(Date.now() + data.expires_in * 1000);
 
       // Mettre à jour le token dans la base
-      await supabase
+      const { error } = await supabase
         .from('google_calendar_tokens')
         .update({
           access_token: data.access_token,
           token_expiry: newExpiry.toISOString(),
         })
         .eq('user_id', userId);
+
+      if (error) {
+        console.error('❌ Erreur mise à jour token:', error);
+        return null;
+      }
 
       return data.access_token;
     } catch (error) {
@@ -97,13 +109,13 @@ export class GoogleCalendarService {
         .from('business_settings')
         .select('google_calendar_id, google_calendar_enabled')
         .eq('user_id', userId)
-        .single();
+        .maybeSingle();
 
       if (error || !data || !data.google_calendar_enabled) {
         return null;
       }
 
-      return data.google_calendar_id;
+      return data.google_calendar_id || 'primary';
     } catch (error) {
       console.error('❌ Erreur récupération calendar ID:', error);
       return null;

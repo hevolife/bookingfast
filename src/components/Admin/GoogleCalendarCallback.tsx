@@ -87,19 +87,38 @@ export function GoogleCalendarCallback() {
         console.log('💾 Sauvegarde dans Supabase...');
         const { error: insertError } = await supabase
           .from('google_calendar_tokens')
-          .upsert({
+          .insert({
             user_id: user.id,
             access_token: tokenData.access_token,
             refresh_token: tokenData.refresh_token,
             token_expiry: expiryDate.toISOString(),
             scope: tokenData.scope,
-          }, {
-            onConflict: 'user_id'
-          });
+          })
+          .select()
+          .single();
 
         if (insertError) {
-          console.error('❌ Erreur sauvegarde tokens:', insertError);
-          throw insertError;
+          // Si l'erreur est un conflit (token existe déjà), faire un UPDATE
+          if (insertError.code === '23505') {
+            console.log('ℹ️ Token existe déjà, mise à jour...');
+            const { error: updateError } = await supabase
+              .from('google_calendar_tokens')
+              .update({
+                access_token: tokenData.access_token,
+                refresh_token: tokenData.refresh_token,
+                token_expiry: expiryDate.toISOString(),
+                scope: tokenData.scope,
+              })
+              .eq('user_id', user.id);
+
+            if (updateError) {
+              console.error('❌ Erreur mise à jour tokens:', updateError);
+              throw updateError;
+            }
+          } else {
+            console.error('❌ Erreur sauvegarde tokens:', insertError);
+            throw insertError;
+          }
         }
 
         console.log('✅ Tokens sauvegardés');
