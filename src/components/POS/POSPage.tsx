@@ -573,45 +573,50 @@ export function POSPage() {
                 </div>
               </div>
 
-              <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-3 sm:gap-4">
+              {/* Grille de services - Format carré pour mobile */}
+              <div className="grid grid-cols-2 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-3 sm:gap-4">
                 {filteredProducts.map(product => (
                   <div
                     key={product.id}
-                    className={`bg-gradient-to-r ${getColorClasses(product.color)} rounded-2xl p-4 sm:p-6 text-white hover:shadow-xl transition-all duration-300 transform hover:scale-105 relative group`}
+                    className={`bg-gradient-to-r ${getColorClasses(product.color)} rounded-2xl text-white hover:shadow-xl transition-all duration-300 transform hover:scale-105 relative group aspect-square flex flex-col`}
                   >
                     {!product._isBookingService && (
                       <button
                         type="button"
                         onClick={(e) => handleEditProduct(e, product)}
-                        className="absolute top-2 right-2 bg-white/20 hover:bg-white/30 p-1.5 sm:p-2 rounded-lg opacity-0 group-hover:opacity-100 transition-opacity"
+                        className="absolute top-2 right-2 bg-white/20 hover:bg-white/30 p-1.5 sm:p-2 rounded-lg opacity-0 group-hover:opacity-100 transition-opacity z-10"
                       >
                         <Edit className="w-3 sm:w-4 h-3 sm:h-4" />
                       </button>
                     )}
                     {product._isBookingService && (
-                      <div className="absolute top-2 right-2 bg-white/20 backdrop-blur-sm px-2 py-1 rounded-lg text-xs font-medium">
-                        📅 Réservation
+                      <div className="absolute top-2 right-2 bg-white/20 backdrop-blur-sm px-2 py-1 rounded-lg text-xs font-medium z-10">
+                        📅
                       </div>
                     )}
                     <button
                       type="button"
                       onClick={(e) => handleAddToCart(e, product)}
-                      className="text-left w-full"
+                      className="text-left w-full h-full p-3 sm:p-4 lg:p-6 flex flex-col justify-between"
                     >
-                      <h3 className="font-bold text-base sm:text-lg mb-1 sm:mb-2">{product.name}</h3>
-                      {product.duration_minutes && (
-                        <div className="flex items-center gap-1 text-xs sm:text-sm opacity-90 mb-2 sm:mb-3">
-                          <Clock className="w-3 sm:w-4 h-3 sm:h-4" />
-                          {product.duration_minutes}min
-                        </div>
-                      )}
-                      <div className="text-xl sm:text-2xl font-bold">{product.price.toFixed(2)} €</div>
-                      {product._isTTCPrice && (
-                        <div className="text-xs sm:text-sm opacity-90 mt-1">TTC</div>
-                      )}
-                      {product.track_stock && (
-                        <div className="text-xs sm:text-sm opacity-90 mt-1 sm:mt-2">Stock: {product.stock}</div>
-                      )}
+                      <div className="flex-1 flex flex-col justify-center">
+                        <h3 className="font-bold text-sm sm:text-base lg:text-lg mb-1 sm:mb-2 line-clamp-2">{product.name}</h3>
+                        {product.duration_minutes && (
+                          <div className="flex items-center gap-1 text-xs opacity-90 mb-1 sm:mb-2">
+                            <Clock className="w-3 h-3" />
+                            {product.duration_minutes}min
+                          </div>
+                        )}
+                      </div>
+                      <div className="mt-auto">
+                        <div className="text-lg sm:text-xl lg:text-2xl font-bold">{product.price.toFixed(2)} €</div>
+                        {product._isTTCPrice && (
+                          <div className="text-xs opacity-90 mt-1">TTC</div>
+                        )}
+                        {product.track_stock && (
+                          <div className="text-xs opacity-90 mt-1">Stock: {product.stock}</div>
+                        )}
+                      </div>
                     </button>
                   </div>
                 ))}
