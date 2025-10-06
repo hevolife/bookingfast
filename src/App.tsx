@@ -1,7 +1,8 @@
-import React, { useState, lazy, Suspense } from 'react';
+import React, { useState, useEffect, lazy, Suspense } from 'react';
 import { TeamProvider } from './contexts/TeamContext';
 import { Navbar } from './components/Layout/Navbar';
 import { LoadingSpinner } from './components/UI/LoadingSpinner';
+import { GoogleCalendarCallback } from './components/Admin/GoogleCalendarCallback';
 
 // Lazy load pages for better code splitting
 const DashboardPage = lazy(() => import('./components/Dashboard/DashboardPage').then(m => ({ default: m.DashboardPage })));
@@ -20,6 +21,21 @@ type PageType = 'dashboard' | 'calendar' | 'bookings-list' | 'clients' | 'servic
 
 function App() {
   const [currentPage, setCurrentPage] = useState<PageType>('dashboard');
+  const [isOAuthCallback, setIsOAuthCallback] = useState(false);
+
+  // Détecter le callback OAuth Google Calendar
+  useEffect(() => {
+    const urlParams = new URLSearchParams(window.location.search);
+    const code = urlParams.get('code');
+    const state = urlParams.get('state');
+    const path = window.location.pathname;
+
+    // Si on est sur /auth/google/callback avec un code, c'est le callback OAuth
+    if ((path === '/auth/google/callback' || path.includes('/auth/google/callback')) && code && state) {
+      console.log('🔍 Callback OAuth détecté:', { code: code.substring(0, 20) + '...', state });
+      setIsOAuthCallback(true);
+    }
+  }, []);
 
   const renderPage = () => {
     const pageComponents: Record<PageType, React.ReactNode> = {
@@ -50,6 +66,19 @@ function App() {
 
     return pageComponents[currentPage] || <DashboardPage />;
   };
+
+  // Si c'est un callback OAuth, afficher le composant de callback
+  if (isOAuthCallback) {
+    return (
+      <TeamProvider>
+        <div className="flex items-center justify-center min-h-screen bg-gradient-to-br from-blue-50 via-purple-50 to-pink-50">
+          <Suspense fallback={<LoadingSpinner />}>
+            <GoogleCalendarCallback />
+          </Suspense>
+        </div>
+      </TeamProvider>
+    );
+  }
 
   return (
     <TeamProvider>
