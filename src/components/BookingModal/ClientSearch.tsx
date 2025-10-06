@@ -31,10 +31,7 @@ export function ClientSearch({ onClientSelect, selectedClient }: ClientSearchPro
   const searchRef = useRef<HTMLDivElement>(null);
   const inputRef = useRef<HTMLInputElement>(null);
 
-  const handleEditClientSubmit = async (e: React.FormEvent) => {
-    e.preventDefault();
-    e.stopPropagation();
-    
+  const handleEditClientSubmit = async () => {
     if (!selectedClient) return;
     
     // Validation des champs requis
@@ -105,10 +102,7 @@ export function ClientSearch({ onClientSelect, selectedClient }: ClientSearchPro
     setIsDropdownOpen(true);
   };
 
-  const handleNewClientSubmit = async (e: React.FormEvent) => {
-    e.preventDefault();
-    e.stopPropagation();
-    
+  const handleNewClientSubmit = async () => {
     // Validation des champs requis
     if (!newClientData.firstname.trim() || !newClientData.lastname.trim() || 
         !newClientData.email.trim() || !newClientData.phone.trim()) {
@@ -119,21 +113,23 @@ export function ClientSearch({ onClientSelect, selectedClient }: ClientSearchPro
     setSaving(true);
     
     try {
+      console.log('🔄 Début création client dans modal...');
       const newClient = await addClient(newClientData);
       
       if (!newClient) {
         throw new Error('Erreur lors de la création du client');
       }
       
+      console.log('✅ Client créé, sélection du client...');
       onClientSelect(newClient);
       setSearchTerm(`${newClient.firstname} ${newClient.lastname}`);
       setNewClientData({ firstname: '', lastname: '', email: '', phone: '' });
       setShowNewClientForm(false);
       setIsDropdownOpen(false);
       
-      console.log('✅ Client créé avec succès:', newClient.email);
+      console.log('✅ Client créé et sélectionné avec succès:', newClient.email);
     } catch (error) {
-      console.error('Erreur lors de la création du client:', error);
+      console.error('❌ Erreur lors de la création du client:', error);
       alert(`Erreur lors de la création du client: ${error instanceof Error ? error.message : 'Erreur inconnue'}`);
     } finally {
       setSaving(false);
@@ -323,7 +319,7 @@ export function ClientSearch({ onClientSelect, selectedClient }: ClientSearchPro
         </div>
       )}
 
-      {/* Formulaire édition client inline */}
+      {/* Formulaire édition client inline - SANS <form> */}
       {showEditClientForm && selectedClient && (
         <div className="mt-4 bg-gradient-to-r from-green-50 to-emerald-50 border-2 border-green-300 rounded-2xl p-4 sm:p-6 animate-slideDown">
           {/* Header */}
@@ -346,11 +342,8 @@ export function ClientSearch({ onClientSelect, selectedClient }: ClientSearchPro
             </button>
           </div>
 
-          {/* Formulaire */}
-          <form 
-            onSubmit={handleEditClientSubmit}
-            className="space-y-4"
-          >
+          {/* Formulaire - DIV au lieu de FORM */}
+          <div className="space-y-4">
             <div className="grid grid-cols-1 sm:grid-cols-2 gap-3 sm:gap-4">
               <div>
                 <label className="block text-sm font-medium text-gray-700 mb-2">
@@ -360,7 +353,6 @@ export function ClientSearch({ onClientSelect, selectedClient }: ClientSearchPro
                   type="text"
                   value={editClientData.firstname}
                   onChange={(e) => setEditClientData(prev => ({ ...prev, firstname: e.target.value }))}
-                  required
                   className="w-full p-3 border border-gray-300 rounded-xl focus:ring-2 focus:ring-green-500 focus:border-transparent transition-all duration-300 text-base"
                   placeholder="Prénom"
                   autoComplete="given-name"
@@ -374,7 +366,6 @@ export function ClientSearch({ onClientSelect, selectedClient }: ClientSearchPro
                   type="text"
                   value={editClientData.lastname}
                   onChange={(e) => setEditClientData(prev => ({ ...prev, lastname: e.target.value }))}
-                  required
                   className="w-full p-3 border border-gray-300 rounded-xl focus:ring-2 focus:ring-green-500 focus:border-transparent transition-all duration-300 text-base"
                   placeholder="Nom"
                   autoComplete="family-name"
@@ -392,7 +383,6 @@ export function ClientSearch({ onClientSelect, selectedClient }: ClientSearchPro
                   type="email"
                   value={editClientData.email}
                   onChange={(e) => setEditClientData(prev => ({ ...prev, email: e.target.value.toLowerCase() }))}
-                  required
                   className="w-full pl-12 pr-4 py-3 border border-gray-300 rounded-xl focus:ring-2 focus:ring-green-500 focus:border-transparent transition-all duration-300 text-base"
                   placeholder="email@exemple.com"
                   autoComplete="email"
@@ -410,7 +400,6 @@ export function ClientSearch({ onClientSelect, selectedClient }: ClientSearchPro
                   type="tel"
                   value={editClientData.phone}
                   onChange={(e) => setEditClientData(prev => ({ ...prev, phone: e.target.value }))}
-                  required
                   className="w-full pl-12 pr-4 py-3 border border-gray-300 rounded-xl focus:ring-2 focus:ring-green-500 focus:border-transparent transition-all duration-300 text-base"
                   placeholder="06 12 34 56 78"
                   autoComplete="tel"
@@ -428,7 +417,8 @@ export function ClientSearch({ onClientSelect, selectedClient }: ClientSearchPro
                 Annuler
               </button>
               <button
-                type="submit"
+                type="button"
+                onClick={handleEditClientSubmit}
                 disabled={saving || !editClientData.firstname || !editClientData.lastname || !editClientData.email || !editClientData.phone}
                 className="flex-1 bg-gradient-to-r from-green-600 to-emerald-600 text-white px-4 py-3 rounded-xl hover:from-green-700 hover:to-emerald-700 disabled:opacity-50 disabled:cursor-not-allowed transition-all duration-300 font-medium flex items-center justify-center gap-2 text-base"
               >
@@ -445,10 +435,11 @@ export function ClientSearch({ onClientSelect, selectedClient }: ClientSearchPro
                 )}
               </button>
             </div>
-          </form>
+          </div>
         </div>
       )}
-      {/* Formulaire nouveau client inline */}
+
+      {/* Formulaire nouveau client inline - SANS <form> */}
       {showNewClientForm && (
         <div className="mt-4 bg-gradient-to-r from-blue-50 to-purple-50 border-2 border-blue-300 rounded-2xl p-4 sm:p-6 animate-slideDown">
           {/* Header */}
@@ -483,11 +474,8 @@ export function ClientSearch({ onClientSelect, selectedClient }: ClientSearchPro
             </div>
           )}
 
-          {/* Formulaire */}
-          <form 
-            onSubmit={handleNewClientSubmit}
-            className="space-y-4"
-          >
+          {/* Formulaire - DIV au lieu de FORM */}
+          <div className="space-y-4">
             <div className="grid grid-cols-1 sm:grid-cols-2 gap-3 sm:gap-4">
               <div>
                 <label className="block text-sm font-medium text-gray-700 mb-2">
@@ -497,7 +485,6 @@ export function ClientSearch({ onClientSelect, selectedClient }: ClientSearchPro
                   type="text"
                   value={newClientData.firstname}
                   onChange={(e) => setNewClientData(prev => ({ ...prev, firstname: e.target.value }))}
-                  required
                   className="w-full p-3 border border-gray-300 rounded-xl focus:ring-2 focus:ring-blue-500 focus:border-transparent transition-all duration-300 text-base"
                   placeholder="Prénom"
                   autoComplete="given-name"
@@ -511,7 +498,6 @@ export function ClientSearch({ onClientSelect, selectedClient }: ClientSearchPro
                   type="text"
                   value={newClientData.lastname}
                   onChange={(e) => setNewClientData(prev => ({ ...prev, lastname: e.target.value }))}
-                  required
                   className="w-full p-3 border border-gray-300 rounded-xl focus:ring-2 focus:ring-blue-500 focus:border-transparent transition-all duration-300 text-base"
                   placeholder="Nom"
                   autoComplete="family-name"
@@ -529,7 +515,6 @@ export function ClientSearch({ onClientSelect, selectedClient }: ClientSearchPro
                   type="email"
                   value={newClientData.email}
                   onChange={(e) => setNewClientData(prev => ({ ...prev, email: e.target.value.toLowerCase() }))}
-                  required
                   className="w-full pl-12 pr-4 py-3 border border-gray-300 rounded-xl focus:ring-2 focus:ring-blue-500 focus:border-transparent transition-all duration-300 text-base"
                   placeholder="email@exemple.com"
                   autoComplete="email"
@@ -547,7 +532,6 @@ export function ClientSearch({ onClientSelect, selectedClient }: ClientSearchPro
                   type="tel"
                   value={newClientData.phone}
                   onChange={(e) => setNewClientData(prev => ({ ...prev, phone: e.target.value }))}
-                  required
                   className="w-full pl-12 pr-4 py-3 border border-gray-300 rounded-xl focus:ring-2 focus:ring-blue-500 focus:border-transparent transition-all duration-300 text-base"
                   placeholder="06 12 34 56 78"
                   autoComplete="tel"
@@ -565,7 +549,8 @@ export function ClientSearch({ onClientSelect, selectedClient }: ClientSearchPro
                 Annuler
               </button>
               <button
-                type="submit"
+                type="button"
+                onClick={handleNewClientSubmit}
                 disabled={saving || !newClientData.firstname || !newClientData.lastname || !newClientData.email || !newClientData.phone}
                 className="flex-1 bg-gradient-to-r from-blue-600 to-purple-600 text-white px-4 py-3 rounded-xl hover:from-blue-700 hover:to-purple-700 disabled:opacity-50 disabled:cursor-not-allowed transition-all duration-300 font-medium flex items-center justify-center gap-2 text-base"
               >
@@ -582,7 +567,7 @@ export function ClientSearch({ onClientSelect, selectedClient }: ClientSearchPro
                 )}
               </button>
             </div>
-          </form>
+          </div>
         </div>
       )}
     </>

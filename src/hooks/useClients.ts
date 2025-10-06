@@ -170,12 +170,12 @@ export function useClients() {
         return newClient;
       }
     } catch (err) {
-      console.error('Erreur lors de la création/récupération du client:', err);
+      console.error('❌ Erreur lors de la création/récupération du client:', err);
       throw err;
     }
   };
 
-  const addClient = async (clientData: Omit<Client, 'id' | 'created_at' | 'updated_at'>): Promise<Client> => {
+  const addClient = async (clientData: Omit<Client, 'id' | 'created_at' | 'updated_at' | 'user_id'>): Promise<Client> => {
     try {
       console.log('🔄 Début création client:', clientData.email);
       const result = await getOrCreateClient(clientData);
