@@ -1,5 +1,5 @@
 import React, { useState } from 'react';
-import { X, Clock, User, Mail, Phone, CreditCard, CreditCard as Edit, Trash2, Calendar, Eye } from 'lucide-react';
+import { X, Clock, User, Mail, Phone, CreditCard, CreditCard as Edit, Trash2, Calendar, Eye, FileText } from 'lucide-react';
 import { Booking } from '../../types';
 
 interface ServiceBookingModalProps {
@@ -216,6 +216,24 @@ export function ServiceBookingModal({
                 </div>
               </div>
             </div>
+
+            {/* Notes internes */}
+            {selectedBookingDetails.notes && (
+              <div className="bg-gradient-to-r from-amber-50 to-yellow-50 rounded-xl sm:rounded-2xl p-4 sm:p-6 border border-amber-200">
+                <h3 className="text-base sm:text-lg font-bold text-gray-900 mb-3 flex items-center gap-2">
+                  <FileText className="w-5 h-5 text-amber-600" />
+                  Notes internes
+                </h3>
+                <div className="bg-white rounded-lg p-3 sm:p-4 border border-amber-100">
+                  <p className="text-sm sm:text-base text-gray-700 whitespace-pre-wrap">
+                    {selectedBookingDetails.notes}
+                  </p>
+                </div>
+                <p className="text-xs text-amber-600 mt-2">
+                  📝 Ces notes sont visibles uniquement par vous et votre équipe
+                </p>
+              </div>
+            )}
 
             {/* Informations paiement */}
             <div className="bg-gradient-to-r from-orange-50 to-yellow-50 rounded-xl sm:rounded-2xl p-4 sm:p-6 border border-orange-200">
@@ -468,6 +486,12 @@ export function ServiceBookingModal({
                             {booking.payment_amount?.toFixed(2) || '0.00'}€ / {booking.total_amount.toFixed(2)}€
                           </span>
                         </div>
+                        {booking.notes && (
+                          <div className="flex items-center gap-1 text-amber-600">
+                            <FileText className="w-3 h-3 sm:w-4 sm:h-4 flex-shrink-0" />
+                            <span className="text-xs">Note</span>
+                          </div>
+                        )}
                       </div>
                     </div>
                   </div>

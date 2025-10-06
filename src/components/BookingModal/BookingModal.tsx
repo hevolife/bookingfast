@@ -1,5 +1,5 @@
 import React, { useState, useEffect } from 'react';
-import { Calendar, User, Euro, Package, Search, Mail, Phone, X } from 'lucide-react';
+import { Calendar, User, Euro, Package, Search, Mail, Phone, X, FileText } from 'lucide-react';
 import { useClients } from '../../hooks/useClients';
 import { useBookings } from '../../hooks/useBookings';
 import { useServices } from '../../hooks/useServices';
@@ -62,6 +62,7 @@ export function BookingModal({
   const [bookingStatus, setBookingStatus] = useState<'pending' | 'confirmed' | 'cancelled'>('pending');
   const [isDatePickerOpen, setIsDatePickerOpen] = useState(false);
   const [assignedUserId, setAssignedUserId] = useState<string | null>(null);
+  const [notes, setNotes] = useState('');
 
   const hasMultiUserPlugin = userPlugins.some(p => p.plugin_slug === 'multi-user');
 
@@ -109,6 +110,7 @@ export function BookingModal({
       setTransactions(editingBooking.transactions || []);
       setBookingStatus(editingBooking.booking_status || 'pending');
       setAssignedUserId(editingBooking.assigned_user_id || null);
+      setNotes(editingBooking.notes || '');
     } else {
       setSelectedService(null);
       setIsCustomService(false);
@@ -120,6 +122,7 @@ export function BookingModal({
       setTransactions([]);
       setBookingStatus('confirmed');
       setAssignedUserId(null);
+      setNotes('');
     }
   }, [editingBooking, services, selectedDate, selectedTime]);
 
@@ -129,6 +132,7 @@ export function BookingModal({
     setIsCustomService(false);
     setCustomServiceData({ name: '', price: 0, duration: 60 });
     setAssignedUserId(null);
+    setNotes('');
     
     setTimeout(() => {
       const event = new CustomEvent('resetDatePicker');
@@ -228,6 +232,7 @@ export function BookingModal({
           created_at: new Date().toISOString()
         }],
         booking_status: bookingStatus,
+        notes,
         service: isCustomService ? {
           id: 'custom',
           name: customServiceData.name,
@@ -333,6 +338,7 @@ export function BookingModal({
         transactions,
         booking_status: bookingStatus,
         assigned_user_id: assignedUserId,
+        notes: notes.trim() || null,
         custom_service_data: isCustomService ? {
           name: customServiceData.name,
           price: customServiceData.price,
@@ -629,6 +635,24 @@ export function BookingModal({
                   onChange={setAssignedUserId}
                 />
               )}
+
+              {/* Champ Notes */}
+              <div>
+                <label className="block text-sm font-medium text-gray-700 mb-2">
+                  <FileText className="w-4 h-4 inline mr-2" />
+                  Notes internes (optionnel)
+                </label>
+                <textarea
+                  value={notes}
+                  onChange={(e) => setNotes(e.target.value)}
+                  className="w-full px-4 py-3 border border-gray-300 rounded-xl focus:ring-2 focus:ring-blue-500 focus:border-blue-500 transition-all duration-300 text-base resize-none"
+                  rows={3}
+                  placeholder="Ajoutez des notes ou commentaires sur cette réservation..."
+                />
+                <p className="text-xs text-gray-500 mt-1">
+                  Ces notes sont visibles uniquement par vous et votre équipe
+                </p>
+              </div>
             </div>
 
             <div className="space-y-4 sm:space-y-6">

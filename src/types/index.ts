@@ -103,11 +103,22 @@ export interface Booking {
   client?: Client;
   service?: Service;
   assigned_user?: User;
+  transactions?: Transaction[];
+  client_name: string;
+  client_firstname: string;
+  client_email: string;
+  client_phone: string;
+  payment_amount: number;
+  custom_service_data?: {
+    name: string;
+    price: number;
+    duration: number;
+  };
 }
 
 export interface Transaction {
   id: string;
-  booking_id: string;
+  booking_id?: string;
   amount: number;
   method: 'cash' | 'card' | 'transfer' | 'stripe';
   status: 'completed' | 'pending' | 'cancelled';
