@@ -1,113 +1,14 @@
 import { useState, useEffect } from 'react';
-import { supabase } from '../lib/supabase';
+import { supabase, isSupabaseConfigured } from '../lib/supabase';
 import { Booking } from '../types';
 import { useAuth } from '../contexts/AuthContext';
-import { useBusinessSettings } from './useBusinessSettings';
-import { bookingEvents } from '../lib/bookingEvents';
-import { notificationEvents } from '../lib/notificationEvents';
-import { triggerWorkflow } from '../lib/workflowEngine';
+import { GoogleCalendarService } from '../lib/googleCalendar';
 
-const checkAndUpdateExpiredPaymentLinks = async (bookings: Booking[], settings?: any): Promise<Booking[]> => {
-  if (!supabase) return bookings;
-
-  const now = Date.now();
-  const expiryMinutes = settings?.payment_link_expiry_minutes || 30;
-  const expiryMs = expiryMinutes * 60 * 1000;
-  const updatedBookings: Booking[] = [];
-  let hasUpdates = false;
-
-  for (const booking of bookings) {
-    let updatedBooking = { ...booking };
-    let needsUpdate = false;
-
-    if (booking.transactions && booking.transactions.length > 0) {
-      const updatedTransactions = booking.transactions.map(transaction => {
-        if (transaction.method === 'stripe' && 
-            transaction.status === 'pending' && 
-            transaction.created_at) {
-          
-          const transactionTime = new Date(transaction.created_at).getTime();
-          const expirationTime = transactionTime + expiryMs;
-          
-          if (now > expirationTime) {
-            console.log(`⏰ Lien de paiement expiré pour réservation: ${booking.id} (délai: ${expiryMinutes}min)`);
-            
-            notificationEvents.emit('paymentLinkExpired', {
-              booking,
-              transaction,
-              expiredAt: new Date(expirationTime)
-            });
-            
-            needsUpdate = true;
-            return {
-              ...transaction,
-              status: 'cancelled' as const,
-              note: transaction.note.replace('En attente', 'Expiré').replace('(expire dans', '(expiré après')
-            };
-          }
-        }
-        return transaction;
-      });
-
-      if (needsUpdate) {
-        const completedTransactions = updatedTransactions.filter(t => t.status === 'completed' || (t.status !== 'pending' && t.status !== 'cancelled'));
-        const totalPaid = completedTransactions.reduce((sum, t) => sum + t.amount, 0);
-        
-        let newPaymentStatus: 'pending' | 'partial' | 'completed' = 'pending';
-        if (totalPaid >= booking.total_amount) {
-          newPaymentStatus = 'completed';
-        } else if (totalPaid > 0) {
-          newPaymentStatus = 'partial';
-        }
-
-        let newBookingStatus = booking.booking_status;
-        if (totalPaid === 0 && booking.booking_status === 'confirmed') {
-          newBookingStatus = 'pending';
-          console.log('📋 Réservation passée en "en attente" suite à expiration du lien:', booking.id);
-        }
-
-        updatedBooking = {
-          ...booking,
-          transactions: updatedTransactions,
-          payment_status: newPaymentStatus,
-          payment_amount: totalPaid,
-          booking_status: newBookingStatus
-        };
-
-        hasUpdates = true;
-
-        try {
-          await supabase
-            .from('bookings')
-            .update({
-              transactions: updatedTransactions,
-              payment_status: newPaymentStatus,
-              payment_amount: totalPaid,
-              booking_status: newBookingStatus,
-              updated_at: new Date().toISOString()
-            })
-            .eq('id', booking.id);
-          
-          console.log('✅ Réservation mise à jour en base:', booking.id);
-        } catch (error) {
-          console.error('❌ Erreur mise à jour réservation expirée:', error);
-        }
-      }
-    }
-
-    updatedBookings.push(updatedBooking);
-  }
-
-  return updatedBookings;
-};
-
-export function useBookings(date?: string) {
+export function useBookings() {
   const { user } = useAuth();
-  const { settings } = useBusinessSettings();
   const [bookings, setBookings] = useState<Booking[]>([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
-  const [lastInteraction, setLastInteraction] = useState(Date.now());
 
   const fetchBookings = async () => {
     if (!user) {
@@ -116,33 +17,20 @@ export function useBookings(date?: string) {
       return;
     }
 
-    if (!supabase) {
-      console.log('⚠️ Supabase non configuré - mode démo');
-      setBookings([]);
+    if (!isSupabaseConfigured) {
+      const demoBookings: Booking[] = [];
+      setBookings(demoBookings);
       setLoading(false);
-      setError(null);
       return;
     }
 
     try {
-      console.log('🔄 Début chargement réservations...');
       setError(null);
       
-      if (!navigator.onLine) {
-        throw new Error('Aucune connexion internet détectée');
-      }
-
-      const timeoutPromise = new Promise((_, reject) => {
-        setTimeout(() => reject(new Error('Timeout chargement réservations')), 8000);
-      });
-
-      // Déterminer l'ID utilisateur pour lequel charger les données
       let targetUserId = user.id;
-      let isTeamMember = false;
       
-      // Vérifier si l'utilisateur est membre d'une équipe
       try {
-        const { data: membershipData, error: membershipError } = await supabase
+        const { data: membershipData, error: membershipError } = await supabase!
           .from('team_members')
           .select('owner_id')
           .eq('user_id', user.id)
@@ -151,205 +39,75 @@ export function useBookings(date?: string) {
 
         if (!membershipError && membershipData?.owner_id) {
           targetUserId = membershipData.owner_id;
-          isTeamMember = true;
-          console.log('👥 Membre d\'équipe - chargement données du propriétaire:', targetUserId);
-        } else {
-          console.log('👑 Propriétaire - chargement données propres:', targetUserId);
         }
       } catch (teamError) {
-        console.warn('⚠️ Erreur vérification équipe, utilisation ID utilisateur:', teamError);
+        console.warn('⚠️ Erreur vérification équipe:', teamError);
       }
 
-      // Vérifier les paramètres de visibilité pour les membres d'équipe
-      let canViewOnlyAssigned = false;
-      if (isTeamMember) {
-        try {
-          const { data: settingsData, error: settingsError } = await supabase
-            .from('multi_user_settings')
-            .select('can_view_only_assigned')
-            .eq('user_id', targetUserId)
-            .eq('team_member_id', user.id)
-            .maybeSingle();
-
-          if (!settingsError && settingsData) {
-            canViewOnlyAssigned = settingsData.can_view_only_assigned;
-            console.log('🔒 Visibilité restreinte activée:', canViewOnlyAssigned);
-          }
-        } catch (settingsError) {
-          console.warn('⚠️ Erreur vérification paramètres visibilité:', settingsError);
-        }
-      }
-
-      let query = supabase
+      const { data, error } = await supabase!
         .from('bookings')
         .select(`
           *,
           service:services(*)
         `)
         .eq('user_id', targetUserId)
-        .in('booking_status', ['pending', 'confirmed'])
         .order('date', { ascending: true })
-        .order('time', { ascending: true })
-        .limit(1000);
+        .order('time', { ascending: true });
 
-      // Filtrer par date si spécifié
-      if (date) {
-        console.log('📅 Filtrage par date:', date);
-        query = query.eq('date', date);
-      }
+      if (error) throw error;
 
-      // Filtrer par assigned_user_id si visibilité restreinte
-      if (canViewOnlyAssigned) {
-        console.log('🔒 Application du filtre assigned_user_id:', user.id);
-        query = query.eq('assigned_user_id', user.id);
-      }
-
-      const { data, error } = await Promise.race([query, timeoutPromise]) as any;
-
-      if (error) {
-        throw error;
-      }
-
-      console.log('✅ Réservations chargées:', data?.length || 0);
-      console.log('📋 Détails des réservations chargées:', data?.map(b => ({
-        id: b.id,
-        client: b.client_email,
-        date: b.date,
-        time: b.time,
-        user_id: b.user_id,
-        assigned_user_id: b.assigned_user_id
-      })));
-
-      const updatedBookings = await checkAndUpdateExpiredPaymentLinks(data || [], settings);
-      setBookings(updatedBookings);
-      console.log('✅ Réservations finales après vérification:', updatedBookings.length);
+      setBookings(data || []);
     } catch (err) {
-      console.error('❌ Erreur chargement réservations:', err);
-      let errorMessage = 'Une erreur est survenue';
-      
-      if (err instanceof Error) {
-        if (err.message.includes('Timeout')) {
-          errorMessage = 'Chargement trop lent. Réessayez dans quelques instants.';
-        } else if (err.message.includes('Failed to fetch')) {
-          errorMessage = 'Impossible de se connecter à la base de données. Vérifiez votre connexion internet.';
-        } else if (err.message.includes('NetworkError')) {
-          errorMessage = 'Erreur réseau. Vérifiez votre connexion internet.';
-        } else {
-          errorMessage = err.message;
-        }
-      }
-      
-      setError(errorMessage);
+      console.error('Erreur lors du chargement des réservations:', err);
+      setError(err instanceof Error ? err.message : 'Erreur de chargement');
       setBookings([]);
     } finally {
       setLoading(false);
     }
   };
 
-  const addBooking = async (booking: Omit<Booking, 'id' | 'created_at' | 'updated_at'>) => {
-    if (!supabase || !user) {
-      throw new Error('Supabase non configuré');
+  const addBooking = async (bookingData: Omit<Booking, 'id' | 'created_at' | 'user_id'>) => {
+    if (!isSupabaseConfigured || !user) {
+      throw new Error('Supabase non configuré ou utilisateur non connecté');
     }
 
     try {
-      const { data, error } = await supabase
+      let targetUserId = user.id;
+      
+      try {
+        const { data: membershipData } = await supabase!
+          .from('team_members')
+          .select('owner_id')
+          .eq('user_id', user.id)
+          .eq('is_active', true)
+          .maybeSingle();
+
+        if (membershipData?.owner_id) {
+          targetUserId = membershipData.owner_id;
+        }
+      } catch (teamError) {
+        console.warn('⚠️ Erreur vérification équipe:', teamError);
+      }
+
+      const { data, error } = await supabase!
         .from('bookings')
-        .insert([{ 
-          ...booking, 
-          user_id: user.id
-        }])
+        .insert([{ ...bookingData, user_id: targetUserId }])
         .select(`
           *,
           service:services(*)
         `)
         .single();
 
-      if (error) {
-        throw error;
-      }
+      if (error) throw error;
 
       if (data) {
-        setBookings(prev => {
-          const exists = prev.some(b => b.id === data.id);
-          const updated = exists ? prev : [...prev, data];
-          console.log('📊 État local mis à jour - Nouvelles réservations:', updated.length);
-          return updated;
-        });
+        setBookings(prev => [...prev, data]);
         
-        console.log('✅ Nouvelle réservation créée:', data.id);
-        
-        const hasPaymentLinks = data.transactions?.some(t => 
-          t.method === 'stripe' && 
-          t.status === 'pending' &&
-          t.note && 
-          t.note.includes('Lien de paiement')
-        );
-        
-        console.log('🔍 Vérification liens de paiement:', {
-          hasPaymentLinks,
-          transactionsCount: data.transactions?.length || 0,
-          transactions: data.transactions?.map(t => ({
-            method: t.method,
-            status: t.status,
-            hasLinkInNote: t.note?.includes('Lien de paiement')
-          }))
-        });
-        
-        if (!hasPaymentLinks) {
-          console.log('✅ Aucun lien de paiement - Déclenchement workflow booking_created');
-          try {
-            console.log('🚀 Déclenchement workflow booking_created pour:', data.client_email);
-            await triggerWorkflow('booking_created', data, user.id);
-            console.log('✅ Workflow booking_created déclenché avec succès');
-          } catch (workflowError) {
-            console.error('❌ Erreur déclenchement workflow:', workflowError);
-          }
-        } else {
-          console.log('⏭️ Lien de paiement généré - Workflow booking_created ignoré (sera déclenché après paiement)');
-        }
-        
-        if (hasPaymentLinks) {
-          try {
-            console.log('🚀 Déclenchement workflow payment_link_created pour:', data.client_email);
-            await triggerWorkflow('payment_link_created', data, user.id);
-            console.log('✅ Workflow payment_link_created déclenché avec succès');
-          } catch (workflowError) {
-            console.error('❌ Erreur déclenchement workflow payment_link_created:', workflowError);
-          }
-        }
-        
-        const hasRecentStripePayment = data.transactions?.some(t => 
-          t.method === 'stripe' && 
-          t.status === 'completed' && 
-          t.created_at &&
-          (Date.now() - new Date(t.created_at).getTime()) < 600000
-        );
-        
-        if (hasRecentStripePayment) {
-          try {
-            console.log('🚀 Déclenchement workflow payment_link_paid pour:', data.client_email);
-            await triggerWorkflow('payment_link_paid', data, user.id);
-            console.log('✅ Workflow payment_link_paid déclenché avec succès');
-          } catch (workflowError) {
-            console.error('❌ Erreur déclenchement workflow payment_link_paid:', workflowError);
-          }
-        }
-        
-        if (data.payment_status === 'completed' || data.payment_status === 'partial') {
-          const hasStripeTransaction = data.transactions?.some(t => 
-            t.method === 'stripe' && 
-            t.status === 'completed'
-          );
-          
-          if (hasStripeTransaction) {
-            try {
-              console.log('🚀 Déclenchement workflow payment_completed pour:', data.client_email);
-              await triggerWorkflow('payment_completed', data, user.id);
-              console.log('✅ Workflow payment_completed déclenché avec succès');
-            } catch (workflowError) {
-              console.error('❌ Erreur déclenchement workflow payment_completed:', workflowError);
-            }
-          }
+        // Synchroniser avec Google Calendar
+        try {
+          await GoogleCalendarService.createEvent(data, targetUserId);
+        } catch (calendarError) {
+          console.warn('⚠️ Erreur synchronisation Google Calendar:', calendarError);
         }
         
         return data;
@@ -361,52 +119,31 @@ export function useBookings(date?: string) {
   };
 
   const updateBooking = async (id: string, updates: Partial<Booking>) => {
-    if (!supabase || !user) {
-      throw new Error('Supabase non configuré');
+    if (!isSupabaseConfigured || !user) {
+      throw new Error('Supabase non configuré ou utilisateur non connecté');
     }
 
     try {
-      let paymentStatus = updates.payment_status;
-      let actualPaidAmount = updates.payment_amount || 0;
-      let bookingStatus = updates.booking_status;
+      let targetUserId = user.id;
       
-      if (updates.transactions && updates.total_amount) {
-        const totalPaid = updates.transactions
-          .filter((t: any) => t.status !== 'pending' && t.status !== 'cancelled')
-          .reduce((sum: number, t: any) => sum + t.amount, 0);
-        
-        actualPaidAmount = totalPaid;
-        
-        if (totalPaid >= updates.total_amount) {
-          paymentStatus = 'completed';
-        } else if (totalPaid > 0) {
-          paymentStatus = 'partial';
-        } else {
-          paymentStatus = 'pending';
+      try {
+        const { data: membershipData } = await supabase!
+          .from('team_members')
+          .select('owner_id')
+          .eq('user_id', user.id)
+          .eq('is_active', true)
+          .maybeSingle();
+
+        if (membershipData?.owner_id) {
+          targetUserId = membershipData.owner_id;
         }
-        
-        const now = Date.now();
-        const expiredLinks = updates.transactions.filter((t: any) => 
-          t.method === 'stripe' && 
-          t.status === 'pending' && 
-          t.created_at && 
-          (now - new Date(t.created_at).getTime()) > (30 * 60 * 1000)
-        );
-        
-        if (expiredLinks.length > 0 && paymentStatus === 'pending') {
-          bookingStatus = 'pending';
-        }
+      } catch (teamError) {
+        console.warn('⚠️ Erreur vérification équipe:', teamError);
       }
 
-      const { data, error } = await supabase
+      const { data, error } = await supabase!
         .from('bookings')
-        .update({
-          ...updates,
-          payment_status: paymentStatus,
-          payment_amount: actualPaidAmount,
-          booking_status: bookingStatus,
-          updated_at: new Date().toISOString()
-        })
+        .update(updates)
         .eq('id', id)
         .select(`
           *,
@@ -414,38 +151,16 @@ export function useBookings(date?: string) {
         `)
         .single();
 
-      if (error) {
-        throw error;
-      }
+      if (error) throw error;
 
       if (data) {
-        setBookings(prev => {
-          const updated = prev.map(b => b.id === id ? data : b);
-          console.log('📊 État local mis à jour - Réservation modifiée:', id);
-          return updated;
-        });
+        setBookings(prev => prev.map(b => b.id === id ? data : b));
         
-        console.log('Réservation mise à jour:', data.id);
-        
-        if (data) {
-          bookingEvents.emit('bookingUpdated', data);
-          
-          const hasRecentStripePayment = data.transactions?.some(t => 
-            t.method === 'stripe' && 
-            t.status === 'completed' && 
-            t.created_at &&
-            (Date.now() - new Date(t.created_at).getTime()) < 600000
-          );
-          
-          if (hasRecentStripePayment) {
-            try {
-              console.log('🚀 Déclenchement workflow payment_link_paid pour:', data.client_email);
-              await triggerWorkflow('payment_link_paid', data, user.id);
-              console.log('✅ Workflow payment_link_paid déclenché avec succès');
-            } catch (workflowError) {
-              console.error('❌ Erreur déclenchement workflow payment_link_paid:', workflowError);
-            }
-          }
+        // Synchroniser avec Google Calendar
+        try {
+          await GoogleCalendarService.updateEvent(data, targetUserId);
+        } catch (calendarError) {
+          console.warn('⚠️ Erreur synchronisation Google Calendar:', calendarError);
         }
         
         return data;
@@ -457,99 +172,57 @@ export function useBookings(date?: string) {
   };
 
   const deleteBooking = async (id: string) => {
-    if (!supabase || !user) {
-      throw new Error('Supabase non configuré');
+    if (!isSupabaseConfigured || !user) {
+      throw new Error('Supabase non configuré ou utilisateur non connecté');
     }
 
     try {
-      const { error } = await supabase
+      let targetUserId = user.id;
+      
+      try {
+        const { data: membershipData } = await supabase!
+          .from('team_members')
+          .select('owner_id')
+          .eq('user_id', user.id)
+          .eq('is_active', true)
+          .maybeSingle();
+
+        if (membershipData?.owner_id) {
+          targetUserId = membershipData.owner_id;
+        }
+      } catch (teamError) {
+        console.warn('⚠️ Erreur vérification équipe:', teamError);
+      }
+
+      // Récupérer l'ID de l'événement Google Calendar avant suppression
+      const { data: bookingData } = await supabase!
+        .from('bookings')
+        .select('google_calendar_event_id')
+        .eq('id', id)
+        .single();
+
+      const { error } = await supabase!
         .from('bookings')
         .delete()
         .eq('id', id);
 
-      if (error) {
-        throw error;
-      }
+      if (error) throw error;
 
       setBookings(prev => prev.filter(b => b.id !== id));
-      console.log('Réservation supprimée:', id);
+      
+      // Supprimer l'événement Google Calendar
+      if (bookingData?.google_calendar_event_id) {
+        try {
+          await GoogleCalendarService.deleteEvent(bookingData.google_calendar_event_id, targetUserId);
+        } catch (calendarError) {
+          console.warn('⚠️ Erreur suppression événement Google Calendar:', calendarError);
+        }
+      }
     } catch (err) {
       console.error('Erreur lors de la suppression de la réservation:', err);
       throw err;
     }
   };
-
-  const refetch = () => {
-    setLastInteraction(Date.now());
-    fetchBookings();
-  };
-
-  useEffect(() => {
-    const checkExpiredLinks = async () => {
-      if (bookings.length > 0) {
-        const updatedBookings = await checkAndUpdateExpiredPaymentLinks(bookings, settings);
-        
-        const hasChanges = updatedBookings.some((updated, index) => {
-          const original = bookings[index];
-          return original && (
-            updated.payment_status !== original.payment_status ||
-            updated.booking_status !== original.booking_status ||
-            JSON.stringify(updated.transactions) !== JSON.stringify(original.transactions)
-          );
-        });
-
-        if (hasChanges) {
-          console.log('🔄 Mise à jour automatique des liens expirés');
-          setBookings(updatedBookings);
-        }
-      }
-    };
-
-    const interval = setInterval(checkExpiredLinks, 30000);
-    return () => clearInterval(interval);
-  }, [bookings, settings]);
-
-  useEffect(() => {
-    const interval = setInterval(() => {
-      const timeSinceLastInteraction = Date.now() - lastInteraction;
-      const twoMinutes = 2 * 60 * 1000;
-      
-      if (timeSinceLastInteraction >= twoMinutes) {
-        console.log('🔄 Auto-refresh du planning (2 minutes d\'inactivité)');
-        fetchBookings();
-      }
-    }, 2 * 60 * 1000);
-
-    return () => clearInterval(interval);
-  }, [lastInteraction, user?.id]);
-
-  useEffect(() => {
-    const handleRefreshBookings = () => {
-      console.log('🔄 Rafraîchissement manuel des réservations demandé');
-      fetchBookings();
-    };
-
-    window.addEventListener('refreshBookings', handleRefreshBookings);
-    return () => window.removeEventListener('refreshBookings', handleRefreshBookings);
-  }, []);
-
-  useEffect(() => {
-    const handleUserInteraction = () => {
-      setLastInteraction(Date.now());
-    };
-
-    document.addEventListener('click', handleUserInteraction);
-    document.addEventListener('keydown', handleUserInteraction);
-    document.addEventListener('scroll', handleUserInteraction);
-    document.addEventListener('touchstart', handleUserInteraction);
-
-    return () => {
-      document.removeEventListener('click', handleUserInteraction);
-      document.removeEventListener('keydown', handleUserInteraction);
-      document.removeEventListener('scroll', handleUserInteraction);
-      document.removeEventListener('touchstart', handleUserInteraction);
-    };
-  }, []);
 
   useEffect(() => {
     let mounted = true;
@@ -568,13 +241,13 @@ export function useBookings(date?: string) {
     return () => {
       mounted = false;
     };
-  }, [date, user?.id]);
+  }, [user?.id]);
 
   return {
     bookings,
     loading,
     error,
-    refetch,
+    refetch: fetchBookings,
     addBooking,
     updateBooking,
     deleteBooking

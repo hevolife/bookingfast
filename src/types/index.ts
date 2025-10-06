@@ -1,66 +1,83 @@
 export interface User {
   id: string;
   email: string;
-  full_name?: string;
   created_at: string;
 }
 
 export interface Client {
   id: string;
-  user_id: string;
   firstname: string;
   lastname: string;
   email: string;
   phone: string;
-  notes?: string;
-  created_at: string;
-  updated_at: string;
+  created_at?: string;
 }
 
 export interface Service {
   id: string;
-  user_id: string;
   name: string;
   description: string;
   duration_minutes: number;
   price_ttc: number;
   price_ht: number;
   capacity: number;
-  image_url?: string;
-  is_active: boolean;
+  color: string;
+  user_id: string;
   created_at: string;
-  updated_at: string;
   unit_name?: string;
 }
 
-export interface TimeRange {
-  start: string;
-  end: string;
+export interface Transaction {
+  id: string;
+  amount: number;
+  method: 'cash' | 'card' | 'check' | 'transfer' | 'stripe';
+  note?: string;
+  status: 'pending' | 'completed' | 'cancelled';
+  created_at: string;
 }
 
-export interface DaySchedule {
-  ranges: TimeRange[];
-  closed: boolean;
-}
-
-export interface OpeningHours {
-  monday: DaySchedule;
-  tuesday: DaySchedule;
-  wednesday: DaySchedule;
-  thursday: DaySchedule;
-  friday: DaySchedule;
-  saturday: DaySchedule;
-  sunday: DaySchedule;
-  [key: string]: DaySchedule;
+export interface Booking {
+  id: string;
+  service_id: string;
+  date: string;
+  time: string;
+  duration_minutes: number;
+  quantity: number;
+  client_name: string;
+  client_firstname: string;
+  client_email: string;
+  client_phone: string;
+  total_amount: number;
+  payment_status: 'pending' | 'partial' | 'completed';
+  payment_amount: number;
+  payment_link?: string;
+  transactions: Transaction[];
+  user_id: string;
+  created_at: string;
+  booking_status: 'pending' | 'confirmed' | 'cancelled';
+  assigned_user_id?: string | null;
+  notes?: string | null;
+  service?: Service;
+  custom_service_data?: {
+    name: string;
+    price: number;
+    duration: number;
+  } | null;
+  google_calendar_event_id?: string | null;
 }
 
 export interface BusinessSettings {
   id: string;
-  user_id?: string;
+  user_id: string;
   business_name: string;
   primary_color: string;
   secondary_color: string;
-  opening_hours: OpeningHours;
+  opening_hours: {
+    [key: string]: {
+      ranges: Array<{ start: string; end: string }>;
+      closed: boolean;
+    };
+  };
   buffer_minutes: number;
   default_deposit_percentage: number;
   minimum_booking_delay_hours: number;
@@ -78,52 +95,11 @@ export interface BusinessSettings {
   stripe_webhook_secret: string;
   timezone: string;
   tax_rate?: number;
-  enable_user_assignment?: boolean;
   multiply_deposit_by_services?: boolean;
-  iframe_services?: string[];
-}
-
-export interface Booking {
-  id: string;
-  user_id: string;
-  client_id: string;
-  service_id: string;
-  date: string;
-  time: string;
-  duration_minutes: number;
-  booking_status: 'pending' | 'confirmed' | 'cancelled' | 'completed';
-  payment_status: 'unpaid' | 'partial' | 'paid';
-  total_amount: number;
-  paid_amount: number;
-  notes?: string;
-  created_at: string;
-  updated_at: string;
-  quantity: number;
-  assigned_user_id?: string;
-  client?: Client;
-  service?: Service;
-  assigned_user?: User;
-  transactions?: Transaction[];
-  client_name: string;
-  client_firstname: string;
-  client_email: string;
-  client_phone: string;
-  payment_amount: number;
-  custom_service_data?: {
-    name: string;
-    price: number;
-    duration: number;
-  };
-}
-
-export interface Transaction {
-  id: string;
-  booking_id?: string;
-  amount: number;
-  method: 'cash' | 'card' | 'transfer' | 'stripe';
-  status: 'completed' | 'pending' | 'cancelled';
-  note?: string;
-  created_at: string;
+  enable_user_assignment?: boolean;
+  google_calendar_enabled?: boolean;
+  google_calendar_id?: string | null;
+  google_calendar_sync_status?: 'disconnected' | 'connected' | 'error';
 }
 
 export interface TeamMember {
@@ -131,108 +107,50 @@ export interface TeamMember {
   owner_id: string;
   user_id: string;
   email: string;
-  firstname?: string;
-  lastname?: string;
-  phone?: string;
-  full_name?: string;
-  permissions: string[];
-  role_name: string;
+  role: 'admin' | 'member';
   is_active: boolean;
-  joined_at: string;
   created_at: string;
-  updated_at: string;
-}
-
-export interface TeamInvitation {
-  id: string;
-  owner_id: string;
-  email: string;
-  firstname?: string;
-  lastname?: string;
-  phone?: string;
-  permissions: string[];
-  role_name: string;
-  status: 'pending' | 'accepted' | 'rejected' | 'expired';
-  invited_at: string;
-  expires_at: string;
-  accepted_at?: string;
-  created_at: string;
-  updated_at: string;
+  user?: {
+    email: string;
+  };
 }
 
 export interface Plugin {
   id: string;
   name: string;
+  slug: string;
   description: string;
-  version: string;
+  icon: string;
   price: number;
   features: string[];
-  icon: string;
-  category: 'pos' | 'analytics' | 'marketing' | 'integration' | 'enterprise';
   is_active: boolean;
-  requires_subscription?: boolean;
 }
 
 export interface UserPlugin {
   id: string;
   user_id: string;
   plugin_id: string;
+  plugin_slug: string;
   is_active: boolean;
   activated_at: string;
   expires_at?: string;
-  settings?: Record<string, any>;
 }
 
-export interface POSProduct {
+export interface Affiliate {
   id: string;
   user_id: string;
-  name: string;
-  description?: string;
-  price: number;
-  stock_quantity: number;
-  category?: string;
-  barcode?: string;
-  image_url?: string;
-  is_active: boolean;
-  created_at: string;
-  updated_at: string;
-}
-
-export interface POSSale {
-  id: string;
-  user_id: string;
-  total_amount: number;
-  payment_method: 'cash' | 'card' | 'transfer';
-  items: POSSaleItem[];
-  notes?: string;
+  affiliate_code: string;
+  commission_rate: number;
+  total_referrals: number;
+  total_earnings: number;
   created_at: string;
 }
 
-export interface POSSaleItem {
-  product_id: string;
-  product_name: string;
-  quantity: number;
-  unit_price: number;
-  total_price: number;
-}
-
-export interface AffiliateLink {
-  id: string;
-  user_id: string;
-  code: string;
-  clicks: number;
-  conversions: number;
-  earnings: number;
-  is_active: boolean;
-  created_at: string;
-}
-
-export interface AffiliateCommission {
+export interface AffiliateReferral {
   id: string;
   affiliate_id: string;
   referred_user_id: string;
-  amount: number;
+  commission_amount: number;
   status: 'pending' | 'paid';
   created_at: string;
-  paid_at?: string;
 }
