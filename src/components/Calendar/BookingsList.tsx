@@ -26,6 +26,24 @@ export function BookingsList({ onEditBooking }: BookingsListProps) {
 
   const itemsPerPage = 12;
 
+  // Fonction pour obtenir le nom d'unité du service
+  const getUnitName = (booking: Booking) => {
+    if (booking.service?.unit_name && booking.service.unit_name !== 'personnes') {
+      return booking.service.unit_name;
+    }
+    return 'participants';
+  };
+
+  // Fonction pour obtenir le pluriel du nom d'unité avec suffixe (s)
+  const getPluralUnitName = (booking: Booking, quantity: number) => {
+    const unitName = getUnitName(booking);
+    if (quantity <= 1) {
+      // Retirer le 's' final si présent et ajouter (s) après
+      return `${unitName.replace(/s$/, '')}(s)`;
+    }
+    return `${unitName}(s)`;
+  };
+
   useEffect(() => {
     let filtered = [...bookings];
 
@@ -295,7 +313,7 @@ export function BookingsList({ onEditBooking }: BookingsListProps) {
                             <div>
                               <div className="font-medium text-gray-900">{booking.service?.name}</div>
                               <div className="text-sm text-gray-600">
-                                {booking.duration_minutes}min • {booking.quantity} pers.
+                                {booking.duration_minutes}min • {booking.quantity} {getPluralUnitName(booking, booking.quantity)}
                               </div>
                             </div>
                           </div>
@@ -414,7 +432,7 @@ export function BookingsList({ onEditBooking }: BookingsListProps) {
                         <div className="text-xs text-gray-600">Service</div>
                         <div className="font-medium text-gray-900 text-sm">{booking.service?.name}</div>
                         <div className="text-xs text-gray-500">
-                          {booking.duration_minutes}min • {booking.quantity} participant(s)
+                          {booking.duration_minutes}min • {booking.quantity} {getPluralUnitName(booking, booking.quantity)}
                         </div>
                       </div>
                     </div>
@@ -589,8 +607,10 @@ export function BookingsList({ onEditBooking }: BookingsListProps) {
                   <span className="font-medium text-purple-800">{selectedBooking.duration_minutes} minutes</span>
                 </div>
                 <div className="flex justify-between">
-                  <span className="text-purple-700">Participants</span>
-                  <span className="font-medium text-purple-800">{selectedBooking.quantity} personne(s)</span>
+                  <span className="text-purple-700">Quantité</span>
+                  <span className="font-medium text-purple-800">
+                    {selectedBooking.quantity} {getPluralUnitName(selectedBooking, selectedBooking.quantity)}
+                  </span>
                 </div>
               </div>
             </div>
