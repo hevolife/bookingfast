@@ -1,5 +1,5 @@
 import React, { useState, useEffect } from 'react';
-import { Save, Building2, Palette, Clock, Euro, Mail, CreditCard, Eye, EyeOff, Globe, Shield, AlertTriangle, CheckCircle, Percent, Trash2, RefreshCw } from 'lucide-react';
+import { Save, Building2, Palette, Clock, Euro, Mail, CreditCard, Eye, EyeOff, Globe, Shield, AlertTriangle, CheckCircle, Percent, Trash2, RefreshCw, Calculator } from 'lucide-react';
 import { useBusinessSettings } from '../../hooks/useBusinessSettings';
 import { BusinessSettings } from '../../types';
 import { Button } from '../UI/Button';
@@ -505,6 +505,47 @@ export function BusinessSettingsForm() {
                 />
               </div>
             )}
+          </div>
+
+          {/* Option multiplication acompte */}
+          <div className="mt-6 bg-gradient-to-r from-purple-50 to-pink-50 border border-purple-200 rounded-xl p-4">
+            <div className="flex items-start gap-3">
+              <div className="flex-shrink-0">
+                <Calculator className="w-6 h-6 text-purple-600" />
+              </div>
+              <div className="flex-1">
+                <div className="flex items-center justify-between mb-2">
+                  <label htmlFor="multiply_deposit" className="font-bold text-purple-900">
+                    Multiplier l'acompte par la quantité
+                  </label>
+                  <input
+                    type="checkbox"
+                    id="multiply_deposit"
+                    checked={formData.multiply_deposit_by_services || false}
+                    onChange={(e) => setFormData(prev => ({ 
+                      ...prev, 
+                      multiply_deposit_by_services: e.target.checked 
+                    }))}
+                    className="w-5 h-5 text-purple-600 rounded focus:ring-purple-500"
+                  />
+                </div>
+                <p className="text-sm text-purple-700">
+                  Quand activé, l'acompte sera multiplié par le nombre de services/participants sélectionnés.
+                </p>
+                <div className="mt-3 bg-white/50 rounded-lg p-3 text-sm">
+                  <div className="font-medium text-purple-800 mb-1">📊 Exemple :</div>
+                  <div className="text-purple-700 space-y-1">
+                    <div>• Service à 100€ avec acompte de 30%</div>
+                    <div>• Client sélectionne 3 participants</div>
+                    <div className="font-bold text-purple-900 mt-2">
+                      {formData.multiply_deposit_by_services 
+                        ? '→ Acompte = 30€ × 3 = 90€' 
+                        : '→ Acompte = 30€ (non multiplié)'}
+                    </div>
+                  </div>
+                </div>
+              </div>
+            </div>
           </div>
         </div>
       </div>
