@@ -151,10 +151,20 @@ export class GoogleCalendarService {
         .eq('user_id', ownerId)
         .maybeSingle();
 
-      if (error || !data) {
+      if (error) {
+        console.error('❌ Erreur Supabase lors de la récupération du token:', error);
+        console.error('   Code:', error.code);
+        console.error('   Message:', error.message);
+        console.error('   Details:', error.details);
+        return null;
+      }
+
+      if (!data) {
         console.log('❌ Token non trouvé pour owner_id:', ownerId);
         return null;
       }
+
+      console.log('✅ Token trouvé en base de données');
 
       // Vérifier si le token est expiré ou va expirer bientôt
       if (this.isTokenExpired(data.token_expiry)) {
@@ -424,14 +434,23 @@ Paiement: ${booking.payment_status === 'completed' ? '✅ Payé' : booking.payme
   }> {
     try {
       const ownerId = await this.getOwnerId(userId);
+      console.log('🔍 Vérification statut token pour owner_id:', ownerId);
       
-      const { data } = await supabase
+      const { data, error } = await supabase
         .from('google_calendar_tokens')
         .select('token_expiry')
         .eq('user_id', ownerId)
         .maybeSingle();
 
+      if (error) {
+        console.error('❌ Erreur vérification statut token:', error);
+        console.error('   Code:', error.code);
+        console.error('   Message:', error.message);
+        return { hasToken: false, isExpired: true };
+      }
+
       if (!data) {
+        console.log('⚠️ Aucun token trouvé pour owner_id:', ownerId);
         return { hasToken: false, isExpired: true };
       }
 
@@ -439,6 +458,10 @@ Paiement: ${booking.payment_status === 'completed' ? '✅ Payé' : booking.payme
       const now = new Date();
       const isExpired = this.isTokenExpired(data.token_expiry);
       const timeUntilExpiry = Math.floor((expiryDate.getTime() - now.getTime()) / 1000 / 60); // en minutes
+
+      console.log('✅ Token trouvé - Expire:', data.token_expiry);
+      console.log('   Expiré:', isExpired);
+      console.log('   Temps restant:', timeUntilExpiry, 'minutes');
 
       return {
         hasToken: true,

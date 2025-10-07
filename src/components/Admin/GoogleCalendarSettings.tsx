@@ -1,5 +1,5 @@
 import React, { useState, useEffect } from 'react';
-import { Calendar, CheckCircle, XCircle, RefreshCw, ExternalLink, AlertTriangle, Loader, Clock, Users } from 'lucide-react';
+import { Calendar, CheckCircle, XCircle, RefreshCw, ExternalLink, AlertTriangle, Loader, Clock, Users, Info } from 'lucide-react';
 import { useBusinessSettings } from '../../hooks/useBusinessSettings';
 import { useAuth } from '../../contexts/AuthContext';
 import { supabase } from '../../lib/supabase';
@@ -16,6 +16,7 @@ export function GoogleCalendarSettings() {
   const [testingConnection, setTestingConnection] = useState(false);
   const [ownerId, setOwnerId] = useState<string | null>(null);
   const [isTeamMember, setIsTeamMember] = useState(false);
+  const [ownerHasToken, setOwnerHasToken] = useState<boolean | null>(null);
   const [tokenStatus, setTokenStatus] = useState<{
     hasToken: boolean;
     isExpired: boolean;
@@ -40,10 +41,16 @@ export function GoogleCalendarSettings() {
           console.log('👤 Membre d\'équipe détecté - Propriétaire:', teamMember.owner_id);
           setOwnerId(teamMember.owner_id);
           setIsTeamMember(true);
+          
+          // Vérifier si le propriétaire a un token
+          await checkOwnerToken(teamMember.owner_id);
         } else {
           console.log('👑 Propriétaire détecté');
           setOwnerId(user.id);
           setIsTeamMember(false);
+          
+          // Vérifier si l'utilisateur a un token
+          await checkOwnerToken(user.id);
         }
       } catch (error) {
         console.error('❌ Erreur vérification équipe:', error);
@@ -54,6 +61,37 @@ export function GoogleCalendarSettings() {
 
     checkTeamMembership();
   }, [user]);
+
+  // Vérifier si le propriétaire a un token Google Calendar
+  const checkOwnerToken = async (checkOwnerId: string) => {
+    if (!supabase) return;
+
+    try {
+      const { data, error } = await supabase
+        .from('google_calendar_tokens')
+        .select('id')
+        .eq('user_id', checkOwnerId)
+        .maybeSingle();
+
+      if (error && error.code !== 'PGRST116') {
+        console.error('❌ Erreur vérification token:', error);
+        setOwnerHasToken(false);
+        return;
+      }
+
+      const hasToken = !!data;
+      setOwnerHasToken(hasToken);
+      
+      if (hasToken) {
+        console.log('✅ Token trouvé pour owner_id:', checkOwnerId);
+      } else {
+        console.log('⚠️ Aucun token trouvé pour owner_id:', checkOwnerId);
+      }
+    } catch (error) {
+      console.error('❌ Erreur vérification token:', error);
+      setOwnerHasToken(false);
+    }
+  };
 
   useEffect(() => {
     if (settings) {
@@ -68,6 +106,7 @@ export function GoogleCalendarSettings() {
       if (!user) return;
       const status = await GoogleCalendarService.checkTokenStatus(user.id);
       setTokenStatus(status);
+      setOwnerHasToken(status.hasToken);
     };
 
     checkToken();
@@ -150,6 +189,7 @@ export function GoogleCalendarSettings() {
       setCalendars([]);
       setSelectedCalendarId('');
       setTokenStatus(null);
+      setOwnerHasToken(false);
       
       alert('✅ Google Calendar déconnecté avec succès');
     } catch (error) {
@@ -166,6 +206,13 @@ export function GoogleCalendarSettings() {
       return;
     }
 
+    // Vérifier d'abord si le propriétaire a un token
+    if (ownerHasToken === false) {
+      console.log('⚠️ Le propriétaire n\'a pas connecté Google Calendar');
+      alert('⚠️ Le propriétaire doit d\'abord connecter Google Calendar avant que vous puissiez l\'utiliser.');
+      return;
+    }
+
     setLoading(true);
     try {
       console.log('🔍 Chargement calendriers pour owner_id:', ownerId);
@@ -177,7 +224,15 @@ export function GoogleCalendarSettings() {
 
       if (!accessToken) {
         console.log('❌ Impossible d\'obtenir le token');
-        throw new Error('Token non disponible');
+        
+        if (isTeamMember) {
+          alert('⚠️ Le propriétaire doit connecter Google Calendar avant que vous puissiez l\'utiliser.');
+        } else {
+          alert('⚠️ Veuillez connecter Google Calendar pour continuer.');
+        }
+        
+        setOwnerHasToken(false);
+        return;
       }
 
       console.log('✅ Token obtenu avec succès');
@@ -199,6 +254,7 @@ export function GoogleCalendarSettings() {
       const data = await response.json();
       console.log('✅ Calendriers récupérés:', data.items?.length || 0);
       setCalendars(data.items || []);
+      setOwnerHasToken(true);
     } catch (error) {
       console.error('❌ Erreur lors du chargement des calendriers:', error);
       
@@ -209,6 +265,7 @@ export function GoogleCalendarSettings() {
       }
       
       setSyncStatus('error');
+      setOwnerHasToken(false);
     } finally {
       setLoading(false);
     }
@@ -242,6 +299,12 @@ export function GoogleCalendarSettings() {
   const testConnection = async () => {
     if (!user || !ownerId) return;
 
+    // Vérifier d'abord si le propriétaire a un token
+    if (ownerHasToken === false) {
+      alert('⚠️ Le propriétaire doit d\'abord connecter Google Calendar.');
+      return;
+    }
+
     setTestingConnection(true);
     try {
       console.log('🧪 Test connexion pour owner_id:', ownerId);
@@ -250,7 +313,13 @@ export function GoogleCalendarSettings() {
       const accessToken = await GoogleCalendarService.getAccessToken(user.id);
 
       if (!accessToken) {
-        throw new Error('Token non disponible');
+        if (isTeamMember) {
+          alert('⚠️ Le propriétaire doit connecter Google Calendar.');
+        } else {
+          alert('⚠️ Veuillez connecter Google Calendar.');
+        }
+        setOwnerHasToken(false);
+        return;
       }
 
       const response = await fetch('https://www.googleapis.com/calendar/v3/users/me/calendarList', {
@@ -261,6 +330,7 @@ export function GoogleCalendarSettings() {
 
       if (response.ok) {
         alert('✅ Connexion Google Calendar active !');
+        setOwnerHasToken(true);
         
         // Rafraîchir le statut du token
         const status = await GoogleCalendarService.checkTokenStatus(user.id);
@@ -278,16 +348,17 @@ export function GoogleCalendarSettings() {
       }
       
       setSyncStatus('error');
+      setOwnerHasToken(false);
     } finally {
       setTestingConnection(false);
     }
   };
 
   useEffect(() => {
-    if (syncStatus === 'connected' && calendars.length === 0 && ownerId) {
+    if (syncStatus === 'connected' && calendars.length === 0 && ownerId && ownerHasToken) {
       loadCalendars();
     }
-  }, [syncStatus, ownerId]);
+  }, [syncStatus, ownerId, ownerHasToken]);
 
   return (
     <div className="space-y-6">
@@ -360,8 +431,28 @@ export function GoogleCalendarSettings() {
         )}
       </div>
 
+      {/* Alerte si le propriétaire n'a pas de token (pour les membres d'équipe) */}
+      {isTeamMember && ownerHasToken === false && (
+        <div className="bg-yellow-50 border border-yellow-200 rounded-xl p-4">
+          <div className="flex items-start gap-3">
+            <div className="w-10 h-10 bg-yellow-100 rounded-lg flex items-center justify-center flex-shrink-0">
+              <AlertTriangle className="w-5 h-5 text-yellow-600" />
+            </div>
+            <div className="flex-1">
+              <h4 className="font-bold text-yellow-800 mb-2">⚠️ Google Calendar non configuré</h4>
+              <div className="text-yellow-700 text-sm space-y-1">
+                <div>Le propriétaire de votre équipe n'a pas encore connecté Google Calendar.</div>
+                <div className="font-medium mt-2">Contactez votre administrateur pour :</div>
+                <div>• Connecter son compte Google Calendar</div>
+                <div>• Activer la synchronisation pour toute l'équipe</div>
+              </div>
+            </div>
+          </div>
+        </div>
+      )}
+
       {/* Message pour les membres d'équipe */}
-      {isTeamMember && (
+      {isTeamMember && ownerHasToken === true && (
         <div className="bg-blue-50 border border-blue-200 rounded-xl p-4">
           <div className="flex items-start gap-3">
             <div className="w-10 h-10 bg-blue-100 rounded-lg flex items-center justify-center flex-shrink-0">
@@ -384,7 +475,7 @@ export function GoogleCalendarSettings() {
       <div className="bg-blue-50 border border-blue-200 rounded-xl p-4">
         <div className="flex items-start gap-3">
           <div className="w-10 h-10 bg-blue-100 rounded-lg flex items-center justify-center flex-shrink-0">
-            <Calendar className="w-5 h-5 text-blue-600" />
+            <Info className="w-5 h-5 text-blue-600" />
           </div>
           <div className="flex-1">
             <h4 className="font-bold text-blue-800 mb-2">💡 Comment ça fonctionne ?</h4>
@@ -401,7 +492,7 @@ export function GoogleCalendarSettings() {
       </div>
 
       {/* Actions selon le statut */}
-      {syncStatus === 'disconnected' || syncStatus === 'error' ? (
+      {syncStatus === 'disconnected' || syncStatus === 'error' || ownerHasToken === false ? (
         <div className="space-y-4">
           <Button
             onClick={handleConnect}
