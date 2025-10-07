@@ -16,6 +16,8 @@ interface CalendarPageProps {
 }
 
 export function CalendarPage({ view = 'calendar' }: CalendarPageProps) {
+  console.log('🔍 CalendarPage - Rendu, view:', view);
+  
   const [currentDate] = useState(new Date());
   const [isModalOpen, setIsModalOpen] = useState(false);
   const [selectedDate, setSelectedDate] = useState(new Date().toISOString().split('T')[0]);
@@ -24,6 +26,12 @@ export function CalendarPage({ view = 'calendar' }: CalendarPageProps) {
   const [selectedTeamMember, setSelectedTeamMember] = useState<string>('all');
   
   const { bookings, loading, addBooking, updateBooking, deleteBooking, refetch } = useBookings();
+  
+  console.log('🔍 CalendarPage - useBookings retourné:', { 
+    bookingsCount: bookings.length, 
+    loading 
+  });
+  
   const { hasPermission, canEditBooking, canDeleteBooking, getUsageLimits, isOwner } = useTeam();
   const { teamMembers, loading: membersLoading } = useTeamMembers();
   const { hasPluginAccess } = usePlugins();
@@ -32,6 +40,8 @@ export function CalendarPage({ view = 'calendar' }: CalendarPageProps) {
   const [isMultiUserActive, setIsMultiUserActive] = useState(false);
 
   useEffect(() => {
+    console.log('🔍 CalendarPage - useEffect checkAccess');
+    
     const checkAccess = async () => {
       const multiUserActive = await hasPluginAccess('multi-user');
       setIsMultiUserActive(multiUserActive);
@@ -62,6 +72,8 @@ export function CalendarPage({ view = 'calendar' }: CalendarPageProps) {
         }
         return b.assigned_user_id === selectedTeamMember;
       });
+
+  console.log('🔍 CalendarPage - Bookings filtrés:', filteredBookings.length);
 
   const handleTimeSlotClick = (date: string, time: string) => {
     if (!hasPermission('create_booking')) {
@@ -124,11 +136,6 @@ export function CalendarPage({ view = 'calendar' }: CalendarPageProps) {
     return member.email || 'Membre sans nom';
   };
 
-  // Afficher le filtre uniquement si :
-  // 1. L'utilisateur a la permission
-  // 2. Le plugin multi-user est actif
-  // 3. Il y a des membres dans l'équipe
-  // 4. On est sur la vue calendrier
   const shouldShowTeamFilter = canViewTeamFilter && isMultiUserActive && teamMembers.length > 0 && view === 'calendar';
 
   return (

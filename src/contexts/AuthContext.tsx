@@ -25,23 +25,32 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
       return;
     }
 
+    let mounted = true;
+
     // Récupérer la session initiale
     supabase.auth.getSession().then(({ data: { session } }) => {
-      setSession(session);
-      setUser(session?.user ?? null);
-      setLoading(false);
+      if (mounted) {
+        setSession(session);
+        setUser(session?.user ?? null);
+        setLoading(false);
+      }
     });
 
     // Écouter les changements d'authentification
     const {
       data: { subscription },
     } = supabase.auth.onAuthStateChange((_event, session) => {
-      console.log('🔐 Auth state changed:', _event, session?.user?.id);
-      setSession(session);
-      setUser(session?.user ?? null);
+      if (mounted) {
+        console.log('🔐 Auth state changed:', _event);
+        setSession(session);
+        setUser(session?.user ?? null);
+      }
     });
 
-    return () => subscription.unsubscribe();
+    return () => {
+      mounted = false;
+      subscription.unsubscribe();
+    };
   }, []);
 
   const signIn = async (email: string, password: string) => {
@@ -88,11 +97,7 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
 
     try {
       console.log('🚪 Déconnexion en cours...');
-      console.log('👤 Utilisateur actuel:', user?.id);
-      console.log('🔑 Session actuelle:', session?.access_token ? 'Présente' : 'Absente');
 
-      // ✅ CORRECTION : Utiliser le scope 'local' pour éviter l'erreur de session
-      // Cela déconnecte uniquement l'utilisateur local sans invalider tous les tokens
       const { error } = await supabase.auth.signOut({ 
         scope: 'local' 
       });
@@ -100,18 +105,11 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
       if (error) {
         console.error('❌ Erreur lors de la déconnexion:', error);
         
-        // Si l'erreur est liée à la session manquante, on force le nettoyage local
         if (error.message?.includes('session') || error.message?.includes('Session')) {
           console.warn('⚠️ Session manquante, nettoyage local forcé');
-          
-          // Nettoyer manuellement le localStorage
           localStorage.removeItem('bookingfast-auth');
-          
-          // Réinitialiser l'état local
           setSession(null);
           setUser(null);
-          
-          // Rediriger vers la page de connexion
           window.location.href = '/';
           return;
         }
@@ -120,18 +118,12 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
       }
 
       console.log('✅ Déconnexion réussie');
-      
-      // Nettoyer l'état local
       setSession(null);
       setUser(null);
-      
-      // Rediriger vers la page de connexion
       window.location.href = '/';
       
     } catch (error) {
       console.error('❌ Erreur critique lors de la déconnexion:', error);
-      
-      // En cas d'erreur critique, forcer le nettoyage et la redirection
       localStorage.removeItem('bookingfast-auth');
       setSession(null);
       setUser(null);

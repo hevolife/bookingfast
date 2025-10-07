@@ -1,4 +1,4 @@
-import { useState, useEffect } from 'react';
+import { useState, useEffect, useCallback } from 'react';
 import { supabase, isSupabaseConfigured } from '../lib/supabase';
 import { Booking } from '../types';
 import { useAuth } from '../contexts/AuthContext';
@@ -7,29 +7,38 @@ import { GoogleCalendarService } from '../lib/googleCalendar';
 export function useBookings() {
   const { user } = useAuth();
   const [bookings, setBookings] = useState<Booking[]>([]);
-  const [loading, setLoading] = useState(true);
+  const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
 
-  const fetchBookings = async () => {
+  console.log('🔍 useBookings - Hook appelé, user:', user?.id);
+
+  const fetchBookings = useCallback(async () => {
+    console.log('🔍 fetchBookings - Début, user:', user?.id);
+    
     if (!user) {
+      console.log('⚠️ fetchBookings - Pas d\'utilisateur');
       setBookings([]);
       setLoading(false);
       return;
     }
 
     if (!isSupabaseConfigured) {
-      const demoBookings: Booking[] = [];
-      setBookings(demoBookings);
+      console.log('⚠️ fetchBookings - Supabase non configuré');
+      setBookings([]);
       setLoading(false);
       return;
     }
 
+    console.log('🔄 fetchBookings - Chargement en cours...');
+    setLoading(true);
+    setError(null);
+
     try {
-      setError(null);
-      
       let targetUserId = user.id;
+      console.log('🔍 fetchBookings - targetUserId initial:', targetUserId);
       
       try {
+        console.log('🔍 fetchBookings - Vérification team_members...');
         const { data: membershipData, error: membershipError } = await supabase!
           .from('team_members')
           .select('owner_id')
@@ -37,13 +46,17 @@ export function useBookings() {
           .eq('is_active', true)
           .maybeSingle();
 
+        console.log('🔍 fetchBookings - membershipData:', membershipData);
+        
         if (!membershipError && membershipData?.owner_id) {
           targetUserId = membershipData.owner_id;
+          console.log('🔍 fetchBookings - targetUserId mis à jour:', targetUserId);
         }
       } catch (teamError) {
         console.warn('⚠️ Erreur vérification équipe:', teamError);
       }
 
+      console.log('🔍 fetchBookings - Requête bookings pour user_id:', targetUserId);
       const { data, error } = await supabase!
         .from('bookings')
         .select(`
@@ -59,16 +72,18 @@ export function useBookings() {
         throw error;
       }
 
-      console.log('✅ Bookings chargés:', data?.length || 0);
+      console.log('✅ Bookings chargés:', data?.length || 0, 'réservations');
+      console.log('📊 Données bookings:', data);
       setBookings(data || []);
     } catch (err) {
-      console.error('Erreur lors du chargement des réservations:', err);
+      console.error('❌ Erreur lors du chargement des réservations:', err);
       setError(err instanceof Error ? err.message : 'Erreur de chargement');
       setBookings([]);
     } finally {
+      console.log('🏁 fetchBookings - Terminé');
       setLoading(false);
     }
-  };
+  }, [user?.id]);
 
   const addBooking = async (bookingData: Omit<Booking, 'id' | 'created_at' | 'user_id'>) => {
     if (!isSupabaseConfigured || !user) {
@@ -225,40 +240,24 @@ export function useBookings() {
   };
 
   useEffect(() => {
-    let mounted = true;
-    let timeoutId: NodeJS.Timeout;
-    
-    const loadBookings = async () => {
-      if (mounted && user) {
-        console.log('🔄 Chargement bookings pour:', user.email);
-        setLoading(true);
-        
-        // Timeout de sécurité
-        timeoutId = setTimeout(() => {
-          if (mounted) {
-            console.warn('⏰ Timeout chargement bookings');
-            setLoading(false);
-            setBookings([]);
-          }
-        }, 10000);
-        
-        await fetchBookings();
-        clearTimeout(timeoutId);
-      }
-    };
+    console.log('🔍 useEffect - Déclenché, user:', user?.id);
     
     if (user) {
-      loadBookings();
+      console.log('✅ useEffect - Appel de fetchBookings');
+      fetchBookings();
     } else {
-      setLoading(false);
+      console.log('⚠️ useEffect - Pas d\'utilisateur, reset bookings');
       setBookings([]);
+      setLoading(false);
     }
-    
-    return () => {
-      mounted = false;
-      if (timeoutId) clearTimeout(timeoutId);
-    };
-  }, [user?.id]);
+  }, [user?.id, fetchBookings]);
+
+  console.log('🔍 useBookings - État actuel:', { 
+    bookingsCount: bookings.length, 
+    loading, 
+    error,
+    userId: user?.id 
+  });
 
   return {
     bookings,
