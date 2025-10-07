@@ -29,7 +29,7 @@ serve(async (req) => {
       console.error('❌ user_id manquant')
       return new Response(
         JSON.stringify({ error: 'user_id parameter required' }),
-        { status: 400, headers: corsHeaders }
+        { status: 400, headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
       )
     }
 
@@ -37,7 +37,7 @@ serve(async (req) => {
 
     // Vérifier d'abord que l'utilisateur existe
     const { data: userData, error: userError } = await supabaseClient
-      .from('users')
+      .from('profiles')
       .select('id, email, full_name')
       .eq('id', userId)
       .maybeSingle()
@@ -46,7 +46,7 @@ serve(async (req) => {
       console.error('❌ Erreur vérification utilisateur:', userError)
       return new Response(
         JSON.stringify({ error: 'User verification failed', details: userError.message }),
-        { status: 404, headers: corsHeaders }
+        { status: 404, headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
       )
     }
 
@@ -54,7 +54,7 @@ serve(async (req) => {
       console.error('❌ Utilisateur non trouvé:', userId)
       return new Response(
         JSON.stringify({ error: 'User not found' }),
-        { status: 404, headers: corsHeaders }
+        { status: 404, headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
       )
     }
 
@@ -71,7 +71,7 @@ serve(async (req) => {
       console.error('❌ Erreur chargement services:', servicesError)
       return new Response(
         JSON.stringify({ error: 'Failed to load services', details: servicesError.message }),
-        { status: 500, headers: corsHeaders }
+        { status: 500, headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
       )
     }
 
@@ -93,7 +93,7 @@ serve(async (req) => {
     // Récupérer les réservations existantes
     const { data: bookingsData, error: bookingsError } = await supabaseClient
       .from('bookings')
-      .select('date, time, duration_minutes, service_id, booking_status')
+      .select('date, time, duration_minutes, service_id, booking_status, quantity')
       .eq('user_id', userId)
       .in('booking_status', ['pending', 'confirmed'])
 
