@@ -65,7 +65,45 @@ export function usePlugins() {
 
       console.log('🔍 Chargement plugins pour utilisateur:', user.id);
 
-      // ÉTAPE 1 : Vérifier si l'utilisateur est propriétaire ou membre d'équipe
+      // ÉTAPE 1 : Vérifier l'abonnement principal (trial ou actif)
+      const { data: mainSubscription, error: subError } = await supabase
+        .from('subscriptions')
+        .select('status, is_trial, trial_ends_at')
+        .eq('user_id', user.id)
+        .maybeSingle();
+
+      if (subError && subError.code !== 'PGRST116') {
+        throw subError;
+      }
+
+      // Si l'utilisateur a un abonnement trial ou actif, accès complet
+      if (mainSubscription && (mainSubscription.status === 'trial' || mainSubscription.status === 'active')) {
+        console.log('✅ Abonnement principal actif:', mainSubscription.status);
+        
+        // Récupérer TOUS les plugins actifs
+        const { data: allPlugins, error: pluginsError } = await supabase
+          .from('plugins')
+          .select('id, name, slug, icon, category')
+          .eq('is_active', true);
+
+        if (pluginsError) throw pluginsError;
+
+        const formattedPlugins: UserPlugin[] = (allPlugins || []).map((plugin: any) => ({
+          plugin_id: plugin.id,
+          plugin_name: plugin.name,
+          plugin_slug: plugin.slug,
+          plugin_icon: plugin.icon,
+          plugin_category: plugin.category,
+          activated_features: [],
+          settings: {}
+        }));
+
+        console.log('✅ Accès complet à tous les plugins (trial/actif):', formattedPlugins.length);
+        setUserPlugins(formattedPlugins);
+        return;
+      }
+
+      // ÉTAPE 2 : Vérifier si l'utilisateur est membre d'équipe
       const { data: teamMember, error: teamError } = await supabase
         .from('team_members')
         .select('id, owner_id, role_name, is_active')
@@ -79,7 +117,7 @@ export function usePlugins() {
 
       // CAS 1 : Utilisateur est propriétaire (pas de team_member)
       if (!teamMember) {
-        console.log('✅ Utilisateur propriétaire - accès complet aux plugins');
+        console.log('✅ Utilisateur propriétaire - vérification abonnements plugins');
         
         const { data, error } = await supabase
           .from('plugin_subscriptions')
@@ -169,7 +207,7 @@ export function usePlugins() {
         .filter((sub: any) => {
           const hasPermission = permissionsMap.get(sub.plugin_id);
           console.log(`🔍 Plugin ${sub.plugin?.slug}: permission =`, hasPermission);
-          return hasPermission === true; // ✅ Seulement si explicitement autorisé
+          return hasPermission === true;
         })
         .filter((sub: any) => sub.plugin)
         .map((sub: any) => ({
@@ -204,6 +242,23 @@ export function usePlugins() {
 
     try {
       console.log(`🔍 Vérification accès plugin: ${pluginSlug}`);
+
+      // ÉTAPE 1 : Vérifier l'abonnement principal (trial ou actif)
+      const { data: mainSubscription, error: subError } = await supabase
+        .from('subscriptions')
+        .select('status, is_trial, trial_ends_at')
+        .eq('user_id', user.id)
+        .maybeSingle();
+
+      if (subError && subError.code !== 'PGRST116') {
+        console.error('❌ Erreur vérification abonnement:', subError);
+      }
+
+      // Si l'utilisateur a un abonnement trial ou actif, accès complet
+      if (mainSubscription && (mainSubscription.status === 'trial' || mainSubscription.status === 'active')) {
+        console.log('✅ Accès autorisé via abonnement principal:', mainSubscription.status);
+        return true;
+      }
 
       // Récupérer le plugin par son slug
       const { data: pluginData, error: pluginError } = await supabase
