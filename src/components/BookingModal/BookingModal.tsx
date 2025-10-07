@@ -17,7 +17,6 @@ import { ClientSearch } from './ClientSearch';
 import { TeamMemberSelector } from './TeamMemberSelector';
 import { useAuth } from '../../contexts/AuthContext';
 import { bookingEvents } from '../../lib/bookingEvents';
-import { triggerWorkflow, sendConfirmationEmail } from '../../lib/workflowEngine';
 
 interface BookingModalProps {
   isOpen: boolean;
@@ -174,12 +173,6 @@ export function BookingModal({
     if (!selectedClient || !selectedService) return;
 
     try {
-      console.log('🔄 Début génération lien de paiement:', {
-        amount,
-        client: selectedClient.email,
-        service: isCustomService ? customServiceData.name : selectedService.name
-      });
-
       const expiryMinutes = settings?.payment_link_expiry_minutes || 30;
       const expiresAt = Date.now() + (expiryMinutes * 60 * 1000);
       const paymentUrl = new URL('/payment', window.location.origin);
@@ -196,8 +189,6 @@ export function BookingModal({
         paymentUrl.searchParams.set('user_id', user.id);
       }
 
-      console.log('✅ URL de paiement générée:', paymentUrl.toString());
-
       const pendingTransaction = {
         amount: amount,
         method: 'stripe' as const,
@@ -210,58 +201,12 @@ export function BookingModal({
         id: crypto.randomUUID(),
         created_at: new Date().toISOString()
       }]);
-
-      const bookingDataForWorkflow = {
-        id: editingBooking?.id || crypto.randomUUID(),
-        service_id: isCustomService ? 'custom' : selectedService.id,
-        date,
-        time,
-        duration_minutes: isCustomService ? customServiceData.duration : selectedService.duration_minutes,
-        quantity,
-        client_name: selectedClient.lastname,
-        client_firstname: selectedClient.firstname,
-        client_email: selectedClient.email,
-        client_phone: selectedClient.phone,
-        total_amount: calculateTotalAmount(),
-        payment_status: 'pending' as const,
-        payment_amount: calculateCurrentPaid(),
-        payment_link: paymentUrl.toString(),
-        transactions: [...transactions, {
-          ...pendingTransaction,
-          id: crypto.randomUUID(),
-          created_at: new Date().toISOString()
-        }],
-        booking_status: bookingStatus,
-        notes,
-        service: isCustomService ? {
-          id: 'custom',
-          name: customServiceData.name,
-          price_ttc: customServiceData.price,
-          duration_minutes: customServiceData.duration,
-          description: 'Service personnalisé'
-        } : selectedService,
-        custom_service_data: isCustomService ? customServiceData : null
-      };
-
-      if (user?.id) {
-        console.log('🚀 Déclenchement workflow payment_link_created pour:', selectedClient.email);
-        
-        try {
-          await triggerWorkflow('payment_link_created', bookingDataForWorkflow, user.id);
-          console.log('✅ Workflow payment_link_created déclenché avec succès');
-        } catch (error) {
-          console.error('❌ Erreur déclenchement workflow payment_link_created:', error);
-        }
-      }
       
       try {
         await navigator.clipboard.writeText(paymentUrl.toString());
-        console.log('✅ Lien copié dans le presse-papiers');
       } catch (clipboardError) {
         console.warn('⚠️ Impossible de copier automatiquement:', clipboardError);
       }
-      
-      console.log('✅ Lien de paiement généré avec succès');
       
     } catch (error) {
       console.error('Erreur lors de la génération du lien:', error);
@@ -392,10 +337,9 @@ export function BookingModal({
   const totalAmount = calculateTotalAmount();
   const currentPaid = calculateCurrentPaid();
 
-  // Obtenir le nom d'unité du service sélectionné
   const getUnitName = () => {
     if (isCustomService) {
-      return 'participants'; // Par défaut pour les services personnalisés
+      return 'participants';
     }
     if (selectedService?.unit_name && selectedService.unit_name !== 'personnes') {
       return selectedService.unit_name;
@@ -403,11 +347,9 @@ export function BookingModal({
     return 'participants';
   };
 
-  // Fonction pour obtenir le nom d'unité avec suffixe (s)
   const getPluralUnitName = (qty: number) => {
     const unitName = getUnitName();
     if (qty <= 1) {
-      // Retirer le 's' final si présent et ajouter (s) après
       return `${unitName.replace(/s$/, '')}(s)`;
     }
     return `${unitName}(s)`;
@@ -636,7 +578,6 @@ export function BookingModal({
                 />
               )}
 
-              {/* Champ Notes */}
               <div>
                 <label className="block text-sm font-medium text-gray-700 mb-2">
                   <FileText className="w-4 h-4 inline mr-2" />

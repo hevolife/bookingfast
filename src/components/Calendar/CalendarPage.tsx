@@ -36,11 +36,9 @@ export function CalendarPage({ view = 'calendar' }: CalendarPageProps) {
       const multiUserActive = await hasPluginAccess('multi-user');
       setIsMultiUserActive(multiUserActive);
       
-      // Le propriétaire voit toujours le filtre si le plugin est actif
       if (isOwner && multiUserActive) {
         setCanViewTeamFilter(true);
       } else if (multiUserActive) {
-        // Pour les membres d'équipe, vérifier la permission
         const hasFilterPermission = hasPermission('view_team_filter');
         setCanViewTeamFilter(hasFilterPermission);
       } else {
@@ -56,7 +54,6 @@ export function CalendarPage({ view = 'calendar' }: CalendarPageProps) {
     b.date === new Date().toISOString().split('T')[0]
   ).length;
 
-  // Filtrer les réservations par membre d'équipe sélectionné
   const filteredBookings = selectedTeamMember === 'all' 
     ? bookings 
     : bookings.filter(b => {
@@ -109,7 +106,12 @@ export function CalendarPage({ view = 'calendar' }: CalendarPageProps) {
     await deleteBooking(bookingId);
   };
 
-  // Fonction pour obtenir le nom d'affichage d'un membre
+  const handleBookingSuccess = async () => {
+    handleCloseModal();
+    // Rafraîchir les réservations après création/modification
+    await refetch();
+  };
+
   const getMemberDisplayName = (member: typeof teamMembers[0]) => {
     if (member.firstname && member.lastname) {
       return `${member.firstname} ${member.lastname}`;
@@ -133,7 +135,6 @@ export function CalendarPage({ view = 'calendar' }: CalendarPageProps) {
         touchAction: 'pan-y'
       }}
     >
-      {/* Filtre membre d'équipe */}
       {canViewTeamFilter && isMultiUserActive && teamMembers.length > 0 && view === 'calendar' && (
         <div className="bg-white border-b border-gray-200 px-4 py-3">
           <div className="flex items-center gap-3">
@@ -177,7 +178,6 @@ export function CalendarPage({ view = 'calendar' }: CalendarPageProps) {
             </div>
           </div>
           
-          {/* Indicateur de filtre actif */}
           {selectedTeamMember !== 'all' && (
             <div className="mt-2 flex items-center gap-2 text-xs text-purple-700 bg-purple-50 px-3 py-2 rounded-lg">
               <span className="font-medium">Filtre actif :</span>
@@ -232,7 +232,7 @@ export function CalendarPage({ view = 'calendar' }: CalendarPageProps) {
           selectedDate={selectedDate}
           selectedTime={selectedTime}
           editingBooking={editingBooking}
-          onSuccess={handleCloseModal}
+          onSuccess={handleBookingSuccess}
         />
       )}
     </div>

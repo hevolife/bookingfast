@@ -103,7 +103,6 @@ export function useBookings() {
       if (data) {
         setBookings(prev => [...prev, data]);
         
-        // Synchroniser avec Google Calendar
         try {
           await GoogleCalendarService.createEvent(data, targetUserId);
         } catch (calendarError) {
@@ -156,7 +155,6 @@ export function useBookings() {
       if (data) {
         setBookings(prev => prev.map(b => b.id === id ? data : b));
         
-        // Synchroniser avec Google Calendar
         try {
           await GoogleCalendarService.updateEvent(data, targetUserId);
         } catch (calendarError) {
@@ -194,7 +192,6 @@ export function useBookings() {
         console.warn('⚠️ Erreur vérification équipe:', teamError);
       }
 
-      // Récupérer l'ID de l'événement Google Calendar avant suppression
       const { data: bookingData } = await supabase!
         .from('bookings')
         .select('google_calendar_event_id')
@@ -210,7 +207,6 @@ export function useBookings() {
 
       setBookings(prev => prev.filter(b => b.id !== id));
       
-      // Supprimer l'événement Google Calendar
       if (bookingData?.google_calendar_event_id) {
         try {
           await GoogleCalendarService.deleteEvent(bookingData.google_calendar_event_id, targetUserId);
