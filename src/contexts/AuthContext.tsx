@@ -39,11 +39,17 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
     // Écouter les changements d'authentification
     const {
       data: { subscription },
-    } = supabase.auth.onAuthStateChange((_event, session) => {
+    } = supabase.auth.onAuthStateChange(async (_event, session) => {
       if (mounted) {
         console.log('🔐 Auth state changed:', _event);
         setSession(session);
         setUser(session?.user ?? null);
+        
+        // Si c'est un nouveau compte (SIGNED_UP), initialiser les données
+        if (_event === 'SIGNED_UP' && session?.user) {
+          console.log('🆕 Nouveau compte détecté, initialisation...');
+          await initializeNewAccount(session.user.id);
+        }
       }
     });
 
@@ -52,6 +58,64 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
       subscription.unsubscribe();
     };
   }, []);
+
+  const initializeNewAccount = async (userId: string) => {
+    if (!supabase) return;
+    
+    try {
+      console.log('🔧 Initialisation du compte:', userId);
+      
+      // 1. Créer le profil utilisateur
+      const { error: profileError } = await supabase
+        .from('profiles')
+        .upsert({
+          id: userId,
+          email: user?.email || '',
+          created_at: new Date().toISOString(),
+          updated_at: new Date().toISOString()
+        });
+      
+      if (profileError) {
+        console.error('❌ Erreur création profil:', profileError);
+      } else {
+        console.log('✅ Profil créé');
+      }
+      
+      // 2. Créer les paramètres business par défaut
+      const { error: settingsError } = await supabase
+        .from('business_settings')
+        .upsert({
+          user_id: userId,
+          business_name: 'Mon Entreprise',
+          primary_color: '#3B82F6',
+          secondary_color: '#8B5CF6',
+          opening_hours: {
+            monday: { start: '08:00', end: '18:00', closed: false },
+            tuesday: { start: '08:00', end: '18:00', closed: false },
+            wednesday: { start: '08:00', end: '18:00', closed: false },
+            thursday: { start: '08:00', end: '18:00', closed: false },
+            friday: { start: '08:00', end: '18:00', closed: false },
+            saturday: { start: '09:00', end: '17:00', closed: false },
+            sunday: { start: '09:00', end: '17:00', closed: true }
+          },
+          buffer_minutes: 15,
+          default_deposit_percentage: 30,
+          email_notifications: true,
+          created_at: new Date().toISOString(),
+          updated_at: new Date().toISOString()
+        });
+      
+      if (settingsError) {
+        console.error('❌ Erreur création paramètres:', settingsError);
+      } else {
+        console.log('✅ Paramètres créés');
+      }
+      
+      console.log('✅ Initialisation terminée');
+    } catch (error) {
+      console.error('❌ Erreur initialisation compte:', error);
+    }
+  };
 
   const signIn = async (email: string, password: string) => {
     if (!supabase) throw new Error('Supabase non configuré');
@@ -76,7 +140,7 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
     
     console.log('📝 Tentative d\'inscription pour:', email);
     
-    const { error } = await supabase.auth.signUp({
+    const { data, error } = await supabase.auth.signUp({
       email,
       password,
     });
@@ -87,6 +151,11 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
     }
     
     console.log('✅ Inscription réussie');
+    
+    // Initialiser le compte immédiatement après l'inscription
+    if (data.user) {
+      await initializeNewAccount(data.user.id);
+    }
   };
 
   const signOut = async () => {
