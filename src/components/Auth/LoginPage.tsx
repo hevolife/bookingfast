@@ -87,9 +87,9 @@ export function LoginPage() {
   };
 
   return (
-    <div className="min-h-screen-safe bg-gradient-to-br from-blue-50 via-purple-50 to-pink-50 flex items-center justify-center p-4 safe-all">
+    <div className="min-h-screen bg-gradient-to-br from-blue-50 via-purple-50 to-pink-50 flex items-center justify-center p-4">
       {/* Background decorations */}
-      <div className="absolute inset-0 overflow-hidden">
+      <div className="absolute inset-0 overflow-hidden pointer-events-none">
         <div className="absolute -top-40 -right-40 w-80 h-80 bg-gradient-to-r from-purple-400 to-pink-400 rounded-full opacity-20 animate-float"></div>
         <div className="absolute -bottom-40 -left-40 w-80 h-80 bg-gradient-to-r from-blue-400 to-cyan-400 rounded-full opacity-20 animate-float" style={{ animationDelay: '2s' }}></div>
         <div className="absolute top-1/2 left-1/2 transform -translate-x-1/2 -translate-y-1/2 w-60 h-60 bg-gradient-to-r from-green-400 to-emerald-400 rounded-full opacity-10 animate-float" style={{ animationDelay: '4s' }}></div>
@@ -97,8 +97,8 @@ export function LoginPage() {
 
       <div className="relative z-10 w-full max-w-md">
         {/* Logo et titre */}
-        <div className="text-center mb-8">
-          <div className="w-20 h-20 bg-gradient-to-r from-blue-600 to-purple-600 rounded-3xl flex items-center justify-center mx-auto mb-6 shadow-2xl animate-glow">
+        <div className="text-center mb-6">
+          <div className="w-20 h-20 bg-gradient-to-r from-blue-600 to-purple-600 rounded-3xl flex items-center justify-center mx-auto mb-4 shadow-2xl animate-glow">
             <Building2 className="w-10 h-10 text-white" />
           </div>
           <h1 className="text-4xl font-bold bg-gradient-to-r from-blue-600 via-purple-600 to-pink-600 bg-clip-text text-transparent mb-2">
@@ -234,21 +234,21 @@ export function LoginPage() {
           )}
 
           {/* Toggle entre login/register */}
-          <div className="mt-8 text-center">
-            <div className="text-gray-600 mb-4">
+          <div className="mt-6 text-center">
+            <div className="text-gray-600 mb-3">
               {isLogin ? "Vous n'avez pas de compte ?" : "Vous avez déjà un compte ?"}
             </div>
             <button
               type="button"
               onClick={toggleMode}
-              className="text-purple-600 hover:text-purple-800 font-bold text-lg hover:underline transition-all duration-300 text-center w-full mx-auto block"
+              className="text-purple-600 hover:text-purple-800 font-bold text-lg hover:underline transition-all duration-300"
             >
               {isLogin ? 'Créer un compte' : 'Se connecter'}
             </button>
           </div>
 
           {/* Code secret */}
-          <div className="mt-6 text-center">
+          <div className="mt-4 text-center">
             <button
               type="button"
               onClick={() => setShowSecretCode(!showSecretCode)}
@@ -261,7 +261,7 @@ export function LoginPage() {
 
           {/* Formulaire code secret */}
           {showSecretCode && (
-            <div className="mt-6">
+            <div className="mt-4">
               <AccessCodeRedemption 
                 onSuccess={() => {
                   setShowSecretCode(false);
@@ -284,19 +284,19 @@ export function LoginPage() {
         )}
 
         {/* Footer */}
-        <div className="text-center mt-8 text-gray-500 text-sm">
+        <div className="text-center mt-6 text-gray-500 text-sm">
           <p>© 2025 BookingFast - Système de réservation professionnel</p>
-          <p className="text-xs text-gray-400 mt-1">
-            {currentVersion ? (
-              <>Version {currentVersion.version} - Build {currentVersion.build}</>
-            ) : (
-              'Chargement de la version...'
-            )}
-          </p>
-          {currentVersion?.release_notes && (
-            <p className="text-xs text-gray-400 mt-1 max-w-md mx-auto">
-              {currentVersion.release_notes}
-            </p>
+          {currentVersion && (
+            <>
+              <p className="text-xs text-gray-400 mt-1">
+                Version {currentVersion.version} - Build {currentVersion.build}
+              </p>
+              {currentVersion.release_notes && (
+                <p className="text-xs text-gray-400 mt-1 max-w-md mx-auto">
+                  {currentVersion.release_notes}
+                </p>
+              )}
+            </>
           )}
         </div>
       </div>
