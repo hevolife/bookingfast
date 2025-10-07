@@ -63,21 +63,34 @@ export function usePlugins() {
         return;
       }
 
-      const { data, error } = await supabase.rpc('get_member_accessible_plugins', {
-        p_user_id: user.id
-      });
+      // Récupérer directement les abonnements actifs
+      const { data, error } = await supabase
+        .from('plugin_subscriptions')
+        .select(`
+          plugin_id,
+          activated_features,
+          plugin:plugins(
+            id,
+            name,
+            slug,
+            icon,
+            category
+          )
+        `)
+        .eq('user_id', user.id)
+        .in('status', ['active', 'trial']);
 
       if (error) throw error;
 
       const formattedPlugins: UserPlugin[] = (data || [])
-        .filter((p: any) => p.can_access)
-        .map((p: any) => ({
-          plugin_id: p.plugin_id,
-          plugin_name: p.plugin_name,
-          plugin_slug: p.plugin_slug,
-          plugin_icon: p.plugin_icon,
-          plugin_category: p.plugin_category,
-          activated_features: [],
+        .filter((sub: any) => sub.plugin)
+        .map((sub: any) => ({
+          plugin_id: sub.plugin.id,
+          plugin_name: sub.plugin.name,
+          plugin_slug: sub.plugin.slug,
+          plugin_icon: sub.plugin.icon,
+          plugin_category: sub.plugin.category,
+          activated_features: sub.activated_features || [],
           settings: {}
         }));
 
@@ -92,13 +105,25 @@ export function usePlugins() {
     if (!supabase || !user) return false;
 
     try {
-      const { data, error } = await supabase.rpc('check_plugin_access', {
-        p_user_id: user.id,
-        p_plugin_slug: pluginSlug
-      });
+      const { data, error } = await supabase
+        .from('plugin_subscriptions')
+        .select('status, current_period_end')
+        .eq('user_id', user.id)
+        .eq('plugin_id', pluginSlug)
+        .in('status', ['active', 'trial'])
+        .maybeSingle();
 
       if (error) throw error;
-      return data === true;
+      
+      if (!data) return false;
+      
+      // Vérifier si la période n'est pas expirée
+      if (data.current_period_end) {
+        const endDate = new Date(data.current_period_end);
+        if (endDate < new Date()) return false;
+      }
+      
+      return true;
     } catch (err) {
       console.error('❌ Erreur vérification accès plugin:', err);
       return false;
