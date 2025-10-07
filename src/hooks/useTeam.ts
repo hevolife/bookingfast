@@ -26,11 +26,46 @@ export function useTeam() {
   const [error, setError] = useState<string | null>(null);
 
   useEffect(() => {
+    let mounted = true;
+    let timeoutId: NodeJS.Timeout;
+    
+    const loadTeamData = async () => {
+      if (!mounted || !user) {
+        setLoading(false);
+        return;
+      }
+
+      console.log('🔄 Chargement données équipe pour:', user.email);
+      
+      // Timeout de sécurité
+      timeoutId = setTimeout(() => {
+        if (mounted) {
+          console.warn('⏰ Timeout chargement équipe - utilisation valeurs par défaut');
+          setIsOwner(true);
+          setOwnerId(user.id);
+          setUserPermissions(['*']);
+          setTeamMembers([]);
+          setLoading(false);
+        }
+      }, 10000);
+
+      await checkOwnerStatus();
+      await fetchTeamData();
+      
+      clearTimeout(timeoutId);
+    };
+
     if (user) {
-      checkOwnerStatus();
-      fetchTeamData();
+      loadTeamData();
+    } else {
+      setLoading(false);
     }
-  }, [user]);
+    
+    return () => {
+      mounted = false;
+      if (timeoutId) clearTimeout(timeoutId);
+    };
+  }, [user?.id]);
 
   const checkOwnerStatus = async () => {
     if (!supabase || !user) {
@@ -52,9 +87,11 @@ export function useTeam() {
       }
 
       if (memberData) {
+        console.log('👥 Utilisateur est membre d\'équipe');
         setIsOwner(false);
         setOwnerId(memberData.owner_id);
       } else {
+        console.log('👑 Utilisateur est propriétaire');
         setIsOwner(true);
         setOwnerId(user.id);
       }
@@ -68,7 +105,7 @@ export function useTeam() {
   const fetchTeamData = async () => {
     if (!supabase || !user) {
       setTeamMembers([]);
-      setUserPermissions([]);
+      setUserPermissions(['*']);
       setLoading(false);
       return;
     }
@@ -88,6 +125,7 @@ export function useTeam() {
       }
 
       if (memberData) {
+        console.log('✅ Permissions membre chargées:', memberData.permissions?.length || 0);
         setIsOwner(false);
         setOwnerId(memberData.owner_id);
         setUserPermissions(memberData.permissions || []);
@@ -102,6 +140,7 @@ export function useTeam() {
         if (teamError) throw teamError;
         setTeamMembers(teamData || []);
       } else {
+        console.log('✅ Propriétaire - permissions complètes');
         setIsOwner(true);
         setOwnerId(user.id);
         setUserPermissions(['*']);
@@ -113,14 +152,16 @@ export function useTeam() {
           .eq('is_active', true)
           .order('email');
 
-        if (teamError) throw teamError;
+        if (teamError && teamError.code !== 'PGRST116') {
+          throw teamError;
+        }
         setTeamMembers(teamData || []);
       }
     } catch (err) {
       console.error('Erreur chargement données équipe:', err);
       setError(err instanceof Error ? err.message : 'Erreur de chargement');
       setTeamMembers([]);
-      setUserPermissions([]);
+      setUserPermissions(['*']);
     } finally {
       setLoading(false);
     }
@@ -236,7 +277,6 @@ export function useTeam() {
     try {
       console.log('📧 Création invitation pour:', memberData.email);
 
-      // Vérifier si l'utilisateur existe
       const { data: existingUser, error: userError } = await supabase
         .from('users')
         .select('id, email')
@@ -251,7 +291,6 @@ export function useTeam() {
         throw new Error('Cet utilisateur n\'a pas de compte BookingFast. Il doit d\'abord créer un compte.');
       }
 
-      // Vérifier si déjà membre
       const { data: existingMember, error: memberCheckError } = await supabase
         .from('team_members')
         .select('id')
@@ -263,7 +302,6 @@ export function useTeam() {
         throw new Error('Cet utilisateur est déjà membre de votre équipe');
       }
 
-      // Vérifier si invitation en attente
       const { data: existingInvitation, error: invitationCheckError } = await supabase
         .from('team_invitations')
         .select('id')
@@ -276,9 +314,8 @@ export function useTeam() {
         throw new Error('Une invitation est déjà en attente pour cet utilisateur');
       }
 
-      // Créer l'invitation
       const expiresAt = new Date();
-      expiresAt.setDate(expiresAt.getDate() + 7); // Expire dans 7 jours
+      expiresAt.setDate(expiresAt.getDate() + 7);
 
       const { data: invitation, error: invitationError } = await supabase
         .from('team_invitations')

@@ -54,8 +54,12 @@ export function useBookings() {
         .order('date', { ascending: true })
         .order('time', { ascending: true });
 
-      if (error) throw error;
+      if (error) {
+        console.error('❌ Erreur chargement bookings:', error);
+        throw error;
+      }
 
+      console.log('✅ Bookings chargés:', data?.length || 0);
       setBookings(data || []);
     } catch (err) {
       console.error('Erreur lors du chargement des réservations:', err);
@@ -222,20 +226,37 @@ export function useBookings() {
 
   useEffect(() => {
     let mounted = true;
+    let timeoutId: NodeJS.Timeout;
     
     const loadBookings = async () => {
       if (mounted && user) {
+        console.log('🔄 Chargement bookings pour:', user.email);
         setLoading(true);
+        
+        // Timeout de sécurité
+        timeoutId = setTimeout(() => {
+          if (mounted) {
+            console.warn('⏰ Timeout chargement bookings');
+            setLoading(false);
+            setBookings([]);
+          }
+        }, 10000);
+        
         await fetchBookings();
+        clearTimeout(timeoutId);
       }
     };
     
     if (user) {
       loadBookings();
+    } else {
+      setLoading(false);
+      setBookings([]);
     }
     
     return () => {
       mounted = false;
+      if (timeoutId) clearTimeout(timeoutId);
     };
   }, [user?.id]);
 
