@@ -59,7 +59,6 @@ export function BookingModal({
   const [saving, setSaving] = useState(false);
   const [showDeleteConfirm, setShowDeleteConfirm] = useState(false);
   const [bookingStatus, setBookingStatus] = useState<'pending' | 'confirmed' | 'cancelled'>('pending');
-  const [isDatePickerOpen, setIsDatePickerOpen] = useState(false);
   const [assignedUserId, setAssignedUserId] = useState<string | null>(null);
   const [notes, setNotes] = useState('');
 
@@ -533,8 +532,6 @@ export function BookingModal({
                   value={date}
                   onChange={setDate}
                   required
-                  isOpen={isDatePickerOpen}
-                  onOpenChange={setIsDatePickerOpen}
                 />
 
                 <TimeSlotPicker
@@ -545,22 +542,6 @@ export function BookingModal({
                   serviceDuration={isCustomService ? customServiceData.duration : selectedService?.duration_minutes || 60}
                 />
               </div>
-
-              {isDatePickerOpen && (
-                <div className="w-full">
-                  <DatePicker
-                    value={date}
-                    onChange={(newDate) => {
-                      setDate(newDate);
-                      setIsDatePickerOpen(false);
-                    }}
-                    required
-                    isOpen={true}
-                    onOpenChange={setIsDatePickerOpen}
-                    showInline={true}
-                  />
-                </div>
-              )}
 
               {(selectedService || (isCustomService && customServiceData.name && customServiceData.price > 0)) && (
                 <ParticipantSelector

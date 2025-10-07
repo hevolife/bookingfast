@@ -24,7 +24,7 @@ export function CalendarPage({ view = 'calendar' }: CalendarPageProps) {
   const [selectedTeamMember, setSelectedTeamMember] = useState<string>('all');
   
   const { bookings, loading, addBooking, updateBooking, deleteBooking, refetch } = useBookings();
-  const { hasPermission, canEditBooking, canDeleteBooking, getUsageLimits, isOwner, loading: teamLoading } = useTeam();
+  const { hasPermission, canEditBooking, canDeleteBooking, getUsageLimits, isOwner } = useTeam();
   const { teamMembers, loading: membersLoading } = useTeamMembers();
   const { hasPluginAccess } = usePlugins();
 
@@ -46,10 +46,8 @@ export function CalendarPage({ view = 'calendar' }: CalendarPageProps) {
       }
     };
 
-    if (!teamLoading) {
-      checkAccess();
-    }
-  }, [hasPluginAccess, isOwner, hasPermission, teamLoading]);
+    checkAccess();
+  }, [hasPluginAccess, isOwner, hasPermission]);
 
   const usageLimits = getUsageLimits();
   const todayBookingsCount = bookings.filter(b => 
@@ -126,19 +124,12 @@ export function CalendarPage({ view = 'calendar' }: CalendarPageProps) {
     return member.email || 'Membre sans nom';
   };
 
+  // Afficher le filtre uniquement si :
+  // 1. L'utilisateur a la permission
+  // 2. Le plugin multi-user est actif
+  // 3. Il y a des membres dans l'équipe
+  // 4. On est sur la vue calendrier
   const shouldShowTeamFilter = canViewTeamFilter && isMultiUserActive && teamMembers.length > 0 && view === 'calendar';
-
-  // Afficher un loader si les données critiques sont en cours de chargement
-  if (loading || teamLoading) {
-    return (
-      <div className="h-full flex items-center justify-center">
-        <div className="text-center">
-          <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-purple-600 mx-auto mb-4"></div>
-          <p className="text-gray-600">Chargement...</p>
-        </div>
-      </div>
-    );
-  }
 
   return (
     <div 

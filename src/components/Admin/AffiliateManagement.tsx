@@ -2,7 +2,7 @@ import React, { useState, useEffect } from 'react';
 import { supabase } from '../../lib/supabase';
 import { useAuth } from '../../contexts/AuthContext';
 import { useAffiliate } from '../../hooks/useAffiliate';
-import { Users, DollarSign, TrendingUp, Copy, Check } from 'lucide-react';
+import { Users, DollarSign, TrendingUp, Copy, Check, Settings } from 'lucide-react';
 
 interface AffiliateStats {
   totalReferrals: number;
@@ -13,7 +13,7 @@ interface AffiliateStats {
 
 export function AffiliateManagement() {
   const { user, isAuthenticated } = useAuth();
-  const { affiliateData, loading: affiliateLoading, createAffiliateAccount, isAffiliate } = useAffiliate();
+  const { affiliateData, loading: affiliateLoading, createAffiliateAccount, updateCommissionRate, isAffiliate } = useAffiliate();
   const [stats, setStats] = useState<AffiliateStats>({
     totalReferrals: 0,
     activeSubscriptions: 0,
@@ -22,6 +22,8 @@ export function AffiliateManagement() {
   });
   const [copied, setCopied] = useState(false);
   const [loading, setLoading] = useState(true);
+  const [showSettings, setShowSettings] = useState(false);
+  const [newCommissionRate, setNewCommissionRate] = useState<number>(20);
 
   useEffect(() => {
     if (!supabase || !user || !isAffiliate) {
@@ -54,6 +56,12 @@ export function AffiliateManagement() {
     fetchStats();
   }, [user, isAffiliate, affiliateData]);
 
+  useEffect(() => {
+    if (affiliateData) {
+      setNewCommissionRate(affiliateData.commission_rate);
+    }
+  }, [affiliateData]);
+
   const handleCreateAccount = async () => {
     if (!isAuthenticated) {
       alert('Vous devez être connecté pour créer un compte affilié');
@@ -62,9 +70,21 @@ export function AffiliateManagement() {
 
     try {
       await createAffiliateAccount();
+      alert('Compte affilié créé avec succès !');
     } catch (error) {
       console.error('Erreur lors de la création du compte affilié:', error);
-      alert('Erreur lors de la création du compte affilié');
+      alert('Erreur lors de la création du compte affilié. Veuillez réessayer.');
+    }
+  };
+
+  const handleUpdateCommissionRate = async () => {
+    try {
+      await updateCommissionRate(newCommissionRate);
+      alert('Taux de commission mis à jour avec succès !');
+      setShowSettings(false);
+    } catch (error) {
+      console.error('Erreur lors de la mise à jour du taux:', error);
+      alert('Erreur lors de la mise à jour du taux de commission.');
     }
   };
 
@@ -111,7 +131,44 @@ export function AffiliateManagement() {
   return (
     <div className="space-y-6">
       <div className="bg-white rounded-lg shadow-md p-6">
-        <h2 className="text-2xl font-bold mb-4">Tableau de Bord Affilié</h2>
+        <div className="flex items-center justify-between mb-4">
+          <h2 className="text-2xl font-bold">Tableau de Bord Affilié</h2>
+          <button
+            onClick={() => setShowSettings(!showSettings)}
+            className="p-2 hover:bg-gray-100 rounded-lg transition-colors"
+            title="Paramètres"
+          >
+            <Settings className="w-5 h-5 text-gray-600" />
+          </button>
+        </div>
+
+        {showSettings && (
+          <div className="mb-6 p-4 bg-gray-50 rounded-lg">
+            <h3 className="font-semibold mb-3">Paramètres de Commission</h3>
+            <div className="flex items-center gap-4">
+              <div className="flex-1">
+                <label className="block text-sm font-medium text-gray-700 mb-2">
+                  Taux de Commission (%)
+                </label>
+                <input
+                  type="number"
+                  min="0"
+                  max="100"
+                  step="0.01"
+                  value={newCommissionRate}
+                  onChange={(e) => setNewCommissionRate(parseFloat(e.target.value))}
+                  className="w-full px-4 py-2 border border-gray-300 rounded-lg"
+                />
+              </div>
+              <button
+                onClick={handleUpdateCommissionRate}
+                className="mt-6 px-4 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700"
+              >
+                Mettre à jour
+              </button>
+            </div>
+          </div>
+        )}
         
         <div className="mb-6">
           <label className="block text-sm font-medium text-gray-700 mb-2">
@@ -132,6 +189,9 @@ export function AffiliateManagement() {
               {copied ? 'Copié!' : 'Copier'}
             </button>
           </div>
+          <p className="mt-2 text-sm text-gray-600">
+            Taux de commission actuel: <span className="font-semibold">{affiliateData?.commission_rate}%</span>
+          </p>
         </div>
 
         <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4">

@@ -55,17 +55,24 @@ export function DatePicker({ value, onChange, disabled, required, isOpen: extern
 
   // Fermer le dropdown quand on clique en dehors
   useEffect(() => {
-    if (showInline) return; // Ne pas fermer si en mode inline
+    if (showInline) return;
     
     const handleClickOutside = (event: MouseEvent) => {
-      if (dropdownRef.current && !dropdownRef.current.contains(event.target as Node)) {
+      if (
+        dropdownRef.current && 
+        !dropdownRef.current.contains(event.target as Node) &&
+        buttonRef.current &&
+        !buttonRef.current.contains(event.target as Node)
+      ) {
         setIsOpen(false);
       }
     };
 
-    document.addEventListener('mousedown', handleClickOutside);
-    return () => document.removeEventListener('mousedown', handleClickOutside);
-  }, [showInline]);
+    if (isOpen) {
+      document.addEventListener('mousedown', handleClickOutside);
+      return () => document.removeEventListener('mousedown', handleClickOutside);
+    }
+  }, [isOpen, showInline]);
 
   const formatDisplayDate = (dateString: string) => {
     if (!dateString) return '';
@@ -83,24 +90,21 @@ export function DatePicker({ value, onChange, disabled, required, isOpen: extern
     const firstDay = new Date(year, month, 1);
     const lastDay = new Date(year, month + 1, 0);
     const daysInMonth = lastDay.getDate();
-    const startingDayOfWeek = (firstDay.getDay() + 6) % 7; // Lundi = 0
+    const startingDayOfWeek = (firstDay.getDay() + 6) % 7;
 
     const days = [];
     
-    // Jours du mois précédent
     for (let i = startingDayOfWeek - 1; i >= 0; i--) {
       const day = new Date(year, month, -i);
       days.push({ date: day, isCurrentMonth: false });
     }
     
-    // Jours du mois actuel
     for (let day = 1; day <= daysInMonth; day++) {
       const dayDate = new Date(year, month, day);
       days.push({ date: dayDate, isCurrentMonth: true });
     }
     
-    // Jours du mois suivant pour compléter la grille
-    const remainingDays = 42 - days.length; // 6 semaines × 7 jours
+    const remainingDays = 42 - days.length;
     for (let day = 1; day <= remainingDays; day++) {
       const dayDate = new Date(year, month + 1, day);
       days.push({ date: dayDate, isCurrentMonth: false });
@@ -109,21 +113,39 @@ export function DatePicker({ value, onChange, disabled, required, isOpen: extern
     return days;
   };
 
-  const handleDateSelect = (date: Date) => {
+  const handleDateSelect = (date: Date, e: React.MouseEvent) => {
+    // Empêcher TOUS les comportements par défaut
+    e.preventDefault();
+    e.stopPropagation();
+    e.nativeEvent.stopImmediatePropagation();
+    
     // Utiliser la date locale pour éviter les décalages de fuseau horaire
     const year = date.getFullYear();
     const month = (date.getMonth() + 1).toString().padStart(2, '0');
     const day = date.getDate().toString().padStart(2, '0');
     const dateString = `${year}-${month}-${day}`;
     
-    onChange(dateString);
+    console.log('📅 Date sélectionnée:', dateString);
+    
+    // Mettre à jour l'état local immédiatement
     setSelectedDate(date);
+    
+    // Appeler onChange avec la nouvelle date
+    onChange(dateString);
+    
+    // Fermer le dropdown seulement si pas en mode inline
     if (!showInline) {
-      setIsOpen(false);
+      // Délai plus long pour s'assurer que tout est traité
+      requestAnimationFrame(() => {
+        setIsOpen(false);
+      });
     }
   };
 
-  const navigateMonth = (direction: 'prev' | 'next') => {
+  const navigateMonth = (direction: 'prev' | 'next', e: React.MouseEvent) => {
+    e.preventDefault();
+    e.stopPropagation();
+    
     setCurrentMonth(prev => {
       const newMonth = new Date(prev);
       if (direction === 'prev') {
@@ -135,22 +157,24 @@ export function DatePicker({ value, onChange, disabled, required, isOpen: extern
     });
   };
 
-  const goToToday = () => {
+  const goToToday = (e: React.MouseEvent) => {
+    e.preventDefault();
+    e.stopPropagation();
+    
     if (settings) {
       const { date: nextAvailableDate } = getNextAvailableDateTime(settings);
       const nextAvailable = new Date(nextAvailableDate);
       setCurrentMonth(nextAvailable);
-      handleDateSelect(nextAvailable);
+      handleDateSelect(nextAvailable, e);
     } else {
       const timezone = getBusinessTimezone(settings);
       const todayString = getCurrentDateInTimezone(timezone);
       const today = new Date(todayString);
       setCurrentMonth(today);
-      handleDateSelect(today);
+      handleDateSelect(today, e);
     }
   };
 
-  // Fonction pour centrer sur la date actuelle sans la sélectionner
   const centerOnToday = () => {
     if (settings) {
       const { date: nextAvailableDate } = getNextAvailableDateTime(settings);
@@ -164,14 +188,12 @@ export function DatePicker({ value, onChange, disabled, required, isOpen: extern
     }
   };
 
-  // Centrer sur la date actuelle quand le composant se réinitialise
   useEffect(() => {
     if (!value) {
       centerOnToday();
     }
   }, [value, settings]);
 
-  // Écouter l'événement de reset pour recentrer le calendrier
   useEffect(() => {
     const handleReset = () => {
       centerOnToday();
@@ -182,7 +204,6 @@ export function DatePicker({ value, onChange, disabled, required, isOpen: extern
   }, [settings]);
 
   const isToday = (date: Date) => {
-    // Utiliser la date locale réelle
     const now = new Date();
     const today = new Date(now.getFullYear(), now.getMonth(), now.getDate());
     const compareDate = new Date(date.getFullYear(), date.getMonth(), date.getDate());
@@ -195,29 +216,26 @@ export function DatePicker({ value, onChange, disabled, required, isOpen: extern
   };
 
   const isPastDate = (date: Date) => {
-    // Désactiver complètement le blocage des dates passées
     return false;
   };
 
   const days = getDaysInMonth();
   const weekDays = ['Lun', 'Mar', 'Mer', 'Jeu', 'Ven', 'Sam', 'Dim'];
 
-  // Si en mode inline, afficher uniquement le calendrier
   if (showInline) {
     return (
       <div className="w-full bg-white border-2 border-gray-200 rounded-3xl shadow-2xl overflow-hidden">
-        {/* Header du calendrier */}
-        <div className="bg-gradient-to-r from-blue-600 to-purple-600 p-3 sm:p-4 text-white">
-          <div className="flex items-center justify-between mb-2 sm:mb-3">
+        <div className="bg-gradient-to-r from-blue-600 to-purple-600 p-4 sm:p-5 text-white">
+          <div className="flex items-center justify-between mb-3 sm:mb-4">
             <button
               type="button"
-              onClick={() => navigateMonth('prev')}
-              className="p-1.5 sm:p-2 hover:bg-white/20 rounded-xl transition-colors"
+              onClick={(e) => navigateMonth('prev', e)}
+              className="p-2 sm:p-2.5 hover:bg-white/20 rounded-xl transition-colors"
             >
-              <ChevronLeft className="w-4 h-4 sm:w-5 sm:h-5" />
+              <ChevronLeft className="w-5 h-5 sm:w-6 sm:h-6" />
             </button>
             
-            <h3 className="text-sm sm:text-lg font-bold">
+            <h3 className="text-base sm:text-xl font-bold">
               {currentMonth.toLocaleDateString('fr-FR', { 
                 month: 'long', 
                 year: 'numeric' 
@@ -226,33 +244,31 @@ export function DatePicker({ value, onChange, disabled, required, isOpen: extern
             
             <button
               type="button"
-              onClick={() => navigateMonth('next')}
-              className="p-1.5 sm:p-2 hover:bg-white/20 rounded-xl transition-colors"
+              onClick={(e) => navigateMonth('next', e)}
+              className="p-2 sm:p-2.5 hover:bg-white/20 rounded-xl transition-colors"
             >
-              <ChevronRight className="w-4 h-4 sm:w-5 sm:h-5" />
+              <ChevronRight className="w-5 h-5 sm:w-6 sm:h-6" />
             </button>
           </div>
           
           <button
             type="button"
             onClick={goToToday}
-            className="w-full bg-white/20 hover:bg-white/30 text-white px-2 sm:px-3 py-1.5 sm:py-2 rounded-xl transition-colors font-medium text-xs sm:text-sm"
+            className="w-full bg-white/20 hover:bg-white/30 text-white px-3 sm:px-4 py-2 sm:py-2.5 rounded-xl transition-colors font-medium text-sm sm:text-base"
           >
             {settings && settings.minimum_booking_delay_hours > 0 ? 'Prochaine date disponible' : 'Aujourd\'hui'}
           </button>
         </div>
 
-        {/* Jours de la semaine */}
         <div className="grid grid-cols-7 bg-gray-50 border-b border-gray-200">
           {weekDays.map(day => (
-            <div key={day} className="py-2 text-center text-[10px] sm:text-xs font-medium text-gray-600">
+            <div key={day} className="py-2.5 sm:py-3 text-center text-xs sm:text-sm font-medium text-gray-600">
               {day}
             </div>
           ))}
         </div>
 
-        {/* Grille des jours */}
-        <div className="grid grid-cols-7 gap-1 p-2 sm:p-3">
+        <div className="grid grid-cols-7 gap-1.5 sm:gap-2 p-3 sm:p-4">
           {days.map((day, index) => {
             const isCurrentMonth = day.isCurrentMonth;
             const isTodayDate = isToday(day.date);
@@ -263,9 +279,9 @@ export function DatePicker({ value, onChange, disabled, required, isOpen: extern
               <button
                 key={index}
                 type="button"
-                onClick={() => handleDateSelect(day.date)}
+                onClick={(e) => handleDateSelect(day.date, e)}
                 disabled={!isCurrentMonth}
-                className={`h-8 sm:h-10 rounded-xl text-xs sm:text-sm font-medium transition-all duration-300 transform hover:scale-110 ${
+                className={`h-10 sm:h-12 rounded-xl text-sm sm:text-base font-medium transition-all duration-300 transform hover:scale-110 ${
                   isSelectedDate
                     ? 'bg-gradient-to-r from-blue-500 to-purple-500 text-white shadow-lg'
                     : isTodayDate
@@ -288,7 +304,7 @@ export function DatePicker({ value, onChange, disabled, required, isOpen: extern
   }
 
   return (
-    <div ref={dropdownRef} className="relative">
+    <div className="relative">
       <label className="block text-sm font-medium text-gray-700 mb-2">
         Date {required && '*'}
       </label>
@@ -296,7 +312,13 @@ export function DatePicker({ value, onChange, disabled, required, isOpen: extern
       <button
         ref={buttonRef}
         type="button"
-        onClick={() => !disabled && setIsOpen(!isOpen)}
+        onClick={(e) => {
+          e.preventDefault();
+          e.stopPropagation();
+          if (!disabled) {
+            setIsOpen(!isOpen);
+          }
+        }}
         disabled={disabled}
         className={`w-full flex items-center justify-between p-3 sm:p-4 border-2 rounded-2xl transition-all duration-300 text-left ${
           disabled 
@@ -322,6 +344,97 @@ export function DatePicker({ value, onChange, disabled, required, isOpen: extern
           isOpen ? 'rotate-180' : ''
         }`} />
       </button>
+
+      {isOpen && (
+        <div 
+          ref={dropdownRef}
+          className="absolute z-50 mt-2 w-[340px] sm:w-[380px] bg-white border-2 border-gray-200 rounded-3xl shadow-2xl overflow-hidden"
+          onMouseDown={(e) => {
+            // Empêcher la fermeture lors du clic dans le calendrier
+            e.stopPropagation();
+          }}
+        >
+          <div className="bg-gradient-to-r from-blue-600 to-purple-600 p-4 sm:p-5 text-white">
+            <div className="flex items-center justify-between mb-3 sm:mb-4">
+              <button
+                type="button"
+                onClick={(e) => navigateMonth('prev', e)}
+                className="p-2 sm:p-2.5 hover:bg-white/20 rounded-xl transition-colors"
+              >
+                <ChevronLeft className="w-5 h-5 sm:w-6 sm:h-6" />
+              </button>
+              
+              <h3 className="text-base sm:text-xl font-bold">
+                {currentMonth.toLocaleDateString('fr-FR', { 
+                  month: 'long', 
+                  year: 'numeric' 
+                })}
+              </h3>
+              
+              <button
+                type="button"
+                onClick={(e) => navigateMonth('next', e)}
+                className="p-2 sm:p-2.5 hover:bg-white/20 rounded-xl transition-colors"
+              >
+                <ChevronRight className="w-5 h-5 sm:w-6 sm:h-6" />
+              </button>
+            </div>
+            
+            <button
+              type="button"
+              onClick={goToToday}
+              className="w-full bg-white/20 hover:bg-white/30 text-white px-3 sm:px-4 py-2 sm:py-2.5 rounded-xl transition-colors font-medium text-sm sm:text-base"
+            >
+              {settings && settings.minimum_booking_delay_hours > 0 ? 'Prochaine date disponible' : 'Aujourd\'hui'}
+            </button>
+          </div>
+
+          <div className="grid grid-cols-7 bg-gray-50 border-b border-gray-200">
+            {weekDays.map(day => (
+              <div key={day} className="py-2.5 sm:py-3 text-center text-xs sm:text-sm font-medium text-gray-600">
+                {day}
+              </div>
+            ))}
+          </div>
+
+          <div className="grid grid-cols-7 gap-1.5 sm:gap-2 p-3 sm:p-4">
+            {days.map((day, index) => {
+              const isCurrentMonth = day.isCurrentMonth;
+              const isTodayDate = isToday(day.date);
+              const isSelectedDate = isSelected(day.date);
+              const isNotAvailable = isPastDate(day.date);
+              
+              return (
+                <button
+                  key={index}
+                  type="button"
+                  onMouseDown={(e) => {
+                    // Utiliser onMouseDown au lieu de onClick pour capturer l'événement avant
+                    if (isCurrentMonth) {
+                      handleDateSelect(day.date, e);
+                    }
+                  }}
+                  disabled={!isCurrentMonth}
+                  className={`h-10 sm:h-12 rounded-xl text-sm sm:text-base font-medium transition-all duration-300 transform hover:scale-110 ${
+                    isSelectedDate
+                      ? 'bg-gradient-to-r from-blue-500 to-purple-500 text-white shadow-lg'
+                      : isTodayDate
+                      ? 'bg-gradient-to-r from-green-500 to-emerald-500 text-white'
+                      : isCurrentMonth
+                      ? isNotAvailable
+                        ? 'bg-gray-100 text-gray-400 hover:bg-gray-200'
+                        : 'bg-gray-50 text-gray-700 hover:bg-blue-50 hover:text-blue-600'
+                      : 'bg-transparent text-gray-300 cursor-not-allowed'
+                  }`}
+                  title={isNotAvailable && settings ? `Délai minimum: ${settings.minimum_booking_delay_hours}h` : ''}
+                >
+                  {day.date.getDate()}
+                </button>
+              );
+            })}
+          </div>
+        </div>
+      )}
     </div>
   );
 }

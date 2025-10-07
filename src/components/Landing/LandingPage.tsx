@@ -21,21 +21,25 @@ import {
   Sparkles,
   Settings
 } from 'lucide-react';
-import { useNavigate } from 'react-router-dom';
+import { useNavigate, useLocation } from 'react-router-dom';
 import { isPWA } from '../../utils/pwaDetection';
 
 export function LandingPage() {
   const navigate = useNavigate();
+  const location = useLocation();
   const [currentFeature, setCurrentFeature] = useState(0);
   const [isVisible, setIsVisible] = useState(false);
 
-  // Rediriger vers login si en mode PWA
+  // Rediriger vers login si en mode PWA - MAIS PAS si on vient d'une route de réservation
   useEffect(() => {
-    if (isPWA()) {
+    // Ne pas rediriger si on est sur une route de réservation publique
+    const isBookingRoute = location.pathname.startsWith('/booking/');
+    
+    if (isPWA() && !isBookingRoute) {
       console.log('🚫 Landing page - PWA détecté, redirection vers /login');
       navigate('/login', { replace: true });
     }
-  }, [navigate]);
+  }, [navigate, location.pathname]);
 
   const features = [
     {
