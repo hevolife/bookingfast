@@ -18,17 +18,21 @@ export function PluginGuard({ pluginSlug, children }: PluginGuardProps) {
 
     const verifyAccess = async () => {
       try {
+        setLoading(true);
         console.log(`🔒 PluginGuard - Vérification accès: ${pluginSlug}`);
         const access = await checkPluginAccess(pluginSlug);
         console.log(`🔒 PluginGuard - Résultat: ${access}`);
+        
         if (mounted) {
           setHasAccess(access);
-          setLoading(false);
         }
       } catch (error) {
         console.error('❌ Erreur vérification accès plugin:', error);
         if (mounted) {
           setHasAccess(false);
+        }
+      } finally {
+        if (mounted) {
           setLoading(false);
         }
       }
@@ -50,7 +54,7 @@ export function PluginGuard({ pluginSlug, children }: PluginGuardProps) {
     );
   }
 
-  if (!hasAccess) {
+  if (hasAccess === false) {
     return (
       <div className="min-h-screen bg-gradient-to-br from-purple-50 via-pink-50 to-red-50 flex items-center justify-center p-4">
         <div className="max-w-2xl w-full bg-white rounded-3xl shadow-2xl overflow-hidden">
@@ -75,7 +79,7 @@ export function PluginGuard({ pluginSlug, children }: PluginGuardProps) {
                     Plugin non activé
                   </h3>
                   <p className="text-gray-600">
-                    Ce plugin n'est pas activé sur votre compte. Rendez-vous dans la marketplace pour l'activer.
+                    Ce plugin n'est pas activé sur votre compte. Contactez le propriétaire du compte pour obtenir l'accès.
                   </p>
                   <p className="text-sm text-gray-500 mt-2">
                     Plugin: <code className="bg-gray-100 px-2 py-1 rounded">{pluginSlug}</code>

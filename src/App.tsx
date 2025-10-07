@@ -3,6 +3,7 @@ import { TeamProvider } from './contexts/TeamContext';
 import { Navbar } from './components/Layout/Navbar';
 import { LoadingSpinner } from './components/UI/LoadingSpinner';
 import { GoogleCalendarCallback } from './components/Admin/GoogleCalendarCallback';
+import { PluginGuard } from './components/Plugins/PluginGuard';
 
 // Lazy load pages for better code splitting
 const DashboardPage = lazy(() => import('./components/Dashboard/DashboardPage').then(m => ({ default: m.DashboardPage })));
@@ -15,7 +16,6 @@ const ReportsPage = lazy(() => import('./components/Reports/ReportsPage').then(m
 const MultiUserSettingsPage = lazy(() => import('./components/MultiUser/MultiUserSettingsPage').then(m => ({ default: m.MultiUserSettingsPage })));
 const POSPage = lazy(() => import('./components/POS/POSPage').then(m => ({ default: m.POSPage })));
 const PluginsPage = lazy(() => import('./components/Plugins/PluginsPage').then(m => ({ default: m.PluginsPage })));
-const PluginGuard = lazy(() => import('./components/Plugins/PluginGuard').then(m => ({ default: m.PluginGuard })));
 
 type PageType = 'dashboard' | 'calendar' | 'bookings-list' | 'clients' | 'services' | 'emails' | 'admin' | 'reports' | 'multi-user' | 'pos' | 'plugins';
 

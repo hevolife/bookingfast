@@ -39,8 +39,9 @@ export function TeamProvider({ children }: { children: React.ReactNode }) {
 
     try {
       setLoading(true);
+      console.log('🔍 Récupération des membres pour:', user.id);
 
-      // CORRECTION : Utiliser owner_id au lieu de team_id et maybeSingle() pour gérer le cas où l'utilisateur n'existe pas
+      // Récupérer le membre actuel pour obtenir son owner_id et role
       const { data: currentMember, error: memberError } = await supabase
         .from('team_members')
         .select('owner_id, role_name')
@@ -69,21 +70,12 @@ export function TeamProvider({ children }: { children: React.ReactNode }) {
       };
       
       setCurrentUserRole(roleMap[currentMember.role_name] || 'member');
+      console.log('✅ Rôle utilisateur:', roleMap[currentMember.role_name]);
 
-      // CORRECTION : Utiliser owner_id au lieu de team_id
+      // Récupérer tous les membres de l'équipe
       const { data: members, error: membersError } = await supabase
         .from('team_members')
-        .select(`
-          id,
-          user_id,
-          owner_id,
-          role_name,
-          created_at,
-          profiles:user_id (
-            full_name,
-            email
-          )
-        `)
+        .select('*')
         .eq('owner_id', currentMember.owner_id)
         .order('created_at', { ascending: true });
 
@@ -92,16 +84,20 @@ export function TeamProvider({ children }: { children: React.ReactNode }) {
         throw membersError;
       }
 
+      console.log('✅ Membres récupérés:', members?.length || 0);
+
+      // Utiliser les données directement de team_members (qui contient déjà email et full_name)
       const formattedMembers = (members || []).map(member => ({
         id: member.id,
         user_id: member.user_id,
         owner_id: member.owner_id,
         role: roleMap[member.role_name] || 'member',
-        full_name: member.profiles?.full_name || 'Utilisateur',
-        email: member.profiles?.email || '',
+        full_name: member.full_name || member.firstname + ' ' + member.lastname || 'Utilisateur',
+        email: member.email || '',
         created_at: member.created_at
       }));
 
+      console.log('✅ Membres formatés:', formattedMembers.length);
       setTeamMembers(formattedMembers);
     } catch (error) {
       console.error('❌ Erreur chargement équipe:', error);

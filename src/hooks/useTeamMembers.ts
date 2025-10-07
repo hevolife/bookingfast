@@ -30,7 +30,7 @@ export function useTeamMembers() {
         setLoading(true);
         setError(null);
 
-        // CORRECTION : Utiliser maybeSingle() pour gérer le cas où l'utilisateur n'est pas dans team_members
+        // Récupérer le membre actuel pour obtenir son owner_id
         const { data: currentMember, error: memberError } = await supabase
           .from('team_members')
           .select('owner_id')
@@ -50,30 +50,29 @@ export function useTeamMembers() {
         // Récupérer tous les membres de la même équipe (même owner_id)
         const { data: members, error: membersError } = await supabase
           .from('team_members')
-          .select(`
-            id,
-            user_id,
-            role_name,
-            profiles:user_id (
-              full_name,
-              email,
-              firstname,
-              lastname
-            )
-          `)
+          .select('*')
           .eq('owner_id', currentMember.owner_id)
           .order('created_at', { ascending: true });
 
         if (membersError) throw membersError;
 
+        // Mapper role_name vers le type attendu
+        const roleMap: Record<string, 'owner' | 'admin' | 'member'> = {
+          'owner': 'owner',
+          'admin': 'admin',
+          'employee': 'member',
+          'member': 'member'
+        };
+
+        // Utiliser les données directement de team_members
         const formattedMembers: TeamMember[] = (members || []).map(member => ({
           id: member.id,
           user_id: member.user_id,
-          full_name: member.profiles?.full_name || 'Utilisateur',
-          email: member.profiles?.email || '',
-          firstname: member.profiles?.firstname,
-          lastname: member.profiles?.lastname,
-          role: member.role_name as 'owner' | 'admin' | 'member'
+          full_name: member.full_name || `${member.firstname || ''} ${member.lastname || ''}`.trim() || 'Utilisateur',
+          email: member.email || '',
+          firstname: member.firstname,
+          lastname: member.lastname,
+          role: roleMap[member.role_name] || 'member'
         }));
 
         setTeamMembers(formattedMembers);

@@ -63,7 +63,65 @@ export function usePlugins() {
         return;
       }
 
-      const { data, error } = await supabase
+      console.log('🔍 Chargement plugins pour utilisateur:', user.id);
+
+      // ÉTAPE 1 : Vérifier si l'utilisateur est propriétaire ou membre d'équipe
+      const { data: teamMember, error: teamError } = await supabase
+        .from('team_members')
+        .select('id, owner_id, role_name, is_active')
+        .eq('user_id', user.id)
+        .eq('is_active', true)
+        .maybeSingle();
+
+      if (teamError && teamError.code !== 'PGRST116') {
+        throw teamError;
+      }
+
+      // CAS 1 : Utilisateur est propriétaire (pas de team_member)
+      if (!teamMember) {
+        console.log('✅ Utilisateur propriétaire - accès complet aux plugins');
+        
+        const { data, error } = await supabase
+          .from('plugin_subscriptions')
+          .select(`
+            plugin_id,
+            activated_features,
+            plugin:plugins(
+              id,
+              name,
+              slug,
+              icon,
+              category
+            )
+          `)
+          .eq('user_id', user.id)
+          .in('status', ['active', 'trial']);
+
+        if (error) throw error;
+
+        const formattedPlugins: UserPlugin[] = (data || [])
+          .filter((sub: any) => sub.plugin)
+          .map((sub: any) => ({
+            plugin_id: sub.plugin.id,
+            plugin_name: sub.plugin.name,
+            plugin_slug: sub.plugin.slug,
+            plugin_icon: sub.plugin.icon,
+            plugin_category: sub.plugin.category,
+            activated_features: sub.activated_features || [],
+            settings: {}
+          }));
+
+        console.log('✅ Plugins propriétaire:', formattedPlugins);
+        setUserPlugins(formattedPlugins);
+        return;
+      }
+
+      // CAS 2 : Utilisateur est membre d'équipe
+      console.log('👤 Utilisateur membre d\'équipe:', teamMember.id);
+      console.log('👤 Propriétaire:', teamMember.owner_id);
+
+      // Récupérer les plugins du propriétaire
+      const { data: ownerPlugins, error: pluginsError } = await supabase
         .from('plugin_subscriptions')
         .select(`
           plugin_id,
@@ -76,12 +134,43 @@ export function usePlugins() {
             category
           )
         `)
-        .eq('user_id', user.id)
+        .eq('user_id', teamMember.owner_id)
         .in('status', ['active', 'trial']);
 
-      if (error) throw error;
+      if (pluginsError) throw pluginsError;
 
-      const formattedPlugins: UserPlugin[] = (data || [])
+      console.log('📦 Plugins du propriétaire:', ownerPlugins?.length || 0);
+
+      if (!ownerPlugins || ownerPlugins.length === 0) {
+        console.log('ℹ️ Aucun plugin actif pour le propriétaire');
+        setUserPlugins([]);
+        return;
+      }
+
+      // Récupérer les permissions du membre pour chaque plugin
+      const { data: permissions, error: permError } = await supabase
+        .from('team_member_plugin_permissions')
+        .select('plugin_id, can_access')
+        .eq('team_member_id', teamMember.id);
+
+      if (permError && permError.code !== 'PGRST116') {
+        throw permError;
+      }
+
+      console.log('🔐 Permissions trouvées:', permissions);
+
+      // Créer un Map des permissions
+      const permissionsMap = new Map(
+        (permissions || []).map(p => [p.plugin_id, p.can_access])
+      );
+
+      // Filtrer les plugins selon les permissions
+      const allowedPlugins: UserPlugin[] = ownerPlugins
+        .filter((sub: any) => {
+          const hasPermission = permissionsMap.get(sub.plugin_id);
+          console.log(`🔍 Plugin ${sub.plugin?.slug}: permission =`, hasPermission);
+          return hasPermission === true; // ✅ Seulement si explicitement autorisé
+        })
         .filter((sub: any) => sub.plugin)
         .map((sub: any) => ({
           plugin_id: sub.plugin.id,
@@ -93,7 +182,9 @@ export function usePlugins() {
           settings: {}
         }));
 
-      setUserPlugins(formattedPlugins);
+      console.log('✅ Plugins autorisés pour le membre:', allowedPlugins);
+      setUserPlugins(allowedPlugins);
+
     } catch (err) {
       console.error('❌ Erreur chargement plugins actifs:', err);
       setUserPlugins([]);
@@ -101,48 +192,110 @@ export function usePlugins() {
   };
 
   const hasPluginAccess = async (pluginSlug: string): Promise<boolean> => {
-    if (!supabase || !user) return false;
+    if (!user) {
+      console.log('❌ Pas d\'utilisateur connecté');
+      return false;
+    }
+
+    if (!supabase) {
+      console.log('✅ Mode démo - accès autorisé');
+      return true;
+    }
 
     try {
-      // ÉTAPE 1 : Récupérer l'UUID du plugin à partir du slug
+      console.log(`🔍 Vérification accès plugin: ${pluginSlug}`);
+
+      // Récupérer le plugin par son slug
       const { data: pluginData, error: pluginError } = await supabase
         .from('plugins')
         .select('id')
         .eq('slug', pluginSlug)
         .maybeSingle();
 
-      if (pluginError) {
-        console.error('❌ Erreur récupération plugin:', pluginError);
-        return false;
-      }
-
-      if (!pluginData) {
+      if (pluginError || !pluginData) {
         console.log('❌ Plugin non trouvé:', pluginSlug);
         return false;
       }
 
-      // ÉTAPE 2 : Vérifier l'abonnement avec l'UUID
-      const { data, error } = await supabase
+      console.log('📦 Plugin trouvé:', pluginData.id);
+
+      // Vérifier si l'utilisateur est propriétaire avec un abonnement actif
+      const { data: ownerSub, error: ownerSubError } = await supabase
         .from('plugin_subscriptions')
-        .select('status, current_period_end')
+        .select('id, status')
         .eq('user_id', user.id)
         .eq('plugin_id', pluginData.id)
         .in('status', ['active', 'trial'])
         .maybeSingle();
 
-      if (error) throw error;
-      
-      if (!data) return false;
-      
-      // Vérifier si la période n'est pas expirée
-      if (data.current_period_end) {
-        const endDate = new Date(data.current_period_end);
-        if (endDate < new Date()) return false;
+      if (ownerSubError && ownerSubError.code !== 'PGRST116') {
+        console.error('❌ Erreur vérification abonnement propriétaire:', ownerSubError);
       }
+
+      if (ownerSub) {
+        console.log('✅ Propriétaire avec abonnement actif');
+        return true;
+      }
+
+      // Vérifier si membre d'équipe
+      const { data: teamMember, error: teamError } = await supabase
+        .from('team_members')
+        .select('id, owner_id, is_active')
+        .eq('user_id', user.id)
+        .eq('is_active', true)
+        .maybeSingle();
+
+      if (teamError && teamError.code !== 'PGRST116') {
+        console.error('❌ Erreur vérification membre équipe:', teamError);
+        return false;
+      }
+
+      if (!teamMember) {
+        console.log('❌ Pas membre d\'équipe et pas d\'abonnement');
+        return false;
+      }
+
+      console.log('👤 Membre d\'équipe trouvé:', teamMember.id);
+
+      // Vérifier si le propriétaire a le plugin
+      const { data: ownerPlugin, error: ownerPluginError } = await supabase
+        .from('plugin_subscriptions')
+        .select('plugin_id, status')
+        .eq('user_id', teamMember.owner_id)
+        .eq('plugin_id', pluginData.id)
+        .in('status', ['active', 'trial'])
+        .maybeSingle();
+
+      if (ownerPluginError && ownerPluginError.code !== 'PGRST116') {
+        console.error('❌ Erreur vérification plugin propriétaire:', ownerPluginError);
+      }
+
+      if (!ownerPlugin) {
+        console.log('❌ Le propriétaire n\'a pas ce plugin');
+        return false;
+      }
+
+      console.log('✅ Le propriétaire a le plugin');
+
+      // Vérifier la permission du membre
+      const { data: permission, error: permError } = await supabase
+        .from('team_member_plugin_permissions')
+        .select('can_access')
+        .eq('team_member_id', teamMember.id)
+        .eq('plugin_id', pluginData.id)
+        .maybeSingle();
+
+      if (permError && permError.code !== 'PGRST116') {
+        console.error('❌ Erreur vérification permission:', permError);
+        return false;
+      }
+
+      const hasAccess = permission?.can_access || false;
+      console.log(`🔐 Permission finale: ${hasAccess}`);
       
-      return true;
-    } catch (err) {
-      console.error('❌ Erreur vérification accès plugin:', err);
+      return hasAccess;
+    } catch (error) {
+      console.error('❌ Erreur vérification accès:', error);
       return false;
     }
   };

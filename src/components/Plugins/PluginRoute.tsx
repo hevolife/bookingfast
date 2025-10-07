@@ -44,7 +44,7 @@ export function PluginRoute({ pluginSlug, children }: PluginRouteProps) {
     );
   }
 
-  if (!hasAccess) {
+  if (hasAccess === false) {
     return (
       <div className="min-h-screen bg-gradient-to-br from-purple-50 via-pink-50 to-red-50 flex items-center justify-center p-4">
         <div className="max-w-2xl w-full bg-white rounded-3xl shadow-2xl overflow-hidden">
