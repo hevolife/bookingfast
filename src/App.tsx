@@ -82,7 +82,7 @@ function App() {
 
   return (
     <TeamProvider>
-      <div className="flex flex-col h-screen overflow-hidden bg-gradient-to-br from-blue-50 via-purple-50 to-pink-50">
+      <div className="app-container flex flex-col h-screen overflow-hidden bg-gradient-to-br from-blue-50 via-purple-50 to-pink-50">
         <Navbar currentPage={currentPage} onPageChange={setCurrentPage} />
         <main 
           className="flex-1 overflow-y-auto scrollable-area"

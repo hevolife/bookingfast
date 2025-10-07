@@ -22,11 +22,20 @@ import {
   Settings
 } from 'lucide-react';
 import { useNavigate } from 'react-router-dom';
+import { isPWA } from '../../utils/pwaDetection';
 
 export function LandingPage() {
   const navigate = useNavigate();
   const [currentFeature, setCurrentFeature] = useState(0);
   const [isVisible, setIsVisible] = useState(false);
+
+  // Rediriger vers login si en mode PWA
+  useEffect(() => {
+    if (isPWA()) {
+      console.log('🚫 Landing page - PWA détecté, redirection vers /login');
+      navigate('/login', { replace: true });
+    }
+  }, [navigate]);
 
   const features = [
     {
@@ -59,7 +68,7 @@ export function LandingPage() {
     {
       name: "Marie Dubois",
       business: "Salon de beauté",
-      text: "BookingPro a révolutionné ma gestion ! Plus de double réservations, paiements automatiques. Je recommande !",
+      text: "BookingFast a révolutionné ma gestion ! Plus de double réservations, paiements automatiques. Je recommande !",
       rating: 5,
       avatar: "M"
     },
@@ -99,7 +108,7 @@ export function LandingPage() {
   };
 
   return (
-    <div className="min-h-screen bg-gradient-to-br from-blue-50 via-purple-50 to-pink-50">
+    <div className="landing-page min-h-screen bg-gradient-to-br from-blue-50 via-purple-50 to-pink-50">
       {/* Navigation */}
       <nav className="fixed top-0 left-0 right-0 z-50 bg-white/95 backdrop-blur-md border-b border-gray-200 shadow-lg">
         <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
@@ -129,7 +138,7 @@ export function LandingPage() {
             </div>
 
             <button
-              onClick={() => navigate('/dashboard')}
+              onClick={() => navigate('/login')}
               className="bg-gradient-to-r from-blue-600 to-purple-600 text-white px-6 py-2 rounded-xl hover:from-blue-700 hover:to-purple-700 transition-all duration-300 transform hover:scale-105 shadow-lg font-medium"
             >
               Commencer
@@ -171,7 +180,7 @@ export function LandingPage() {
 
               <div className="flex flex-col sm:flex-row gap-4 justify-center items-center mb-12">
                 <button
-                  onClick={() => navigate('/dashboard')}
+                  onClick={() => navigate('/login')}
                   className="bg-gradient-to-r from-green-600 to-emerald-600 text-white px-6 sm:px-8 py-3 sm:py-4 rounded-2xl hover:from-green-700 hover:to-emerald-700 transition-all duration-300 transform hover:scale-105 shadow-2xl font-bold text-base sm:text-lg flex items-center gap-2 sm:gap-3 group"
                 >
                   <Sparkles className="w-5 h-5 sm:w-6 sm:h-6 group-hover:rotate-12 transition-transform" />
@@ -265,7 +274,7 @@ export function LandingPage() {
                     <div className="w-6 h-6 sm:w-8 sm:h-8 bg-white/20 rounded-lg flex items-center justify-center">
                       <Building2 className="w-4 h-4 sm:w-5 sm:h-5 text-white" />
                     </div>
-                    <div className="text-white font-bold text-sm sm:text-base">BookingPro Dashboard</div>
+                    <div className="text-white font-bold text-sm sm:text-base">BookingFast Dashboard</div>
                   </div>
                   
                   {/* Mockup content */}
@@ -315,136 +324,6 @@ export function LandingPage() {
         </div>
       </section>
 
-      {/* How it works */}
-      <section id="demo" className="py-20 px-4 sm:px-6 lg:px-8">
-        <div className="max-w-7xl mx-auto">
-          <div className="text-center mb-16">
-            <h2 className="text-2xl sm:text-4xl font-bold text-gray-900 mb-6">
-              Comment ça marche ?
-            </h2>
-            <p className="text-lg text-gray-600 max-w-3xl mx-auto">
-              En 3 étapes simples, transformez votre façon de gérer les réservations
-            </p>
-          </div>
-
-          <div className="grid grid-cols-1 md:grid-cols-3 gap-8">
-            {[
-              {
-                step: "1",
-                title: "Configurez vos services",
-                description: "Ajoutez vos prestations, tarifs et créneaux horaires en quelques clics",
-                icon: Settings,
-                color: "from-blue-500 to-cyan-500"
-              },
-              {
-                step: "2", 
-                title: "Vos clients réservent",
-                description: "Interface intuitive pour vos clients, paiement sécurisé intégré",
-                icon: Calendar,
-                color: "from-purple-500 to-pink-500"
-              },
-              {
-                step: "3",
-                title: "Tout est automatisé",
-                description: "Confirmations, rappels, paiements... Concentrez-vous sur votre métier !",
-                icon: Zap,
-                color: "from-green-500 to-emerald-500"
-              }
-            ].map((step, index) => (
-              <div
-                key={index}
-                className={`relative bg-white rounded-3xl p-8 shadow-xl hover:shadow-2xl transition-all duration-500 transform hover:scale-105 animate-fadeIn border border-gray-100`}
-                style={{ animationDelay: `${index * 300}ms` }}
-              >
-                {/* Step number */}
-                <div className={`absolute -top-6 left-8 w-12 h-12 bg-gradient-to-r ${step.color} rounded-full flex items-center justify-center text-white font-bold text-xl shadow-lg`}>
-                  {step.step}
-                </div>
-                
-                <div className={`w-16 h-16 bg-gradient-to-r ${step.color} rounded-2xl flex items-center justify-center mx-auto mb-6 mt-4`}>
-                  <step.icon className="w-8 h-8 text-white" />
-                </div>
-                
-                <h3 className="text-2xl font-bold text-gray-900 mb-4 text-center">{step.title}</h3>
-                <p className="text-gray-600 text-center leading-relaxed">{step.description}</p>
-                
-                {/* Connection line */}
-                {index < 2 && (
-                  <div className="hidden md:block absolute top-1/2 -right-4 w-8 h-1 bg-gradient-to-r from-gray-300 to-gray-400 rounded-full"></div>
-                )}
-              </div>
-            ))}
-          </div>
-        </div>
-      </section>
-
-      {/* Benefits Section */}
-      <section className="py-20 px-4 sm:px-6 lg:px-8 bg-gradient-to-r from-blue-50 to-purple-50">
-        <div className="max-w-7xl mx-auto">
-          <div className="text-center mb-16">
-            <h2 className="text-2xl sm:text-4xl font-bold text-gray-900 mb-6">
-              Pourquoi choisir BookingPro ?
-            </h2>
-            <p className="text-lg text-gray-600 max-w-3xl mx-auto">
-              Rejoignez des centaines de professionnels qui ont déjà transformé leur activité
-            </p>
-          </div>
-
-          <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-8">
-            {[
-              {
-                icon: TrendingUp,
-                title: "Augmentez vos revenus",
-                description: "Réduisez les no-shows de 80% avec les rappels automatiques et les acomptes en ligne",
-                color: "from-green-500 to-emerald-500"
-              },
-              {
-                icon: Clock,
-                title: "Gagnez du temps",
-                description: "Automatisez la gestion des rendez-vous, confirmations et paiements",
-                color: "from-blue-500 to-cyan-500"
-              },
-              {
-                icon: Heart,
-                title: "Fidélisez vos clients",
-                description: "Expérience client premium avec interface moderne et paiements fluides",
-                color: "from-purple-500 to-pink-500"
-              },
-              {
-                icon: Smartphone,
-                title: "Accessible partout",
-                description: "Application web responsive, fonctionne sur tous les appareils",
-                color: "from-orange-500 to-red-500"
-              },
-              {
-                icon: Shield,
-                title: "Sécurité maximale",
-                description: "Données chiffrées, paiements sécurisés par Stripe, conformité RGPD",
-                color: "from-indigo-500 to-purple-500"
-              },
-              {
-                icon: Target,
-                title: "Support expert",
-                description: "Équipe dédiée pour vous accompagner dans votre réussite",
-                color: "from-pink-500 to-red-500"
-              }
-            ].map((benefit, index) => (
-              <div
-                key={index}
-                className={`bg-white rounded-2xl p-8 shadow-xl hover:shadow-2xl transition-all duration-500 transform hover:scale-105 animate-fadeIn border border-gray-100`}
-                style={{ animationDelay: `${index * 150}ms` }}
-              >
-                <div className={`w-16 h-16 bg-gradient-to-r ${benefit.color} rounded-2xl flex items-center justify-center mx-auto mb-6`}>
-                  <benefit.icon className="w-8 h-8 text-white" />
-                </div>
-                <h3 className="text-xl font-bold text-gray-900 mb-4 text-center">{benefit.title}</h3>
-                <p className="text-gray-600 text-center leading-relaxed">{benefit.description}</p>
-              </div>
-            ))}
-          </div>
-        </div>
-      </section>
-
       {/* Pricing Section */}
       <section id="pricing" className="py-20 px-4 sm:px-6 lg:px-8">
         <div className="max-w-7xl mx-auto">
@@ -485,7 +364,7 @@ export function LandingPage() {
               </div>
 
               <button
-                onClick={() => navigate('/dashboard')}
+                onClick={() => navigate('/login')}
                 className="w-full bg-gradient-to-r from-blue-600 to-cyan-600 text-white py-4 px-6 rounded-2xl font-bold text-lg hover:from-blue-700 hover:to-cyan-700 transition-all duration-300 transform hover:scale-105 shadow-lg"
               >
                 Essai gratuit 7 jours
@@ -535,19 +414,6 @@ export function LandingPage() {
               </button>
             </div>
           </div>
-
-          {/* Guarantee */}
-          <div className="text-center mt-12">
-            <div className="bg-gradient-to-r from-green-50 to-emerald-50 border border-green-200 rounded-2xl p-6 max-w-2xl mx-auto">
-              <div className="flex items-center justify-center gap-2 mb-3">
-                <CheckCircle className="w-6 h-6 text-green-600" />
-                <h4 className="text-lg font-bold text-green-800">Garantie 30 jours</h4>
-              </div>
-              <p className="text-green-700">
-                Satisfait ou remboursé. Annulez votre abonnement à tout moment.
-              </p>
-            </div>
-          </div>
         </div>
       </section>
 
@@ -595,7 +461,6 @@ export function LandingPage() {
 
       {/* CTA Section */}
       <section className="py-20 px-4 sm:px-6 lg:px-8 bg-gradient-to-r from-blue-600 via-purple-600 to-pink-600 relative overflow-hidden">
-        {/* Background effects */}
         <div className="absolute inset-0">
           <div className="absolute top-0 left-0 w-full h-full bg-gradient-to-r from-transparent via-white/10 to-transparent -skew-x-12 animate-shimmer"></div>
         </div>
@@ -610,7 +475,7 @@ export function LandingPage() {
           
           <div className="flex flex-col sm:flex-row gap-4 justify-center items-center">
             <button
-              onClick={() => navigate('/dashboard')}
+              onClick={() => navigate('/login')}
               className="bg-white text-purple-600 px-8 py-4 rounded-2xl hover:bg-gray-50 transition-all duration-300 transform hover:scale-105 shadow-2xl font-bold text-lg flex items-center gap-3 group"
             >
               <Sparkles className="w-6 h-6 group-hover:rotate-12 transition-transform" />
@@ -657,10 +522,24 @@ export function LandingPage() {
             </div>
             
             <div>
-              <h4 className="font-bold mb-4">Support</h4>
+              <h4 className="font-bold mb-4">Légal</h4>
               <ul className="space-y-2 text-gray-400 text-sm">
-                <li>Documentation</li>
-                <li>Tutoriels vidéo</li>
+                <li>
+                  <button 
+                    onClick={() => navigate('/privacy-policy')}
+                    className="hover:text-white transition-colors"
+                  >
+                    Politique de confidentialité
+                  </button>
+                </li>
+                <li>
+                  <button 
+                    onClick={() => navigate('/terms-of-service')}
+                    className="hover:text-white transition-colors"
+                  >
+                    Conditions d'utilisation
+                  </button>
+                </li>
                 <li>Support 24/7</li>
                 <li>Formation gratuite</li>
               </ul>

@@ -39,34 +39,6 @@
     <link rel="preload" href="/pwa-192x192.png" as="image" type="image/png" />
     <link rel="dns-prefetch" href="https://fonts.googleapis.com" />
     <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
-    
-    <style>
-      /* Critical CSS pour empêcher tout mouvement du viewport */
-      html, body {
-        position: fixed !important;
-        overflow: hidden !important;
-        width: 100% !important;
-        height: 100% !important;
-        margin: 0 !important;
-        padding: 0 !important;
-        overscroll-behavior: none !important;
-        touch-action: none !important;
-        -webkit-overflow-scrolling: auto !important;
-      }
-      
-      #root {
-        position: fixed !important;
-        top: 0 !important;
-        left: 0 !important;
-        right: 0 !important;
-        bottom: 0 !important;
-        width: 100% !important;
-        height: 100% !important;
-        overflow: hidden !important;
-        overscroll-behavior: none !important;
-        touch-action: none !important;
-      }
-    </style>
   </head>
   <body>
     <div id="root"></div>
@@ -93,14 +65,6 @@
           }
         });
       }
-      
-      // Prevent viewport movement on iOS PWA
-      document.addEventListener('touchmove', function(e) {
-        if (e.target.closest('.scrollable-area')) {
-          return; // Allow scroll in scrollable areas
-        }
-        e.preventDefault();
-      }, { passive: false });
       
       // Performance monitoring
       if ('performance' in window) {
