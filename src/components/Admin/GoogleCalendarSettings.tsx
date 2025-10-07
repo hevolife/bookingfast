@@ -1,5 +1,5 @@
 import React, { useState, useEffect } from 'react';
-import { Calendar, CheckCircle, XCircle, RefreshCw, ExternalLink, AlertTriangle, Loader, Clock } from 'lucide-react';
+import { Calendar, CheckCircle, XCircle, RefreshCw, ExternalLink, AlertTriangle, Loader, Clock, Users } from 'lucide-react';
 import { useBusinessSettings } from '../../hooks/useBusinessSettings';
 import { useAuth } from '../../contexts/AuthContext';
 import { supabase } from '../../lib/supabase';
@@ -127,7 +127,7 @@ export function GoogleCalendarSettings() {
       return;
     }
 
-    if (!window.confirm('⚠️ Êtes-vous sûr de vouloir déconnecter Google Calendar ?')) {
+    if (!window.confirm('⚠️ Êtes-vous sûr de vouloir déconnecter Google Calendar ? Cela affectera tous les membres de l\'équipe.')) {
       return;
     }
 
@@ -172,30 +172,21 @@ export function GoogleCalendarSettings() {
       console.log('👤 Utilisateur actuel:', user.id);
       console.log('🏢 Est membre d\'équipe:', isTeamMember);
 
-      const { data: tokenData, error: tokenError } = await supabase
-        .from('google_calendar_tokens')
-        .select('access_token, token_expiry')
-        .eq('user_id', ownerId)
-        .maybeSingle();
+      // Utiliser le service pour obtenir le token (avec rafraîchissement automatique)
+      const accessToken = await GoogleCalendarService.getAccessToken(user.id);
 
-      if (tokenError) {
-        console.error('❌ Erreur récupération token:', tokenError);
-        throw new Error('Erreur lors de la récupération du token');
+      if (!accessToken) {
+        console.log('❌ Impossible d\'obtenir le token');
+        throw new Error('Token non disponible');
       }
 
-      if (!tokenData) {
-        console.log('❌ Aucun token trouvé pour owner_id:', ownerId);
-        throw new Error('Token non trouvé');
-      }
+      console.log('✅ Token obtenu avec succès');
 
-      console.log('✅ Token trouvé, expiration:', tokenData.token_expiry);
-
-      // Le token sera automatiquement rafraîchi si nécessaire par getAccessToken
       // Récupérer la liste des calendriers
       console.log('📅 Récupération liste calendriers...');
       const response = await fetch('https://www.googleapis.com/calendar/v3/users/me/calendarList', {
         headers: {
-          'Authorization': `Bearer ${tokenData.access_token}`
+          'Authorization': `Bearer ${accessToken}`
         }
       });
 
@@ -229,12 +220,7 @@ export function GoogleCalendarSettings() {
       return;
     }
 
-    // Les membres d'équipe ne peuvent pas modifier la configuration
-    if (isTeamMember) {
-      alert('⚠️ Seul le propriétaire peut modifier la configuration du calendrier.');
-      return;
-    }
-
+    // Les membres d'équipe peuvent maintenant sauvegarder le calendrier
     setLoading(true);
     try {
       await updateSettings({
@@ -260,19 +246,16 @@ export function GoogleCalendarSettings() {
     try {
       console.log('🧪 Test connexion pour owner_id:', ownerId);
 
-      const { data: tokenData, error: tokenError } = await supabase
-        .from('google_calendar_tokens')
-        .select('access_token')
-        .eq('user_id', ownerId)
-        .maybeSingle();
+      // Utiliser le service pour obtenir le token
+      const accessToken = await GoogleCalendarService.getAccessToken(user.id);
 
-      if (tokenError || !tokenData) {
-        throw new Error('Token non trouvé');
+      if (!accessToken) {
+        throw new Error('Token non disponible');
       }
 
       const response = await fetch('https://www.googleapis.com/calendar/v3/users/me/calendarList', {
         headers: {
-          'Authorization': `Bearer ${tokenData.access_token}`
+          'Authorization': `Bearer ${accessToken}`
         }
       });
 
@@ -317,7 +300,7 @@ export function GoogleCalendarSettings() {
           <div>
             <h2 className="text-xl font-bold text-gray-900">Google Calendar</h2>
             <p className="text-sm text-gray-600">
-              {isTeamMember ? '👤 Configuration du propriétaire' : 'Synchronisez automatiquement vos réservations'}
+              {isTeamMember ? '👥 Connexion partagée avec l\'équipe' : 'Synchronisez automatiquement vos réservations'}
             </p>
           </div>
         </div>
@@ -329,7 +312,9 @@ export function GoogleCalendarSettings() {
               <CheckCircle className="w-5 h-5 text-green-600" />
               <div className="flex-1">
                 <div className="font-medium text-green-700">Connecté</div>
-                <div className="text-sm text-gray-600">Synchronisation active</div>
+                <div className="text-sm text-gray-600">
+                  {isTeamMember ? 'Utilise la connexion du propriétaire' : 'Synchronisation active pour toute l\'équipe'}
+                </div>
               </div>
             </>
           ) : syncStatus === 'error' ? (
@@ -380,14 +365,15 @@ export function GoogleCalendarSettings() {
         <div className="bg-blue-50 border border-blue-200 rounded-xl p-4">
           <div className="flex items-start gap-3">
             <div className="w-10 h-10 bg-blue-100 rounded-lg flex items-center justify-center flex-shrink-0">
-              <AlertTriangle className="w-5 h-5 text-blue-600" />
+              <Users className="w-5 h-5 text-blue-600" />
             </div>
             <div className="flex-1">
-              <h4 className="font-bold text-blue-800 mb-2">👤 Mode Membre d'équipe</h4>
+              <h4 className="font-bold text-blue-800 mb-2">👥 Accès partagé</h4>
               <div className="text-blue-700 text-sm space-y-1">
-                <div>• Vous consultez la configuration du propriétaire</div>
-                <div>• Seul le propriétaire peut modifier ces paramètres</div>
-                <div>• Les réservations seront synchronisées automatiquement</div>
+                <div>• Vous utilisez la connexion Google Calendar du propriétaire</div>
+                <div>• Vos réservations seront synchronisées automatiquement</div>
+                <div>• Vous pouvez créer, modifier et supprimer des événements</div>
+                <div>• Seul le propriétaire peut connecter/déconnecter le compte</div>
               </div>
             </div>
           </div>
@@ -404,10 +390,11 @@ export function GoogleCalendarSettings() {
             <h4 className="font-bold text-blue-800 mb-2">💡 Comment ça fonctionne ?</h4>
             <div className="text-blue-700 text-sm space-y-1">
               <div>• {isTeamMember ? 'Le propriétaire connecte' : 'Connectez'} son compte Google Calendar</div>
-              <div>• {isTeamMember ? 'Le propriétaire sélectionne' : 'Sélectionnez'} le calendrier à synchroniser</div>
-              <div>• Les réservations seront automatiquement ajoutées</div>
-              <div>• Les modifications seront synchronisées en temps réel</div>
+              <div>• {isTeamMember ? 'Vous pouvez sélectionner' : 'Sélectionnez'} le calendrier à synchroniser</div>
+              <div>• Toutes les réservations de l'équipe seront synchronisées</div>
+              <div>• Les modifications seront visibles pour tous</div>
               <div>• 🔄 Les tokens sont rafraîchis automatiquement (pas d'expiration)</div>
+              <div>• 👥 Tous les membres d'équipe peuvent créer des événements</div>
             </div>
           </div>
         </div>
@@ -453,8 +440,7 @@ export function GoogleCalendarSettings() {
                 <select
                   value={selectedCalendarId}
                   onChange={(e) => setSelectedCalendarId(e.target.value)}
-                  disabled={isTeamMember}
-                  className="w-full p-3 border border-gray-300 rounded-xl focus:ring-2 focus:ring-blue-500 focus:border-blue-500 transition-all duration-300 disabled:opacity-50 disabled:cursor-not-allowed"
+                  className="w-full p-3 border border-gray-300 rounded-xl focus:ring-2 focus:ring-blue-500 focus:border-blue-500 transition-all duration-300"
                 >
                   <option value="">Sélectionnez un calendrier</option>
                   {calendars.map((calendar) => (
@@ -464,7 +450,7 @@ export function GoogleCalendarSettings() {
                   ))}
                 </select>
 
-                {!isTeamMember && selectedCalendarId && selectedCalendarId !== settings?.google_calendar_id && (
+                {selectedCalendarId && selectedCalendarId !== settings?.google_calendar_id && (
                   <Button
                     onClick={handleSaveCalendar}
                     loading={loading}
@@ -527,6 +513,7 @@ export function GoogleCalendarSettings() {
                     <div>• Modifications → Mises à jour en temps réel</div>
                     <div>• Annulations → Événements supprimés</div>
                     <div>• 🔄 Tokens rafraîchis automatiquement toutes les heures</div>
+                    <div>• 👥 Accessible à tous les membres de l'équipe</div>
                   </div>
                 </div>
               </div>

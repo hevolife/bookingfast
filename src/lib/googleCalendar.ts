@@ -137,8 +137,9 @@ export class GoogleCalendarService {
   /**
    * Récupère le token d'accès Google Calendar
    * Rafraîchit automatiquement si expiré
+   * ACCESSIBLE PUBLIQUEMENT pour les membres d'équipe
    */
-  private static async getAccessToken(userId: string): Promise<string | null> {
+  static async getAccessToken(userId: string): Promise<string | null> {
     try {
       // Récupérer le token du propriétaire
       const ownerId = await this.getOwnerId(userId);

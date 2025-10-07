@@ -21,6 +21,7 @@ export function useTeam() {
   const [teamMembers, setTeamMembers] = useState<TeamMember[]>([]);
   const [userPermissions, setUserPermissions] = useState<string[]>([]);
   const [isOwner, setIsOwner] = useState(false);
+  const [ownerId, setOwnerId] = useState<string | null>(null);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
 
@@ -34,6 +35,7 @@ export function useTeam() {
   const checkOwnerStatus = async () => {
     if (!supabase || !user) {
       setIsOwner(true);
+      setOwnerId(user?.id || null);
       return;
     }
 
@@ -49,10 +51,17 @@ export function useTeam() {
         throw memberError;
       }
 
-      setIsOwner(!memberData);
+      if (memberData) {
+        setIsOwner(false);
+        setOwnerId(memberData.owner_id);
+      } else {
+        setIsOwner(true);
+        setOwnerId(user.id);
+      }
     } catch (err) {
       console.error('Erreur vérification statut propriétaire:', err);
       setIsOwner(true);
+      setOwnerId(user.id);
     }
   };
 
@@ -80,6 +89,7 @@ export function useTeam() {
 
       if (memberData) {
         setIsOwner(false);
+        setOwnerId(memberData.owner_id);
         setUserPermissions(memberData.permissions || []);
 
         const { data: teamData, error: teamError } = await supabase
@@ -93,6 +103,7 @@ export function useTeam() {
         setTeamMembers(teamData || []);
       } else {
         setIsOwner(true);
+        setOwnerId(user.id);
         setUserPermissions(['*']);
 
         const { data: teamData, error: teamError } = await supabase
@@ -359,6 +370,7 @@ export function useTeam() {
     teamMembers,
     userPermissions,
     isOwner,
+    ownerId,
     loading,
     error,
     hasPermission,
