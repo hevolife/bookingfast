@@ -19,39 +19,50 @@ interface GoogleCalendarEvent {
 }
 
 export class GoogleCalendarService {
-  private static async getAccessToken(userId: string): Promise<string | null> {
+  /**
+   * Récupère l'ID du propriétaire pour un utilisateur donné
+   * Si l'utilisateur est membre d'équipe, retourne l'owner_id
+   * Sinon, retourne l'ID de l'utilisateur lui-même
+   */
+  private static async getOwnerId(userId: string): Promise<string> {
     try {
-      const { data, error } = await supabase
-        .from('google_calendar_tokens')
-        .select('access_token, token_expiry, refresh_token')
+      const { data: teamMember } = await supabase
+        .from('team_members')
+        .select('owner_id, is_active')
         .eq('user_id', userId)
+        .eq('is_active', true)
         .maybeSingle();
 
-      if (error || !data) {
-        return null;
+      if (teamMember?.owner_id) {
+        console.log('👤 Membre d\'équipe - utilisation owner_id:', teamMember.owner_id);
+        return teamMember.owner_id;
       }
 
-      // Vérifier si le token est expiré
-      if (new Date(data.token_expiry) < new Date()) {
-        return await this.refreshAccessToken(userId, data.refresh_token);
-      }
-
-      return data.access_token;
+      console.log('👑 Propriétaire - utilisation user_id:', userId);
+      return userId;
     } catch (error) {
-      console.error('Erreur récupération token:', error);
-      return null;
+      console.error('❌ Erreur récupération owner_id:', error);
+      return userId;
     }
   }
 
-  private static async refreshAccessToken(userId: string, refreshToken: string): Promise<string | null> {
+  /**
+   * Rafraîchit le token d'accès Google Calendar
+   * Utilise le refresh_token pour obtenir un nouveau access_token
+   */
+  private static async refreshAccessToken(ownerId: string, refreshToken: string): Promise<string | null> {
     try {
       const clientId = import.meta.env.VITE_GOOGLE_CLIENT_ID;
       const clientSecret = import.meta.env.VITE_GOOGLE_CLIENT_SECRET;
 
       if (!clientId || !clientSecret) {
+        console.error('❌ Configuration OAuth manquante (VITE_GOOGLE_CLIENT_ID ou VITE_GOOGLE_CLIENT_SECRET)');
         return null;
       }
 
+      console.log('🔄 Rafraîchissement du token pour owner_id:', ownerId);
+
+      // Appel à l'API Google OAuth2 pour rafraîchir le token
       const response = await fetch('https://oauth2.googleapis.com/token', {
         method: 'POST',
         headers: {
@@ -66,53 +77,142 @@ export class GoogleCalendarService {
       });
 
       if (!response.ok) {
-        throw new Error('Erreur rafraîchissement token');
+        const errorData = await response.json();
+        console.error('❌ Erreur rafraîchissement token:', errorData);
+        throw new Error(`Erreur rafraîchissement: ${errorData.error_description || errorData.error}`);
       }
 
       const data = await response.json();
+      
+      // Calculer la nouvelle date d'expiration (expires_in est en secondes)
       const newExpiry = new Date(Date.now() + data.expires_in * 1000);
 
-      // Mettre à jour le token dans la base
-      await supabase
+      console.log('✅ Nouveau token obtenu, expiration:', newExpiry.toISOString());
+
+      // Mettre à jour le token dans la base de données
+      const { error: updateError } = await supabase
         .from('google_calendar_tokens')
         .update({
           access_token: data.access_token,
           token_expiry: newExpiry.toISOString(),
+          updated_at: new Date().toISOString(),
         })
-        .eq('user_id', userId);
+        .eq('user_id', ownerId);
 
+      if (updateError) {
+        console.error('❌ Erreur mise à jour token en base:', updateError);
+        throw updateError;
+      }
+
+      console.log('✅ Token rafraîchi et sauvegardé avec succès');
       return data.access_token;
     } catch (error) {
-      console.error('Erreur rafraîchissement token:', error);
+      console.error('❌ Erreur critique lors du rafraîchissement du token:', error);
+      return null;
+    }
+  }
+
+  /**
+   * Vérifie si le token est expiré ou va expirer dans les 5 prochaines minutes
+   */
+  private static isTokenExpired(tokenExpiry: string): boolean {
+    const expiryDate = new Date(tokenExpiry);
+    const now = new Date();
+    
+    // Ajouter une marge de 5 minutes pour éviter les expirations pendant les requêtes
+    const bufferTime = 5 * 60 * 1000; // 5 minutes en millisecondes
+    const expiryWithBuffer = new Date(expiryDate.getTime() - bufferTime);
+    
+    const isExpired = now >= expiryWithBuffer;
+    
+    if (isExpired) {
+      console.log('⚠️ Token expiré ou expire bientôt');
+      console.log('   Expiration:', expiryDate.toISOString());
+      console.log('   Maintenant:', now.toISOString());
+    }
+    
+    return isExpired;
+  }
+
+  /**
+   * Récupère le token d'accès Google Calendar
+   * Rafraîchit automatiquement si expiré
+   */
+  private static async getAccessToken(userId: string): Promise<string | null> {
+    try {
+      // Récupérer le token du propriétaire
+      const ownerId = await this.getOwnerId(userId);
+      console.log('🔍 Récupération token pour owner_id:', ownerId);
+
+      const { data, error } = await supabase
+        .from('google_calendar_tokens')
+        .select('access_token, token_expiry, refresh_token')
+        .eq('user_id', ownerId)
+        .maybeSingle();
+
+      if (error || !data) {
+        console.log('❌ Token non trouvé pour owner_id:', ownerId);
+        return null;
+      }
+
+      // Vérifier si le token est expiré ou va expirer bientôt
+      if (this.isTokenExpired(data.token_expiry)) {
+        console.log('🔄 Token expiré, rafraîchissement automatique...');
+        
+        // Rafraîchir le token
+        const newToken = await this.refreshAccessToken(ownerId, data.refresh_token);
+        
+        if (!newToken) {
+          console.error('❌ Impossible de rafraîchir le token');
+          return null;
+        }
+        
+        return newToken;
+      }
+
+      console.log('✅ Token valide trouvé (expire:', data.token_expiry, ')');
+      return data.access_token;
+    } catch (error) {
+      console.error('❌ Erreur récupération token:', error);
       return null;
     }
   }
 
   private static async getCalendarId(userId: string): Promise<string | null> {
     try {
+      // Récupérer le calendar_id du propriétaire
+      const ownerId = await this.getOwnerId(userId);
+      console.log('🔍 Récupération calendar_id pour owner_id:', ownerId);
+
       const { data } = await supabase
         .from('business_settings')
         .select('google_calendar_id, google_calendar_enabled')
-        .eq('user_id', userId)
+        .eq('user_id', ownerId)
         .maybeSingle();
 
       if (!data || !data.google_calendar_enabled) {
+        console.log('❌ Google Calendar non activé pour owner_id:', ownerId);
         return null;
       }
 
+      console.log('✅ Calendar ID trouvé:', data.google_calendar_id || 'primary');
       return data.google_calendar_id || 'primary';
     } catch (error) {
-      console.error('Erreur récupération calendar ID:', error);
+      console.error('❌ Erreur récupération calendar ID:', error);
       return null;
     }
   }
 
   static async createEvent(booking: Booking, userId: string): Promise<string | null> {
     try {
+      console.log('📅 Création événement Google Calendar pour booking:', booking.id);
+      console.log('👤 User ID:', userId);
+
       const accessToken = await this.getAccessToken(userId);
       const calendarId = await this.getCalendarId(userId);
 
       if (!accessToken || !calendarId) {
+        console.log('❌ Token ou Calendar ID manquant');
         return null;
       }
 
@@ -155,6 +255,8 @@ Paiement: ${booking.payment_status === 'completed' ? '✅ Payé' : booking.payme
         ],
       };
 
+      console.log('📤 Envoi événement à Google Calendar...');
+
       // Créer l'événement via l'API Google Calendar
       const response = await fetch(
         `https://www.googleapis.com/calendar/v3/calendars/${encodeURIComponent(calendarId)}/events`,
@@ -174,6 +276,7 @@ Paiement: ${booking.payment_status === 'completed' ? '✅ Payé' : booking.payme
       }
 
       const createdEvent = await response.json();
+      console.log('✅ Événement créé avec succès:', createdEvent.id);
 
       // Mettre à jour la réservation avec l'ID de l'événement
       await supabase
@@ -183,14 +286,17 @@ Paiement: ${booking.payment_status === 'completed' ? '✅ Payé' : booking.payme
 
       return createdEvent.id;
     } catch (error) {
-      console.error('Erreur création événement Google Calendar:', error);
+      console.error('❌ Erreur création événement Google Calendar:', error);
       return null;
     }
   }
 
   static async updateEvent(booking: Booking, userId: string): Promise<boolean> {
     try {
+      console.log('📝 Mise à jour événement Google Calendar pour booking:', booking.id);
+
       if (!booking.google_calendar_event_id) {
+        console.log('ℹ️ Pas d\'event_id, création d\'un nouvel événement');
         await this.createEvent(booking, userId);
         return true;
       }
@@ -199,6 +305,7 @@ Paiement: ${booking.payment_status === 'completed' ? '✅ Payé' : booking.payme
       const calendarId = await this.getCalendarId(userId);
 
       if (!accessToken || !calendarId) {
+        console.log('❌ Token ou Calendar ID manquant');
         return false;
       }
 
@@ -241,6 +348,8 @@ Paiement: ${booking.payment_status === 'completed' ? '✅ Payé' : booking.payme
         ],
       };
 
+      console.log('📤 Mise à jour événement Google Calendar...');
+
       // Mettre à jour l'événement via l'API Google Calendar
       const response = await fetch(
         `https://www.googleapis.com/calendar/v3/calendars/${encodeURIComponent(calendarId)}/events/${booking.google_calendar_event_id}`,
@@ -259,19 +368,23 @@ Paiement: ${booking.payment_status === 'completed' ? '✅ Payé' : booking.payme
         throw new Error(`Erreur API Google Calendar: ${errorData.error?.message || 'Erreur inconnue'}`);
       }
 
+      console.log('✅ Événement mis à jour avec succès');
       return true;
     } catch (error) {
-      console.error('Erreur mise à jour événement Google Calendar:', error);
+      console.error('❌ Erreur mise à jour événement Google Calendar:', error);
       return false;
     }
   }
 
   static async deleteEvent(eventId: string, userId: string): Promise<boolean> {
     try {
+      console.log('🗑️ Suppression événement Google Calendar:', eventId);
+
       const accessToken = await this.getAccessToken(userId);
       const calendarId = await this.getCalendarId(userId);
 
       if (!accessToken || !calendarId) {
+        console.log('❌ Token ou Calendar ID manquant');
         return false;
       }
 
@@ -291,10 +404,50 @@ Paiement: ${booking.payment_status === 'completed' ? '✅ Payé' : booking.payme
         throw new Error(`Erreur API Google Calendar: ${errorData.error?.message || 'Erreur inconnue'}`);
       }
 
+      console.log('✅ Événement supprimé avec succès');
       return true;
     } catch (error) {
-      console.error('Erreur suppression événement Google Calendar:', error);
+      console.error('❌ Erreur suppression événement Google Calendar:', error);
       return false;
+    }
+  }
+
+  /**
+   * Vérifie manuellement l'état du token (pour debugging)
+   */
+  static async checkTokenStatus(userId: string): Promise<{
+    hasToken: boolean;
+    isExpired: boolean;
+    expiresAt?: string;
+    timeUntilExpiry?: string;
+  }> {
+    try {
+      const ownerId = await this.getOwnerId(userId);
+      
+      const { data } = await supabase
+        .from('google_calendar_tokens')
+        .select('token_expiry')
+        .eq('user_id', ownerId)
+        .maybeSingle();
+
+      if (!data) {
+        return { hasToken: false, isExpired: true };
+      }
+
+      const expiryDate = new Date(data.token_expiry);
+      const now = new Date();
+      const isExpired = this.isTokenExpired(data.token_expiry);
+      const timeUntilExpiry = Math.floor((expiryDate.getTime() - now.getTime()) / 1000 / 60); // en minutes
+
+      return {
+        hasToken: true,
+        isExpired,
+        expiresAt: data.token_expiry,
+        timeUntilExpiry: `${timeUntilExpiry} minutes`,
+      };
+    } catch (error) {
+      console.error('❌ Erreur vérification statut token:', error);
+      return { hasToken: false, isExpired: true };
     }
   }
 }

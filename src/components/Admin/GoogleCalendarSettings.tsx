@@ -1,8 +1,9 @@
 import React, { useState, useEffect } from 'react';
-import { Calendar, CheckCircle, XCircle, RefreshCw, ExternalLink, AlertTriangle, Loader } from 'lucide-react';
+import { Calendar, CheckCircle, XCircle, RefreshCw, ExternalLink, AlertTriangle, Loader, Clock } from 'lucide-react';
 import { useBusinessSettings } from '../../hooks/useBusinessSettings';
 import { useAuth } from '../../contexts/AuthContext';
 import { supabase } from '../../lib/supabase';
+import { GoogleCalendarService } from '../../lib/googleCalendar';
 import { Button } from '../UI/Button';
 
 export function GoogleCalendarSettings() {
@@ -13,6 +14,46 @@ export function GoogleCalendarSettings() {
   const [calendars, setCalendars] = useState<Array<{ id: string; summary: string }>>([]);
   const [selectedCalendarId, setSelectedCalendarId] = useState<string>('');
   const [testingConnection, setTestingConnection] = useState(false);
+  const [ownerId, setOwnerId] = useState<string | null>(null);
+  const [isTeamMember, setIsTeamMember] = useState(false);
+  const [tokenStatus, setTokenStatus] = useState<{
+    hasToken: boolean;
+    isExpired: boolean;
+    expiresAt?: string;
+    timeUntilExpiry?: string;
+  } | null>(null);
+
+  // Déterminer si l'utilisateur est membre d'équipe et récupérer l'owner_id
+  useEffect(() => {
+    const checkTeamMembership = async () => {
+      if (!user || !supabase) return;
+
+      try {
+        const { data: teamMember } = await supabase
+          .from('team_members')
+          .select('owner_id, is_active')
+          .eq('user_id', user.id)
+          .eq('is_active', true)
+          .maybeSingle();
+
+        if (teamMember?.owner_id) {
+          console.log('👤 Membre d\'équipe détecté - Propriétaire:', teamMember.owner_id);
+          setOwnerId(teamMember.owner_id);
+          setIsTeamMember(true);
+        } else {
+          console.log('👑 Propriétaire détecté');
+          setOwnerId(user.id);
+          setIsTeamMember(false);
+        }
+      } catch (error) {
+        console.error('❌ Erreur vérification équipe:', error);
+        setOwnerId(user.id);
+        setIsTeamMember(false);
+      }
+    };
+
+    checkTeamMembership();
+  }, [user]);
 
   useEffect(() => {
     if (settings) {
@@ -21,8 +62,30 @@ export function GoogleCalendarSettings() {
     }
   }, [settings]);
 
+  // Vérifier le statut du token périodiquement
+  useEffect(() => {
+    const checkToken = async () => {
+      if (!user) return;
+      const status = await GoogleCalendarService.checkTokenStatus(user.id);
+      setTokenStatus(status);
+    };
+
+    checkToken();
+    
+    // Vérifier toutes les 5 minutes
+    const interval = setInterval(checkToken, 5 * 60 * 1000);
+    
+    return () => clearInterval(interval);
+  }, [user]);
+
   const handleConnect = async () => {
     if (!user) return;
+
+    // Les membres d'équipe ne peuvent pas connecter leur propre compte
+    if (isTeamMember) {
+      alert('⚠️ Seul le propriétaire peut connecter Google Calendar. Contactez votre administrateur.');
+      return;
+    }
 
     setLoading(true);
     try {
@@ -56,17 +119,25 @@ export function GoogleCalendarSettings() {
   };
 
   const handleDisconnect = async () => {
-    if (!user || !window.confirm('⚠️ Êtes-vous sûr de vouloir déconnecter Google Calendar ?')) {
+    if (!user || !ownerId) return;
+
+    // Les membres d'équipe ne peuvent pas déconnecter
+    if (isTeamMember) {
+      alert('⚠️ Seul le propriétaire peut déconnecter Google Calendar.');
+      return;
+    }
+
+    if (!window.confirm('⚠️ Êtes-vous sûr de vouloir déconnecter Google Calendar ?')) {
       return;
     }
 
     setLoading(true);
     try {
-      // Supprimer les tokens
+      // Supprimer les tokens (utiliser ownerId au lieu de user.id)
       await supabase
         .from('google_calendar_tokens')
         .delete()
-        .eq('user_id', user.id);
+        .eq('user_id', ownerId);
 
       // Mettre à jour les paramètres
       await updateSettings({
@@ -78,6 +149,7 @@ export function GoogleCalendarSettings() {
       setSyncStatus('disconnected');
       setCalendars([]);
       setSelectedCalendarId('');
+      setTokenStatus(null);
       
       alert('✅ Google Calendar déconnecté avec succès');
     } catch (error) {
@@ -89,27 +161,38 @@ export function GoogleCalendarSettings() {
   };
 
   const loadCalendars = async () => {
-    if (!user) return;
+    if (!user || !ownerId) {
+      console.log('❌ Pas d\'utilisateur ou d\'owner_id');
+      return;
+    }
 
     setLoading(true);
     try {
-      // Récupérer le token d'accès
-      const { data: tokenData } = await supabase
+      console.log('🔍 Chargement calendriers pour owner_id:', ownerId);
+      console.log('👤 Utilisateur actuel:', user.id);
+      console.log('🏢 Est membre d\'équipe:', isTeamMember);
+
+      const { data: tokenData, error: tokenError } = await supabase
         .from('google_calendar_tokens')
         .select('access_token, token_expiry')
-        .eq('user_id', user.id)
-        .single();
+        .eq('user_id', ownerId)
+        .maybeSingle();
+
+      if (tokenError) {
+        console.error('❌ Erreur récupération token:', tokenError);
+        throw new Error('Erreur lors de la récupération du token');
+      }
 
       if (!tokenData) {
+        console.log('❌ Aucun token trouvé pour owner_id:', ownerId);
         throw new Error('Token non trouvé');
       }
 
-      // Vérifier si le token est expiré
-      if (new Date(tokenData.token_expiry) < new Date()) {
-        throw new Error('Token expiré');
-      }
+      console.log('✅ Token trouvé, expiration:', tokenData.token_expiry);
 
+      // Le token sera automatiquement rafraîchi si nécessaire par getAccessToken
       // Récupérer la liste des calendriers
+      console.log('📅 Récupération liste calendriers...');
       const response = await fetch('https://www.googleapis.com/calendar/v3/users/me/calendarList', {
         headers: {
           'Authorization': `Bearer ${tokenData.access_token}`
@@ -117,14 +200,23 @@ export function GoogleCalendarSettings() {
       });
 
       if (!response.ok) {
+        const errorText = await response.text();
+        console.error('❌ Erreur API Google:', response.status, errorText);
         throw new Error('Erreur lors de la récupération des calendriers');
       }
 
       const data = await response.json();
+      console.log('✅ Calendriers récupérés:', data.items?.length || 0);
       setCalendars(data.items || []);
     } catch (error) {
-      console.error('Erreur lors du chargement des calendriers:', error);
-      alert('❌ Erreur lors du chargement des calendriers. Veuillez vous reconnecter.');
+      console.error('❌ Erreur lors du chargement des calendriers:', error);
+      
+      if (isTeamMember) {
+        alert('❌ Impossible de charger les calendriers. Le propriétaire doit se reconnecter à Google Calendar.');
+      } else {
+        alert('❌ Erreur lors du chargement des calendriers. Veuillez vous reconnecter.');
+      }
+      
       setSyncStatus('error');
     } finally {
       setLoading(false);
@@ -134,6 +226,12 @@ export function GoogleCalendarSettings() {
   const handleSaveCalendar = async () => {
     if (!selectedCalendarId) {
       alert('⚠️ Veuillez sélectionner un calendrier');
+      return;
+    }
+
+    // Les membres d'équipe ne peuvent pas modifier la configuration
+    if (isTeamMember) {
+      alert('⚠️ Seul le propriétaire peut modifier la configuration du calendrier.');
       return;
     }
 
@@ -156,17 +254,19 @@ export function GoogleCalendarSettings() {
   };
 
   const testConnection = async () => {
-    if (!user) return;
+    if (!user || !ownerId) return;
 
     setTestingConnection(true);
     try {
-      const { data: tokenData } = await supabase
+      console.log('🧪 Test connexion pour owner_id:', ownerId);
+
+      const { data: tokenData, error: tokenError } = await supabase
         .from('google_calendar_tokens')
         .select('access_token')
-        .eq('user_id', user.id)
-        .single();
+        .eq('user_id', ownerId)
+        .maybeSingle();
 
-      if (!tokenData) {
+      if (tokenError || !tokenData) {
         throw new Error('Token non trouvé');
       }
 
@@ -178,12 +278,22 @@ export function GoogleCalendarSettings() {
 
       if (response.ok) {
         alert('✅ Connexion Google Calendar active !');
+        
+        // Rafraîchir le statut du token
+        const status = await GoogleCalendarService.checkTokenStatus(user.id);
+        setTokenStatus(status);
       } else {
         throw new Error('Connexion échouée');
       }
     } catch (error) {
       console.error('Erreur test connexion:', error);
-      alert('❌ Erreur de connexion. Veuillez vous reconnecter.');
+      
+      if (isTeamMember) {
+        alert('❌ Erreur de connexion. Le propriétaire doit se reconnecter.');
+      } else {
+        alert('❌ Erreur de connexion. Veuillez vous reconnecter.');
+      }
+      
       setSyncStatus('error');
     } finally {
       setTestingConnection(false);
@@ -191,10 +301,10 @@ export function GoogleCalendarSettings() {
   };
 
   useEffect(() => {
-    if (syncStatus === 'connected' && calendars.length === 0) {
+    if (syncStatus === 'connected' && calendars.length === 0 && ownerId) {
       loadCalendars();
     }
-  }, [syncStatus]);
+  }, [syncStatus, ownerId]);
 
   return (
     <div className="space-y-6">
@@ -206,7 +316,9 @@ export function GoogleCalendarSettings() {
           </div>
           <div>
             <h2 className="text-xl font-bold text-gray-900">Google Calendar</h2>
-            <p className="text-sm text-gray-600">Synchronisez automatiquement vos réservations</p>
+            <p className="text-sm text-gray-600">
+              {isTeamMember ? '👤 Configuration du propriétaire' : 'Synchronisez automatiquement vos réservations'}
+            </p>
           </div>
         </div>
 
@@ -225,7 +337,9 @@ export function GoogleCalendarSettings() {
               <XCircle className="w-5 h-5 text-red-600" />
               <div className="flex-1">
                 <div className="font-medium text-red-700">Erreur de connexion</div>
-                <div className="text-sm text-gray-600">Veuillez vous reconnecter</div>
+                <div className="text-sm text-gray-600">
+                  {isTeamMember ? 'Le propriétaire doit se reconnecter' : 'Veuillez vous reconnecter'}
+                </div>
               </div>
             </>
           ) : (
@@ -233,12 +347,52 @@ export function GoogleCalendarSettings() {
               <XCircle className="w-5 h-5 text-gray-400" />
               <div className="flex-1">
                 <div className="font-medium text-gray-700">Non connecté</div>
-                <div className="text-sm text-gray-600">Connectez votre compte Google</div>
+                <div className="text-sm text-gray-600">
+                  {isTeamMember ? 'Le propriétaire doit connecter Google Calendar' : 'Connectez votre compte Google'}
+                </div>
               </div>
             </>
           )}
         </div>
+
+        {/* Statut du token */}
+        {tokenStatus && tokenStatus.hasToken && (
+          <div className={`mt-3 p-3 rounded-xl border ${
+            tokenStatus.isExpired 
+              ? 'bg-red-50 border-red-200' 
+              : 'bg-green-50 border-green-200'
+          }`}>
+            <div className="flex items-center gap-2 text-sm">
+              <Clock className={`w-4 h-4 ${tokenStatus.isExpired ? 'text-red-600' : 'text-green-600'}`} />
+              <span className={tokenStatus.isExpired ? 'text-red-700' : 'text-green-700'}>
+                {tokenStatus.isExpired 
+                  ? '⚠️ Token expiré - Rafraîchissement automatique activé' 
+                  : `✅ Token valide - Expire dans ${tokenStatus.timeUntilExpiry}`
+                }
+              </span>
+            </div>
+          </div>
+        )}
       </div>
+
+      {/* Message pour les membres d'équipe */}
+      {isTeamMember && (
+        <div className="bg-blue-50 border border-blue-200 rounded-xl p-4">
+          <div className="flex items-start gap-3">
+            <div className="w-10 h-10 bg-blue-100 rounded-lg flex items-center justify-center flex-shrink-0">
+              <AlertTriangle className="w-5 h-5 text-blue-600" />
+            </div>
+            <div className="flex-1">
+              <h4 className="font-bold text-blue-800 mb-2">👤 Mode Membre d'équipe</h4>
+              <div className="text-blue-700 text-sm space-y-1">
+                <div>• Vous consultez la configuration du propriétaire</div>
+                <div>• Seul le propriétaire peut modifier ces paramètres</div>
+                <div>• Les réservations seront synchronisées automatiquement</div>
+              </div>
+            </div>
+          </div>
+        </div>
+      )}
 
       {/* Instructions */}
       <div className="bg-blue-50 border border-blue-200 rounded-xl p-4">
@@ -249,10 +403,11 @@ export function GoogleCalendarSettings() {
           <div className="flex-1">
             <h4 className="font-bold text-blue-800 mb-2">💡 Comment ça fonctionne ?</h4>
             <div className="text-blue-700 text-sm space-y-1">
-              <div>• Connectez votre compte Google Calendar</div>
-              <div>• Sélectionnez le calendrier à synchroniser</div>
+              <div>• {isTeamMember ? 'Le propriétaire connecte' : 'Connectez'} son compte Google Calendar</div>
+              <div>• {isTeamMember ? 'Le propriétaire sélectionne' : 'Sélectionnez'} le calendrier à synchroniser</div>
               <div>• Les réservations seront automatiquement ajoutées</div>
               <div>• Les modifications seront synchronisées en temps réel</div>
+              <div>• 🔄 Les tokens sont rafraîchis automatiquement (pas d'expiration)</div>
             </div>
           </div>
         </div>
@@ -264,20 +419,23 @@ export function GoogleCalendarSettings() {
           <Button
             onClick={handleConnect}
             loading={loading}
-            className="w-full bg-gradient-to-r from-blue-600 to-purple-600 text-white hover:from-blue-700 hover:to-purple-700"
+            disabled={isTeamMember}
+            className="w-full bg-gradient-to-r from-blue-600 to-purple-600 text-white hover:from-blue-700 hover:to-purple-700 disabled:opacity-50 disabled:cursor-not-allowed"
           >
             <Calendar className="w-5 h-5" />
-            Connecter Google Calendar
+            {isTeamMember ? 'Seul le propriétaire peut connecter' : 'Connecter Google Calendar'}
           </Button>
 
-          <div className="bg-yellow-50 border border-yellow-200 rounded-xl p-4">
-            <div className="flex items-start gap-3">
-              <AlertTriangle className="w-5 h-5 text-yellow-600 flex-shrink-0 mt-0.5" />
-              <div className="text-sm text-yellow-800">
-                <strong>Configuration requise:</strong> Assurez-vous d'avoir configuré les identifiants OAuth Google dans les variables d'environnement (VITE_GOOGLE_CLIENT_ID et VITE_GOOGLE_CLIENT_SECRET).
+          {!isTeamMember && (
+            <div className="bg-yellow-50 border border-yellow-200 rounded-xl p-4">
+              <div className="flex items-start gap-3">
+                <AlertTriangle className="w-5 h-5 text-yellow-600 flex-shrink-0 mt-0.5" />
+                <div className="text-sm text-yellow-800">
+                  <strong>Configuration requise:</strong> Assurez-vous d'avoir configuré les identifiants OAuth Google dans les variables d'environnement (VITE_GOOGLE_CLIENT_ID et VITE_GOOGLE_CLIENT_SECRET).
+                </div>
               </div>
             </div>
-          </div>
+          )}
         </div>
       ) : (
         <div className="space-y-6">
@@ -295,7 +453,8 @@ export function GoogleCalendarSettings() {
                 <select
                   value={selectedCalendarId}
                   onChange={(e) => setSelectedCalendarId(e.target.value)}
-                  className="w-full p-3 border border-gray-300 rounded-xl focus:ring-2 focus:ring-blue-500 focus:border-blue-500 transition-all duration-300"
+                  disabled={isTeamMember}
+                  className="w-full p-3 border border-gray-300 rounded-xl focus:ring-2 focus:ring-blue-500 focus:border-blue-500 transition-all duration-300 disabled:opacity-50 disabled:cursor-not-allowed"
                 >
                   <option value="">Sélectionnez un calendrier</option>
                   {calendars.map((calendar) => (
@@ -305,7 +464,7 @@ export function GoogleCalendarSettings() {
                   ))}
                 </select>
 
-                {selectedCalendarId && selectedCalendarId !== settings?.google_calendar_id && (
+                {!isTeamMember && selectedCalendarId && selectedCalendarId !== settings?.google_calendar_id && (
                   <Button
                     onClick={handleSaveCalendar}
                     loading={loading}
@@ -343,15 +502,17 @@ export function GoogleCalendarSettings() {
               <RefreshCw className="w-4 h-4" />
               Tester la connexion
             </Button>
-            <Button
-              onClick={handleDisconnect}
-              loading={loading}
-              variant="danger"
-              className="flex-1"
-            >
-              <XCircle className="w-4 h-4" />
-              Déconnecter
-            </Button>
+            {!isTeamMember && (
+              <Button
+                onClick={handleDisconnect}
+                loading={loading}
+                variant="danger"
+                className="flex-1"
+              >
+                <XCircle className="w-4 h-4" />
+                Déconnecter
+              </Button>
+            )}
           </div>
 
           {/* Informations de synchronisation */}
@@ -365,6 +526,7 @@ export function GoogleCalendarSettings() {
                     <div>• Nouvelles réservations → Ajoutées automatiquement</div>
                     <div>• Modifications → Mises à jour en temps réel</div>
                     <div>• Annulations → Événements supprimés</div>
+                    <div>• 🔄 Tokens rafraîchis automatiquement toutes les heures</div>
                   </div>
                 </div>
               </div>
