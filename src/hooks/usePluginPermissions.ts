@@ -1,6 +1,7 @@
 import { useState, useEffect, useCallback } from 'react';
 import { supabase } from '../lib/supabase';
 import { useAuth } from '../contexts/AuthContext';
+import { TeamMemberPluginAccess } from '../types/plugin';
 
 interface PluginPermission {
   plugin_slug: string;
@@ -69,8 +70,7 @@ export function usePluginPermissions() {
             const { data: permission, error: permError } = await supabase
               .from('team_member_plugin_permissions')
               .select('can_access')
-              .eq('user_id', user.id)
-              .eq('owner_id', teamMember.owner_id)
+              .eq('owner_id', user.id)
               .eq('plugin_id', sub.plugin_id)
               .maybeSingle();
 
@@ -94,130 +94,233 @@ export function usePluginPermissions() {
   }, [fetchPermissions]);
 
   const checkPluginAccess = useCallback(async (pluginSlug: string): Promise<boolean> => {
-    console.log('🔍 === DÉBUT VÉRIFICATION ===');
-    console.log('🔍 Plugin slug:', pluginSlug);
-    console.log('🔍 User:', user?.id);
-    console.log('🔍 Supabase configuré:', !!supabase);
-
     if (!user) {
-      console.log('❌ Pas d\'utilisateur connecté');
       return false;
     }
 
     if (!supabase) {
-      console.log('✅ Mode démo - accès autorisé');
       return true;
     }
 
     try {
-      // ÉTAPE 1: Vérifier si propriétaire
-      console.log('📍 ÉTAPE 1: Vérification propriétaire');
-      const { data: ownerSub, error: ownerError } = await supabase
-        .from('plugin_subscriptions')
-        .select('id, status, plugins(slug)')
-        .eq('user_id', user.id);
+      // D'abord récupérer le plugin par son slug
+      const { data: pluginData, error: pluginError } = await supabase
+        .from('plugins')
+        .select('id')
+        .eq('slug', pluginSlug)
+        .maybeSingle();
 
-      console.log('📊 Tous les abonnements utilisateur:', ownerSub);
-      console.log('📊 Erreur requête:', ownerError);
-
-      if (ownerSub && ownerSub.length > 0) {
-        console.log('📍 Abonnements trouvés, vérification du plugin...');
-        // CORRECTION: Accepter active ET trial
-        const validPlugins = ownerSub.filter(sub => 
-          sub.status === 'active' || sub.status === 'trial'
-        );
-        console.log('📊 Abonnements valides (active + trial):', validPlugins);
-        
-        const hasPlugin = validPlugins.some(sub => {
-          const slug = (sub.plugins as any)?.slug;
-          console.log(`  - Comparaison: ${slug} === ${pluginSlug} ?`, slug === pluginSlug);
-          return slug === pluginSlug;
-        });
-        
-        if (hasPlugin) {
-          console.log('✅ PROPRIÉTAIRE AVEC PLUGIN ACTIF/TRIAL');
-          return true;
-        } else {
-          console.log('⚠️ Propriétaire mais plugin non trouvé');
-        }
-      } else {
-        console.log('⚠️ Aucun abonnement trouvé pour cet utilisateur');
+      if (pluginError || !pluginData) {
+        return false;
       }
 
-      // ÉTAPE 2: Vérifier si membre d'équipe
-      console.log('📍 ÉTAPE 2: Vérification membre d\'équipe');
-      const { data: teamMember, error: teamError } = await supabase
+      // Vérifier si l'utilisateur a un abonnement actif pour ce plugin
+      const { data: ownerSub } = await supabase
+        .from('plugin_subscriptions')
+        .select('id, status')
+        .eq('user_id', user.id)
+        .eq('plugin_id', pluginData.id)
+        .in('status', ['active', 'trial'])
+        .maybeSingle();
+
+      if (ownerSub) {
+        return true;
+      }
+
+      // Vérifier si membre d'équipe
+      const { data: teamMember } = await supabase
         .from('team_members')
         .select('owner_id, is_active')
         .eq('user_id', user.id)
         .maybeSingle();
 
-      console.log('👥 Résultat team_member:', teamMember);
-      console.log('👥 Erreur:', teamError);
-
-      if (!teamMember) {
-        console.log('❌ NI PROPRIÉTAIRE NI MEMBRE D\'ÉQUIPE');
+      if (!teamMember || !teamMember.is_active) {
         return false;
       }
 
-      if (!teamMember.is_active) {
-        console.log('❌ Membre d\'équipe inactif');
-        return false;
-      }
-
-      // ÉTAPE 3: Vérifier plugins du propriétaire
-      console.log('📍 ÉTAPE 3: Vérification plugins du propriétaire');
-      console.log('👤 Owner ID:', teamMember.owner_id);
-      
-      const { data: ownerPlugin, error: pluginError } = await supabase
+      // Vérifier si le propriétaire a le plugin
+      const { data: ownerPlugin } = await supabase
         .from('plugin_subscriptions')
-        .select('plugin_id, status, plugins(slug)')
-        .eq('user_id', teamMember.owner_id);
-
-      console.log('📦 Tous les plugins du propriétaire:', ownerPlugin);
-      console.log('📦 Erreur:', pluginError);
-
-      // CORRECTION: Accepter active ET trial
-      const validOwnerPlugins = ownerPlugin?.filter(p => 
-        p.status === 'active' || p.status === 'trial'
-      );
-      console.log('📦 Plugins valides du propriétaire (active + trial):', validOwnerPlugins);
-
-      const ownerHasPlugin = validOwnerPlugins?.find(p => {
-        const slug = (p.plugins as any)?.slug;
-        console.log(`  - Comparaison owner: ${slug} === ${pluginSlug} ?`, slug === pluginSlug);
-        return slug === pluginSlug;
-      });
-      
-      if (!ownerHasPlugin) {
-        console.log('❌ PROPRIÉTAIRE N\'A PAS CE PLUGIN');
-        return false;
-      }
-
-      console.log('✅ Propriétaire a le plugin, plugin_id:', ownerHasPlugin.plugin_id);
-
-      // ÉTAPE 4: Vérifier permission du membre
-      console.log('📍 ÉTAPE 4: Vérification permission membre');
-      const { data: permission, error: permError } = await supabase
-        .from('team_member_plugin_permissions')
-        .select('can_access')
-        .eq('user_id', user.id)
-        .eq('owner_id', teamMember.owner_id)
-        .eq('plugin_id', ownerHasPlugin.plugin_id)
+        .select('plugin_id, status')
+        .eq('user_id', teamMember.owner_id)
+        .eq('plugin_id', pluginData.id)
+        .in('status', ['active', 'trial'])
         .maybeSingle();
 
-      console.log('🔐 Permission trouvée:', permission);
-      console.log('🔐 Erreur:', permError);
-      console.log('🔐 can_access:', permission?.can_access);
+      if (!ownerPlugin) {
+        return false;
+      }
 
-      const finalResult = permission?.can_access || false;
-      console.log('🎯 RÉSULTAT FINAL:', finalResult);
-      console.log('🔍 === FIN VÉRIFICATION ===');
+      // Vérifier permission du membre
+      const { data: permission } = await supabase
+        .from('team_member_plugin_permissions')
+        .select('can_access')
+        .eq('owner_id', user.id)
+        .eq('plugin_id', pluginData.id)
+        .maybeSingle();
 
-      return finalResult;
+      return permission?.can_access || false;
     } catch (error) {
-      console.error('❌ ERREUR CRITIQUE:', error);
+      console.error('❌ Erreur vérification accès:', error);
       return false;
+    }
+  }, [user]);
+
+  const getTeamMemberPluginPermissions = useCallback(async (
+    ownerId: string,
+    teamMemberId: string
+  ): Promise<TeamMemberPluginAccess[]> => {
+    if (!supabase) {
+      return [];
+    }
+
+    try {
+      console.log('🔍 Chargement permissions pour team_member:', teamMemberId);
+      console.log('👤 Propriétaire:', ownerId);
+
+      // CORRECTION: Récupérer d'abord le user_id du team_member
+      const { data: teamMember, error: memberError } = await supabase
+        .from('team_members')
+        .select('user_id')
+        .eq('id', teamMemberId)
+        .eq('owner_id', ownerId)
+        .maybeSingle();
+
+      if (memberError || !teamMember) {
+        console.error('❌ Team member non trouvé:', memberError);
+        return [];
+      }
+
+      const memberUserId = teamMember.user_id;
+      console.log('👤 User ID du membre:', memberUserId);
+
+      // Récupérer tous les plugins actifs du propriétaire
+      const { data: ownerPlugins, error: pluginsError } = await supabase
+        .from('plugin_subscriptions')
+        .select(`
+          plugin_id,
+          plugins (
+            id,
+            name,
+            slug,
+            icon
+          )
+        `)
+        .eq('user_id', ownerId)
+        .in('status', ['active', 'trial']);
+
+      if (pluginsError) throw pluginsError;
+
+      if (!ownerPlugins || ownerPlugins.length === 0) {
+        return [];
+      }
+
+      // Pour chaque plugin, vérifier la permission du membre
+      const permissions: TeamMemberPluginAccess[] = [];
+
+      for (const sub of ownerPlugins) {
+        const plugin = sub.plugins as any;
+        if (!plugin) continue;
+
+        // Vérifier si une permission existe déjà
+        const { data: existingPerm } = await supabase
+          .from('team_member_plugin_permissions')
+          .select('can_access')
+          .eq('owner_id', memberUserId)
+          .eq('plugin_id', sub.plugin_id)
+          .maybeSingle();
+
+        permissions.push({
+          plugin_id: sub.plugin_id,
+          plugin_name: plugin.name,
+          plugin_slug: plugin.slug,
+          plugin_icon: plugin.icon,
+          can_access: existingPerm?.can_access || false
+        });
+      }
+
+      console.log('✅ Permissions chargées:', permissions);
+      return permissions;
+    } catch (error) {
+      console.error('❌ Erreur chargement permissions membre:', error);
+      throw error;
+    }
+  }, []);
+
+  const bulkUpdatePluginPermissions = useCallback(async (
+    teamMemberId: string,
+    updates: Array<{ pluginId: string; canAccess: boolean }>
+  ): Promise<void> => {
+    console.log('💾 === DÉBUT MISE À JOUR PERMISSIONS ===');
+    console.log('👤 Team Member ID:', teamMemberId);
+    console.log('👤 Owner ID (user connecté):', user?.id);
+    console.log('📝 Updates:', updates);
+
+    if (!supabase) {
+      throw new Error('Supabase non configuré');
+    }
+
+    if (!user) {
+      throw new Error('Utilisateur non connecté');
+    }
+
+    try {
+      // CORRECTION: Chercher par ID de team_members, pas par user_id
+      const { data: teamMember, error: teamMemberError } = await supabase
+        .from('team_members')
+        .select('id, user_id, owner_id, role_name, is_active')
+        .eq('id', teamMemberId)
+        .eq('owner_id', user.id)
+        .maybeSingle();
+
+      console.log('📊 Team member trouvé:', teamMember);
+
+      if (teamMemberError) {
+        console.error('❌ Erreur SQL:', teamMemberError);
+        throw teamMemberError;
+      }
+
+      if (!teamMember) {
+        throw new Error('Membre d\'équipe non trouvé');
+      }
+
+      const memberUserId = teamMember.user_id;
+      console.log('✅ User ID du membre:', memberUserId);
+
+      // ÉTAPE 2: Mise à jour des permissions
+      for (const update of updates) {
+        const { data: existing } = await supabase
+          .from('team_member_plugin_permissions')
+          .select('id')
+          .eq('owner_id', memberUserId)
+          .eq('plugin_id', update.pluginId)
+          .maybeSingle();
+
+        if (existing) {
+          await supabase
+            .from('team_member_plugin_permissions')
+            .update({
+              can_access: update.canAccess,
+              updated_at: new Date().toISOString()
+            })
+            .eq('id', existing.id);
+        } else {
+          await supabase
+            .from('team_member_plugin_permissions')
+            .insert({
+              team_member_id: teamMember.id,
+              owner_id: memberUserId,
+              plugin_id: update.pluginId,
+              can_access: update.canAccess
+            });
+        }
+      }
+
+      console.log('✅ Permissions mises à jour avec succès');
+    } catch (error) {
+      console.error('❌ === ERREUR MISE À JOUR PERMISSIONS ===');
+      console.error(error);
+      throw error;
     }
   }, [user]);
 
@@ -225,6 +328,8 @@ export function usePluginPermissions() {
     permissions,
     loading,
     checkPluginAccess,
+    getTeamMemberPluginPermissions,
+    bulkUpdatePluginPermissions,
     refreshPermissions: fetchPermissions
   };
 }

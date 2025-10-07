@@ -8,6 +8,8 @@ export interface TeamMember {
   full_name: string;
   email: string;
   role: 'owner' | 'admin' | 'member';
+  firstname?: string;
+  lastname?: string;
 }
 
 export function useTeamMembers() {
@@ -28,36 +30,50 @@ export function useTeamMembers() {
         setLoading(true);
         setError(null);
 
+        // CORRECTION : Utiliser maybeSingle() pour gérer le cas où l'utilisateur n'est pas dans team_members
         const { data: currentMember, error: memberError } = await supabase
           .from('team_members')
-          .select('team_id')
+          .select('owner_id')
           .eq('user_id', user.id)
-          .single();
+          .maybeSingle();
 
         if (memberError) throw memberError;
 
+        // Si l'utilisateur n'est pas dans team_members, retourner une liste vide
+        if (!currentMember) {
+          console.log('ℹ️ Utilisateur non membre d\'une équipe');
+          setTeamMembers([]);
+          setLoading(false);
+          return;
+        }
+
+        // Récupérer tous les membres de la même équipe (même owner_id)
         const { data: members, error: membersError } = await supabase
           .from('team_members')
           .select(`
             id,
             user_id,
-            role,
+            role_name,
             profiles:user_id (
               full_name,
-              email
+              email,
+              firstname,
+              lastname
             )
           `)
-          .eq('team_id', currentMember.team_id)
+          .eq('owner_id', currentMember.owner_id)
           .order('created_at', { ascending: true });
 
         if (membersError) throw membersError;
 
-        const formattedMembers: TeamMember[] = members.map(member => ({
+        const formattedMembers: TeamMember[] = (members || []).map(member => ({
           id: member.id,
           user_id: member.user_id,
           full_name: member.profiles?.full_name || 'Utilisateur',
           email: member.profiles?.email || '',
-          role: member.role
+          firstname: member.profiles?.firstname,
+          lastname: member.profiles?.lastname,
+          role: member.role_name as 'owner' | 'admin' | 'member'
         }));
 
         setTeamMembers(formattedMembers);

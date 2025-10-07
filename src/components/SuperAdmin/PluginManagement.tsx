@@ -1,7 +1,7 @@
 import React, { useState, useEffect } from 'react';
 import { Package, Plus, Edit2, Trash2, Check, X, Sparkles } from 'lucide-react';
 import * as LucideIcons from 'lucide-react';
-import { supabase, isSupabaseConfigured } from '../../lib/supabase';
+import { supabase } from '../../lib/supabase';
 import { Plugin, PluginFeature } from '../../types/plugin';
 import { LoadingSpinner } from '../UI/LoadingSpinner';
 
@@ -17,7 +17,9 @@ export function PluginManagement() {
 
   const fetchPlugins = async () => {
     try {
-      if (!isSupabaseConfigured()) {
+      // Vérifier si Supabase est configuré
+      if (!supabase) {
+        console.log('⚠️ Supabase non configuré');
         setPlugins([]);
         setLoading(false);
         return;

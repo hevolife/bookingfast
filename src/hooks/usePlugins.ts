@@ -63,7 +63,6 @@ export function usePlugins() {
         return;
       }
 
-      // Récupérer directement les abonnements actifs
       const { data, error } = await supabase
         .from('plugin_subscriptions')
         .select(`
@@ -105,11 +104,29 @@ export function usePlugins() {
     if (!supabase || !user) return false;
 
     try {
+      // ÉTAPE 1 : Récupérer l'UUID du plugin à partir du slug
+      const { data: pluginData, error: pluginError } = await supabase
+        .from('plugins')
+        .select('id')
+        .eq('slug', pluginSlug)
+        .maybeSingle();
+
+      if (pluginError) {
+        console.error('❌ Erreur récupération plugin:', pluginError);
+        return false;
+      }
+
+      if (!pluginData) {
+        console.log('❌ Plugin non trouvé:', pluginSlug);
+        return false;
+      }
+
+      // ÉTAPE 2 : Vérifier l'abonnement avec l'UUID
       const { data, error } = await supabase
         .from('plugin_subscriptions')
         .select('status, current_period_end')
         .eq('user_id', user.id)
-        .eq('plugin_id', pluginSlug)
+        .eq('plugin_id', pluginData.id)
         .in('status', ['active', 'trial'])
         .maybeSingle();
 

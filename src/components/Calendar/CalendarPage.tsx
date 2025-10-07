@@ -108,7 +108,6 @@ export function CalendarPage({ view = 'calendar' }: CalendarPageProps) {
 
   const handleBookingSuccess = async () => {
     handleCloseModal();
-    // Rafraîchir les réservations après création/modification
     await refetch();
   };
 
@@ -125,6 +124,13 @@ export function CalendarPage({ view = 'calendar' }: CalendarPageProps) {
     return member.email || 'Membre sans nom';
   };
 
+  // Afficher le filtre uniquement si :
+  // 1. L'utilisateur a la permission
+  // 2. Le plugin multi-user est actif
+  // 3. Il y a des membres dans l'équipe
+  // 4. On est sur la vue calendrier
+  const shouldShowTeamFilter = canViewTeamFilter && isMultiUserActive && teamMembers.length > 0 && view === 'calendar';
+
   return (
     <div 
       className="h-full flex flex-col overflow-y-auto scrollable-area" 
@@ -135,7 +141,7 @@ export function CalendarPage({ view = 'calendar' }: CalendarPageProps) {
         touchAction: 'pan-y'
       }}
     >
-      {canViewTeamFilter && isMultiUserActive && teamMembers.length > 0 && view === 'calendar' && (
+      {shouldShowTeamFilter && (
         <div className="bg-white border-b border-gray-200 px-4 py-3">
           <div className="flex items-center gap-3">
             <div className="hidden md:flex items-center gap-2 text-gray-700 flex-shrink-0">

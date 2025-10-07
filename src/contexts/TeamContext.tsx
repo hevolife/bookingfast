@@ -5,7 +5,7 @@ import { useAuth } from './AuthContext';
 interface TeamMember {
   id: string;
   user_id: string;
-  team_id: string;
+  owner_id: string;
   role: 'owner' | 'admin' | 'member';
   full_name: string;
   email: string;
@@ -40,10 +40,10 @@ export function TeamProvider({ children }: { children: React.ReactNode }) {
     try {
       setLoading(true);
 
-      // Récupérer le membre actuel avec maybeSingle pour éviter les erreurs 400
+      // CORRECTION : Utiliser owner_id au lieu de team_id et maybeSingle() pour gérer le cas où l'utilisateur n'existe pas
       const { data: currentMember, error: memberError } = await supabase
         .from('team_members')
-        .select('team_id, role')
+        .select('owner_id, role_name')
         .eq('user_id', user.id)
         .maybeSingle();
 
@@ -60,22 +60,31 @@ export function TeamProvider({ children }: { children: React.ReactNode }) {
         return;
       }
 
-      setCurrentUserRole(currentMember.role);
+      // Mapper role_name vers le type attendu
+      const roleMap: Record<string, 'owner' | 'admin' | 'member'> = {
+        'owner': 'owner',
+        'admin': 'admin',
+        'employee': 'member',
+        'member': 'member'
+      };
+      
+      setCurrentUserRole(roleMap[currentMember.role_name] || 'member');
 
+      // CORRECTION : Utiliser owner_id au lieu de team_id
       const { data: members, error: membersError } = await supabase
         .from('team_members')
         .select(`
           id,
           user_id,
-          team_id,
-          role,
+          owner_id,
+          role_name,
           created_at,
           profiles:user_id (
             full_name,
             email
           )
         `)
-        .eq('team_id', currentMember.team_id)
+        .eq('owner_id', currentMember.owner_id)
         .order('created_at', { ascending: true });
 
       if (membersError) {
@@ -86,8 +95,8 @@ export function TeamProvider({ children }: { children: React.ReactNode }) {
       const formattedMembers = (members || []).map(member => ({
         id: member.id,
         user_id: member.user_id,
-        team_id: member.team_id,
-        role: member.role,
+        owner_id: member.owner_id,
+        role: roleMap[member.role_name] || 'member',
         full_name: member.profiles?.full_name || 'Utilisateur',
         email: member.profiles?.email || '',
         created_at: member.created_at

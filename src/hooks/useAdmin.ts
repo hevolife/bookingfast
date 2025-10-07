@@ -38,7 +38,6 @@ export function useAdmin() {
         throw new Error('Supabase non configuré');
       }
       
-      // Utiliser l'Edge Function pour récupérer tous les utilisateurs
       const { data: { session } } = await supabase.auth.getSession();
       if (!session) {
         throw new Error('Session non trouvée');
@@ -100,7 +99,6 @@ export function useAdmin() {
         return;
       }
       
-      // Table user_subscriptions vide - pas d'abonnements Stripe
       console.log('ℹ️ Table user_subscriptions vide - système basé sur codes d\'accès uniquement');
       setSubscriptions([]);
     } catch (err) {
@@ -163,22 +161,55 @@ export function useAdmin() {
     if (!supabase) throw new Error('Supabase non configuré');
     
     try {
-      const { data, error } = await supabase
-        .from('users')
-        .update({
-          ...updates,
-          updated_at: new Date().toISOString()
-        })
-        .eq('id', userId)
-        .select()
-        .single();
-
-      if (error) throw error;
+      console.log('🔄 Mise à jour utilisateur via Edge Function...');
       
-      setUsers(prev => prev.map(u => u.id === userId ? data : u));
-      return data;
+      const { data: { session } } = await supabase.auth.getSession();
+      if (!session) {
+        throw new Error('Session non trouvée');
+      }
+
+      const supabaseUrl = import.meta.env.VITE_SUPABASE_URL;
+      
+      if (!supabaseUrl || supabaseUrl === 'https://placeholder.supabase.co') {
+        throw new Error('URL Supabase non configurée');
+      }
+      
+      const response = await fetch(`${supabaseUrl}/functions/v1/update-user`, {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+          'Authorization': `Bearer ${session.access_token}`,
+        },
+        body: JSON.stringify({
+          user_id: userId,
+          updates: updates
+        })
+      });
+
+      if (!response.ok) {
+        let errorData;
+        try {
+          errorData = await response.json();
+        } catch (parseError) {
+          throw new Error(`Erreur HTTP ${response.status}: ${response.statusText}`);
+        }
+        throw new Error(errorData.error || `Erreur ${response.status}: ${response.statusText}`);
+      }
+
+      const result = await response.json();
+      
+      if (!result.success) {
+        throw new Error(result.error || 'Erreur lors de la mise à jour de l\'utilisateur');
+      }
+
+      const updatedUser = result.user;
+      
+      setUsers(prev => prev.map(u => u.id === userId ? updatedUser : u));
+      console.log('✅ Utilisateur mis à jour avec succès');
+      
+      return updatedUser;
     } catch (err) {
-      console.error('Erreur mise à jour utilisateur:', err);
+      console.error('❌ Erreur mise à jour utilisateur:', err);
       throw err;
     }
   };
@@ -217,7 +248,6 @@ export function useAdmin() {
         return;
       }
       
-      // Vérifier d'abord si la table code_redemptions a des données
       const { count, error: countError } = await supabase
         .from('code_redemptions')
         .select('*', { count: 'exact', head: true });
@@ -234,7 +264,6 @@ export function useAdmin() {
         return;
       }
 
-      // Si la table a des données, charger avec jointures simples
       const { data: redemptionsData, error: redemptionsError } = await supabase
         .from('code_redemptions')
         .select(`
@@ -260,7 +289,6 @@ export function useAdmin() {
         return;
       }
 
-      // Charger les codes et utilisateurs séparément pour éviter les erreurs de relation
       const codeIds = [...new Set(redemptionsData.map(r => r.code_id))];
       const userIds = [...new Set(redemptionsData.map(r => r.user_id))];
 
@@ -272,7 +300,6 @@ export function useAdmin() {
       const codesData = codesResult.data || [];
       const usersData = usersResult.data || [];
 
-      // Enrichir les données manuellement
       const enrichedRedemptions = redemptionsData.map(redemption => ({
         ...redemption,
         code: codesData.find(c => c.id === redemption.code_id) || null,
@@ -319,7 +346,6 @@ export function useAdmin() {
     try {
       console.log('🔄 Utilisation du code:', code);
       
-      // Vérifier que le code existe et est actif
       const { data: accessCode, error: codeError } = await supabase
         .from('access_codes')
         .select('*')
@@ -333,7 +359,6 @@ export function useAdmin() {
 
       console.log('✅ Code trouvé:', accessCode.code);
 
-      // Vérifier si le code n'a pas déjà été utilisé par cet utilisateur
       const { data: existingRedemption } = await supabase
         .from('code_redemptions')
         .select('id')
@@ -345,17 +370,14 @@ export function useAdmin() {
         throw new Error('Ce code a déjà été utilisé par votre compte');
       }
 
-      // Vérifier si le code n'a pas atteint sa limite d'utilisation
       if (accessCode.current_uses >= accessCode.max_uses) {
         throw new Error('Ce code a atteint sa limite d\'utilisation');
       }
 
-      // Vérifier si le code n'a pas expiré
       if (accessCode.expires_at && new Date(accessCode.expires_at) < new Date()) {
         throw new Error('Ce code a expiré');
       }
 
-      // Calculer la date de fin d'accès
       let accessGrantedUntil = null;
       if (accessCode.access_type !== 'lifetime') {
         const now = new Date();
@@ -372,7 +394,6 @@ export function useAdmin() {
         }
       }
 
-      // Créer l'entrée de rédemption
       const { error: redemptionError } = await supabase
         .from('code_redemptions')
         .insert({
@@ -383,18 +404,15 @@ export function useAdmin() {
 
       if (redemptionError) throw redemptionError;
 
-      // Mettre à jour le statut de l'utilisateur selon le type de code
       let newSubscriptionStatus = 'active';
       let newTrialEndsAt = null;
       
       if (accessCode.access_type === 'lifetime') {
-        // Accès à vie
         newSubscriptionStatus = 'active';
-        newTrialEndsAt = null; // Pas de limite
+        newTrialEndsAt = null;
         console.log('🎯 Code à vie utilisé - accès permanent accordé');
       } else {
-        // Accès temporaire
-        newSubscriptionStatus = 'trial'; // Garder en trial mais avec une nouvelle date de fin
+        newSubscriptionStatus = 'trial';
         newTrialEndsAt = accessGrantedUntil?.toISOString() || null;
         console.log('⏰ Code temporaire utilisé - accès jusqu\'au:', newTrialEndsAt);
       }
@@ -419,7 +437,6 @@ export function useAdmin() {
       
       console.log('✅ Statut utilisateur mis à jour');
       
-      // Forcer le rechargement des données utilisateur
       console.log('🔄 Rechargement des données utilisateur...');
       const { data: updatedUserData, error: refreshError } = await supabase
         .from('users')
@@ -434,7 +451,6 @@ export function useAdmin() {
         });
       }
       
-      // Incrémenter le compteur d'utilisation du code
       const { error: updateError } = await supabase
         .from('access_codes')
         .update({
@@ -445,7 +461,6 @@ export function useAdmin() {
 
       if (updateError) throw updateError;
 
-      // Recharger toutes les données pour refléter les changements
       await fetchAllData();
       
       console.log('✅ Code utilisé avec succès');
@@ -515,7 +530,7 @@ export function useAdmin() {
           plan_id: planId,
           status: 'active',
           current_period_start: new Date().toISOString(),
-          current_period_end: new Date(Date.now() + 30 * 24 * 60 * 60 * 1000).toISOString() // 30 jours
+          current_period_end: new Date(Date.now() + 30 * 24 * 60 * 60 * 1000).toISOString()
         })
         .select(`
           *,
@@ -528,7 +543,6 @@ export function useAdmin() {
       
       setSubscriptions(prev => [data, ...prev]);
       
-      // Mettre à jour le statut de l'utilisateur
       await updateUserStatus(userId, { subscription_status: 'active' });
       
       return data;
@@ -568,7 +582,7 @@ export function useAdmin() {
   };
 
   const checkUserAccess = async (userId: string): Promise<boolean> => {
-    if (!supabase) return true; // Mode démo
+    if (!supabase) return true;
     
     try {
       const { data, error } = await supabase.rpc('check_user_access', { user_id: userId });

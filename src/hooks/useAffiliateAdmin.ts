@@ -1,5 +1,5 @@
 import { useState, useEffect } from 'react';
-import { supabase, isSupabaseConfigured } from '../lib/supabase';
+import { supabase } from '../lib/supabase';
 import { useAuth } from '../contexts/AuthContext';
 import { Affiliate, AffiliateReferral, AffiliateCommission, AffiliateSettings, AffiliateStats } from '../types/affiliate';
 
@@ -73,7 +73,7 @@ export function useAffiliateAdmin() {
   };
 
   const fetchAllData = async () => {
-    if (!user || !isSupabaseConfigured()) {
+    if (!user || !supabase) {
       setLoading(false);
       return;
     }
@@ -196,7 +196,7 @@ export function useAffiliateAdmin() {
   };
 
   const updateSettings = async (newSettings: Partial<AffiliateSettings>) => {
-    if (!isSupabaseConfigured() || !settings) {
+    if (!supabase || !settings) {
       throw new Error('Paramètres non disponibles');
     }
 
@@ -224,7 +224,7 @@ export function useAffiliateAdmin() {
   };
 
   const payCommission = async (commissionId: string) => {
-    if (!isSupabaseConfigured()) {
+    if (!supabase) {
       throw new Error('Supabase non configuré');
     }
 

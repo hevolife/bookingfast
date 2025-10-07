@@ -2,7 +2,7 @@ import { useState, useEffect } from 'react';
 import { supabase } from '../lib/supabase';
 import { useAuth } from '../contexts/AuthContext';
 
-interface TeamStats {
+interface TeamLimitStats {
   currentMembers: number;
   memberLimit: number;
   availableSlots: number;
@@ -11,7 +11,7 @@ interface TeamStats {
 
 export function useTeamLimit() {
   const { user } = useAuth();
-  const [stats, setStats] = useState<TeamStats>({
+  const [stats, setStats] = useState<TeamLimitStats>({
     currentMembers: 0,
     memberLimit: 10,
     availableSlots: 10,
@@ -20,7 +20,7 @@ export function useTeamLimit() {
   const [loading, setLoading] = useState(true);
 
   const fetchStats = async () => {
-    if (!supabase || !user) {
+    if (!user || !supabase) {
       setStats({
         currentMembers: 0,
         memberLimit: 10,
@@ -32,35 +32,59 @@ export function useTeamLimit() {
     }
 
     try {
-      // Check for Enterprise Pack subscription
-      const { data: enterpriseSubscription } = await supabase
-        .from('subscriptions')
-        .select('plugin_slug')
-        .eq('user_id', user.id)
-        .eq('plugin_slug', 'entreprisepack')
-        .in('status', ['active', 'trial'])
+      setLoading(true);
+
+      // ÉTAPE 1 : Récupérer l'UUID du plugin entreprisepack
+      const { data: pluginData, error: pluginError } = await supabase
+        .from('plugins')
+        .select('id')
+        .eq('slug', 'entreprisepack')
         .maybeSingle();
 
-      const hasEnterprise = !!enterpriseSubscription;
-      const limit = hasEnterprise ? 50 : 10;
+      if (pluginError) {
+        console.error('❌ Erreur récupération plugin:', pluginError);
+        throw pluginError;
+      }
 
-      // Count current team members
-      const { count: memberCount } = await supabase
+      // ÉTAPE 2 : Vérifier l'abonnement avec l'UUID
+      let hasEnterprisePack = false;
+      if (pluginData) {
+        const { data: subscription, error: subError } = await supabase
+          .from('plugin_subscriptions')
+          .select('id, status')
+          .eq('user_id', user.id)
+          .eq('plugin_id', pluginData.id)
+          .in('status', ['active', 'trial'])
+          .maybeSingle();
+
+        if (subError) {
+          console.error('❌ Erreur vérification abonnement:', subError);
+        }
+
+        hasEnterprisePack = !!subscription;
+      }
+
+      // Compter les membres actuels
+      const { count, error: countError } = await supabase
         .from('team_members')
         .select('*', { count: 'exact', head: true })
         .eq('owner_id', user.id)
         .eq('is_active', true);
 
-      const current = memberCount || 0;
+      if (countError) throw countError;
+
+      const currentMembers = count || 0;
+      const memberLimit = hasEnterprisePack ? 50 : 10;
+      const availableSlots = Math.max(0, memberLimit - currentMembers);
 
       setStats({
-        currentMembers: current,
-        memberLimit: limit,
-        availableSlots: Math.max(0, limit - current),
-        hasEnterprisePack: hasEnterprise
+        currentMembers,
+        memberLimit,
+        availableSlots,
+        hasEnterprisePack
       });
     } catch (error) {
-      console.error('Error fetching team stats:', error);
+      console.error('❌ Erreur chargement stats équipe:', error);
       setStats({
         currentMembers: 0,
         memberLimit: 10,
@@ -77,7 +101,6 @@ export function useTeamLimit() {
   }, [user]);
 
   const canAddMember = async (): Promise<boolean> => {
-    await fetchStats();
     return stats.availableSlots > 0;
   };
 
@@ -86,7 +109,7 @@ export function useTeamLimit() {
   };
 
   const needsUpgrade = (): boolean => {
-    return !stats.hasEnterprisePack && stats.currentMembers >= stats.memberLimit * 0.8;
+    return !stats.hasEnterprisePack && stats.currentMembers >= 8;
   };
 
   return {

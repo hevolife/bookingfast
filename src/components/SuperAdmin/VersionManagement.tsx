@@ -1,6 +1,6 @@
 import React, { useState, useEffect } from 'react';
 import { Settings, Plus, CreditCard as Edit, Trash2, CheckCircle, Clock, Save, X, AlertTriangle } from 'lucide-react';
-import { supabase, isSupabaseConfigured } from '../../lib/supabase';
+import { supabase } from '../../lib/supabase';
 import { Modal } from '../UI/Modal';
 import { Button } from '../UI/Button';
 import { LoadingSpinner } from '../UI/LoadingSpinner';
@@ -29,7 +29,7 @@ export function VersionManagement() {
   });
 
   const fetchVersions = async () => {
-    if (!isSupabaseConfigured()) {
+    if (!supabase) {
       setVersions([]);
       setLoading(false);
       return;
