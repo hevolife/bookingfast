@@ -2,16 +2,16 @@ import { useState, useEffect } from 'react';
 import { supabase, isSupabaseConfigured } from '../lib/supabase';
 import { useAuth } from '../contexts/AuthContext';
 
-interface TeamLimitInfo {
+interface BookingLimitInfo {
   allowed: boolean;
   limit: number | null;
   current: number;
   remaining: number | null;
 }
 
-export function useTeamLimit() {
+export function useBookingLimit() {
   const { user } = useAuth();
-  const [limitInfo, setLimitInfo] = useState<TeamLimitInfo | null>(null);
+  const [limitInfo, setLimitInfo] = useState<BookingLimitInfo | null>(null);
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
 
@@ -25,14 +25,32 @@ export function useTeamLimit() {
     setError(null);
 
     try {
+      let targetUserId = user.id;
+      
+      // Vérifier si l'utilisateur est membre d'une équipe
+      try {
+        const { data: membershipData } = await supabase!
+          .from('team_members')
+          .select('owner_id')
+          .eq('user_id', user.id)
+          .eq('is_active', true)
+          .maybeSingle();
+
+        if (membershipData?.owner_id) {
+          targetUserId = membershipData.owner_id;
+        }
+      } catch (teamError) {
+        console.warn('⚠️ Erreur vérification équipe:', teamError);
+      }
+
       const { data, error: rpcError } = await supabase!
-        .rpc('check_team_member_limit', { owner_id_param: user.id });
+        .rpc('check_booking_limit', { user_id_param: targetUserId });
 
       if (rpcError) throw rpcError;
 
-      setLimitInfo(data as TeamLimitInfo);
+      setLimitInfo(data as BookingLimitInfo);
     } catch (err) {
-      console.error('❌ Erreur vérification limite équipe:', err);
+      console.error('❌ Erreur vérification limite:', err);
       setError(err instanceof Error ? err.message : 'Erreur de vérification');
       setLimitInfo(null);
     } finally {
@@ -53,8 +71,7 @@ export function useTeamLimit() {
     loading,
     error,
     refetch: checkLimit,
-    canInviteMember: limitInfo?.allowed ?? true,
-    isUnlimited: limitInfo?.limit === null,
-    isAtLimit: limitInfo ? limitInfo.current >= (limitInfo.limit || 0) : false
+    canCreateBooking: limitInfo?.allowed ?? true,
+    isUnlimited: limitInfo?.limit === null
   };
 }

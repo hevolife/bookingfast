@@ -22,25 +22,51 @@ export function SubscriptionStatus() {
   }, [user]);
 
   const loadSubscriptionPlans = async () => {
-    if (!supabase) {
-      const defaultPlans = [
-        {
-          id: 'monthly',
-          name: 'Plan Mensuel',
-          price_monthly: 29.99,
-          features: ['Réservations illimitées', 'Gestion des clients', 'Paiements en ligne', 'Workflows email', 'Support email']
-        },
-        {
-          id: 'yearly',
-          name: 'Plan Annuel',
-          price_monthly: 24.99,
-          price_yearly: 299.99,
-          features: ['Tout du plan mensuel', '2 mois gratuits', 'Support prioritaire', 'Fonctionnalités avancées', 'Accès aux bêtas']
-        }
-      ];
-      setSubscriptionPlans(defaultPlans);
-      return;
-    }
+    // Plans par défaut avec le nouveau Starter
+    const defaultPlans = [
+      {
+        id: 'starter',
+        name: 'Starter Mensuel',
+        price_monthly: 29.99,
+        features: [
+          'Réservations illimitées',
+          'Gestion des clients',
+          'Calendrier intégré',
+          'Support email',
+          'Idéal pour démarrer'
+        ]
+      },
+      {
+        id: 'monthly',
+        name: 'Plan Pro Mensuel',
+        price_monthly: 49.99,
+        features: [
+          'Tout du plan Starter',
+          'Paiements en ligne Stripe',
+          'Workflows email automatiques',
+          'Gestion d\'équipe',
+          'Support prioritaire'
+        ]
+      },
+      {
+        id: 'yearly',
+        name: 'Plan Pro Annuel',
+        price_monthly: 41.66,
+        price_yearly: 499.99,
+        features: [
+          'Tout du plan Pro',
+          '2 mois gratuits',
+          'Support prioritaire 24/7',
+          'Fonctionnalités avancées',
+          'Accès aux bêtas',
+          'Formation personnalisée'
+        ]
+      }
+    ];
+    
+    setSubscriptionPlans(defaultPlans);
+
+    if (!supabase) return;
 
     try {
       const { data, error } = await supabase
@@ -49,14 +75,11 @@ export function SubscriptionStatus() {
         .eq('is_active', true)
         .order('price_monthly');
 
-      if (!error && data) {
+      if (!error && data && data.length > 0) {
         setSubscriptionPlans(data);
-      } else {
-        setSubscriptionPlans([]);
       }
     } catch (error) {
       console.error('Erreur chargement plans:', error);
-      setSubscriptionPlans([]);
     }
   };
 
@@ -180,7 +203,7 @@ export function SubscriptionStatus() {
         throw new Error('Plan non trouvé');
       }
 
-      const amount = planId === 'monthly' ? plan.price_monthly : plan.price_yearly || plan.price_monthly * 12;
+      const amount = planId === 'yearly' ? plan.price_yearly || plan.price_monthly * 12 : plan.price_monthly;
       const planName = plan.name;
 
       console.log('💳 Création session Stripe PLATEFORME:', {
@@ -544,14 +567,16 @@ export function SubscriptionStatus() {
               Plans d'Abonnement
             </h3>
 
-            <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+            <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
               {subscriptionPlans.map((plan) => (
                 <div 
                   key={plan.id}
                   className={`bg-white rounded-2xl shadow-lg p-6 border-2 transition-all duration-300 transform hover:scale-[1.02] ${
                     plan.id === 'yearly' 
                       ? 'border-purple-400 hover:border-purple-600 relative' 
-                      : 'border-gray-200 hover:border-blue-400'
+                      : plan.id === 'monthly'
+                      ? 'border-blue-400 hover:border-blue-600 relative'
+                      : 'border-gray-200 hover:border-green-400'
                   }`}
                 >
                   {plan.id === 'yearly' && (
@@ -561,18 +586,38 @@ export function SubscriptionStatus() {
                       </span>
                     </div>
                   )}
+                  
+                  {plan.id === 'monthly' && (
+                    <div className="absolute -top-3 left-1/2 transform -translate-x-1/2">
+                      <span className="bg-gradient-to-r from-blue-500 to-cyan-500 text-white px-4 py-1 rounded-full text-sm font-bold shadow-lg">
+                        ⭐ Populaire
+                      </span>
+                    </div>
+                  )}
 
                   <div className="text-center mb-6">
                     <div className={`w-12 h-12 rounded-xl flex items-center justify-center mx-auto mb-4 ${
                       plan.id === 'yearly'
                         ? 'bg-gradient-to-r from-purple-500 to-pink-500'
-                        : 'bg-gradient-to-r from-blue-500 to-cyan-500'
+                        : plan.id === 'monthly'
+                        ? 'bg-gradient-to-r from-blue-500 to-cyan-500'
+                        : 'bg-gradient-to-r from-green-500 to-emerald-500'
                     }`}>
-                      {plan.id === 'yearly' ? <Star className="w-6 h-6 text-white" /> : <CreditCard className="w-6 h-6 text-white" />}
+                      {plan.id === 'yearly' ? (
+                        <Star className="w-6 h-6 text-white" />
+                      ) : plan.id === 'monthly' ? (
+                        <Zap className="w-6 h-6 text-white" />
+                      ) : (
+                        <Sparkles className="w-6 h-6 text-white" />
+                      )}
                     </div>
                     <h4 className="text-xl font-bold text-gray-900 mb-2">{plan.name}</h4>
                     <div className={`text-3xl font-bold mb-2 ${
-                      plan.id === 'yearly' ? 'text-purple-600' : 'text-blue-600'
+                      plan.id === 'yearly' 
+                        ? 'text-purple-600' 
+                        : plan.id === 'monthly'
+                        ? 'text-blue-600'
+                        : 'text-green-600'
                     }`}>
                       {plan.price_monthly}€
                     </div>
@@ -589,7 +634,7 @@ export function SubscriptionStatus() {
                   <div className="space-y-2 mb-6">
                     {plan.features.map((feature: string, featureIndex: number) => (
                       <div key={featureIndex} className="flex items-center gap-2">
-                        <CheckCircle className="w-4 h-4 text-green-500" />
+                        <CheckCircle className="w-4 h-4 text-green-500 flex-shrink-0" />
                         <span className="text-gray-700 text-sm">{feature}</span>
                       </div>
                     ))}
@@ -600,10 +645,18 @@ export function SubscriptionStatus() {
                     className={`w-full ${
                       plan.id === 'yearly'
                         ? 'bg-gradient-to-r from-purple-600 to-pink-600 hover:from-purple-700 hover:to-pink-700'
-                        : ''
+                        : plan.id === 'monthly'
+                        ? 'bg-gradient-to-r from-blue-600 to-cyan-600 hover:from-blue-700 hover:to-cyan-700'
+                        : 'bg-gradient-to-r from-green-600 to-emerald-600 hover:from-green-700 hover:to-emerald-700'
                     }`}
                   >
-                    {plan.id === 'yearly' ? <Star className="w-4 h-4" /> : <CreditCard className="w-4 h-4" />}
+                    {plan.id === 'yearly' ? (
+                      <Star className="w-4 h-4" />
+                    ) : plan.id === 'monthly' ? (
+                      <Zap className="w-4 h-4" />
+                    ) : (
+                      <Sparkles className="w-4 h-4" />
+                    )}
                     S'abonner
                   </Button>
                 </div>

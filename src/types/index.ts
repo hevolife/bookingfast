@@ -154,3 +154,10 @@ export interface AffiliateReferral {
   status: 'pending' | 'paid';
   created_at: string;
 }
+
+export interface BookingLimitInfo {
+  allowed: boolean;
+  limit: number | null;
+  current: number;
+  remaining: number | null;
+}

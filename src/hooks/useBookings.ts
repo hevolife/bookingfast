@@ -108,6 +108,18 @@ export function useBookings() {
         console.warn('⚠️ Erreur vérification équipe:', teamError);
       }
 
+      // Vérifier la limite de réservations
+      const { data: limitCheck, error: limitError } = await supabase!
+        .rpc('check_booking_limit', { user_id_param: targetUserId });
+
+      if (limitError) {
+        console.warn('⚠️ Erreur vérification limite:', limitError);
+      } else if (limitCheck && !limitCheck.allowed) {
+        throw new Error(
+          `Limite de réservations atteinte ! Vous avez utilisé ${limitCheck.current}/${limitCheck.limit} réservations ce mois-ci. Passez au plan Pro pour des réservations illimitées.`
+        );
+      }
+
       const { data, error } = await supabase!
         .from('bookings')
         .insert([{ ...bookingData, user_id: targetUserId }])

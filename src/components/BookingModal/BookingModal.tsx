@@ -1,10 +1,11 @@
 import React, { useState, useEffect } from 'react';
-import { Calendar, User, Euro, Package, Search, Mail, Phone, X, FileText } from 'lucide-react';
+import { Calendar, User, Euro, Package, Search, Mail, Phone, X, FileText, AlertCircle } from 'lucide-react';
 import { useClients } from '../../hooks/useClients';
 import { useBookings } from '../../hooks/useBookings';
 import { useServices } from '../../hooks/useServices';
 import { useBusinessSettings } from '../../hooks/useBusinessSettings';
 import { usePlugins } from '../../hooks/usePlugins';
+import { useBookingLimit } from '../../hooks/useBookingLimit';
 import { Booking, Service, Client, Transaction } from '../../types';
 import { Modal } from '../UI/Modal';
 import { Button } from '../UI/Button';
@@ -43,6 +44,7 @@ export function BookingModal({
   const { settings } = useBusinessSettings();
   const { ensureCustomServiceExists } = useServices();
   const { userPlugins } = usePlugins();
+  const { limitInfo, canCreateBooking, isUnlimited, refetch: refetchLimit } = useBookingLimit();
   
   const [selectedService, setSelectedService] = useState<Service | null>(null);
   const [isCustomService, setIsCustomService] = useState(false);
@@ -232,6 +234,16 @@ export function BookingModal({
       return;
     }
 
+    // Vérifier la limite uniquement pour les nouvelles réservations
+    if (!editingBooking && !canCreateBooking) {
+      alert(
+        `Limite de réservations atteinte !\n\n` +
+        `Vous avez utilisé ${limitInfo?.current}/${limitInfo?.limit} réservations ce mois-ci.\n\n` +
+        `Passez au plan Pro pour des réservations illimitées.`
+      );
+      return;
+    }
+
     setSaving(true);
     
     try {
@@ -301,6 +313,8 @@ export function BookingModal({
         
         if (newBooking) {
           bookingEvents.emit('bookingCreated', newBooking);
+          // Rafraîchir les limites après création
+          refetchLimit();
         }
       }
 
@@ -322,6 +336,9 @@ export function BookingModal({
       await deleteBooking(editingBooking.id);
       
       bookingEvents.emit('bookingDeleted', editingBooking.id);
+      
+      // Rafraîchir les limites après suppression
+      refetchLimit();
       
       onSuccess();
       handleClose();
@@ -363,6 +380,57 @@ export function BookingModal({
         size="xl"
       >
         <form onSubmit={handleSubmit} className="space-y-4 sm:space-y-6 touch-action-pan-y">
+          {/* Afficher l'alerte de limite si applicable */}
+          {!editingBooking && limitInfo && !isUnlimited && (
+            <div className={`rounded-xl p-4 ${
+              canCreateBooking 
+                ? limitInfo.remaining! <= 10
+                  ? 'bg-yellow-50 border-2 border-yellow-300'
+                  : 'bg-blue-50 border-2 border-blue-300'
+                : 'bg-red-50 border-2 border-red-300'
+            }`}>
+              <div className="flex items-start gap-3">
+                <AlertCircle className={`w-5 h-5 mt-0.5 ${
+                  canCreateBooking
+                    ? limitInfo.remaining! <= 10
+                      ? 'text-yellow-600'
+                      : 'text-blue-600'
+                    : 'text-red-600'
+                }`} />
+                <div className="flex-1">
+                  <h4 className={`font-bold mb-1 ${
+                    canCreateBooking
+                      ? limitInfo.remaining! <= 10
+                        ? 'text-yellow-800'
+                        : 'text-blue-800'
+                      : 'text-red-800'
+                  }`}>
+                    {canCreateBooking 
+                      ? `${limitInfo.remaining} réservation${limitInfo.remaining! > 1 ? 's' : ''} restante${limitInfo.remaining! > 1 ? 's' : ''} ce mois-ci`
+                      : 'Limite de réservations atteinte !'
+                    }
+                  </h4>
+                  <p className={`text-sm ${
+                    canCreateBooking
+                      ? limitInfo.remaining! <= 10
+                        ? 'text-yellow-700'
+                        : 'text-blue-700'
+                      : 'text-red-700'
+                  }`}>
+                    {canCreateBooking
+                      ? `Vous avez utilisé ${limitInfo.current}/${limitInfo.limit} réservations. ${
+                          limitInfo.remaining! <= 10 
+                            ? 'Pensez à passer au plan Pro pour des réservations illimitées !' 
+                            : ''
+                        }`
+                      : `Vous avez atteint votre limite de ${limitInfo.limit} réservations pour ce mois. Passez au plan Pro pour continuer !`
+                    }
+                  </p>
+                </div>
+              </div>
+            </div>
+          )}
+
           <div className="grid grid-cols-1 lg:grid-cols-2 gap-4 sm:gap-6">
             <div className="space-y-4 sm:space-y-6 touch-action-pan-y">
               <div>
@@ -742,7 +810,8 @@ export function BookingModal({
             <Button
               type="submit"
               disabled={saving || (!selectedService && (!isCustomService || !customServiceData.name || customServiceData.price <= 0)) || 
-                !selectedClient?.firstname || !selectedClient?.lastname || !selectedClient?.email || !selectedClient?.phone}
+                !selectedClient?.firstname || !selectedClient?.lastname || !selectedClient?.email || !selectedClient?.phone ||
+                (!editingBooking && !canCreateBooking)}
               className="inline-flex items-center justify-center gap-1 sm:gap-2 font-medium rounded-xl sm:rounded-2xl transition-all duration-300 transform hover:scale-105 shadow-lg disabled:opacity-50 disabled:cursor-not-allowed disabled:transform-none text-center bg-gradient-to-r from-blue-600 via-purple-600 to-pink-600 text-white hover:from-blue-700 hover:via-purple-700 hover:to-pink-700 px-4 sm:px-6 py-3 text-sm sm:text-base min-h-[44px] flex-1"
               style={{
                 background: 'rgb(13 163 26)',
