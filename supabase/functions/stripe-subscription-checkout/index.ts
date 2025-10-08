@@ -1,5 +1,6 @@
 import 'jsr:@supabase/functions-js/edge-runtime.d.ts';
 import Stripe from 'npm:stripe@17.7.0';
+import { createClient } from 'jsr:@supabase/supabase-js@2';
 
 const corsHeaders = {
   'Access-Control-Allow-Origin': '*',
@@ -22,38 +23,75 @@ Deno.serve(async (req) => {
       )
     }
 
-    const { amount, currency = 'eur', success_url, cancel_url, customer_email, metadata, service_name } = await req.json()
+    const { plan_id, billing_period = 'monthly', success_url, cancel_url, customer_email, metadata } = await req.json()
 
     // Validation des paramètres
-    if (!amount || !success_url || !cancel_url || !customer_email || !service_name) {
-      console.error('❌ Paramètres manquants:', { amount, success_url, cancel_url, customer_email, service_name })
+    if (!plan_id || !success_url || !cancel_url || !customer_email) {
+      console.error('❌ Paramètres manquants:', { plan_id, billing_period, success_url, cancel_url, customer_email })
       return new Response(
-        JSON.stringify({ error: 'Paramètres requis manquants: amount, success_url, cancel_url, customer_email, service_name' }),
+        JSON.stringify({ error: 'Paramètres requis manquants: plan_id, success_url, cancel_url, customer_email' }),
         { status: 400, headers: corsHeaders }
       )
     }
 
     console.log('📊 Données reçues:', {
-      amount,
-      currency,
+      plan_id,
+      billing_period,
       customer_email,
-      service_name,
       user_id: metadata?.user_id
     })
 
-    // IMPORTANT: Pour les abonnements à BookingFast, utiliser VOS clés Stripe
-    // PAS les clés du client !
-    const stripeSecretKey = Deno.env.get('STRIPE_SECRET_KEY')
-    
-    if (!stripeSecretKey) {
-      console.error('❌ STRIPE_SECRET_KEY non configurée dans les variables d\'environnement')
+    // Initialiser Supabase client
+    const supabaseUrl = Deno.env.get('SUPABASE_URL')!
+    const supabaseServiceKey = Deno.env.get('SUPABASE_SERVICE_ROLE_KEY')!
+    const supabase = createClient(supabaseUrl, supabaseServiceKey)
+
+    // Récupérer le plan depuis la base de données
+    console.log('🔍 Récupération du plan:', plan_id)
+    const { data: plan, error: planError } = await supabase
+      .from('subscription_plans')
+      .select('*')
+      .eq('id', plan_id)
+      .single()
+
+    if (planError || !plan) {
+      console.error('❌ Plan non trouvé:', planError)
       return new Response(
-        JSON.stringify({ error: 'Configuration Stripe manquante. Contactez le support.' }),
-        { status: 500, headers: corsHeaders }
+        JSON.stringify({ error: 'Plan d\'abonnement non trouvé' }),
+        { status: 404, headers: corsHeaders }
       )
     }
 
-    console.log('🔑 Initialisation Stripe avec clé BookingFast...')
+    console.log('✅ Plan trouvé:', plan.name)
+
+    // Sélectionner le bon Price ID selon la période de facturation
+    let stripePriceId: string | null = null
+    let planName = plan.name
+
+    if (billing_period === 'yearly' && plan.stripe_price_id_yearly) {
+      stripePriceId = plan.stripe_price_id_yearly
+      planName = `${plan.name} (Annuel)`
+      console.log('📅 Abonnement annuel sélectionné')
+    } else if (plan.stripe_price_id_monthly) {
+      stripePriceId = plan.stripe_price_id_monthly
+      planName = `${plan.name} (Mensuel)`
+      console.log('📅 Abonnement mensuel sélectionné')
+    }
+
+    if (!stripePriceId) {
+      console.error('❌ Aucun Price ID Stripe trouvé pour ce plan et cette période')
+      return new Response(
+        JSON.stringify({ error: 'Configuration de prix manquante pour ce plan' }),
+        { status: 400, headers: corsHeaders }
+      )
+    }
+
+    console.log('💰 Price ID Stripe:', stripePriceId)
+
+    // Initialiser Stripe
+    const stripeSecretKey = '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'
+    
+    console.log('🔑 Initialisation Stripe...')
     const stripe = new Stripe(stripeSecretKey, {
       appInfo: {
         name: 'BookingFast',
@@ -91,8 +129,8 @@ Deno.serve(async (req) => {
       )
     }
 
-    // Créer la session de checkout
-    console.log('💳 Création session checkout...')
+    // Créer la session de checkout avec le Price ID
+    console.log('💳 Création session checkout avec Price ID...')
     
     try {
       const session = await stripe.checkout.sessions.create({
@@ -100,21 +138,25 @@ Deno.serve(async (req) => {
         payment_method_types: ['card'],
         line_items: [
           {
-            price_data: {
-              currency: currency,
-              product_data: {
-                name: service_name,
-                description: `Abonnement BookingFast - ${service_name}`,
-              },
-              unit_amount: Math.round(amount * 100), // Convertir en centimes
-            },
+            price: stripePriceId,
             quantity: 1,
           },
         ],
-        mode: 'payment',
+        mode: 'subscription',
         success_url,
         cancel_url,
-        metadata: metadata || {},
+        metadata: {
+          ...metadata,
+          plan_id,
+          billing_period,
+        },
+        subscription_data: {
+          metadata: {
+            ...metadata,
+            plan_id,
+            billing_period,
+          },
+        },
       })
 
       console.log('✅ Session checkout créée:', session.id)
@@ -138,8 +180,8 @@ Deno.serve(async (req) => {
         errorMessage = 'Clé API Stripe invalide. Contactez le support.'
       } else if (stripeError.message.includes('No such customer')) {
         errorMessage = 'Erreur client Stripe. Veuillez réessayer.'
-      } else if (stripeError.message.includes('amount')) {
-        errorMessage = 'Montant invalide. Le montant doit être supérieur à 0.'
+      } else if (stripeError.message.includes('price')) {
+        errorMessage = 'Configuration de prix invalide. Contactez le support.'
       }
       
       return new Response(

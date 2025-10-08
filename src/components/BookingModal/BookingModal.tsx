@@ -1,10 +1,11 @@
 import React, { useState, useEffect } from 'react';
-import { Calendar, User, Euro, Package, Search, Mail, Phone, X, FileText } from 'lucide-react';
+import { Calendar, User, Euro, Package, Search, Mail, Phone, X, FileText, AlertTriangle } from 'lucide-react';
 import { useClients } from '../../hooks/useClients';
 import { useBookings } from '../../hooks/useBookings';
 import { useServices } from '../../hooks/useServices';
 import { useBusinessSettings } from '../../hooks/useBusinessSettings';
 import { usePlugins } from '../../hooks/usePlugins';
+import { useSubscriptionLimits } from '../../hooks/useSubscriptionLimits';
 import { Booking, Service, Client, Transaction } from '../../types';
 import { Modal } from '../UI/Modal';
 import { Button } from '../UI/Button';
@@ -43,6 +44,7 @@ export function BookingModal({
   const { settings } = useBusinessSettings();
   const { ensureCustomServiceExists } = useServices();
   const { userPlugins } = usePlugins();
+  const { limits, loading: limitsLoading } = useSubscriptionLimits();
   
   const [selectedService, setSelectedService] = useState<Service | null>(null);
   const [isCustomService, setIsCustomService] = useState(false);
@@ -67,6 +69,10 @@ export function BookingModal({
   const occupiedSlots = bookings
     .filter(booking => booking.date === date && (!editingBooking || booking.id !== editingBooking.id))
     .map(booking => booking.time);
+
+  // Check if user can create booking
+  const canCreateBooking = !limitsLoading && (!limits || limits.canCreateBooking || editingBooking);
+  const canUseCustomService = !limitsLoading && (!limits || limits.canUseCustomService);
 
   useEffect(() => {
     if (editingBooking) {
@@ -222,6 +228,16 @@ export function BookingModal({
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
     
+    if (!canCreateBooking && !editingBooking) {
+      alert('Vous avez atteint la limite de réservations pour ce mois. Passez au plan Premium pour des réservations illimitées.');
+      return;
+    }
+
+    if (isCustomService && !canUseCustomService) {
+      alert('Les services personnalisés ne sont pas disponibles avec votre plan actuel. Passez au plan Premium pour débloquer cette fonctionnalité.');
+      return;
+    }
+    
     if ((!selectedService && !isCustomService) || !selectedClient) {
       alert('Veuillez sélectionner un service et un client');
       return;
@@ -363,6 +379,22 @@ export function BookingModal({
         size="xl"
       >
         <form onSubmit={handleSubmit} className="space-y-4 sm:space-y-6 touch-action-pan-y">
+          {/* Booking limit warning */}
+          {!editingBooking && !canCreateBooking && (
+            <div className="bg-red-50 border-2 border-red-200 rounded-xl p-4">
+              <div className="flex items-start gap-3">
+                <AlertTriangle className="w-5 h-5 text-red-600 flex-shrink-0 mt-0.5" />
+                <div>
+                  <h4 className="font-bold text-red-800 mb-1">Limite de réservations atteinte</h4>
+                  <p className="text-red-700 text-sm">
+                    Vous avez atteint la limite de {limits?.maxBookingsPerMonth} réservations pour ce mois. 
+                    Passez au plan Premium pour des réservations illimitées.
+                  </p>
+                </div>
+              </div>
+            </div>
+          )}
+
           <div className="grid grid-cols-1 lg:grid-cols-2 gap-4 sm:gap-6">
             <div className="space-y-4 sm:space-y-6 touch-action-pan-y">
               <div>
@@ -388,6 +420,10 @@ export function BookingModal({
                   <button
                     type="button"
                     onClick={() => {
+                      if (!canUseCustomService) {
+                        alert('Les services personnalisés ne sont pas disponibles avec votre plan actuel. Passez au plan Premium pour débloquer cette fonctionnalité.');
+                        return;
+                      }
                       setIsCustomService(true);
                       setSelectedService(null);
                     }}
@@ -395,9 +431,11 @@ export function BookingModal({
                       isCustomService
                         ? 'bg-white text-purple-600 shadow-md'
                         : 'text-gray-600 hover:text-gray-800'
-                    }`}
+                    } ${!canUseCustomService ? 'opacity-50 cursor-not-allowed' : ''}`}
+                    disabled={!canUseCustomService}
                   >
                     Service personnalisé
+                    {!canUseCustomService && ' 🔒'}
                   </button>
                 </div>
                 
@@ -741,7 +779,7 @@ export function BookingModal({
             </Button>
             <Button
               type="submit"
-              disabled={saving || (!selectedService && (!isCustomService || !customServiceData.name || customServiceData.price <= 0)) || 
+              disabled={saving || (!canCreateBooking && !editingBooking) || (!selectedService && (!isCustomService || !customServiceData.name || customServiceData.price <= 0)) || 
                 !selectedClient?.firstname || !selectedClient?.lastname || !selectedClient?.email || !selectedClient?.phone}
               className="inline-flex items-center justify-center gap-1 sm:gap-2 font-medium rounded-xl sm:rounded-2xl transition-all duration-300 transform hover:scale-105 shadow-lg disabled:opacity-50 disabled:cursor-not-allowed disabled:transform-none text-center bg-gradient-to-r from-blue-600 via-purple-600 to-pink-600 text-white hover:from-blue-700 hover:via-purple-700 hover:to-pink-700 px-4 sm:px-6 py-3 text-sm sm:text-base min-h-[44px] flex-1"
               style={{
