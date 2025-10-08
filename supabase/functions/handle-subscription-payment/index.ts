@@ -13,16 +13,14 @@ serve(async (req) => {
   }
 
   try {
-    console.log('💰 Traitement paiement d\'abonnement pour affiliation...')
+    console.log('💰 Traitement paiement abonnement plateforme...')
     
-    // Créer le client Supabase avec la clé service role
     const supabaseClient = createClient(
       Deno.env.get('SUPABASE_URL') ?? '',
       Deno.env.get('SUPABASE_SERVICE_ROLE_KEY') ?? ''
     )
 
-    // Lire les données de la requête
-    const { user_id, subscription_amount } = await req.json()
+    const { user_id, subscription_amount, plugin_slug, payment_type } = await req.json()
 
     if (!user_id || !subscription_amount) {
       return new Response(
@@ -31,9 +29,45 @@ serve(async (req) => {
       )
     }
 
-    console.log('🔍 Recherche parrainage pour utilisateur:', user_id)
+    console.log('📊 Données paiement:', {
+      user_id,
+      subscription_amount,
+      plugin_slug,
+      payment_type
+    })
 
-    // Vérifier si cet utilisateur a été parrainé
+    // SI C'EST UN ABONNEMENT PLATEFORME
+    if (payment_type === 'platform_subscription' && plugin_slug) {
+      console.log('💳 Création/mise à jour abonnement plugin...')
+      
+      // Créer ou mettre à jour l'abonnement
+      const { data: subscription, error: subError } = await supabaseClient
+        .from('subscriptions')
+        .upsert({
+          user_id,
+          plugin_slug,
+          status: 'active',
+          start_date: new Date().toISOString(),
+          end_date: new Date(Date.now() + 30 * 24 * 60 * 60 * 1000).toISOString(), // +30 jours
+          amount: subscription_amount,
+          updated_at: new Date().toISOString()
+        }, {
+          onConflict: 'user_id,plugin_slug'
+        })
+        .select()
+        .single()
+
+      if (subError) {
+        console.error('❌ Erreur création abonnement:', subError)
+        throw subError
+      }
+
+      console.log('✅ Abonnement créé/mis à jour:', subscription.id)
+    }
+
+    // VÉRIFIER SI L'UTILISATEUR A ÉTÉ PARRAINÉ (pour affiliation)
+    console.log('🔍 Vérification parrainage...')
+    
     const { data: referral, error: referralError } = await supabaseClient
       .from('affiliate_referrals')
       .select('*, affiliate:affiliates(*)')
@@ -42,16 +76,16 @@ serve(async (req) => {
       .single()
 
     if (referralError || !referral) {
-      console.log('ℹ️ Aucun parrainage trouvé pour cet utilisateur')
+      console.log('ℹ️ Aucun parrainage trouvé')
       return new Response(
-        JSON.stringify({ success: true, message: 'No affiliate referral found' }),
+        JSON.stringify({ success: true, message: 'Subscription created, no affiliate referral' }),
         { headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
       )
     }
 
     console.log('✅ Parrainage trouvé:', referral.affiliate_code)
 
-    // Récupérer les paramètres d'affiliation
+    // RÉCUPÉRER LES PARAMÈTRES D'AFFILIATION
     const { data: settings, error: settingsError } = await supabaseClient
       .from('affiliate_settings')
       .select('*')
@@ -61,12 +95,12 @@ serve(async (req) => {
     if (settingsError || !settings) {
       console.warn('⚠️ Paramètres d\'affiliation non trouvés')
       return new Response(
-        JSON.stringify({ success: true, message: 'Affiliate settings not found' }),
+        JSON.stringify({ success: true, message: 'Subscription created, affiliate settings not found' }),
         { headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
       )
     }
 
-    // Marquer la conversion si ce n'est pas déjà fait
+    // MARQUER LA CONVERSION
     if (!referral.conversion_date) {
       const { error: updateError } = await supabaseClient
         .from('affiliate_referrals')
@@ -83,7 +117,6 @@ serve(async (req) => {
       } else {
         console.log('✅ Conversion marquée')
         
-        // Mettre à jour les statistiques de l'affilié
         await supabaseClient
           .from('affiliates')
           .update({
@@ -94,9 +127,9 @@ serve(async (req) => {
       }
     }
 
-    // Calculer et créer la commission
+    // CALCULER ET CRÉER LA COMMISSION
     const commissionAmount = subscription_amount * (settings.commission_percentage / 100)
-    const currentMonth = new Date().toISOString().slice(0, 7) + '-01' // Premier jour du mois
+    const currentMonth = new Date().toISOString().slice(0, 7) + '-01'
 
     console.log('💰 Calcul commission:', {
       subscription_amount,
@@ -104,7 +137,6 @@ serve(async (req) => {
       commission_amount: commissionAmount
     })
 
-    // Vérifier si la commission pour ce mois n'existe pas déjà
     const { data: existingCommission, error: commissionCheckError } = await supabaseClient
       .from('affiliate_commissions')
       .select('id')
@@ -113,7 +145,6 @@ serve(async (req) => {
       .single()
 
     if (!existingCommission && !commissionCheckError) {
-      // Créer la commission
       const { error: commissionError } = await supabaseClient
         .from('affiliate_commissions')
         .insert([{
@@ -129,7 +160,6 @@ serve(async (req) => {
       } else {
         console.log('✅ Commission créée:', commissionAmount, '€')
         
-        // Mettre à jour les totaux de l'affilié
         await supabaseClient
           .from('affiliates')
           .update({
@@ -153,7 +183,7 @@ serve(async (req) => {
     )
 
   } catch (error) {
-    console.error('❌ Erreur traitement paiement affiliation:', error)
+    console.error('❌ Erreur traitement paiement:', error)
     return new Response(
       JSON.stringify({ error: error.message }),
       { status: 500, headers: { ...corsHeaders, 'Content-Type': 'application/json' } }

@@ -66,12 +66,9 @@ export function SubscriptionStatus() {
       return;
     }
 
-
     try {
       console.log('👑 Chargement des données d\'abonnement pour:', user.email);
       
-      // Vérifier d'abord si l'utilisateur possède une équipe (= propriétaire)
-      console.log('🔍 Vérification si propriétaire d\'équipe pour:', user.email);
       const { data: ownedTeamData, error: ownedTeamError } = await supabase
         .from('team_members')
         .select('user_id')
@@ -82,7 +79,6 @@ export function SubscriptionStatus() {
       const isOwner = !ownedTeamError && ownedTeamData && ownedTeamData.length > 0;
       console.log('👑 Résultat propriétaire:', { isOwner, ownedMembers: ownedTeamData?.length || 0 });
 
-      // Ensuite vérifier si l'utilisateur est membre d'une équipe (seulement s'il n'est pas propriétaire)
       const { data: membershipCheck, error: membershipError } = await supabase
         .from('team_members')
         .select('owner_id, is_active')
@@ -101,17 +97,15 @@ export function SubscriptionStatus() {
         memberOf: membershipCheck?.owner_id || 'aucun'
       });
       
-      // Déterminer l'ID utilisateur pour lequel charger les données d'abonnement
-      let targetUserId = user.id; // Par défaut, utiliser l'ID de l'utilisateur connecté
+      let targetUserId = user.id;
       
       if (isMember && membershipCheck?.owner_id) {
-        // Si c'est un membre d'équipe, charger les données du propriétaire
         targetUserId = membershipCheck.owner_id;
         console.log('👥 MEMBRE D\'ÉQUIPE - Chargement données du propriétaire:', targetUserId);
       } else {
         console.log('👑 PROPRIÉTAIRE - Chargement données propres:', targetUserId);
       }
-      // ÉTAPE 2: Récupérer les informations utilisateur
+
       const { data: userData, error: userError } = await supabase
         .from('users')
         .select('*')
@@ -132,7 +126,6 @@ export function SubscriptionStatus() {
 
       setUserStatus(userData);
 
-      // ÉTAPE 3: Récupérer tous les codes utilisés par l'utilisateur cible
       const { data: redemptions, error: redemptionError } = await supabase
         .from('code_redemptions')
         .select('id, code_id, user_id, redeemed_at, access_granted_until, created_at, updated_at')
@@ -140,7 +133,6 @@ export function SubscriptionStatus() {
         .order('redeemed_at', { ascending: false });
 
       if (!redemptionError && redemptions) {
-        // Charger les codes séparément
         const codeIds = [...new Set(redemptions.map(r => r.code_id))];
         const { data: codes, error: codesError } = await supabase
           .from('access_codes')
@@ -154,7 +146,6 @@ export function SubscriptionStatus() {
 
         setAllRedemptions(enrichedRedemptions);
 
-        // Trouver le code actif le plus récent
         const activeRedemption = enrichedRedemptions.find(redemption => {
           if (redemption.code?.access_type === 'lifetime' && redemption.code?.is_active) {
             return true;
@@ -192,7 +183,7 @@ export function SubscriptionStatus() {
       const amount = planId === 'monthly' ? plan.price_monthly : plan.price_yearly || plan.price_monthly * 12;
       const planName = plan.name;
 
-      console.log('💳 Création session Stripe:', {
+      console.log('💳 Création session Stripe PLATEFORME:', {
         planId,
         planName,
         amount,
@@ -200,15 +191,13 @@ export function SubscriptionStatus() {
         userId: user.id
       });
 
-      // Créer une session de checkout Stripe
       const supabaseUrl = import.meta.env.VITE_SUPABASE_URL;
-      
-      // ✅ FIX: Enlever le slash final de l'URL pour éviter le double slash
       const baseUrl = supabaseUrl.endsWith('/') ? supabaseUrl.slice(0, -1) : supabaseUrl;
       const checkoutUrl = `${baseUrl}/functions/v1/stripe-checkout`;
       
       console.log('🔗 URL Stripe checkout:', checkoutUrl);
 
+      // IMPORTANT: Utilise le Stripe de la PLATEFORME (pas celui de l'utilisateur)
       const response = await fetch(checkoutUrl, {
         method: 'POST',
         headers: {
@@ -225,7 +214,7 @@ export function SubscriptionStatus() {
             user_id: user.id,
             plan_id: planId,
             plan_type: planId,
-            subscription: 'true'
+            payment_type: 'platform_subscription' // IMPORTANT: Indique que c'est un abonnement plateforme
           },
         }),
       });
@@ -262,7 +251,6 @@ export function SubscriptionStatus() {
   };
 
   const getRemainingTrialDays = () => {
-    // Pour les membres d'équipe, ne pas afficher de jours restants
     if (isTeamMember) return 0;
     
     if (!userStatus?.trial_ends_at) return 0;
@@ -274,7 +262,6 @@ export function SubscriptionStatus() {
   };
 
   const getStatusColor = () => {
-    // Pour les membres d'équipe, toujours vert (accès complet)
     if (isTeamMember) {
       return 'from-green-500 to-emerald-500';
     }
@@ -293,7 +280,6 @@ export function SubscriptionStatus() {
   };
 
   const getStatusText = () => {
-    // Pour les membres d'équipe, affichage spécial
     if (isTeamMember) {
       return '👥 Membre d\'équipe - Accès complet';
     }
@@ -436,7 +422,6 @@ export function SubscriptionStatus() {
             {(!activeAccessCode || activeAccessCode.access_type !== 'lifetime') && userStatus?.subscription_status !== 'active' && !isTeamMember && (
               <button
                 onClick={() => {
-                  // Scroll vers les plans d'abonnement
                   document.getElementById('subscription-plans')?.scrollIntoView({ behavior: 'smooth' });
                 }}
                 className="p-6 bg-gradient-to-r from-blue-50 to-cyan-50 border-2 border-blue-200 rounded-2xl hover:border-blue-400 transition-all duration-300 transform hover:scale-[1.02] text-left"
@@ -638,9 +623,6 @@ export function SubscriptionStatus() {
             <div>
               <div className="text-sm text-gray-600 mb-1">Email</div>
               <div className="font-medium text-gray-900">{user?.email}</div>
-            </div>
-            
-            <div>
             </div>
           </div>
         </div>
