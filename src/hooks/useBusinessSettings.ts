@@ -56,11 +56,10 @@ export function useBusinessSettings() {
 
     try {
       setError(null);
+      console.log('🔄 Chargement paramètres pour:', user.email);
       
-      // Déterminer l'ID utilisateur pour lequel charger les données
       let targetUserId = user.id;
       
-      // Vérifier si l'utilisateur est membre d'une équipe
       try {
         const { data: membershipData, error: membershipError } = await supabase!
           .from('team_members')
@@ -79,21 +78,19 @@ export function useBusinessSettings() {
         console.warn('⚠️ Erreur vérification équipe, utilisation ID utilisateur:', teamError);
       }
 
-      const supabaseQuery = supabase!
+      const { data, error } = await supabase!
         .from('business_settings')
         .select('*')
         .eq('user_id', targetUserId)
         .limit(1)
         .maybeSingle();
 
-      const timeoutPromise = new Promise((_, reject) => 
-        setTimeout(() => reject(new Error('Timeout chargement paramètres')), 30000)
-      );
+      if (error && error.code !== 'PGRST116') {
+        throw error;
+      }
 
-      const { data, error } = await Promise.race([supabaseQuery, timeoutPromise]);
-
-      if (error) {
-        console.warn('Paramètres non trouvés, utilisation des valeurs par défaut');
+      if (!data) {
+        console.log('⚠️ Paramètres non trouvés, création des valeurs par défaut');
         const defaultSettings: BusinessSettings = {
           id: 'default',
           user_id: targetUserId,
@@ -131,17 +128,12 @@ export function useBusinessSettings() {
         return;
       }
 
+      console.log('✅ Paramètres chargés');
       setSettings(data);
       
     } catch (err) {
       console.error('Erreur lors du chargement des paramètres:', err);
       
-      // Ne pas afficher d'erreur pour les timeouts
-      if (err instanceof Error && err.message.includes('Timeout')) {
-        console.log('⏰ Timeout paramètres - utilisation des valeurs par défaut');
-      }
-      
-      // En cas d'erreur réseau ou autre, utiliser les paramètres par défaut
       const defaultSettings: BusinessSettings = {
         id: 'default-fallback',
         user_id: user.id,
@@ -175,7 +167,7 @@ export function useBusinessSettings() {
         timezone: 'Europe/Paris',
       };
       setSettings(defaultSettings);
-      setError(null); // Ne pas afficher d'erreur à l'utilisateur
+      setError(null);
     } finally {
       setLoading(false);
     }
@@ -221,20 +213,71 @@ export function useBusinessSettings() {
 
   useEffect(() => {
     let mounted = true;
+    let timeoutId: NodeJS.Timeout;
     
     const loadSettings = async () => {
-      if (mounted && user) {
-        setLoading(true);
-        await fetchSettings();
+      if (!mounted || !user) {
+        setLoading(false);
+        return;
       }
+
+      console.log('🔄 Chargement paramètres business');
+      setLoading(true);
+      
+      // Timeout de sécurité
+      timeoutId = setTimeout(() => {
+        if (mounted) {
+          console.warn('⏰ Timeout chargement paramètres - utilisation valeurs par défaut');
+          const defaultSettings: BusinessSettings = {
+            id: 'default-timeout',
+            user_id: user.id,
+            business_name: 'BookingFast',
+            primary_color: '#3B82F6',
+            secondary_color: '#8B5CF6',
+            opening_hours: {
+              monday: { ranges: [{ start: '08:00', end: '18:00' }], closed: false },
+              tuesday: { ranges: [{ start: '08:00', end: '18:00' }], closed: false },
+              wednesday: { ranges: [{ start: '08:00', end: '18:00' }], closed: false },
+              thursday: { ranges: [{ start: '08:00', end: '18:00' }], closed: false },
+              friday: { ranges: [{ start: '08:00', end: '18:00' }], closed: false },
+              saturday: { ranges: [{ start: '09:00', end: '17:00' }], closed: false },
+              sunday: { ranges: [{ start: '10:00', end: '16:00' }], closed: true }
+            },
+            buffer_minutes: 15,
+            default_deposit_percentage: 30,
+            minimum_booking_delay_hours: 24,
+            payment_link_expiry_minutes: 30,
+            deposit_type: 'percentage',
+            deposit_fixed_amount: 20,
+            email_notifications: true,
+            brevo_enabled: false,
+            brevo_api_key: '',
+            brevo_sender_email: '',
+            brevo_sender_name: 'BookingFast',
+            stripe_enabled: false,
+            stripe_public_key: '',
+            stripe_secret_key: '',
+            stripe_webhook_secret: '',
+            timezone: 'Europe/Paris',
+          };
+          setSettings(defaultSettings);
+          setLoading(false);
+        }
+      }, 10000);
+      
+      await fetchSettings();
+      clearTimeout(timeoutId);
     };
     
     if (user) {
       loadSettings();
+    } else {
+      setLoading(false);
     }
     
     return () => {
       mounted = false;
+      if (timeoutId) clearTimeout(timeoutId);
     };
   }, [user?.id]);
 
