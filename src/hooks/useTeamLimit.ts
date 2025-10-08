@@ -7,6 +7,7 @@ interface TeamLimitInfo {
   limit: number | null;
   current: number;
   remaining: number | null;
+  has_plugin?: boolean;
 }
 
 export function useTeamLimit() {
@@ -55,6 +56,7 @@ export function useTeamLimit() {
     refetch: checkLimit,
     canInviteMember: limitInfo?.allowed ?? true,
     isUnlimited: limitInfo?.limit === null,
-    isAtLimit: limitInfo ? limitInfo.current >= (limitInfo.limit || 0) : false
+    isAtLimit: limitInfo ? limitInfo.current >= (limitInfo.limit || 0) : false,
+    hasPlugin: limitInfo?.has_plugin ?? false
   };
 }

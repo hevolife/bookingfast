@@ -1,5 +1,5 @@
 import React, { useState } from 'react';
-import { Users, Plus, Edit, Trash2, Shield, Mail, Phone, Save, X, AlertTriangle, UserPlus, Eye, Crown, Star, Award, Settings, Building2, Zap, TrendingUp, Key, Clock } from 'lucide-react';
+import { Users, Plus, Edit, Trash2, Shield, Mail, Phone, Save, X, AlertTriangle, UserPlus, Eye, Crown, Star, Award, Settings, Building2, Zap, TrendingUp, Key, Clock, Package } from 'lucide-react';
 import { useTeam } from '../../hooks/useTeam';
 import { useTeamLimit } from '../../hooks/useTeamLimit';
 import { usePlugins } from '../../hooks/usePlugins';
@@ -29,6 +29,7 @@ export function TeamManagement() {
     canInviteMember,
     isUnlimited,
     isAtLimit,
+    hasPlugin,
     refetch: refetchTeamLimit
   } = useTeamLimit();
 
@@ -42,6 +43,7 @@ export function TeamManagement() {
   const [memberToDelete, setMemberToDelete] = useState<any>(null);
   const [selectedRole, setSelectedRole] = useState<string>('employee');
   const [showUpgradeModal, setShowUpgradeModal] = useState(false);
+  const [showPluginModal, setShowPluginModal] = useState(false);
   const [showPluginPermissionsModal, setShowPluginPermissionsModal] = useState(false);
   const [selectedMemberForPlugins, setSelectedMemberForPlugins] = useState<any>(null);
 
@@ -65,12 +67,24 @@ export function TeamManagement() {
 
     // Vérifier la limite d'équipe
     if (!canInviteMember) {
-      alert(
-        `Limite de membres d'équipe atteinte !\n\n` +
-        `Votre plan Starter ne permet pas d'inviter des membres d'équipe.\n\n` +
-        `Passez au plan Pro pour inviter des membres illimités !`
-      );
-      setShowUpgradeModal(true);
+      // Si plan Starter (limite 0)
+      if (teamLimitInfo?.limit === 0) {
+        alert(
+          `Limite de membres d'équipe atteinte !\n\n` +
+          `Votre plan Starter ne permet pas d'inviter des membres d'équipe.\n\n` +
+          `Passez au plan Pro pour inviter jusqu'à 10 membres !`
+        );
+        setShowUpgradeModal(true);
+      } 
+      // Si plan Pro (limite 10) sans plugin
+      else if (teamLimitInfo?.limit === 10 && !hasPlugin) {
+        alert(
+          `Limite de membres d'équipe atteinte !\n\n` +
+          `Votre plan Pro permet d'inviter jusqu'à 10 membres.\n\n` +
+          `Activez le plugin Pack Société pour des invitations illimitées !`
+        );
+        setShowPluginModal(true);
+      }
       return;
     }
 
@@ -123,8 +137,12 @@ export function TeamManagement() {
   };
 
   const handleUpgradeToPro = () => {
-    // Rediriger vers la page d'abonnement
     window.location.href = '/settings?tab=subscription';
+  };
+
+  const handleActivatePlugin = () => {
+    // Rediriger vers la page des plugins
+    window.location.href = '/plugins';
   };
 
   const handleManagePluginPermissions = (member: any) => {
@@ -302,20 +320,20 @@ export function TeamManagement() {
             <div className="bg-white border border-purple-300 rounded-xl p-4">
               <div className="flex items-center justify-between mb-2">
                 <div className="text-sm text-purple-700 font-medium">Membres actifs</div>
-                {isUnlimited && (
+                {hasPlugin && (
                   <div className="flex items-center gap-1 text-xs bg-gradient-to-r from-green-500 to-emerald-500 text-white px-2 py-1 rounded-full">
-                    <Zap className="w-3 h-3" />
-                    Illimité
+                    <Package className="w-3 h-3" />
+                    Pack Société
                   </div>
                 )}
               </div>
               <div className="flex items-baseline gap-2">
                 <div className="text-2xl font-bold text-purple-600">{teamLimitInfo?.current || 0}</div>
-                {!isUnlimited && (
+                {!hasPlugin && (
                   <div className="text-sm text-gray-500">/ {teamLimitInfo?.limit || 0}</div>
                 )}
               </div>
-              {!isUnlimited && teamLimitInfo && (
+              {!hasPlugin && teamLimitInfo && teamLimitInfo.limit !== null && (
                 <div className="mt-2 bg-gray-200 rounded-full h-2 overflow-hidden">
                   <div 
                     className={`h-full transition-all duration-300 ${
@@ -327,7 +345,7 @@ export function TeamManagement() {
                   />
                 </div>
               )}
-              {isAtLimit && (
+              {isAtLimit && !hasPlugin && (
                 <div className="mt-2 text-xs text-red-600 font-medium">
                   ⚠️ Limite atteinte
                 </div>
@@ -336,7 +354,7 @@ export function TeamManagement() {
             
             <div className="bg-white border border-purple-300 rounded-xl p-4 text-center">
               <div className="text-2xl font-bold text-purple-600">
-                {isUnlimited ? '∞' : (teamLimitInfo?.remaining || 0)}
+                {hasPlugin ? '∞' : (teamLimitInfo?.remaining || 0)}
               </div>
               <div className="text-sm text-purple-700">Places disponibles</div>
             </div>
@@ -347,23 +365,37 @@ export function TeamManagement() {
             </div>
           </div>
 
-          {isAtLimit && !isUnlimited && (
+          {isAtLimit && !hasPlugin && (
             <div className="mt-4 bg-gradient-to-r from-orange-50 to-pink-50 border-2 border-orange-200 rounded-xl p-4">
               <div className="flex items-start gap-3">
                 <div className="w-10 h-10 bg-gradient-to-r from-orange-500 to-pink-500 rounded-lg flex items-center justify-center flex-shrink-0">
-                  <TrendingUp className="w-5 h-5 text-white" />
+                  {teamLimitInfo?.limit === 0 ? <TrendingUp className="w-5 h-5 text-white" /> : <Package className="w-5 h-5 text-white" />}
                 </div>
                 <div className="flex-1">
-                  <h4 className="font-bold text-orange-800 mb-1">Besoin d'inviter des membres ?</h4>
+                  <h4 className="font-bold text-orange-800 mb-1">
+                    {teamLimitInfo?.limit === 0 ? 'Besoin d\'inviter des membres ?' : 'Besoin de plus de membres ?'}
+                  </h4>
                   <p className="text-sm text-orange-700 mb-3">
-                    Votre plan Starter ne permet pas d'inviter des membres d'équipe. Passez au plan Pro pour des invitations illimitées !
+                    {teamLimitInfo?.limit === 0 
+                      ? 'Votre plan Starter ne permet pas d\'inviter des membres d\'équipe. Passez au plan Pro pour inviter jusqu\'à 10 membres !'
+                      : 'Vous avez atteint la limite de 10 membres. Activez le plugin Pack Société pour des invitations illimitées !'
+                    }
                   </p>
                   <button
-                    onClick={() => setShowUpgradeModal(true)}
+                    onClick={() => teamLimitInfo?.limit === 0 ? setShowUpgradeModal(true) : setShowPluginModal(true)}
                     className="bg-gradient-to-r from-orange-500 to-pink-500 text-white px-4 py-2 rounded-lg hover:from-orange-600 hover:to-pink-600 transition-all duration-300 font-medium text-sm flex items-center gap-2"
                   >
-                    <Zap className="w-4 h-4" />
-                    Passer au plan Pro
+                    {teamLimitInfo?.limit === 0 ? (
+                      <>
+                        <Zap className="w-4 h-4" />
+                        Passer au plan Pro
+                      </>
+                    ) : (
+                      <>
+                        <Package className="w-4 h-4" />
+                        Activer Pack Société
+                      </>
+                    )}
                   </button>
                 </div>
               </div>
@@ -385,17 +417,21 @@ export function TeamManagement() {
           <Button
             onClick={() => {
               if (!canInviteMember) {
-                setShowUpgradeModal(true);
+                if (teamLimitInfo?.limit === 0) {
+                  setShowUpgradeModal(true);
+                } else {
+                  setShowPluginModal(true);
+                }
                 return;
               }
               resetForm();
               setShowMemberModal(true);
             }}
             className="flex items-center justify-center gap-2 w-full sm:w-auto"
-            disabled={!canInviteMember && !isUnlimited}
+            disabled={!canInviteMember && !hasPlugin}
           >
             <UserPlus className="w-5 h-5" />
-            {!canInviteMember && !isUnlimited ? 'Limite atteinte' : 'Inviter un Membre'}
+            {!canInviteMember && !hasPlugin ? 'Limite atteinte' : 'Inviter un Membre'}
           </Button>
         </div>
 
@@ -587,6 +623,87 @@ export function TeamManagement() {
         />
       )}
 
+      {showPluginModal && (
+        <Modal
+          isOpen={showPluginModal}
+          onClose={() => setShowPluginModal(false)}
+          title="Activer Pack Société"
+          size="lg"
+        >
+          <div className="space-y-6">
+            <div className="text-center">
+              <div className="w-20 h-20 bg-gradient-to-r from-green-500 to-emerald-500 rounded-2xl flex items-center justify-center mx-auto mb-4 shadow-lg">
+                <Package className="w-10 h-10 text-white" />
+              </div>
+              <h3 className="text-2xl font-bold text-gray-900 mb-2">Pack Société</h3>
+              <p className="text-gray-600 mb-6">
+                Débloquez les invitations illimitées pour votre équipe
+              </p>
+            </div>
+
+            <div className="bg-gradient-to-r from-green-50 to-emerald-50 rounded-xl p-6 border-2 border-green-200">
+              <div className="space-y-4">
+                <div className="flex items-start gap-3">
+                  <div className="w-6 h-6 bg-gradient-to-r from-green-500 to-emerald-500 rounded-lg flex items-center justify-center flex-shrink-0">
+                    <Users className="w-4 h-4 text-white" />
+                  </div>
+                  <div>
+                    <div className="font-bold text-gray-900">Membres illimités</div>
+                    <div className="text-sm text-gray-600">Invitez autant de membres que nécessaire</div>
+                  </div>
+                </div>
+
+                <div className="flex items-start gap-3">
+                  <div className="w-6 h-6 bg-gradient-to-r from-green-500 to-emerald-500 rounded-lg flex items-center justify-center flex-shrink-0">
+                    <Shield className="w-4 h-4 text-white" />
+                  </div>
+                  <div>
+                    <div className="font-bold text-gray-900">Gestion avancée</div>
+                    <div className="text-sm text-gray-600">Permissions et rôles personnalisés</div>
+                  </div>
+                </div>
+
+                <div className="flex items-start gap-3">
+                  <div className="w-6 h-6 bg-gradient-to-r from-green-500 to-emerald-500 rounded-lg flex items-center justify-center flex-shrink-0">
+                    <Building2 className="w-4 h-4 text-white" />
+                  </div>
+                  <div>
+                    <div className="font-bold text-gray-900">Idéal pour les entreprises</div>
+                    <div className="text-sm text-gray-600">Gérez plusieurs équipes et départements</div>
+                  </div>
+                </div>
+              </div>
+            </div>
+
+            <div className="bg-white border-2 border-gray-200 rounded-xl p-6 text-center">
+              <div className="text-4xl font-bold text-gray-900 mb-2">29,99€</div>
+              <div className="text-gray-600 mb-4">par mois</div>
+              <div className="inline-flex items-center gap-2 bg-green-100 text-green-700 px-4 py-2 rounded-full text-sm font-medium">
+                <Zap className="w-4 h-4" />
+                Essai gratuit 7 jours
+              </div>
+            </div>
+
+            <div className="flex gap-3">
+              <Button
+                variant="secondary"
+                onClick={() => setShowPluginModal(false)}
+                className="flex-1"
+              >
+                Plus tard
+              </Button>
+              <Button
+                onClick={handleActivatePlugin}
+                className="flex-1 bg-gradient-to-r from-green-500 to-emerald-500 hover:from-green-600 hover:to-emerald-600"
+              >
+                <Package className="w-4 h-4" />
+                Voir le plugin
+              </Button>
+            </div>
+          </div>
+        </Modal>
+      )}
+
       {showUpgradeModal && (
         <Modal
           isOpen={showUpgradeModal}
@@ -601,7 +718,7 @@ export function TeamManagement() {
               </div>
               <h3 className="text-2xl font-bold text-gray-900 mb-2">Invitez votre équipe</h3>
               <p className="text-gray-600 mb-6">
-                Passez au plan Pro pour inviter des membres illimités
+                Passez au plan Pro pour inviter jusqu'à 10 membres
               </p>
             </div>
 
@@ -612,8 +729,8 @@ export function TeamManagement() {
                     <Users className="w-4 h-4 text-white" />
                   </div>
                   <div>
-                    <div className="font-bold text-gray-900">Membres illimités</div>
-                    <div className="text-sm text-gray-600">Invitez autant de membres que nécessaire</div>
+                    <div className="font-bold text-gray-900">Jusqu'à 10 membres</div>
+                    <div className="text-sm text-gray-600">Invitez votre équipe à collaborer</div>
                   </div>
                 </div>
 
@@ -634,6 +751,16 @@ export function TeamManagement() {
                   <div>
                     <div className="font-bold text-gray-900">Réservations illimitées</div>
                     <div className="text-sm text-gray-600">Plus de limite de 100 réservations/mois</div>
+                  </div>
+                </div>
+
+                <div className="flex items-start gap-3">
+                  <div className="w-6 h-6 bg-gradient-to-r from-blue-500 to-purple-500 rounded-lg flex items-center justify-center flex-shrink-0">
+                    <Package className="w-4 h-4 text-white" />
+                  </div>
+                  <div>
+                    <div className="font-bold text-gray-900">Besoin de plus ?</div>
+                    <div className="text-sm text-gray-600">Ajoutez le Pack Société pour des membres illimités</div>
                   </div>
                 </div>
               </div>
