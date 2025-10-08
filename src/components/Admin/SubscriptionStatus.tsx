@@ -22,14 +22,14 @@ export function SubscriptionStatus() {
   }, [user]);
 
   const loadSubscriptionPlans = async () => {
-    // Plans par défaut avec le nouveau Starter
+    // Plans par défaut avec descriptions mises à jour
     const defaultPlans = [
       {
         id: 'starter',
         name: 'Starter Mensuel',
         price_monthly: 29.99,
         features: [
-          'Réservations illimitées',
+          '100 réservations par mois',
           'Gestion des clients',
           'Calendrier intégré',
           'Support email',
@@ -41,10 +41,10 @@ export function SubscriptionStatus() {
         name: 'Plan Pro Mensuel',
         price_monthly: 49.99,
         features: [
-          'Tout du plan Starter',
+          'Réservations illimitées',
           'Paiements en ligne Stripe',
           'Workflows email automatiques',
-          'Gestion d\'équipe',
+          'Jusqu\'à 10 membres d\'équipe',
           'Support prioritaire'
         ]
       },
@@ -54,12 +54,13 @@ export function SubscriptionStatus() {
         price_monthly: 41.66,
         price_yearly: 499.99,
         features: [
-          'Tout du plan Pro',
-          '2 mois gratuits',
+          'Réservations illimitées',
+          'Paiements en ligne Stripe',
+          'Workflows email automatiques',
+          'Jusqu\'à 10 membres d\'équipe',
           'Support prioritaire 24/7',
           'Fonctionnalités avancées',
-          'Accès aux bêtas',
-          'Formation personnalisée'
+          'Accès aux bêtas'
         ]
       }
     ];

@@ -62,8 +62,8 @@ export function LandingPage() {
     },
     {
       icon: Users,
-      title: "Gestion Clients",
-      description: "Base de données clients complète avec historique des réservations",
+      title: "Gestion d'Équipe",
+      description: "Ajoutez jusqu'à 10 membres avec le plan Pro, illimité avec Pack Société",
       color: "from-orange-500 to-red-500"
     }
   ];
@@ -358,10 +358,11 @@ export function LandingPage() {
                   'Gestion des clients',
                   'Paiements en ligne',
                   'Workflows email',
+                  'Jusqu\'à 10 membres d\'équipe',
                   'Support email'
                 ].map((feature, index) => (
                   <div key={index} className="flex items-center gap-3">
-                    <CheckCircle className="w-5 h-5 text-green-500" />
+                    <CheckCircle className="w-5 h-5 text-green-500 flex-shrink-0" />
                     <span className="text-gray-700">{feature}</span>
                   </div>
                 ))}
@@ -399,12 +400,13 @@ export function LandingPage() {
                 {[
                   'Tout du plan mensuel',
                   '2 mois gratuits',
+                  'Jusqu\'à 10 membres d\'équipe',
                   'Support prioritaire',
                   'Fonctionnalités avancées',
                   'Accès aux bêtas'
                 ].map((feature, index) => (
                   <div key={index} className="flex items-center gap-3">
-                    <CheckCircle className="w-5 h-5 text-green-500" />
+                    <CheckCircle className="w-5 h-5 text-green-500 flex-shrink-0" />
                     <span className="text-gray-700">{feature}</span>
                   </div>
                 ))}
@@ -416,6 +418,39 @@ export function LandingPage() {
               >
                 Commencer maintenant
               </button>
+            </div>
+          </div>
+
+          {/* Pack Société Plugin Info */}
+          <div className="mt-12 max-w-4xl mx-auto">
+            <div className="bg-gradient-to-r from-orange-50 to-amber-50 rounded-3xl p-8 border-2 border-orange-200 shadow-xl">
+              <div className="flex items-start gap-6">
+                <div className="w-16 h-16 bg-gradient-to-r from-orange-500 to-amber-500 rounded-2xl flex items-center justify-center flex-shrink-0">
+                  <Users className="w-8 h-8 text-white" />
+                </div>
+                <div className="flex-1">
+                  <h3 className="text-2xl font-bold text-gray-900 mb-3">
+                    🚀 Pack Société - Membres d'équipe illimités
+                  </h3>
+                  <p className="text-gray-700 mb-4 leading-relaxed">
+                    Besoin de plus de 10 membres d'équipe ? Activez le <strong>Pack Société</strong> pour débloquer un nombre illimité de collaborateurs et gérer votre entreprise sans limites.
+                  </p>
+                  <div className="flex flex-wrap gap-3">
+                    <div className="flex items-center gap-2 bg-white px-4 py-2 rounded-xl border border-orange-200">
+                      <CheckCircle className="w-5 h-5 text-green-500" />
+                      <span className="text-sm font-medium text-gray-700">Membres illimités</span>
+                    </div>
+                    <div className="flex items-center gap-2 bg-white px-4 py-2 rounded-xl border border-orange-200">
+                      <CheckCircle className="w-5 h-5 text-green-500" />
+                      <span className="text-sm font-medium text-gray-700">Gestion multi-sites</span>
+                    </div>
+                    <div className="flex items-center gap-2 bg-white px-4 py-2 rounded-xl border border-orange-200">
+                      <CheckCircle className="w-5 h-5 text-green-500" />
+                      <span className="text-sm font-medium text-gray-700">Support prioritaire</span>
+                    </div>
+                  </div>
+                </div>
+              </div>
             </div>
           </div>
         </div>
@@ -521,7 +556,7 @@ export function LandingPage() {
                 <li>Planning intelligent</li>
                 <li>Paiements en ligne</li>
                 <li>Emails automatiques</li>
-                <li>Gestion clients</li>
+                <li>Gestion d'équipe</li>
               </ul>
             </div>
             
