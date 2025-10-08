@@ -184,6 +184,8 @@ export function SubscriptionStatus() {
     if (!user || !supabase) return;
 
     try {
+      console.log('💳 Début processus abonnement:', { planId, userId: user.id, email: user.email });
+      
       const plan = subscriptionPlans.find(p => p.id === planId);
       if (!plan) {
         throw new Error('Plan non trouvé');
@@ -192,40 +194,61 @@ export function SubscriptionStatus() {
       const amount = planId === 'monthly' ? plan.price_monthly : plan.price_yearly || plan.price_monthly * 12;
       const planName = plan.name;
 
+      console.log('📊 Détails plan:', { planId, planName, amount });
+
       // Créer une session de checkout Stripe
       const supabaseUrl = import.meta.env.VITE_SUPABASE_URL;
-      const response = await fetch(`${supabaseUrl}/functions/v1/stripe-checkout`, {
+      
+      // CORRECTION: Enlever le double slash
+      const functionUrl = `${supabaseUrl}/functions/v1/stripe-subscription-checkout`;
+      
+      console.log('🔗 URL Edge Function:', functionUrl);
+
+      const payload = {
+        amount: amount,
+        service_name: planName,
+        customer_email: user.email,
+        success_url: `${window.location.origin}/subscription-success`,
+        cancel_url: `${window.location.origin}/subscription-cancel`,
+        metadata: {
+          user_id: user.id,
+          plan_id: planId,
+          plan_type: planId,
+          subscription: 'true'
+        },
+      };
+
+      console.log('📤 Payload envoyé:', payload);
+
+      const response = await fetch(functionUrl, {
         method: 'POST',
         headers: {
           'Content-Type': 'application/json',
           'Authorization': `Bearer ${import.meta.env.VITE_SUPABASE_ANON_KEY}`,
         },
-        body: JSON.stringify({
-          amount: amount,
-          service_name: planName,
-          customer_email: user.email,
-          success_url: `${window.location.origin}/subscription-success`,
-          cancel_url: `${window.location.origin}/subscription-cancel`,
-          metadata: {
-            user_id: user.id,
-            plan_id: planId,
-            plan_type: planId,
-            subscription: 'true'
-          },
-        }),
+        body: JSON.stringify(payload),
       });
 
+      console.log('📥 Réponse reçue:', { status: response.status, ok: response.ok });
+
       if (response.ok) {
-        const { url } = await response.json();
-        if (url) {
-          window.location.href = url;
+        const data = await response.json();
+        console.log('✅ Données réponse:', data);
+        
+        if (data.url) {
+          console.log('🔗 Redirection vers Stripe:', data.url);
+          window.location.href = data.url;
+        } else {
+          throw new Error('URL de checkout manquante dans la réponse');
         }
       } else {
-        throw new Error('Erreur lors de la création de la session de paiement');
+        const errorData = await response.json().catch(() => ({ error: 'Erreur inconnue' }));
+        console.error('❌ Erreur réponse:', errorData);
+        throw new Error(errorData.error || 'Erreur lors de la création de la session de paiement');
       }
     } catch (error) {
-      console.error('Erreur abonnement:', error);
-      alert('Erreur lors de la création de l\'abonnement');
+      console.error('❌ Erreur abonnement:', error);
+      alert(`Erreur lors de la création de l'abonnement: ${error.message}`);
     }
   };
 
