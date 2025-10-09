@@ -122,9 +122,76 @@ Deno.serve(async (req) => {
         return new Response('Email client manquant', { status: 400, headers: corsHeaders })
       }
 
-      // Vérifier si c'est un paiement d'abonnement
+      // 🎯 NOUVEAU : Vérifier si c'est un paiement d'abonnement PLATEFORME
+      if (metadata.payment_type === 'platform_subscription') {
+        console.log('💳 🆕 ABONNEMENT PLATEFORME DÉTECTÉ')
+        
+        const userId = metadata.user_id
+        const planId = metadata.plan_id || metadata.plan_type
+        
+        if (!userId || !planId) {
+          console.error('❌ Données abonnement manquantes')
+          processedSessions.delete(sessionId)
+          return new Response('Données abonnement manquantes', { status: 400, headers: corsHeaders })
+        }
+        
+        console.log('👤 User ID:', userId)
+        console.log('📋 Plan ID:', planId)
+        
+        // Déterminer le tier d'abonnement
+        let subscriptionTier = 'starter'
+        if (planId === 'monthly' || planId === 'pro') {
+          subscriptionTier = 'pro'
+        } else if (planId === 'yearly') {
+          subscriptionTier = 'pro'
+        }
+        
+        console.log('🎯 Tier d\'abonnement:', subscriptionTier)
+        
+        // 🔥 MISE À JOUR CRITIQUE : Activer l'abonnement dans la table users
+        const { error: updateError } = await supabaseClient
+          .from('users')
+          .update({
+            subscription_tier: subscriptionTier,
+            subscription_status: 'active',
+            trial_ends_at: null, // Supprimer la date d'essai
+            updated_at: new Date().toISOString()
+          })
+          .eq('id', userId)
+        
+        if (updateError) {
+          console.error('❌ Erreur mise à jour abonnement:', updateError)
+          processedSessions.delete(sessionId)
+          return new Response('Erreur mise à jour abonnement', { status: 500, headers: corsHeaders })
+        }
+        
+        console.log('✅ ✅ ✅ ABONNEMENT ACTIVÉ AVEC SUCCÈS pour utilisateur:', userId)
+        console.log('📊 Nouveau statut:', {
+          subscription_tier: subscriptionTier,
+          subscription_status: 'active',
+          trial_ends_at: null
+        })
+        
+        const result = { 
+          success: true, 
+          type: 'platform_subscription',
+          userId: userId,
+          planId: planId,
+          subscriptionTier: subscriptionTier,
+          status: 'active'
+        }
+        
+        // Mettre à jour le cache avec le résultat final
+        processedSessions.set(sessionId, { timestamp: Date.now(), result })
+        
+        return new Response(JSON.stringify(result), {
+          headers: { ...corsHeaders, 'Content-Type': 'application/json' }
+        })
+      }
+
+      // Vérifier si c'est un paiement d'abonnement (ancien système)
       if (metadata.subscription === 'true') {
-        console.log('💳 Paiement d\'abonnement détecté')
+        console.log('💳 Paiement d\'abonnement détecté (ancien système)')
         
         const userId = metadata.user_id
         const planId = metadata.plan_id

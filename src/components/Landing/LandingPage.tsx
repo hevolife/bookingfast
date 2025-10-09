@@ -23,23 +23,32 @@ import {
 } from 'lucide-react';
 import { useNavigate, useLocation } from 'react-router-dom';
 import { isPWA } from '../../utils/pwaDetection';
+import { useAuth } from '../../contexts/AuthContext';
 
 export function LandingPage() {
   const navigate = useNavigate();
   const location = useLocation();
+  const { isAuthenticated } = useAuth();
   const [currentFeature, setCurrentFeature] = useState(0);
   const [isVisible, setIsVisible] = useState(false);
 
-  // Rediriger vers login si en mode PWA - MAIS PAS si on vient d'une route de réservation
+  // CORRECTION : Rediriger les utilisateurs authentifiés vers le dashboard
   useEffect(() => {
-    // Ne pas rediriger si on est sur une route de réservation publique
     const isBookingRoute = location.pathname.startsWith('/booking/');
     
+    // Si l'utilisateur est authentifié et pas sur une route de réservation publique
+    if (isAuthenticated && !isBookingRoute) {
+      console.log('✅ Utilisateur authentifié détecté sur landing page - redirection vers dashboard');
+      navigate('/dashboard', { replace: true });
+      return;
+    }
+
+    // Rediriger vers login si en mode PWA - MAIS PAS si on vient d'une route de réservation
     if (isPWA() && !isBookingRoute) {
       console.log('🚫 Landing page - PWA détecté, redirection vers /login');
       navigate('/login', { replace: true });
     }
-  }, [navigate, location.pathname]);
+  }, [navigate, location.pathname, isAuthenticated]);
 
   const features = [
     {

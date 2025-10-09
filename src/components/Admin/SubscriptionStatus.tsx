@@ -148,6 +148,12 @@ export function SubscriptionStatus() {
         return;
       }
 
+      console.log('📊 Données utilisateur chargées:', {
+        subscription_tier: userData.subscription_tier,
+        subscription_status: userData.subscription_status,
+        trial_ends_at: userData.trial_ends_at
+      });
+
       setUserStatus(userData);
 
       const { data: redemptions, error: redemptionError } = await supabase
@@ -232,8 +238,8 @@ export function SubscriptionStatus() {
           amount: amount,
           service_name: planName,
           customer_email: user.email,
-          success_url: `${window.location.origin}/subscription-success`,
-          cancel_url: `${window.location.origin}/subscription-cancel`,
+          success_url: `${window.location.origin}/dashboard?payment=success`,
+          cancel_url: `${window.location.origin}/dashboard?payment=cancelled`,
           metadata: {
             user_id: user.id,
             plan_id: planId,
@@ -320,7 +326,9 @@ export function SubscriptionStatus() {
       })`;
     }
     if (userStatus?.subscription_status === 'active') {
-      return '✅ Abonnement actif';
+      // Afficher le tier d'abonnement
+      const tierName = userStatus.subscription_tier === 'starter' ? 'Starter' : 'Pro';
+      return `✅ Abonnement ${tierName} actif`;
     }
     if (userStatus?.subscription_status === 'trial') {
       const remainingDays = getRemainingTrialDays();
@@ -378,7 +386,7 @@ export function SubscriptionStatus() {
                   : activeAccessCode
                   ? `Code "${activeAccessCode.code}" - ${activeAccessCode.description || 'Code d\'accès secret'}`
                   : userStatus?.subscription_status === 'active'
-                  ? 'Toutes les fonctionnalités sont disponibles'
+                  ? `Plan ${userStatus.subscription_tier === 'starter' ? 'Starter' : 'Pro'} - Toutes les fonctionnalités disponibles`
                   : userStatus?.subscription_status === 'trial'
                   ? `Essai gratuit jusqu'au ${formatDate(userStatus.trial_ends_at)}`
                   : 'Abonnez-vous pour accéder aux fonctionnalités'

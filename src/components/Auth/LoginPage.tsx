@@ -1,14 +1,14 @@
-import React, { useState } from 'react';
-import { useSearchParams } from 'react-router-dom';
+import React, { useState, useEffect } from 'react';
+import { useSearchParams, useNavigate } from 'react-router-dom';
 import { Mail, Lock, Eye, EyeOff, LogIn, UserPlus, Building2, Sparkles, Key, Gift, RotateCcw } from 'lucide-react';
 import { useAuth } from '../../contexts/AuthContext';
-import { useNavigate } from 'react-router-dom';
 import { AccessCodeRedemption } from './AccessCodeRedemption';
 import { useAppVersion } from '../../hooks/useAppVersion';
 import { ForgotPasswordModal } from './ForgotPasswordModal';
 
 export function LoginPage() {
   const [searchParams] = useSearchParams();
+  const navigate = useNavigate();
   const [isLogin, setIsLogin] = useState(true);
   const [email, setEmail] = useState('');
   const [password, setPassword] = useState('');
@@ -18,8 +18,7 @@ export function LoginPage() {
   const [showSecretCode, setShowSecretCode] = useState(false);
   const [showForgotPassword, setShowForgotPassword] = useState(false);
   
-  const { signIn, signUp } = useAuth();
-  const navigate = useNavigate();
+  const { signIn, signUp, isAuthenticated } = useAuth();
   const { currentVersion } = useAppVersion();
 
   // Récupérer le code d'affiliation depuis l'URL
@@ -27,6 +26,28 @@ export function LoginPage() {
 
   // Afficher un message si c'est un lien d'affiliation
   const isAffiliateSignup = affiliateCode && !isLogin;
+
+  // CORRECTION : Rediriger vers le dashboard si déjà authentifié
+  useEffect(() => {
+    if (isAuthenticated) {
+      console.log('✅ Utilisateur déjà authentifié - redirection vers dashboard');
+      navigate('/dashboard', { replace: true });
+    }
+  }, [isAuthenticated, navigate]);
+
+  // CORRECTION : Gérer le retour de confirmation d'email
+  useEffect(() => {
+    const type = searchParams.get('type');
+    const accessToken = searchParams.get('access_token');
+    
+    if (type === 'signup' && accessToken) {
+      console.log('✅ Email confirmé - redirection vers dashboard');
+      // L'utilisateur est maintenant authentifié via le token dans l'URL
+      // Le AuthContext va gérer la session automatiquement
+      navigate('/dashboard', { replace: true });
+    }
+  }, [searchParams, navigate]);
+
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
     setLoading(true);
@@ -36,7 +57,7 @@ export function LoginPage() {
       if (isLogin) {
         await signIn(email, password);
         // Redirection explicite après connexion réussie
-        window.location.href = '/dashboard';
+        navigate('/dashboard', { replace: true });
       } else {
         // Inscription avec gestion du code d'affiliation
         await signUp(email, password);
@@ -53,7 +74,7 @@ export function LoginPage() {
           }
         }
         
-        setError('Compte créé avec succès ! Vous pouvez maintenant vous connecter.');
+        setError('Compte créé avec succès ! Vérifiez votre email pour confirmer votre compte.');
         setIsLogin(true); // Basculer vers le mode connexion
         setPassword(''); // Vider le mot de passe
         return;
@@ -138,12 +159,12 @@ export function LoginPage() {
 
           {error && (
             <div className={`mb-6 p-4 rounded-2xl border-2 animate-fadeIn ${
-              error.includes('créé') 
+              error.includes('créé') || error.includes('Vérifiez votre email')
                 ? 'bg-green-50 border-green-200 text-green-800' 
                 : 'bg-red-50 border-red-200 text-red-800'
             }`}>
               <div className="flex items-center gap-2">
-                {error.includes('créé') ? '✅' : '❌'}
+                {error.includes('créé') || error.includes('Vérifiez votre email') ? '✅' : '❌'}
                 <span className="font-medium">{error}</span>
               </div>
             </div>
@@ -267,7 +288,7 @@ export function LoginPage() {
                   setShowSecretCode(false);
                   // Rediriger vers le dashboard après succès
                   setTimeout(() => {
-                    window.location.href = '/dashboard';
+                    navigate('/dashboard', { replace: true });
                   }, 1500);
                 }}
               />
