@@ -799,20 +799,19 @@ export function BookingModal({
           </div>
 
           <div className="flex flex-col sm:flex-row gap-3 mt-6 pt-4 border-t border-gray-200">
-            <Button
+            <button
               type="button"
-              variant="secondary"
               onClick={handleClose}
-              className="flex-1"
+              className="w-full sm:w-auto sm:min-w-[120px] bg-gradient-to-r from-gray-500 to-gray-600 text-white px-6 py-3 rounded-xl hover:from-gray-600 hover:to-gray-700 transition-all duration-300 transform hover:scale-105 shadow-lg disabled:opacity-50 disabled:cursor-not-allowed disabled:transform-none font-medium text-sm sm:text-base"
             >
               Annuler
-            </Button>
-            <Button
+            </button>
+            <button
               type="submit"
               disabled={saving || (!selectedService && (!isCustomService || !customServiceData.name || customServiceData.price <= 0)) || 
                 !selectedClient?.firstname || !selectedClient?.lastname || !selectedClient?.email || !selectedClient?.phone ||
                 (!editingBooking && !canCreateBooking)}
-              className="inline-flex items-center justify-center gap-1 sm:gap-2 font-medium rounded-xl sm:rounded-2xl transition-all duration-300 transform hover:scale-105 shadow-lg disabled:opacity-50 disabled:cursor-not-allowed disabled:transform-none text-center bg-gradient-to-r from-blue-600 via-purple-600 to-pink-600 text-white hover:from-blue-700 hover:via-purple-700 hover:to-pink-700 px-4 sm:px-6 py-3 text-sm sm:text-base min-h-[44px] flex-1"
+              className="w-full sm:flex-1 inline-flex items-center justify-center gap-2 font-medium rounded-xl transition-all duration-300 transform hover:scale-105 shadow-lg disabled:opacity-50 disabled:cursor-not-allowed disabled:transform-none text-center bg-gradient-to-r from-blue-600 via-purple-600 to-pink-600 text-white hover:from-blue-700 hover:via-purple-700 hover:to-pink-700 px-6 py-3 text-sm sm:text-base"
               style={{
                 background: 'rgb(13 163 26)',
                 borderColor: 'rgb(20 221 76)',
@@ -829,21 +828,20 @@ export function BookingModal({
                   {editingBooking ? 'Modifier' : 'Créer'}
                 </span>
               )}
-            </Button>
+            </button>
           </div>
         </form>
 
         {editingBooking && (
           <div className="mt-4 pt-4 border-t border-gray-200">
-            <Button
+            <button
               type="button"
-              variant="danger"
               onClick={() => setShowDeleteConfirm(true)}
               disabled={saving}
-              className="w-full sm:w-auto"
+              className="w-full sm:w-auto bg-gradient-to-r from-red-500 to-pink-500 text-white px-6 py-3 rounded-xl hover:from-red-600 hover:to-pink-600 transition-all duration-300 transform hover:scale-105 shadow-lg disabled:opacity-50 disabled:cursor-not-allowed disabled:transform-none font-medium text-sm sm:text-base"
             >
               Supprimer la réservation
-            </Button>
+            </button>
           </div>
         )}
       </Modal>
@@ -859,20 +857,18 @@ export function BookingModal({
             Êtes-vous sûr de vouloir supprimer cette réservation ? Cette action est irréversible.
           </p>
           <div className="flex gap-3">
-            <Button
+            <button
               type="button"
-              variant="secondary"
               onClick={() => setShowDeleteConfirm(false)}
-              className="flex-1"
+              className="flex-1 bg-gradient-to-r from-gray-500 to-gray-600 text-white px-6 py-3 rounded-xl hover:from-gray-600 hover:to-gray-700 transition-all duration-300 transform hover:scale-105 shadow-lg font-medium text-sm sm:text-base"
             >
               Annuler
-            </Button>
-            <Button
+            </button>
+            <button
               type="button"
-              variant="danger"
               onClick={handleDelete}
               disabled={saving}
-              className="flex-1"
+              className="flex-1 bg-gradient-to-r from-red-500 to-pink-500 text-white px-6 py-3 rounded-xl hover:from-red-600 hover:to-pink-600 transition-all duration-300 transform hover:scale-105 shadow-lg disabled:opacity-50 disabled:cursor-not-allowed disabled:transform-none font-medium text-sm sm:text-base"
             >
               {saving ? (
                 <div className="flex items-center gap-2">
@@ -882,7 +878,7 @@ export function BookingModal({
               ) : (
                 'Supprimer'
               )}
-            </Button>
+            </button>
           </div>
         </div>
       </Modal>

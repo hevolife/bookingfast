@@ -44,7 +44,7 @@ export function Button({
       {loading ? (
         <LoadingSpinner size="sm" />
       ) : icon ? (
-        <span className="flex items-center justify-center">{icon}</span>
+        <span className="flex items-center justify-center flex-shrink-0">{icon}</span>
       ) : null}
       <span className="flex items-center justify-center">{children}</span>
     </button>

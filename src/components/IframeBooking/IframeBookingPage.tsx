@@ -121,8 +121,13 @@ export function IframeBookingPage() {
         return;
       }
 
-      const supabaseUrl = import.meta.env.VITE_SUPABASE_URL;
-      const response = await fetch(`${supabaseUrl}/functions/v1/public-booking-data?user_id=${userId}`, {
+      // Construire l'URL en supprimant les slashes finaux/initiaux pour éviter les doubles slashes
+      const supabaseUrl = import.meta.env.VITE_SUPABASE_URL?.replace(/\/$/, ''); // Supprimer slash final
+      const functionUrl = `${supabaseUrl}/functions/v1/public-booking-data?user_id=${userId}`;
+      
+      console.log('🔍 Appel API:', functionUrl);
+      
+      const response = await fetch(functionUrl, {
         method: 'GET',
         headers: {
           'Content-Type': 'application/json',
@@ -130,12 +135,15 @@ export function IframeBookingPage() {
         },
       });
 
+      console.log('📡 Réponse API:', response.status, response.statusText);
+
       if (!response.ok) {
         console.warn(`⚠️ Erreur HTTP ${response.status} - utilisation des données par défaut`);
         throw new Error(`HTTP ${response.status}`);
       }
 
       const result = await response.json();
+      console.log('✅ Données reçues:', result);
       
       if (!result.success) {
         throw new Error(result.error || 'Erreur lors de la récupération des données');

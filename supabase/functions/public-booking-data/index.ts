@@ -35,30 +35,18 @@ serve(async (req) => {
 
     console.log('🔍 Récupération données pour userId:', userId)
 
-    // Vérifier d'abord que l'utilisateur existe
-    const { data: userData, error: userError } = await supabaseClient
-      .from('profiles')
-      .select('id, email, full_name')
-      .eq('id', userId)
-      .maybeSingle()
+    // Vérifier d'abord que l'utilisateur existe dans auth.users
+    const { data: userData, error: userError } = await supabaseClient.auth.admin.getUserById(userId)
 
-    if (userError) {
-      console.error('❌ Erreur vérification utilisateur:', userError)
-      return new Response(
-        JSON.stringify({ error: 'User verification failed', details: userError.message }),
-        { status: 404, headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
-      )
-    }
-
-    if (!userData) {
-      console.error('❌ Utilisateur non trouvé:', userId)
+    if (userError || !userData.user) {
+      console.error('❌ Utilisateur non trouvé:', userId, userError)
       return new Response(
         JSON.stringify({ error: 'User not found' }),
         { status: 404, headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
       )
     }
 
-    console.log('✅ Utilisateur trouvé:', userData.email)
+    console.log('✅ Utilisateur trouvé:', userData.user.email)
 
     // Récupérer les services avec les privilèges service role (contourne RLS)
     const { data: servicesData, error: servicesError } = await supabaseClient
@@ -106,7 +94,11 @@ serve(async (req) => {
     return new Response(
       JSON.stringify({ 
         success: true,
-        user: userData,
+        user: {
+          id: userData.user.id,
+          email: userData.user.email,
+          full_name: userData.user.user_metadata?.full_name || userData.user.email
+        },
         services: servicesData || [],
         settings: settingsData,
         bookings: bookingsData || []

@@ -318,7 +318,7 @@ export function ServiceBookingModal({
             <div className="flex flex-col sm:flex-row gap-3">
               <button
                 onClick={() => setSelectedBookingDetails(null)}
-                className="flex-1 bg-gray-500 text-white px-4 py-3 rounded-xl hover:bg-gray-600 transition-colors font-medium text-sm sm:text-base"
+                className="w-full sm:w-auto sm:min-w-[120px] bg-gray-500 text-white px-6 py-3 rounded-xl hover:bg-gray-600 transition-colors font-medium text-sm sm:text-base"
               >
                 Fermer
               </button>
@@ -327,7 +327,7 @@ export function ServiceBookingModal({
                   onEditBooking(selectedBookingDetails);
                   setSelectedBookingDetails(null);
                 }}
-                className="flex-1 bg-gradient-to-r from-blue-600 to-purple-600 text-white px-4 py-3 rounded-xl hover:from-blue-700 hover:to-purple-700 transition-all duration-300 font-medium flex items-center justify-center gap-2 text-sm sm:text-base"
+                className="w-full sm:flex-1 bg-gradient-to-r from-blue-600 to-purple-600 text-white px-6 py-3 rounded-xl hover:from-blue-700 hover:to-purple-700 transition-all duration-300 font-medium flex items-center justify-center gap-2 text-sm sm:text-base"
               >
                 <Edit className="w-4 h-4 sm:w-5 sm:h-5" />
                 Modifier
