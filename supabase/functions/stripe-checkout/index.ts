@@ -10,15 +10,15 @@ const corsHeaders = {
 
 const PLATFORM_STRIPE_SECRET_KEY = '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';
 
-// Prix récurrents Stripe (à créer dans votre dashboard Stripe)
+// Prix récurrents Stripe - REMPLACEZ PAR VOS VRAIS PRICE IDs
 const STRIPE_PRICES = {
-  starter: 'price_STARTER_MONTHLY', // À remplacer par votre vrai Price ID
-  monthly: 'price_PRO_MONTHLY',     // À remplacer par votre vrai Price ID
-  yearly: 'price_PRO_YEARLY'        // À remplacer par votre vrai Price ID
+  starter: 'price_1QpCZhKiNbWQJGP3YourStarterPriceID',
+  monthly: 'price_1QpCZhKiNbWQJGP3YourMonthlyPriceID',
+  yearly: 'price_1QpCZhKiNbWQJGP3YourYearlyPriceID'
 }
 
 Deno.serve(async (req) => {
-  console.log('🚀 === STRIPE-CHECKOUT V4 - ABONNEMENTS RÉCURRENTS === 🚀')
+  console.log('🚀 === STRIPE-CHECKOUT V5 - FIX VALIDATION === 🚀')
   
   if (req.method === 'OPTIONS') {
     return new Response('ok', { headers: corsHeaders })
@@ -99,18 +99,28 @@ Deno.serve(async (req) => {
       const planId = metadata?.plan_id || 'starter'
       const priceId = STRIPE_PRICES[planId as keyof typeof STRIPE_PRICES]
 
-      if (!priceId || priceId.startsWith('price_')) {
+      console.log('🔍 Plan demandé:', planId)
+      console.log('🔍 Price ID récupéré:', priceId)
+
+      // CORRECTION: Vérifier que le Price ID existe ET ne commence PAS par "price_1QpCZh" (placeholder)
+      if (!priceId || priceId.includes('YourStarterPriceID') || priceId.includes('YourMonthlyPriceID') || priceId.includes('YourYearlyPriceID')) {
         console.error('❌ Price ID non configuré pour le plan:', planId)
+        console.error('❌ Price ID actuel:', priceId)
         return new Response(
           JSON.stringify({ 
             error: 'Prix Stripe non configuré. Créez les prix récurrents dans votre dashboard Stripe.',
-            help: 'Allez dans Stripe Dashboard > Produits > Créer un prix récurrent'
+            help: 'Allez dans Stripe Dashboard > Produits > Créer un prix récurrent',
+            debug: {
+              planId,
+              priceId,
+              availablePlans: Object.keys(STRIPE_PRICES)
+            }
           }),
           { status: 500, headers: corsHeaders }
         )
       }
 
-      // CRÉER UN ABONNEMENT (pas un paiement unique)
+      // CRÉER UN ABONNEMENT
       console.log('💳 Création session ABONNEMENT avec Price ID:', priceId)
       
       const session = await stripe.checkout.sessions.create({
@@ -118,11 +128,11 @@ Deno.serve(async (req) => {
         payment_method_types: ['card'],
         line_items: [
           {
-            price: priceId, // Utiliser un Price ID récurrent
+            price: priceId,
             quantity: 1,
           },
         ],
-        mode: 'subscription', // MODE ABONNEMENT (pas 'payment')
+        mode: 'subscription',
         success_url,
         cancel_url,
         metadata: metadata || {},
@@ -211,7 +221,7 @@ Deno.serve(async (req) => {
             quantity: 1,
           },
         ],
-        mode: 'payment', // Mode paiement unique pour réservations
+        mode: 'payment',
         success_url,
         cancel_url,
         metadata: metadata || {},
