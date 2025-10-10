@@ -10,7 +10,7 @@ const corsHeaders = {
 
 const PLATFORM_STRIPE_SECRET_KEY = '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';
 
-// Prix récurrents Stripe - REMPLACEZ PAR VOS VRAIS PRICE IDs
+// Prix récurrents Stripe
 const STRIPE_PRICES = {
   starter: 'price_1QpCZhKiNbWQJGP3YourStarterPriceID',
   monthly: 'price_1QpCZhKiNbWQJGP3YourMonthlyPriceID',
@@ -18,7 +18,7 @@ const STRIPE_PRICES = {
 }
 
 Deno.serve(async (req) => {
-  console.log('🚀 === STRIPE-CHECKOUT V5 - FIX VALIDATION === 🚀')
+  console.log('🚀 === STRIPE-CHECKOUT V6 - PLUGIN SUPPORT === 🚀')
   
   if (req.method === 'OPTIONS') {
     return new Response('ok', { headers: corsHeaders })
@@ -51,13 +51,14 @@ Deno.serve(async (req) => {
       customer_email,
       service_name,
       payment_type: metadata?.payment_type,
-      plan_id: metadata?.plan_id
+      plan_id: metadata?.plan_id,
+      plugin_id: metadata?.plugin_id
     })
 
     let stripeSecretKey: string | undefined;
     
-    // ABONNEMENT PLATEFORME
-    if (metadata?.payment_type === 'platform_subscription') {
+    // ABONNEMENT PLATEFORME (plans ou plugins)
+    if (metadata?.payment_type === 'platform_subscription' || metadata?.payment_type === 'plugin_subscription') {
       console.log('💳 CRÉATION ABONNEMENT RÉCURRENT')
       
       stripeSecretKey = PLATFORM_STRIPE_SECRET_KEY;
@@ -95,29 +96,59 @@ Deno.serve(async (req) => {
         console.log('✅ Nouveau client créé:', customerId)
       }
 
-      // Récupérer le Price ID selon le plan
-      const planId = metadata?.plan_id || 'starter'
-      const priceId = STRIPE_PRICES[planId as keyof typeof STRIPE_PRICES]
+      let priceId: string | undefined;
 
-      console.log('🔍 Plan demandé:', planId)
-      console.log('🔍 Price ID récupéré:', priceId)
+      // PLUGIN SUBSCRIPTION
+      if (metadata?.payment_type === 'plugin_subscription') {
+        console.log('🔌 ABONNEMENT PLUGIN')
+        
+        const pluginId = metadata?.plugin_id
+        if (!pluginId) {
+          return new Response(
+            JSON.stringify({ error: 'plugin_id requis' }),
+            { status: 400, headers: corsHeaders }
+          )
+        }
 
-      // CORRECTION: Vérifier que le Price ID existe ET ne commence PAS par "price_1QpCZh" (placeholder)
-      if (!priceId || priceId.includes('YourStarterPriceID') || priceId.includes('YourMonthlyPriceID') || priceId.includes('YourYearlyPriceID')) {
-        console.error('❌ Price ID non configuré pour le plan:', planId)
-        console.error('❌ Price ID actuel:', priceId)
-        return new Response(
-          JSON.stringify({ 
-            error: 'Prix Stripe non configuré. Créez les prix récurrents dans votre dashboard Stripe.',
-            help: 'Allez dans Stripe Dashboard > Produits > Créer un prix récurrent',
-            debug: {
-              planId,
-              priceId,
-              availablePlans: Object.keys(STRIPE_PRICES)
-            }
-          }),
-          { status: 500, headers: corsHeaders }
-        )
+        // Récupérer le Price ID du plugin depuis la base de données
+        const { data: plugin, error: pluginError } = await supabaseClient
+          .from('plugins')
+          .select('stripe_price_id')
+          .eq('id', pluginId)
+          .single()
+
+        if (pluginError || !plugin?.stripe_price_id) {
+          console.error('❌ Price ID plugin non trouvé:', pluginError)
+          return new Response(
+            JSON.stringify({ 
+              error: 'Configuration Stripe du plugin manquante',
+              help: 'Ajoutez le stripe_price_id dans la table plugins'
+            }),
+            { status: 500, headers: corsHeaders }
+          )
+        }
+
+        priceId = plugin.stripe_price_id
+        console.log('✅ Price ID plugin récupéré:', priceId)
+
+      } else {
+        // PLAN SUBSCRIPTION
+        const planId = metadata?.plan_id || 'starter'
+        priceId = STRIPE_PRICES[planId as keyof typeof STRIPE_PRICES]
+
+        console.log('🔍 Plan demandé:', planId)
+        console.log('🔍 Price ID récupéré:', priceId)
+
+        if (!priceId || priceId.includes('YourStarterPriceID') || priceId.includes('YourMonthlyPriceID') || priceId.includes('YourYearlyPriceID')) {
+          console.error('❌ Price ID non configuré pour le plan:', planId)
+          return new Response(
+            JSON.stringify({ 
+              error: 'Prix Stripe non configuré. Créez les prix récurrents dans votre dashboard Stripe.',
+              help: 'Allez dans Stripe Dashboard > Produits > Créer un prix récurrent'
+            }),
+            { status: 500, headers: corsHeaders }
+          )
+        }
       }
 
       // CRÉER UN ABONNEMENT

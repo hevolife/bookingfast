@@ -433,30 +433,74 @@ export function usePlugins() {
 
   const createPluginSubscription = async (
     pluginId: string,
-    subscriptionId: string
+    pluginName: string,
+    pluginPrice: number
   ): Promise<{ url: string }> => {
     if (!supabase || !user) {
       throw new Error('Configuration invalide');
     }
 
     try {
-      const { data, error } = await supabase.functions.invoke('create-plugin-subscription', {
-        body: {
-          plugin_id: pluginId,
-          user_id: user.id,
-          subscription_id: subscriptionId,
-        },
+      console.log('💳 === DÉBUT CRÉATION ABONNEMENT PLUGIN ===');
+      console.log('📊 Données envoyées:', {
+        plugin_id: pluginId,
+        plugin_name: pluginName,
+        plugin_price: pluginPrice,
+        user_id: user.id,
+        user_email: user.email
       });
 
-      if (error) throw error;
+      const requestBody = {
+        amount: pluginPrice,
+        currency: 'eur',
+        success_url: `${window.location.origin}/plugins?success=true&plugin_id=${pluginId}`,
+        cancel_url: `${window.location.origin}/plugins?cancelled=true`,
+        customer_email: user.email,
+        service_name: pluginName,
+        metadata: {
+          payment_type: 'plugin_subscription',
+          user_id: user.id,
+          plugin_id: pluginId,
+          plugin_name: pluginName
+        }
+      };
 
-      if (!data || !data.url) {
+      console.log('📤 Body de la requête:', JSON.stringify(requestBody, null, 2));
+
+      const { data, error } = await supabase.functions.invoke('stripe-checkout', {
+        body: requestBody
+      });
+
+      console.log('📥 Réponse complète:', { data, error });
+
+      if (error) {
+        console.error('❌ Erreur Edge Function détaillée:', {
+          message: error.message,
+          context: error.context,
+          details: error
+        });
+        throw new Error(error.message || 'Erreur lors de la création de l\'abonnement');
+      }
+
+      if (!data) {
+        console.error('❌ Pas de données reçues de l\'Edge Function');
+        throw new Error('Pas de réponse de l\'Edge Function');
+      }
+
+      if (!data.url) {
+        console.error('❌ Pas d\'URL de checkout dans la réponse:', data);
         throw new Error('Pas d\'URL de checkout reçue');
       }
 
+      console.log('✅ URL checkout reçue:', data.url);
+      console.log('💳 === FIN CRÉATION ABONNEMENT PLUGIN ===');
+      
       return { url: data.url };
     } catch (err) {
-      console.error('❌ Erreur création abonnement:', err);
+      console.error('❌ === ERREUR CRÉATION ABONNEMENT ===');
+      console.error('Type:', err instanceof Error ? err.constructor.name : typeof err);
+      console.error('Message:', err instanceof Error ? err.message : String(err));
+      console.error('Stack:', err instanceof Error ? err.stack : 'N/A');
       throw err;
     }
   };

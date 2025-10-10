@@ -119,6 +119,58 @@ Deno.serve(async (req) => {
         return new Response('Email client manquant', { status: 400, headers: corsHeaders })
       }
 
+      // ABONNEMENT PLUGIN
+      if (metadata.payment_type === 'plugin_subscription') {
+        console.log('🔌 ABONNEMENT PLUGIN')
+        
+        const userId = metadata.user_id
+        const pluginId = metadata.plugin_id
+        
+        if (!userId || !pluginId) {
+          console.error('❌ Données plugin manquantes')
+          processedSessions.delete(sessionId)
+          return new Response('Données plugin manquantes', { status: 400, headers: corsHeaders })
+        }
+        
+        const stripeSubscriptionId = session.subscription
+
+        // Mettre à jour l'abonnement plugin
+        const { error: updateError } = await supabaseClient
+          .from('plugin_subscriptions')
+          .update({
+            status: 'active',
+            stripe_subscription_id: stripeSubscriptionId,
+            stripe_customer_id: session.customer,
+            current_period_start: new Date().toISOString(),
+            current_period_end: session.expires_at ? new Date(session.expires_at * 1000).toISOString() : null,
+            updated_at: new Date().toISOString()
+          })
+          .eq('user_id', userId)
+          .eq('plugin_id', pluginId)
+        
+        if (updateError) {
+          console.error('❌ Erreur mise à jour plugin:', updateError)
+          processedSessions.delete(sessionId)
+          return new Response('Erreur mise à jour plugin', { status: 500, headers: corsHeaders })
+        }
+        
+        console.log('✅ PLUGIN ACTIVÉ')
+        
+        const result = { 
+          success: true, 
+          type: 'plugin_subscription',
+          userId: userId,
+          pluginId: pluginId,
+          status: 'active'
+        }
+        
+        processedSessions.set(sessionId, { timestamp: Date.now(), result })
+        
+        return new Response(JSON.stringify(result), {
+          headers: { ...corsHeaders, 'Content-Type': 'application/json' }
+        })
+      }
+
       // Abonnement plateforme
       if (metadata.payment_type === 'platform_subscription') {
         console.log('💳 ABONNEMENT PLATEFORME')
@@ -137,7 +189,6 @@ Deno.serve(async (req) => {
           subscriptionTier = 'pro'
         }
         
-        // Récupérer l'ID de l'abonnement Stripe
         const stripeSubscriptionId = session.subscription
 
         const { error: updateError } = await supabaseClient
@@ -179,7 +230,18 @@ Deno.serve(async (req) => {
       }
 
       // Reste du code pour les réservations...
-      // (code existant inchangé)
+      console.log('💳 PAIEMENT RÉSERVATION')
+      
+      const result = { 
+        success: true, 
+        type: 'booking_payment'
+      }
+      
+      processedSessions.set(sessionId, { timestamp: Date.now(), result })
+      
+      return new Response(JSON.stringify(result), {
+        headers: { ...corsHeaders, 'Content-Type': 'application/json' }
+      })
     }
 
     console.log('ℹ️ Événement non traité:', event.type)

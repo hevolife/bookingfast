@@ -74,18 +74,17 @@ export function PluginsPage() {
     setSubscriptionError(null);
     
     try {
-      const subscription = getSubscription(plugin.id);
-      if (!subscription) {
-        throw new Error('Abonnement non trouvé');
-      }
-
       console.log('🔄 Création session Stripe...', {
         pluginId: plugin.id,
-        price: plugin.base_price,
-        subscriptionId: subscription.id
+        pluginName: plugin.name,
+        price: plugin.base_price
       });
 
-      const { url } = await createPluginSubscription(plugin.id, subscription.id);
+      const { url } = await createPluginSubscription(
+        plugin.id,
+        plugin.name,
+        plugin.base_price
+      );
       
       console.log('✅ Redirection vers Stripe:', url);
       window.location.href = url;
