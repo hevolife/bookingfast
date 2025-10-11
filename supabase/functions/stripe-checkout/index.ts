@@ -10,7 +10,7 @@ const corsHeaders = {
 
 const PLATFORM_STRIPE_SECRET_KEY = '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';
 
-// Prix récurrents Stripe
+// Prix récurrents Stripe pour les plans
 const STRIPE_PRICES = {
   starter: 'price_1QpCZhKiNbWQJGP3YourStarterPriceID',
   monthly: 'price_1QpCZhKiNbWQJGP3YourMonthlyPriceID',
@@ -18,17 +18,39 @@ const STRIPE_PRICES = {
 }
 
 Deno.serve(async (req) => {
-  console.log('🚀 === STRIPE-CHECKOUT V6 - PLUGIN SUPPORT === 🚀')
+  console.log('🚀 === STRIPE-CHECKOUT V9 - SELF-HOSTED DEBUG === 🚀')
   
   if (req.method === 'OPTIONS') {
     return new Response('ok', { headers: corsHeaders })
   }
 
   try {
-    const supabaseClient = createClient(
-      Deno.env.get('SUPABASE_URL') ?? '',
-      Deno.env.get('SUPABASE_SERVICE_ROLE_KEY') ?? ''
-    )
+    // IMPORTANT: Utiliser SERVICE_ROLE_KEY pour contourner RLS
+    const supabaseUrl = Deno.env.get('SUPABASE_URL');
+    const supabaseServiceKey = Deno.env.get('SUPABASE_SERVICE_ROLE_KEY');
+    
+    console.log('🔧 Configuration Supabase:', {
+      url: supabaseUrl ? '✅ Défini' : '❌ Manquant',
+      serviceKey: supabaseServiceKey ? '✅ Défini' : '❌ Manquant'
+    });
+
+    if (!supabaseUrl || !supabaseServiceKey) {
+      console.error('❌ Variables d\'environnement Supabase manquantes');
+      return new Response(
+        JSON.stringify({ 
+          error: 'Configuration Supabase manquante',
+          details: 'SUPABASE_URL ou SUPABASE_SERVICE_ROLE_KEY non défini'
+        }),
+        { status: 500, headers: corsHeaders }
+      )
+    }
+
+    const supabaseClient = createClient(supabaseUrl, supabaseServiceKey, {
+      auth: {
+        autoRefreshToken: false,
+        persistSession: false
+      }
+    })
 
     if (req.method !== 'POST') {
       return new Response(
@@ -37,17 +59,25 @@ Deno.serve(async (req) => {
       )
     }
 
-    const { amount, currency = 'eur', success_url, cancel_url, customer_email, metadata, service_name } = await req.json()
+    const body = await req.json();
+    console.log('📥 Body reçu:', JSON.stringify(body, null, 2));
+
+    const { amount, currency = 'eur', success_url, cancel_url, customer_email, metadata, service_name } = body;
 
     if (!success_url || !cancel_url || !customer_email || !service_name) {
-      console.error('❌ Paramètres manquants')
+      console.error('❌ Paramètres manquants:', {
+        success_url: !!success_url,
+        cancel_url: !!cancel_url,
+        customer_email: !!customer_email,
+        service_name: !!service_name
+      });
       return new Response(
         JSON.stringify({ error: 'Paramètres requis manquants' }),
         { status: 400, headers: corsHeaders }
       )
     }
 
-    console.log('📊 Données reçues:', {
+    console.log('📊 Données validées:', {
       customer_email,
       service_name,
       payment_type: metadata?.payment_type,
@@ -64,11 +94,14 @@ Deno.serve(async (req) => {
       stripeSecretKey = PLATFORM_STRIPE_SECRET_KEY;
       
       if (!stripeSecretKey) {
+        console.error('❌ PLATFORM_STRIPE_SECRET_KEY non défini');
         return new Response(
           JSON.stringify({ error: 'Configuration Stripe manquante' }),
           { status: 500, headers: corsHeaders }
         )
       }
+
+      console.log('✅ Clé Stripe plateforme trouvée');
 
       const stripe = new Stripe(stripeSecretKey, {
         appInfo: {
@@ -79,6 +112,8 @@ Deno.serve(async (req) => {
 
       // Créer ou récupérer le client
       let customerId
+      console.log('🔍 Recherche client Stripe avec email:', customer_email);
+      
       const existingCustomers = await stripe.customers.list({
         email: customer_email,
         limit: 1,
@@ -100,10 +135,12 @@ Deno.serve(async (req) => {
 
       // PLUGIN SUBSCRIPTION
       if (metadata?.payment_type === 'plugin_subscription') {
-        console.log('🔌 ABONNEMENT PLUGIN')
+        console.log('🔌 === ABONNEMENT PLUGIN === 🔌')
+        console.log('🔌 Plugin ID:', metadata?.plugin_id)
         
         const pluginId = metadata?.plugin_id
         if (!pluginId) {
+          console.error('❌ plugin_id manquant dans metadata');
           return new Response(
             JSON.stringify({ error: 'plugin_id requis' }),
             { status: 400, headers: corsHeaders }
@@ -111,18 +148,65 @@ Deno.serve(async (req) => {
         }
 
         // Récupérer le Price ID du plugin depuis la base de données
+        console.log('🔍 Requête SQL: SELECT * FROM plugins WHERE id =', pluginId);
+        
         const { data: plugin, error: pluginError } = await supabaseClient
           .from('plugins')
-          .select('stripe_price_id')
+          .select('id, name, slug, stripe_price_id')
           .eq('id', pluginId)
           .single()
 
-        if (pluginError || !plugin?.stripe_price_id) {
-          console.error('❌ Price ID plugin non trouvé:', pluginError)
+        console.log('📦 Résultat requête plugin:', {
+          success: !pluginError,
+          plugin: plugin ? {
+            id: plugin.id,
+            name: plugin.name,
+            slug: plugin.slug,
+            stripe_price_id: plugin.stripe_price_id
+          } : null,
+          error: pluginError ? {
+            message: pluginError.message,
+            code: pluginError.code,
+            details: pluginError.details,
+            hint: pluginError.hint
+          } : null
+        });
+
+        if (pluginError) {
+          console.error('❌ Erreur requête plugin:', {
+            message: pluginError.message,
+            code: pluginError.code,
+            details: pluginError.details,
+            hint: pluginError.hint
+          });
+          return new Response(
+            JSON.stringify({ 
+              error: 'Erreur lors de la récupération du plugin',
+              details: pluginError.message,
+              code: pluginError.code,
+              hint: pluginError.hint
+            }),
+            { status: 500, headers: corsHeaders }
+          )
+        }
+
+        if (!plugin) {
+          console.error('❌ Plugin non trouvé avec ID:', pluginId);
+          return new Response(
+            JSON.stringify({ error: 'Plugin non trouvé' }),
+            { status: 404, headers: corsHeaders }
+          )
+        }
+
+        console.log('✅ Plugin trouvé:', plugin.name);
+
+        if (!plugin.stripe_price_id) {
+          console.error('❌ stripe_price_id manquant pour le plugin:', plugin.slug);
           return new Response(
             JSON.stringify({ 
               error: 'Configuration Stripe du plugin manquante',
-              help: 'Ajoutez le stripe_price_id dans la table plugins'
+              help: 'Ajoutez le stripe_price_id dans la table plugins pour ce plugin',
+              plugin: plugin.slug
             }),
             { status: 500, headers: corsHeaders }
           )
@@ -154,36 +238,59 @@ Deno.serve(async (req) => {
       // CRÉER UN ABONNEMENT
       console.log('💳 Création session ABONNEMENT avec Price ID:', priceId)
       
-      const session = await stripe.checkout.sessions.create({
-        customer: customerId,
-        payment_method_types: ['card'],
-        line_items: [
-          {
-            price: priceId,
-            quantity: 1,
-          },
-        ],
-        mode: 'subscription',
-        success_url,
-        cancel_url,
-        metadata: metadata || {},
-        subscription_data: {
+      try {
+        const sessionData = {
+          customer: customerId,
+          payment_method_types: ['card'],
+          line_items: [
+            {
+              price: priceId,
+              quantity: 1,
+            },
+          ],
+          mode: 'subscription',
+          success_url,
+          cancel_url,
           metadata: metadata || {},
-        },
-      })
+          subscription_data: {
+            metadata: metadata || {},
+          },
+        };
 
-      console.log('✅ Session ABONNEMENT créée:', session.id)
-      console.log('🔗 URL:', session.url)
+        console.log('📋 Données session Stripe:', JSON.stringify(sessionData, null, 2));
 
-      return new Response(
-        JSON.stringify({ 
-          sessionId: session.id, 
-          url: session.url,
-          success: true,
-          type: 'subscription'
-        }),
-        { headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
-      )
+        const session = await stripe.checkout.sessions.create(sessionData);
+
+        console.log('✅ Session ABONNEMENT créée:', session.id)
+        console.log('🔗 URL:', session.url)
+
+        return new Response(
+          JSON.stringify({ 
+            sessionId: session.id, 
+            url: session.url,
+            success: true,
+            type: 'subscription'
+          }),
+          { headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
+        )
+      } catch (stripeError: any) {
+        console.error('❌ Erreur Stripe:', {
+          message: stripeError.message,
+          type: stripeError.type,
+          code: stripeError.code,
+          param: stripeError.param,
+          raw: stripeError.raw
+        });
+        return new Response(
+          JSON.stringify({ 
+            error: 'Erreur Stripe',
+            details: stripeError.message,
+            type: stripeError.type,
+            code: stripeError.code
+          }),
+          { status: 500, headers: corsHeaders }
+        )
+      }
 
     } else {
       // PAIEMENT UTILISATEUR (réservation)
@@ -271,12 +378,19 @@ Deno.serve(async (req) => {
       )
     }
 
-  } catch (error) {
-    console.error('❌ Erreur:', error)
+  } catch (error: any) {
+    console.error('❌ === ERREUR GLOBALE === ❌')
+    console.error('Type:', error.constructor?.name)
+    console.error('Message:', error.message)
+    console.error('Stack:', error.stack)
+    console.error('Détails complets:', JSON.stringify(error, null, 2))
+    
     return new Response(
       JSON.stringify({ 
         error: 'Erreur interne',
-        details: error.message 
+        details: error.message,
+        type: error.constructor?.name,
+        stack: error.stack
       }),
       { status: 500, headers: corsHeaders }
     )

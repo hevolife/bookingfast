@@ -364,6 +364,9 @@ export function usePlugins() {
     }
 
     try {
+      console.log('🎯 Début souscription plugin:', pluginId);
+
+      // Vérifier si une souscription existe déjà
       const { data: existingSub, error: checkError } = await supabase
         .from('plugin_subscriptions')
         .select('*')
@@ -374,7 +377,12 @@ export function usePlugins() {
       if (checkError) throw checkError;
 
       if (existingSub) {
+        console.log('📋 Souscription existante trouvée:', existingSub.status);
+        
+        // Si la souscription est expirée ou annulée, on la réactive en trial
         if (existingSub.status === 'expired' || existingSub.status === 'cancelled') {
+          console.log('🔄 Réactivation de la souscription en trial');
+          
           const { data: updatedSub, error: updateError } = await supabase
             .from('plugin_subscriptions')
             .update({
@@ -398,9 +406,13 @@ export function usePlugins() {
           return updatedSub;
         }
         
+        console.log('✅ Souscription déjà active');
         return existingSub as PluginSubscription;
       }
 
+      // Créer une nouvelle souscription en trial
+      console.log('➕ Création nouvelle souscription trial');
+      
       const newSubscription = {
         user_id: user.id,
         plugin_id: pluginId,
@@ -420,6 +432,8 @@ export function usePlugins() {
         .single();
 
       if (error) throw error;
+
+      console.log('✅ Souscription trial créée avec succès');
 
       await fetchUserSubscriptions();
       await fetchUserPlugins();
@@ -442,7 +456,7 @@ export function usePlugins() {
 
     try {
       console.log('💳 === DÉBUT CRÉATION ABONNEMENT PLUGIN ===');
-      console.log('📊 Données envoyées:', {
+      console.log('📊 Données:', {
         plugin_id: pluginId,
         plugin_name: pluginName,
         plugin_price: pluginPrice,
@@ -450,42 +464,47 @@ export function usePlugins() {
         user_email: user.email
       });
 
-      const requestBody = {
-        amount: pluginPrice,
-        currency: 'eur',
-        success_url: `${window.location.origin}/plugins?success=true&plugin_id=${pluginId}`,
-        cancel_url: `${window.location.origin}/plugins?cancelled=true`,
-        customer_email: user.email,
-        service_name: pluginName,
-        metadata: {
-          payment_type: 'plugin_subscription',
-          user_id: user.id,
-          plugin_id: pluginId,
-          plugin_name: pluginName
-        }
-      };
-
-      console.log('📤 Body de la requête:', JSON.stringify(requestBody, null, 2));
-
+      // Appeler l'Edge Function Stripe
       const { data, error } = await supabase.functions.invoke('stripe-checkout', {
-        body: requestBody
+        body: {
+          amount: pluginPrice,
+          currency: 'eur',
+          success_url: `${window.location.origin}/plugins?success=true&plugin_id=${pluginId}`,
+          cancel_url: `${window.location.origin}/plugins?cancelled=true`,
+          customer_email: user.email,
+          service_name: pluginName,
+          metadata: {
+            payment_type: 'plugin_subscription',
+            user_id: user.id,
+            plugin_id: pluginId,
+            plugin_name: pluginName
+          }
+        }
       });
 
-      console.log('📥 Réponse complète:', { data, error });
+      console.log('📥 Réponse complète Stripe:', { data, error });
 
       if (error) {
-        console.error('❌ Erreur Edge Function détaillée:', {
-          message: error.message,
-          context: error.context,
-          details: error
-        });
-        throw new Error(error.message || 'Erreur lors de la création de l\'abonnement');
+        console.error('❌ Erreur Edge Function:', error);
+        console.error('❌ Détails erreur:', JSON.stringify(error, null, 2));
+        
+        // Essayer de parser le message d'erreur pour plus de détails
+        let errorMessage = error.message || 'Erreur lors de la création de l\'abonnement';
+        
+        if (error.context) {
+          console.error('❌ Contexte erreur:', error.context);
+          errorMessage += ` - ${JSON.stringify(error.context)}`;
+        }
+        
+        throw new Error(errorMessage);
       }
 
       if (!data) {
-        console.error('❌ Pas de données reçues de l\'Edge Function');
-        throw new Error('Pas de réponse de l\'Edge Function');
+        console.error('❌ Pas de données reçues');
+        throw new Error('Aucune donnée reçue de l\'Edge Function');
       }
+
+      console.log('📦 Données reçues:', data);
 
       if (!data.url) {
         console.error('❌ Pas d\'URL de checkout dans la réponse:', data);

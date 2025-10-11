@@ -34,7 +34,22 @@ export function ServiceBookingModal({
   const totalAmount = bookings.reduce((sum, booking) => sum + booking.total_amount, 0);
   const totalPaid = bookings.reduce((sum, booking) => sum + (booking.payment_amount || 0), 0);
 
-  const getPaymentStatusColor = (status: string) => {
+  // Fonction pour calculer le statut de paiement réel basé sur les montants
+  const getActualPaymentStatus = (booking: Booking): 'pending' | 'partial' | 'completed' => {
+    const paid = booking.payment_amount || 0;
+    const total = booking.total_amount || 0;
+    
+    if (paid === 0) {
+      return 'pending';
+    } else if (paid >= total) {
+      return 'completed';
+    } else {
+      return 'partial';
+    }
+  };
+
+  const getPaymentStatusColor = (booking: Booking) => {
+    const status = getActualPaymentStatus(booking);
     switch (status) {
       case 'completed':
         return 'bg-gradient-to-r from-green-100 to-emerald-100 text-green-700 border-green-200';
@@ -45,12 +60,13 @@ export function ServiceBookingModal({
     }
   };
 
-  const getPaymentStatusText = (status: string) => {
+  const getPaymentStatusText = (booking: Booking) => {
+    const status = getActualPaymentStatus(booking);
     switch (status) {
       case 'completed':
         return '✅ Payé';
       case 'partial':
-        return '⏳ Acompte';
+        return '💵 Partiel';
       default:
         return '❌ Non payé';
     }
@@ -89,6 +105,8 @@ export function ServiceBookingModal({
 
   // Modal de détails de réservation
   if (selectedBookingDetails) {
+    const actualPaymentStatus = getActualPaymentStatus(selectedBookingDetails);
+    
     return (
       <div className="fixed inset-0 bg-black/60 backdrop-blur-sm flex items-end sm:items-center justify-center z-50 animate-fadeIn modal-container">
         <div className="bg-white w-full sm:max-w-3xl max-h-[95vh] sm:max-h-[90vh] overflow-y-auto sm:rounded-3xl shadow-2xl transform animate-slideUp modal-content">
@@ -262,8 +280,8 @@ export function ServiceBookingModal({
                 </div>
                 <div className="pt-3 border-t border-orange-200">
                   <div className="text-xs sm:text-sm text-gray-600 mb-2">Statut du paiement</div>
-                  <div className={`inline-flex px-3 py-1 rounded-full text-xs font-medium border ${getPaymentStatusColor(selectedBookingDetails.payment_status)}`}>
-                    {getPaymentStatusText(selectedBookingDetails.payment_status)}
+                  <div className={`inline-flex px-3 py-1 rounded-full text-xs font-medium border ${getPaymentStatusColor(selectedBookingDetails)}`}>
+                    {getPaymentStatusText(selectedBookingDetails)}
                   </div>
                 </div>
               </div>
@@ -447,9 +465,8 @@ export function ServiceBookingModal({
                             {booking.booking_status === 'confirmed' ? '✅ Confirmée' : 
                              booking.booking_status === 'cancelled' ? '❌ Annulée' : '⏳ En attente'}
                           </div>
-                          <div className={`px-2 sm:px-3 py-1 rounded-full text-xs font-medium border self-start ${getPaymentStatusColor(booking.payment_status)}`}>
-                            {booking.payment_status === 'completed' ? '✅ Payé' :
-                             booking.payment_status === 'partial' ? '💵 Partiellement' : '❌ Non payé'}
+                          <div className={`px-2 sm:px-3 py-1 rounded-full text-xs font-medium border self-start ${getPaymentStatusColor(booking)}`}>
+                            {getPaymentStatusText(booking)}
                           </div>
                         </div>
                       </div>

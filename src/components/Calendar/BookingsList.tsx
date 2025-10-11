@@ -26,6 +26,20 @@ export function BookingsList({ onEditBooking }: BookingsListProps) {
 
   const itemsPerPage = 12;
 
+  // Fonction pour calculer le statut de paiement réel basé sur les montants
+  const getActualPaymentStatus = (booking: Booking): 'pending' | 'partial' | 'completed' => {
+    const paid = booking.payment_amount || 0;
+    const total = booking.total_amount || 0;
+    
+    if (paid === 0) {
+      return 'pending';
+    } else if (paid >= total) {
+      return 'completed';
+    } else {
+      return 'partial';
+    }
+  };
+
   // Fonction pour obtenir le nom d'unité du service
   const getUnitName = (booking: Booking) => {
     if (booking.service?.unit_name && booking.service.unit_name !== 'personnes') {
@@ -62,7 +76,8 @@ export function BookingsList({ onEditBooking }: BookingsListProps) {
     }
 
     if (paymentFilter !== 'all') {
-      filtered = filtered.filter(booking => booking.payment_status === paymentFilter);
+      // Utiliser le statut calculé au lieu du statut de la base de données
+      filtered = filtered.filter(booking => getActualPaymentStatus(booking) === paymentFilter);
     }
 
     filtered.sort((a, b) => {
@@ -115,7 +130,8 @@ export function BookingsList({ onEditBooking }: BookingsListProps) {
     }
   };
 
-  const getPaymentStatusColor = (status: string) => {
+  const getPaymentStatusColor = (booking: Booking) => {
+    const status = getActualPaymentStatus(booking);
     switch (status) {
       case 'completed':
         return 'bg-green-100 text-green-700 border-green-200';
@@ -125,6 +141,20 @@ export function BookingsList({ onEditBooking }: BookingsListProps) {
         return 'bg-red-100 text-red-700 border-red-200';
       default:
         return 'bg-gray-100 text-gray-700 border-gray-200';
+    }
+  };
+
+  const getPaymentStatusText = (booking: Booking) => {
+    const status = getActualPaymentStatus(booking);
+    switch (status) {
+      case 'completed':
+        return '💰 Payé';
+      case 'partial':
+        return '💳 Acompte';
+      case 'pending':
+        return '❌ Non payé';
+      default:
+        return '❌ Non payé';
     }
   };
 
@@ -325,9 +355,8 @@ export function BookingsList({ onEditBooking }: BookingsListProps) {
                               {booking.booking_status === 'confirmed' ? '✅ Confirmée' : 
                                booking.booking_status === 'cancelled' ? '❌ Annulée' : '⏳ En attente'}
                             </span>
-                            <span className={`inline-flex items-center px-3 py-1 rounded-full text-xs font-medium border ${getPaymentStatusColor(booking.payment_status)}`}>
-                              {booking.payment_status === 'completed' ? '💰 Payé' :
-                               booking.payment_status === 'partial' ? '💵 Partiellement' : '❌ Non payé'}
+                            <span className={`inline-flex items-center px-3 py-1 rounded-full text-xs font-medium border ${getPaymentStatusColor(booking)}`}>
+                              {getPaymentStatusText(booking)}
                             </span>
                           </div>
                         </td>
@@ -443,9 +472,8 @@ export function BookingsList({ onEditBooking }: BookingsListProps) {
                           {booking.booking_status === 'confirmed' ? '✅ Confirmée' : 
                            booking.booking_status === 'cancelled' ? '❌ Annulée' : '⏳ En attente'}
                         </span>
-                        <span className={`inline-flex items-center px-2 py-1 rounded-full text-xs font-medium border ${getPaymentStatusColor(booking.payment_status)}`}>
-                          {booking.payment_status === 'completed' ? '💰 Payé' :
-                           booking.payment_status === 'partial' ? '💳 Acompte' : '❌ Non payé'}
+                        <span className={`inline-flex items-center px-2 py-1 rounded-full text-xs font-medium border ${getPaymentStatusColor(booking)}`}>
+                          {getPaymentStatusText(booking)}
                         </span>
                       </div>
                       
@@ -638,15 +666,8 @@ export function BookingsList({ onEditBooking }: BookingsListProps) {
                 </div>
                 <div className="flex justify-between">
                   <span className="text-green-700">Statut</span>
-                  <span className={`px-2 sm:px-3 py-1 rounded-full text-xs sm:text-sm font-medium ${
-                    selectedBooking.payment_status === 'completed' 
-                      ? 'bg-green-100 text-green-700'
-                      : selectedBooking.payment_status === 'partial'
-                      ? 'bg-orange-100 text-orange-700'
-                      : 'bg-red-100 text-red-700'
-                  }`}>
-                    {selectedBooking.payment_status === 'completed' ? '✅ Payé' :
-                     selectedBooking.payment_status === 'partial' ? '⏳ Acompte' : '❌ Non payé'}
+                  <span className={`px-2 sm:px-3 py-1 rounded-full text-xs sm:text-sm font-medium ${getPaymentStatusColor(selectedBooking)}`}>
+                    {getPaymentStatusText(selectedBooking)}
                   </span>
                 </div>
               </div>
