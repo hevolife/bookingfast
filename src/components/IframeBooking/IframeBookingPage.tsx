@@ -121,8 +121,7 @@ export function IframeBookingPage() {
         return;
       }
 
-      // Construire l'URL en supprimant les slashes finaux/initiaux pour éviter les doubles slashes
-      const supabaseUrl = import.meta.env.VITE_SUPABASE_URL?.replace(/\/$/, ''); // Supprimer slash final
+      const supabaseUrl = import.meta.env.VITE_SUPABASE_URL?.replace(/\/$/, '');
       const functionUrl = `${supabaseUrl}/functions/v1/public-booking-data?user_id=${userId}`;
       
       console.log('🔍 Appel API:', functionUrl);
@@ -149,29 +148,24 @@ export function IframeBookingPage() {
         throw new Error(result.error || 'Erreur lors de la récupération des données');
       }
 
-      // Filtrer les services selon la configuration iframe
       let filteredServices = result.services || [];
       
-      // 🚫 BLOQUER LES SERVICES PERSONNALISÉS
       filteredServices = filteredServices.filter(service => 
         service.description !== 'Service personnalisé'
       );
       console.log('🚫 Services personnalisés filtrés');
       
       if (allowedServices.length > 0) {
-        // Si des services spécifiques sont demandés via l'URL
         filteredServices = filteredServices.filter(service => 
           allowedServices.includes(service.id)
         );
         console.log('🎯 Services filtrés par URL:', filteredServices.length, 'sur', result.services?.length || 0);
       } else if (result.settings?.iframe_services && result.settings.iframe_services.length > 0) {
-        // Si des services sont configurés dans les paramètres
         filteredServices = filteredServices.filter(service => 
           result.settings.iframe_services.includes(service.id)
         );
         console.log('⚙️ Services filtrés par paramètres:', filteredServices.length, 'sur', result.services?.length || 0);
       }
-      // Sinon, afficher tous les services (sauf personnalisés)
       
       setData({
         ...result,
@@ -198,12 +192,18 @@ export function IframeBookingPage() {
   }, [data?.settings, selectedDate]);
 
   const generateTimeSlots = (date: string): TimeSlot[] => {
-    if (!data?.settings) return [];
+    if (!data?.settings || !date) {
+      console.log('⚠️ generateTimeSlots: Pas de settings ou date');
+      return [];
+    }
     
     const dayName = new Date(date).toLocaleDateString('en-US', { weekday: 'long' }).toLowerCase();
     const daySettings = data.settings.opening_hours[dayName];
     
-    if (!daySettings || daySettings.closed) return [];
+    if (!daySettings || daySettings.closed) {
+      console.log('⚠️ generateTimeSlots: Jour fermé');
+      return [];
+    }
     
     const slots: TimeSlot[] = [];
     const ranges = daySettings.ranges || [];
@@ -220,7 +220,6 @@ export function IframeBookingPage() {
       while (currentHour < endHour || (currentHour === endHour && currentMinute < endMinute)) {
         const time = `${currentHour.toString().padStart(2, '0')}:${currentMinute.toString().padStart(2, '0')}`;
         
-        // Vérifier si le créneau est disponible pour le service sélectionné
         const isAvailable = isTimeSlotAvailable(time, selectedService);
         
         slots.push({ time, available: isAvailable });
@@ -233,39 +232,33 @@ export function IframeBookingPage() {
       }
     });
     
+    console.log('✅ generateTimeSlots: Créneaux générés:', slots.length);
     return slots.sort((a, b) => a.time.localeCompare(b.time));
   };
 
-  // Fonction pour vérifier si un créneau est disponible pour un service donné
   const isTimeSlotAvailable = (time: string, service: Service | null): boolean => {
     if (!service || !selectedDate) return false;
     
-    // Vérifier le délai minimum pour les réservations publiques
-    const validation = validateBookingDateTime(selectedDate, time, data.settings, true);
+    const validation = validateBookingDateTime(selectedDate, time, data?.settings, true);
     if (!validation.isValid) {
       return false;
     }
     
-    // Calculer l'heure de fin du service sélectionné
     const [startHour, startMinute] = time.split(':').map(Number);
-    const startTime = startHour * 60 + startMinute; // en minutes
-    const endTime = startTime + service.duration_minutes; // en minutes
+    const startTime = startHour * 60 + startMinute;
+    const endTime = startTime + service.duration_minutes;
     
-    // Vérifier les conflits avec les réservations existantes
-    const dayBookings = data.bookings.filter(booking => booking.date === selectedDate);
+    const dayBookings = data?.bookings?.filter(booking => booking.date === selectedDate) || [];
     
     for (const booking of dayBookings) {
       const [bookingHour, bookingMinute] = booking.time.split(':').map(Number);
       const bookingStartTime = bookingHour * 60 + bookingMinute;
       const bookingEndTime = bookingStartTime + booking.duration_minutes;
       
-      // Vérifier s'il y a chevauchement
       const hasOverlap = (startTime < bookingEndTime && endTime > bookingStartTime);
       
       if (hasOverlap) {
-        // Si c'est le même service, vérifier la capacité
         if (booking.service_id === service.id) {
-          // Compter les participants déjà réservés pour ce créneau et ce service
           const existingParticipants = dayBookings
             .filter(b => 
               b.service_id === service.id && 
@@ -274,12 +267,10 @@ export function IframeBookingPage() {
             )
             .reduce((sum, b) => sum + (b.quantity || 1), 0);
           
-          // Vérifier s'il reste de la place (on assume quantity = 1 pour la vérification)
           if (existingParticipants >= service.capacity) {
-            return false; // Plus de place pour ce service
+            return false;
           }
         } else {
-          // Services différents qui se chevauchent = conflit
           return false;
         }
       }
@@ -289,13 +280,14 @@ export function IframeBookingPage() {
   };
 
   const handleServiceSelect = (service: Service) => {
+    console.log('🎯 Service sélectionné:', service.name);
     setSelectedService(service);
-    // Réinitialiser la sélection de temps quand on change de service
     setSelectedTime('');
     setCurrentStep(2);
   };
 
   const handleDateTimeSelect = (date: string, time: string) => {
+    console.log('📅 Date/heure sélectionnée:', date, time);
     setSelectedDate(date);
     setSelectedTime(time);
     setCurrentStep(3);
@@ -310,34 +302,32 @@ export function IframeBookingPage() {
     setSubmitting(true);
     
     try {
-      // Créer la réservation
       const totalAmount = selectedService.price_ttc * quantity;
-      const depositPercentage = data.settings?.default_deposit_percentage || 30;
+      const depositPercentage = data?.settings?.default_deposit_percentage || 30;
       
       let depositAmount: number;
       
-      if (data.settings?.deposit_type === 'fixed_amount') {
+      if (data?.settings?.deposit_type === 'fixed_amount') {
         const baseDeposit = data.settings.deposit_fixed_amount || 20;
         depositAmount = data.settings.multiply_deposit_by_services 
           ? baseDeposit * quantity 
           : baseDeposit;
       } else {
         const baseDeposit = (totalAmount * depositPercentage) / 100;
-        depositAmount = data.settings?.multiply_deposit_by_services 
+        depositAmount = data?.settings?.multiply_deposit_by_services 
           ? (selectedService.price_ttc * depositPercentage / 100) * quantity
           : baseDeposit;
       }
       
       console.log('💰 Calcul acompte:', {
-        type: data.settings?.deposit_type,
-        multiply: data.settings?.multiply_deposit_by_services,
+        type: data?.settings?.deposit_type,
+        multiply: data?.settings?.multiply_deposit_by_services,
         quantity,
         totalAmount,
         depositAmount
       });
       
       if (isSupabaseConfigured) {
-        // Créer la réservation dans Supabase
         const { data: booking, error: bookingError } = await supabase
           .from('bookings')
           .insert({
@@ -366,7 +356,6 @@ export function IframeBookingPage() {
         console.log('✅ Réservation créée:', booking.id);
         setCurrentStep(5);
       } else {
-        // Mode démo
         console.log('🎭 Mode démo - simulation réservation');
         await new Promise(resolve => setTimeout(resolve, 1000));
         setCurrentStep(5);
@@ -380,7 +369,10 @@ export function IframeBookingPage() {
   };
 
   const getAvailableDates = () => {
-    if (!data?.settings) return [];
+    if (!data?.settings) {
+      console.log('⚠️ getAvailableDates: Pas de settings');
+      return [];
+    }
     
     const dates = [];
     const today = new Date();
@@ -409,10 +401,11 @@ export function IframeBookingPage() {
       }
     }
     
+    console.log('✅ getAvailableDates: Dates disponibles:', dates.length);
     return dates;
   };
 
-  const timeSlots = selectedDate ? generateTimeSlots(selectedDate) : [];
+  const timeSlots = selectedDate && selectedService ? generateTimeSlots(selectedDate) : [];
   const availableDates = getAvailableDates();
 
   if (loading) {
@@ -452,9 +445,8 @@ export function IframeBookingPage() {
 
   return (
     <div className="min-h-screen bg-white">
-      {/* Main Content */}
       <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-4 sm:py-6">
-        {/* Progress Indicator - Compact */}
+        {/* Progress Indicator */}
         <div className="mb-6 sm:mb-8">
           <div className="flex items-center justify-center gap-2 mb-4">
             {steps.map((step) => (
@@ -491,7 +483,6 @@ export function IframeBookingPage() {
                   className="group bg-white rounded-2xl sm:rounded-3xl shadow-lg hover:shadow-2xl transition-all duration-500 cursor-pointer transform hover:scale-[1.02] overflow-hidden animate-fadeIn border border-gray-100"
                   style={{ animationDelay: `${index * 150}ms` }}
                 >
-                  {/* Service Image */}
                   <div className="relative h-48 sm:h-56 lg:h-64 overflow-hidden">
                     {service.image_url ? (
                       <img
@@ -508,15 +499,12 @@ export function IframeBookingPage() {
                       <Package className="w-16 h-16 text-white" />
                     </div>
                     
-                    {/* Price Badge */}
                     <div className="absolute top-4 right-4 bg-gradient-to-r from-green-500 to-emerald-500 text-white px-3 py-2 rounded-xl font-bold text-sm sm:text-base shadow-lg">
                       {service.price_ttc.toFixed(2)}€
                     </div>
                     
-                    {/* Overlay */}
                     <div className="absolute inset-0 bg-gradient-to-t from-black/60 via-transparent to-transparent opacity-0 group-hover:opacity-100 transition-opacity duration-300" />
                     
-                    {/* Select Button */}
                     <div className="absolute bottom-4 left-4 right-4 transform translate-y-4 group-hover:translate-y-0 opacity-0 group-hover:opacity-100 transition-all duration-300">
                       <button className="w-full bg-white text-gray-900 py-3 px-4 rounded-xl font-bold flex items-center justify-center gap-2 shadow-lg">
                         <Sparkles className="w-5 h-5" />
@@ -525,7 +513,6 @@ export function IframeBookingPage() {
                     </div>
                   </div>
 
-                  {/* Service Info */}
                   <div className="p-4 sm:p-6">
                     <h3 className="text-lg sm:text-xl font-bold text-gray-900 mb-2 group-hover:text-blue-600 transition-colors">
                       {service.name}
@@ -565,7 +552,325 @@ export function IframeBookingPage() {
           </div>
         )}
 
-        {/* Les autres steps restent identiques... */}
+        {/* Step 2: Date & Time Selection */}
+        {currentStep === 2 && selectedService && (
+          <div className="space-y-6 sm:space-y-8">
+            <div className="text-center">
+              <h2 className="text-2xl sm:text-3xl font-bold text-gray-900 mb-2">
+                Choisissez votre créneau
+              </h2>
+              <p className="text-gray-600 text-sm sm:text-base">
+                Sélectionnez une date et une heure pour {selectedService.name}
+              </p>
+            </div>
+
+            {/* Service récapitulatif */}
+            <div className="bg-gradient-to-r from-blue-50 to-purple-50 rounded-3xl p-4 sm:p-6 border-2 border-blue-200">
+              <div className="flex items-center gap-4">
+                <div className="w-16 h-16 bg-gradient-to-r from-blue-500 to-purple-500 rounded-2xl flex items-center justify-center">
+                  <Package className="w-8 h-8 text-white" />
+                </div>
+                <div className="flex-1">
+                  <h3 className="text-lg font-bold text-gray-900">{selectedService.name}</h3>
+                  <div className="flex items-center gap-4 text-sm text-gray-600 mt-1">
+                    <span className="flex items-center gap-1">
+                      <Timer className="w-4 h-4" />
+                      {selectedService.duration_minutes}min
+                    </span>
+                    <span className="flex items-center gap-1">
+                      <Euro className="w-4 h-4" />
+                      {selectedService.price_ttc.toFixed(2)}€
+                    </span>
+                  </div>
+                </div>
+                <button
+                  onClick={() => setCurrentStep(1)}
+                  className="px-4 py-2 bg-white rounded-xl text-sm font-medium text-gray-700 hover:bg-gray-50 transition-colors"
+                >
+                  Changer
+                </button>
+              </div>
+            </div>
+
+            {/* Date Picker */}
+            <DatePicker
+              selectedDate={selectedDate}
+              onDateSelect={setSelectedDate}
+              availableDates={availableDates}
+              settings={data.settings}
+            />
+
+            {/* Time Slots */}
+            {selectedDate && (
+              <div className="space-y-4">
+                <h3 className="text-xl font-bold text-gray-900">Horaires disponibles</h3>
+                
+                {timeSlots.length === 0 ? (
+                  <div className="text-center py-12 bg-gray-50 rounded-3xl">
+                    <Clock className="w-16 h-16 text-gray-300 mx-auto mb-4" />
+                    <h3 className="text-xl font-medium text-gray-900 mb-2">Aucun créneau disponible</h3>
+                    <p className="text-gray-500">Veuillez sélectionner une autre date</p>
+                  </div>
+                ) : (
+                  <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 lg:grid-cols-5 gap-3">
+                    {timeSlots.map((slot) => (
+                      <button
+                        key={slot.time}
+                        onClick={() => slot.available && handleDateTimeSelect(selectedDate, slot.time)}
+                        disabled={!slot.available}
+                        className={`p-4 rounded-2xl text-center font-medium transition-all duration-300 ${
+                          selectedTime === slot.time
+                            ? 'bg-gradient-to-r from-blue-500 to-purple-500 text-white shadow-xl scale-105'
+                            : slot.available
+                            ? 'bg-white text-gray-700 hover:bg-blue-50 hover:text-blue-600 border-2 border-gray-200 hover:border-blue-300'
+                            : 'bg-gray-100 text-gray-400 cursor-not-allowed'
+                        }`}
+                      >
+                        <Clock className="w-5 h-5 mx-auto mb-2" />
+                        {slot.time}
+                      </button>
+                    ))}
+                  </div>
+                )}
+              </div>
+            )}
+
+            {/* Navigation */}
+            <div className="flex gap-4">
+              <button
+                onClick={() => setCurrentStep(1)}
+                className="flex-1 bg-gray-100 text-gray-700 py-4 px-6 rounded-2xl font-bold hover:bg-gray-200 transition-colors flex items-center justify-center gap-2"
+              >
+                <ArrowLeft className="w-5 h-5" />
+                Retour
+              </button>
+            </div>
+          </div>
+        )}
+
+        {/* Step 3: Client Information */}
+        {currentStep === 3 && (
+          <div className="space-y-6 sm:space-y-8">
+            <div className="text-center">
+              <h2 className="text-2xl sm:text-3xl font-bold text-gray-900 mb-2">
+                Vos informations
+              </h2>
+              <p className="text-gray-600 text-sm sm:text-base">
+                Complétez vos coordonnées pour finaliser la réservation
+              </p>
+            </div>
+
+            <div className="bg-white rounded-3xl shadow-xl p-6 sm:p-8 space-y-6">
+              <div className="grid grid-cols-1 sm:grid-cols-2 gap-6">
+                <div>
+                  <label className="block text-sm font-medium text-gray-700 mb-2">
+                    Prénom *
+                  </label>
+                  <input
+                    type="text"
+                    value={clientData.firstname}
+                    onChange={(e) => setClientData({ ...clientData, firstname: e.target.value })}
+                    className="w-full px-4 py-3 border-2 border-gray-200 rounded-xl focus:border-blue-500 focus:ring-2 focus:ring-blue-200 transition-all"
+                    placeholder="Votre prénom"
+                    required
+                  />
+                </div>
+
+                <div>
+                  <label className="block text-sm font-medium text-gray-700 mb-2">
+                    Nom *
+                  </label>
+                  <input
+                    type="text"
+                    value={clientData.lastname}
+                    onChange={(e) => setClientData({ ...clientData, lastname: e.target.value })}
+                    className="w-full px-4 py-3 border-2 border-gray-200 rounded-xl focus:border-blue-500 focus:ring-2 focus:ring-blue-200 transition-all"
+                    placeholder="Votre nom"
+                    required
+                  />
+                </div>
+              </div>
+
+              <div>
+                <label className="block text-sm font-medium text-gray-700 mb-2">
+                  Email *
+                </label>
+                <input
+                  type="email"
+                  value={clientData.email}
+                  onChange={(e) => setClientData({ ...clientData, email: e.target.value })}
+                  className="w-full px-4 py-3 border-2 border-gray-200 rounded-xl focus:border-blue-500 focus:ring-2 focus:ring-blue-200 transition-all"
+                  placeholder="votre@email.com"
+                  required
+                />
+              </div>
+
+              <div>
+                <label className="block text-sm font-medium text-gray-700 mb-2">
+                  Téléphone
+                </label>
+                <input
+                  type="tel"
+                  value={clientData.phone}
+                  onChange={(e) => setClientData({ ...clientData, phone: e.target.value })}
+                  className="w-full px-4 py-3 border-2 border-gray-200 rounded-xl focus:border-blue-500 focus:ring-2 focus:ring-blue-200 transition-all"
+                  placeholder="+33 6 12 34 56 78"
+                />
+              </div>
+
+              <div>
+                <label className="block text-sm font-medium text-gray-700 mb-2">
+                  Nombre de {selectedService?.unit_name || 'participants'}
+                </label>
+                <input
+                  type="number"
+                  min="1"
+                  max={selectedService?.capacity || 1}
+                  value={quantity}
+                  onChange={(e) => setQuantity(Math.min(parseInt(e.target.value) || 1, selectedService?.capacity || 1))}
+                  className="w-full px-4 py-3 border-2 border-gray-200 rounded-xl focus:border-blue-500 focus:ring-2 focus:ring-blue-200 transition-all"
+                />
+              </div>
+            </div>
+
+            <div className="flex gap-4">
+              <button
+                onClick={() => setCurrentStep(2)}
+                className="flex-1 bg-gray-100 text-gray-700 py-4 px-6 rounded-2xl font-bold hover:bg-gray-200 transition-colors flex items-center justify-center gap-2"
+              >
+                <ArrowLeft className="w-5 h-5" />
+                Retour
+              </button>
+              <button
+                onClick={() => setCurrentStep(4)}
+                disabled={!clientData.firstname || !clientData.lastname || !clientData.email}
+                className="flex-1 bg-gradient-to-r from-blue-500 to-purple-500 text-white py-4 px-6 rounded-2xl font-bold hover:shadow-xl transition-all disabled:opacity-50 disabled:cursor-not-allowed flex items-center justify-center gap-2"
+              >
+                Continuer
+                <ArrowRight className="w-5 h-5" />
+              </button>
+            </div>
+          </div>
+        )}
+
+        {/* Step 4: Confirmation */}
+        {currentStep === 4 && selectedService && (
+          <div className="space-y-6 sm:space-y-8">
+            <div className="text-center">
+              <h2 className="text-2xl sm:text-3xl font-bold text-gray-900 mb-2">
+                Récapitulatif
+              </h2>
+              <p className="text-gray-600 text-sm sm:text-base">
+                Vérifiez les informations avant de confirmer
+              </p>
+            </div>
+
+            <div className="bg-white rounded-3xl shadow-xl p-6 sm:p-8 space-y-6">
+              <div className="space-y-4">
+                <div className="flex items-start gap-4 p-4 bg-blue-50 rounded-2xl">
+                  <Package className="w-6 h-6 text-blue-600 flex-shrink-0 mt-1" />
+                  <div className="flex-1">
+                    <h3 className="font-bold text-gray-900 mb-1">Service</h3>
+                    <p className="text-gray-600">{selectedService.name}</p>
+                    <p className="text-sm text-gray-500 mt-1">{selectedService.duration_minutes} minutes</p>
+                  </div>
+                  <div className="text-right">
+                    <p className="font-bold text-gray-900">{selectedService.price_ttc.toFixed(2)}€</p>
+                    <p className="text-sm text-gray-500">x {quantity}</p>
+                  </div>
+                </div>
+
+                <div className="flex items-start gap-4 p-4 bg-purple-50 rounded-2xl">
+                  <Calendar className="w-6 h-6 text-purple-600 flex-shrink-0 mt-1" />
+                  <div className="flex-1">
+                    <h3 className="font-bold text-gray-900 mb-1">Date et heure</h3>
+                    <p className="text-gray-600">
+                      {new Date(selectedDate).toLocaleDateString('fr-FR', {
+                        weekday: 'long',
+                        day: 'numeric',
+                        month: 'long',
+                        year: 'numeric'
+                      })}
+                    </p>
+                    <p className="text-gray-600 mt-1">{selectedTime}</p>
+                  </div>
+                </div>
+
+                <div className="flex items-start gap-4 p-4 bg-green-50 rounded-2xl">
+                  <User className="w-6 h-6 text-green-600 flex-shrink-0 mt-1" />
+                  <div className="flex-1">
+                    <h3 className="font-bold text-gray-900 mb-1">Vos informations</h3>
+                    <p className="text-gray-600">{clientData.firstname} {clientData.lastname}</p>
+                    <p className="text-gray-600">{clientData.email}</p>
+                    {clientData.phone && <p className="text-gray-600">{clientData.phone}</p>}
+                  </div>
+                </div>
+              </div>
+
+              <div className="border-t-2 border-gray-200 pt-6">
+                <div className="flex justify-between items-center text-2xl font-bold">
+                  <span className="text-gray-900">Total</span>
+                  <span className="text-blue-600">{(selectedService.price_ttc * quantity).toFixed(2)}€</span>
+                </div>
+              </div>
+            </div>
+
+            <div className="flex gap-4">
+              <button
+                onClick={() => setCurrentStep(3)}
+                className="flex-1 bg-gray-100 text-gray-700 py-4 px-6 rounded-2xl font-bold hover:bg-gray-200 transition-colors flex items-center justify-center gap-2"
+              >
+                <ArrowLeft className="w-5 h-5" />
+                Retour
+              </button>
+              <button
+                onClick={handleSubmit}
+                disabled={submitting}
+                className="flex-1 bg-gradient-to-r from-green-500 to-emerald-500 text-white py-4 px-6 rounded-2xl font-bold hover:shadow-xl transition-all disabled:opacity-50 disabled:cursor-not-allowed flex items-center justify-center gap-2"
+              >
+                {submitting ? (
+                  <>
+                    <div className="w-5 h-5 border-2 border-white border-t-transparent rounded-full animate-spin" />
+                    Confirmation...
+                  </>
+                ) : (
+                  <>
+                    <Check className="w-5 h-5" />
+                    Confirmer la réservation
+                  </>
+                )}
+              </button>
+            </div>
+          </div>
+        )}
+
+        {/* Step 5: Success */}
+        {currentStep === 5 && (
+          <div className="text-center py-12">
+            <div className="w-24 h-24 bg-gradient-to-r from-green-500 to-emerald-500 rounded-full flex items-center justify-center mx-auto mb-6">
+              <Check className="w-12 h-12 text-white" />
+            </div>
+            <h2 className="text-3xl font-bold text-gray-900 mb-4">
+              Réservation confirmée !
+            </h2>
+            <p className="text-gray-600 text-lg mb-8">
+              Vous allez recevoir un email de confirmation à {clientData.email}
+            </p>
+            <button
+              onClick={() => {
+                setCurrentStep(1);
+                setSelectedService(null);
+                setSelectedDate('');
+                setSelectedTime('');
+                setQuantity(1);
+                setClientData({ firstname: '', lastname: '', email: '', phone: '' });
+              }}
+              className="bg-gradient-to-r from-blue-500 to-purple-500 text-white py-4 px-8 rounded-2xl font-bold hover:shadow-xl transition-all"
+            >
+              Nouvelle réservation
+            </button>
+          </div>
+        )}
       </div>
     </div>
   );

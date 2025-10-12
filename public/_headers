@@ -1,39 +1,39 @@
-# Disable caching for all files
+# CRITICAL: Disable ALL caching for ALL files
 /*
   Cache-Control: no-store, no-cache, must-revalidate, proxy-revalidate, max-age=0
   Pragma: no-cache
   Expires: 0
   Surrogate-Control: no-store
   X-Content-Type-Options: nosniff
-  X-Frame-Options: DENY
+  X-Frame-Options: SAMEORIGIN
   X-XSS-Protection: 1; mode=block
   Referrer-Policy: strict-origin-when-cross-origin
 
-# Disable caching for HTML files
+# HTML files - NO CACHE
 /*.html
   Cache-Control: no-store, no-cache, must-revalidate, proxy-revalidate, max-age=0
   Pragma: no-cache
   Expires: 0
 
-# Disable caching for JavaScript files
+# JavaScript files - NO CACHE
 /*.js
   Cache-Control: no-store, no-cache, must-revalidate, proxy-revalidate, max-age=0
   Pragma: no-cache
   Expires: 0
 
-# Disable caching for CSS files
+# CSS files - NO CACHE
 /*.css
   Cache-Control: no-store, no-cache, must-revalidate, proxy-revalidate, max-age=0
   Pragma: no-cache
   Expires: 0
 
-# Disable caching for JSON files
+# JSON files - NO CACHE
 /*.json
   Cache-Control: no-store, no-cache, must-revalidate, proxy-revalidate, max-age=0
   Pragma: no-cache
   Expires: 0
 
-# Disable caching for images
+# Images - NO CACHE
 /*.png
   Cache-Control: no-store, no-cache, must-revalidate, proxy-revalidate, max-age=0
   Pragma: no-cache

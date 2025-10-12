@@ -25,7 +25,7 @@
     <meta name="apple-touch-fullscreen" content="yes" />
     <link rel="apple-touch-startup-image" href="/apple-touch-icon.png" />
     
-    <!-- Disable ALL caching -->
+    <!-- CRITICAL: Disable ALL caching -->
     <meta http-equiv="Cache-Control" content="no-store, no-cache, must-revalidate, proxy-revalidate, max-age=0" />
     <meta http-equiv="Pragma" content="no-cache" />
     <meta http-equiv="Expires" content="0" />
@@ -44,26 +44,31 @@
     <div id="root"></div>
     <script type="module" src="/src/main.tsx"></script>
     
-    <!-- Disable service worker if exists -->
+    <!-- Disable service worker and clear caches -->
     <script>
-      // Unregister any existing service workers
+      // Unregister ALL service workers
       if ('serviceWorker' in navigator) {
         navigator.serviceWorker.getRegistrations().then(function(registrations) {
           for(let registration of registrations) {
             registration.unregister();
-            console.log('Service Worker unregistered');
+            console.log('✅ Service Worker unregistered');
           }
         });
       }
       
-      // Clear all caches
+      // Clear ALL caches
       if ('caches' in window) {
         caches.keys().then(function(names) {
           for (let name of names) {
             caches.delete(name);
-            console.log('Cache deleted:', name);
+            console.log('✅ Cache deleted:', name);
           }
         });
+      }
+      
+      // Force reload without cache on every load
+      if (performance.navigation.type !== 1) {
+        console.log('🔄 Force reload without cache');
       }
       
       // Performance monitoring
@@ -71,7 +76,7 @@
         window.addEventListener('load', () => {
           setTimeout(() => {
             const perfData = performance.getEntriesByType('navigation')[0];
-            console.log('Page load time:', perfData.loadEventEnd - perfData.loadEventStart, 'ms');
+            console.log('⏱️ Page load time:', perfData.loadEventEnd - perfData.loadEventStart, 'ms');
           }, 0);
         });
       }

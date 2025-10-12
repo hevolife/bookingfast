@@ -12,9 +12,8 @@ export default defineConfig({
     minify: 'terser',
     terserOptions: {
       compress: {
-        drop_console: true,
-        drop_debugger: true,
-        pure_funcs: ['console.log', 'console.info', 'console.debug']
+        drop_console: false,
+        drop_debugger: false
       }
     },
     rollupOptions: {
@@ -31,7 +30,7 @@ export default defineConfig({
       }
     },
     chunkSizeWarningLimit: 1000,
-    sourcemap: false
+    sourcemap: true
   },
   server: {
     port: 5173,
@@ -39,11 +38,21 @@ export default defineConfig({
     host: true,
     hmr: {
       overlay: true
+    },
+    headers: {
+      'Cache-Control': 'no-store, no-cache, must-revalidate, proxy-revalidate, max-age=0',
+      'Pragma': 'no-cache',
+      'Expires': '0'
     }
   },
   preview: {
     port: 4173,
     strictPort: false,
-    host: true
+    host: true,
+    headers: {
+      'Cache-Control': 'no-store, no-cache, must-revalidate, proxy-revalidate, max-age=0',
+      'Pragma': 'no-cache',
+      'Expires': '0'
+    }
   }
 });
