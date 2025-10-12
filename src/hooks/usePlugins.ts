@@ -1,4 +1,4 @@
-import { useState, useEffect } from 'react';
+import { useState, useEffect, useCallback } from 'react';
 import { supabase } from '../lib/supabase';
 import { Plugin, PluginSubscription, UserPlugin } from '../types/plugin';
 import { useAuth } from '../contexts/AuthContext';
@@ -11,7 +11,7 @@ export function usePlugins() {
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
 
-  const fetchPlugins = async () => {
+  const fetchPlugins = useCallback(async () => {
     try {
       if (!supabase) {
         setPlugins([]);
@@ -31,9 +31,9 @@ export function usePlugins() {
       console.error('❌ Erreur chargement plugins:', err);
       setError(err instanceof Error ? err.message : 'Erreur de chargement');
     }
-  };
+  }, []);
 
-  const fetchUserSubscriptions = async () => {
+  const fetchUserSubscriptions = useCallback(async () => {
     try {
       if (!supabase || !user) {
         setUserSubscriptions([]);
@@ -58,9 +58,9 @@ export function usePlugins() {
     } catch (err) {
       console.error('❌ Erreur chargement abonnements:', err);
     }
-  };
+  }, [user?.id]);
 
-  const fetchUserPlugins = async () => {
+  const fetchUserPlugins = useCallback(async () => {
     try {
       if (!supabase || !user) {
         setUserPlugins([]);
@@ -94,9 +94,9 @@ export function usePlugins() {
       console.error('❌ Erreur chargement plugins actifs:', err);
       setUserPlugins([]);
     }
-  };
+  }, [user?.id]);
 
-  const hasPluginAccess = async (pluginSlug: string): Promise<boolean> => {
+  const hasPluginAccess = useCallback(async (pluginSlug: string): Promise<boolean> => {
     if (!user) {
       console.log('❌ Pas d\'utilisateur connecté');
       return false;
@@ -127,7 +127,7 @@ export function usePlugins() {
       console.error('❌ Erreur vérification accès:', error);
       return false;
     }
-  };
+  }, [user?.id]);
 
   const subscribeToPlugin = async (
     pluginId: string,
@@ -288,10 +288,39 @@ export function usePlugins() {
   };
 
   const cancelSubscription = async (subscriptionId: string) => {
-    if (!supabase) throw new Error('Supabase non configuré');
+    if (!supabase || !user) throw new Error('Configuration invalide');
 
     try {
-      const { error } = await supabase
+      console.log('🔴 Annulation abonnement:', subscriptionId);
+
+      // Récupérer l'abonnement pour obtenir le stripe_subscription_id
+      const { data: subscription, error: fetchError } = await supabase
+        .from('plugin_subscriptions')
+        .select('stripe_subscription_id')
+        .eq('id', subscriptionId)
+        .single();
+
+      if (fetchError) throw fetchError;
+
+      if (!subscription?.stripe_subscription_id) {
+        throw new Error('Aucun abonnement Stripe trouvé');
+      }
+
+      console.log('💳 Stripe Subscription ID:', subscription.stripe_subscription_id);
+
+      // Appeler l'Edge Function pour annuler sur Stripe
+      const { data, error: cancelError } = await supabase.functions.invoke('cancel-subscription', {
+        body: {
+          subscription_id: subscription.stripe_subscription_id
+        }
+      });
+
+      if (cancelError) throw cancelError;
+
+      console.log('✅ Réponse Stripe:', data);
+
+      // Mettre à jour localement
+      const { error: updateError } = await supabase
         .from('plugin_subscriptions')
         .update({
           status: 'cancelled',
@@ -299,7 +328,9 @@ export function usePlugins() {
         })
         .eq('id', subscriptionId);
 
-      if (error) throw error;
+      if (updateError) throw updateError;
+
+      console.log('✅ Abonnement marqué comme annulé');
 
       await fetchUserSubscriptions();
       await fetchUserPlugins();
@@ -320,8 +351,10 @@ export function usePlugins() {
       setLoading(false);
     };
 
-    loadData();
-  }, [user]);
+    if (user) {
+      loadData();
+    }
+  }, [user?.id, fetchPlugins, fetchUserSubscriptions, fetchUserPlugins]);
 
   return {
     plugins,

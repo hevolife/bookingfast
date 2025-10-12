@@ -1,4 +1,4 @@
-import { useState, useEffect, useCallback } from 'react';
+import { useState, useEffect, useCallback, useRef } from 'react';
 import { supabase, isSupabaseConfigured } from '../lib/supabase';
 import { Booking } from '../types';
 import { useAuth } from '../contexts/AuthContext';
@@ -9,12 +9,17 @@ export function useBookings() {
   const [bookings, setBookings] = useState<Booking[]>([]);
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
-
-  console.log('🔍 useBookings - Hook appelé, user:', user?.id);
+  
+  // Utiliser useRef pour éviter les re-renders
+  const fetchingRef = useRef(false);
 
   const fetchBookings = useCallback(async () => {
-    console.log('🔍 fetchBookings - Début, user:', user?.id);
-    
+    // Éviter les appels multiples simultanés
+    if (fetchingRef.current) {
+      console.log('⏭️ fetchBookings déjà en cours, skip');
+      return;
+    }
+
     if (!user) {
       console.log('⚠️ fetchBookings - Pas d\'utilisateur');
       setBookings([]);
@@ -29,6 +34,7 @@ export function useBookings() {
       return;
     }
 
+    fetchingRef.current = true;
     console.log('🔄 fetchBookings - Chargement en cours...');
     setLoading(true);
     setError(null);
@@ -73,7 +79,6 @@ export function useBookings() {
       }
 
       console.log('✅ Bookings chargés:', data?.length || 0, 'réservations');
-      console.log('📊 Données bookings:', data);
       setBookings(data || []);
     } catch (err) {
       console.error('❌ Erreur lors du chargement des réservations:', err);
@@ -82,8 +87,9 @@ export function useBookings() {
     } finally {
       console.log('🏁 fetchBookings - Terminé');
       setLoading(false);
+      fetchingRef.current = false;
     }
-  }, [user?.id]);
+  }, [user?.id]); // ✅ Seulement user.id comme dépendance
 
   const addBooking = async (bookingData: Omit<Booking, 'id' | 'created_at' | 'user_id'>) => {
     if (!isSupabaseConfigured || !user) {
@@ -262,14 +268,7 @@ export function useBookings() {
       setBookings([]);
       setLoading(false);
     }
-  }, [user?.id, fetchBookings]);
-
-  console.log('🔍 useBookings - État actuel:', { 
-    bookingsCount: bookings.length, 
-    loading, 
-    error,
-    userId: user?.id 
-  });
+  }, [user?.id, fetchBookings]); // ✅ Dépendances stables
 
   return {
     bookings,

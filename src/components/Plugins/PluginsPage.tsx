@@ -1,5 +1,5 @@
 import React, { useState, useEffect } from 'react';
-import { Package, Sparkles, Check, X, Settings as SettingsIcon, Crown, Zap, AlertCircle, CreditCard, Clock, ExternalLink } from 'lucide-react';
+import { Package, Sparkles, Check, X, Settings as SettingsIcon, Crown, Zap, AlertCircle, CreditCard, Clock, ExternalLink, XCircle } from 'lucide-react';
 import * as LucideIcons from 'lucide-react';
 import { usePlugins } from '../../hooks/usePlugins';
 import { Plugin } from '../../types/plugin';
@@ -8,9 +8,10 @@ import { useAuth } from '../../contexts/AuthContext';
 
 export function PluginsPage() {
   const { user } = useAuth();
-  const { plugins, userSubscriptions, loading, subscribeToPlugin, createCheckoutSession, refetch } = usePlugins();
+  const { plugins, userSubscriptions, loading, subscribeToPlugin, createCheckoutSession, cancelSubscription, refetch } = usePlugins();
   const [selectedPlugin, setSelectedPlugin] = useState<Plugin | null>(null);
   const [subscribing, setSubscribing] = useState(false);
+  const [cancelling, setCancelling] = useState(false);
   const [subscriptionError, setSubscriptionError] = useState<string | null>(null);
 
   // Recharger les données toutes les 2 secondes pendant 10 secondes après un changement
@@ -139,6 +140,47 @@ export function PluginsPage() {
     }
   };
 
+  const handleCancelSubscription = async (plugin: Plugin) => {
+    const subscription = getSubscription(plugin.id);
+    if (!subscription) return;
+
+    const confirmed = window.confirm(
+      `⚠️ Êtes-vous sûr de vouloir résilier votre abonnement à "${plugin.name}" ?\n\n` +
+      `Votre accès restera actif jusqu'à la fin de la période en cours, puis sera automatiquement désactivé.\n\n` +
+      `Vous pourrez vous réabonner à tout moment.`
+    );
+
+    if (!confirmed) return;
+
+    console.log('🔴 Résiliation abonnement:', plugin.name);
+    
+    setCancelling(true);
+    setSubscriptionError(null);
+
+    try {
+      await cancelSubscription(subscription.id);
+      
+      console.log('✅ Abonnement résilié');
+      
+      // Déclencher le rechargement automatique
+      setShouldRefetch(true);
+      
+      // Recharger immédiatement
+      await refetch();
+      
+      alert('✅ Votre abonnement a été résilié. Vous conservez l\'accès jusqu\'à la fin de la période en cours.');
+      
+      setSelectedPlugin(null);
+    } catch (err) {
+      console.error('❌ Erreur résiliation:', err);
+      const errorMessage = err instanceof Error ? err.message : 'Erreur lors de la résiliation';
+      setSubscriptionError(errorMessage);
+      alert(`Erreur: ${errorMessage}`);
+    } finally {
+      setCancelling(false);
+    }
+  };
+
   if (loading) {
     return (
       <div className="flex items-center justify-center h-64">
@@ -246,6 +288,7 @@ export function PluginsPage() {
           isTrialExpired={isTrialExpired(selectedPlugin.id)}
           trialDaysLeft={getTrialDaysLeft(selectedPlugin.id)}
           subscribing={subscribing}
+          cancelling={cancelling}
           error={subscriptionError}
           onClose={() => {
             setSelectedPlugin(null);
@@ -253,6 +296,7 @@ export function PluginsPage() {
           }}
           onStartTrial={() => handleStartTrial(selectedPlugin)}
           onSubscribe={() => handleSubscribe(selectedPlugin)}
+          onCancel={() => handleCancelSubscription(selectedPlugin)}
         />
       )}
     </div>
@@ -406,13 +450,15 @@ interface PluginModalProps {
   isTrialExpired: boolean;
   trialDaysLeft: number;
   subscribing: boolean;
+  cancelling: boolean;
   error: string | null;
   onClose: () => void;
   onStartTrial: () => void;
   onSubscribe: () => void;
+  onCancel: () => void;
 }
 
-function PluginModal({ plugin, isSubscribed, isTrialActive, isTrialExpired, trialDaysLeft, subscribing, error, onClose, onStartTrial, onSubscribe }: PluginModalProps) {
+function PluginModal({ plugin, isSubscribed, isTrialActive, isTrialExpired, trialDaysLeft, subscribing, cancelling, error, onClose, onStartTrial, onSubscribe, onCancel }: PluginModalProps) {
   const IconComponent = (LucideIcons as any)[plugin.icon] || Package;
   const includedFeatures = plugin.features.filter(f => f.included);
   const additionalFeatures = plugin.features.filter(f => !f.included);
@@ -452,6 +498,39 @@ function PluginModal({ plugin, isSubscribed, isTrialActive, isTrialExpired, tria
               <div>
                 <p className="font-bold text-red-900">Erreur</p>
                 <p className="text-sm text-red-700 mt-1">{error}</p>
+              </div>
+            </div>
+          )}
+
+          {isSubscribed && (
+            <div className="bg-green-50 border-2 border-green-200 rounded-xl p-6">
+              <div className="flex items-start gap-4">
+                <div className="w-12 h-12 bg-green-500 rounded-xl flex items-center justify-center flex-shrink-0">
+                  <Check className="w-6 h-6 text-white" />
+                </div>
+                <div className="flex-1">
+                  <h3 className="text-xl font-bold text-green-900 mb-2">Abonnement actif</h3>
+                  <p className="text-green-800 mb-4">
+                    Vous avez un accès complet à toutes les fonctionnalités de ce plugin.
+                  </p>
+                  <button
+                    onClick={onCancel}
+                    disabled={cancelling}
+                    className="bg-red-600 text-white px-6 py-3 rounded-xl font-bold hover:bg-red-700 transition-colors disabled:opacity-50 disabled:cursor-not-allowed flex items-center gap-2"
+                  >
+                    {cancelling ? (
+                      <>
+                        <LoadingSpinner size="sm" />
+                        Résiliation...
+                      </>
+                    ) : (
+                      <>
+                        <XCircle className="w-5 h-5" />
+                        Résilier l'abonnement
+                      </>
+                    )}
+                  </button>
+                </div>
               </div>
             </div>
           )}
@@ -536,22 +615,6 @@ function PluginModal({ plugin, isSubscribed, isTrialActive, isTrialExpired, tria
             </div>
           )}
 
-          {isSubscribed && (
-            <div className="bg-green-50 border-2 border-green-200 rounded-xl p-6">
-              <div className="flex items-start gap-4">
-                <div className="w-12 h-12 bg-green-500 rounded-xl flex items-center justify-center flex-shrink-0">
-                  <Check className="w-6 h-6 text-white" />
-                </div>
-                <div className="flex-1">
-                  <h3 className="text-xl font-bold text-green-900 mb-2">Abonnement actif</h3>
-                  <p className="text-green-800">
-                    Vous avez un accès complet à toutes les fonctionnalités de ce plugin.
-                  </p>
-                </div>
-              </div>
-            </div>
-          )}
-
           <div>
             <h3 className="text-xl font-bold text-gray-900 mb-4 flex items-center gap-2">
               <Check className="w-6 h-6 text-green-500" />
@@ -599,7 +662,7 @@ function PluginModal({ plugin, isSubscribed, isTrialActive, isTrialExpired, tria
           <div className="flex gap-4">
             <button
               onClick={onClose}
-              disabled={subscribing}
+              disabled={subscribing || cancelling}
               className="flex-1 bg-gray-100 text-gray-700 py-4 rounded-xl font-bold hover:bg-gray-200 transition-colors disabled:opacity-50"
             >
               Fermer
@@ -607,7 +670,7 @@ function PluginModal({ plugin, isSubscribed, isTrialActive, isTrialExpired, tria
             {!isSubscribed && !isTrialActive && !isTrialExpired && (
               <button
                 onClick={onStartTrial}
-                disabled={subscribing}
+                disabled={subscribing || cancelling}
                 className="flex-1 bg-gradient-to-r from-purple-600 to-pink-600 text-white py-4 rounded-xl font-bold hover:from-purple-700 hover:to-pink-700 transition-all duration-300 shadow-lg hover:shadow-xl disabled:opacity-50 disabled:cursor-not-allowed"
               >
                 {subscribing ? (

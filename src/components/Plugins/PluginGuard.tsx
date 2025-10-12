@@ -43,7 +43,7 @@ export function PluginGuard({ pluginSlug, children }: PluginGuardProps) {
     return () => {
       mounted = false;
     };
-  }, [pluginSlug, hasPluginAccess]);
+  }, [pluginSlug, hasPluginAccess]); // ✅ Dépendances stables
 
   if (loading) {
     return (
