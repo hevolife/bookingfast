@@ -4,8 +4,10 @@ import * as LucideIcons from 'lucide-react';
 import { usePlugins } from '../../hooks/usePlugins';
 import { Plugin } from '../../types/plugin';
 import { LoadingSpinner } from '../UI/LoadingSpinner';
+import { useAuth } from '../../contexts/AuthContext';
 
 export function PluginsPage() {
+  const { user } = useAuth();
   const { plugins, userSubscriptions, loading, subscribeToPlugin, getPluginPaymentLink, refetch } = usePlugins();
   const [selectedPlugin, setSelectedPlugin] = useState<Plugin | null>(null);
   const [subscribing, setSubscribing] = useState(false);
@@ -111,7 +113,14 @@ export function PluginsPage() {
   };
 
   const handleSubscribe = (plugin: Plugin) => {
-    console.log('💳 Redirection vers Stripe Payment Link pour:', plugin.name);
+    if (!user) {
+      alert('⚠️ Vous devez être connecté pour vous abonner');
+      return;
+    }
+
+    console.log('💳 Préparation redirection vers Stripe Payment Link pour:', plugin.name);
+    console.log('👤 User ID:', user.id);
+    console.log('🔌 Plugin ID:', plugin.id);
     
     const paymentLink = getPluginPaymentLink(plugin);
     
@@ -120,13 +129,28 @@ export function PluginsPage() {
       return;
     }
 
-    // Ajouter les paramètres client_reference_id et prefilled_email
-    const url = new URL(paymentLink);
-    url.searchParams.set('client_reference_id', plugin.id);
-    url.searchParams.set('prefilled_email', 'user@example.com'); // Remplacer par user.email si disponible
-    
-    console.log('✅ Redirection vers:', url.toString());
-    window.location.href = url.toString();
+    try {
+      // Créer l'URL avec les paramètres de métadonnées
+      const url = new URL(paymentLink);
+      
+      // Format: user_id|plugin_id pour client_reference_id
+      const clientReferenceId = `${user.id}|${plugin.id}`;
+      url.searchParams.set('client_reference_id', clientReferenceId);
+      
+      // Pré-remplir l'email
+      url.searchParams.set('prefilled_email', user.email || '');
+      
+      console.log('📋 Métadonnées ajoutées:');
+      console.log('  - client_reference_id:', clientReferenceId);
+      console.log('  - prefilled_email:', user.email);
+      console.log('✅ URL finale:', url.toString());
+      
+      // Rediriger vers Stripe
+      window.location.href = url.toString();
+    } catch (error) {
+      console.error('❌ Erreur création URL:', error);
+      alert('Erreur lors de la préparation du paiement. Veuillez réessayer.');
+    }
   };
 
   if (loading) {

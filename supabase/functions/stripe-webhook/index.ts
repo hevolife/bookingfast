@@ -81,6 +81,7 @@ Deno.serve(async (req) => {
       const sessionId = session.id
       
       console.log('💳 Session de paiement complétée:', sessionId)
+      console.log('📋 Client reference ID:', session.client_reference_id)
       
       if (session.status !== 'complete' || session.payment_status !== 'paid') {
         console.log('⚠️ PAIEMENT NON COMPLET - Session ignorée')
@@ -110,8 +111,7 @@ Deno.serve(async (req) => {
       })
 
       const customerEmail = session.customer_details?.email
-      const amountPaid = session.amount_total / 100
-      const metadata = session.metadata || {}
+      const clientReferenceId = session.client_reference_id
 
       if (!customerEmail) {
         console.error('❌ Email client manquant')
@@ -119,42 +119,88 @@ Deno.serve(async (req) => {
         return new Response('Email client manquant', { status: 400, headers: corsHeaders })
       }
 
-      // ABONNEMENT PLUGIN
-      if (metadata.payment_type === 'plugin_subscription') {
-        console.log('🔌 ABONNEMENT PLUGIN')
+      // ABONNEMENT PLUGIN - Extraction depuis client_reference_id
+      if (clientReferenceId && clientReferenceId.includes('|')) {
+        console.log('🔌 ABONNEMENT PLUGIN détecté via client_reference_id')
         
-        const userId = metadata.user_id
-        const pluginId = metadata.plugin_id
+        // Format: user_id|plugin_id
+        const [userId, pluginId] = clientReferenceId.split('|')
+        
+        console.log('👤 User ID extrait:', userId)
+        console.log('🔌 Plugin ID extrait:', pluginId)
         
         if (!userId || !pluginId) {
-          console.error('❌ Données plugin manquantes')
+          console.error('❌ Format client_reference_id invalide:', clientReferenceId)
           processedSessions.delete(sessionId)
-          return new Response('Données plugin manquantes', { status: 400, headers: corsHeaders })
+          return new Response('Format client_reference_id invalide', { status: 400, headers: corsHeaders })
         }
         
         const stripeSubscriptionId = session.subscription
 
-        // Mettre à jour l'abonnement plugin
-        const { error: updateError } = await supabaseClient
+        // Vérifier si une souscription existe déjà
+        const { data: existingSub, error: checkError } = await supabaseClient
           .from('plugin_subscriptions')
-          .update({
-            status: 'active',
-            stripe_subscription_id: stripeSubscriptionId,
-            stripe_customer_id: session.customer,
-            current_period_start: new Date().toISOString(),
-            current_period_end: session.expires_at ? new Date(session.expires_at * 1000).toISOString() : null,
-            updated_at: new Date().toISOString()
-          })
+          .select('*')
           .eq('user_id', userId)
           .eq('plugin_id', pluginId)
-        
-        if (updateError) {
-          console.error('❌ Erreur mise à jour plugin:', updateError)
+          .maybeSingle()
+
+        if (checkError) {
+          console.error('❌ Erreur vérification souscription:', checkError)
           processedSessions.delete(sessionId)
-          return new Response('Erreur mise à jour plugin', { status: 500, headers: corsHeaders })
+          return new Response('Erreur vérification souscription', { status: 500, headers: corsHeaders })
         }
-        
-        console.log('✅ PLUGIN ACTIVÉ')
+
+        if (existingSub) {
+          console.log('📋 Souscription existante trouvée, mise à jour...')
+          
+          // Mettre à jour l'abonnement existant
+          const { error: updateError } = await supabaseClient
+            .from('plugin_subscriptions')
+            .update({
+              status: 'active',
+              is_trial: false,
+              trial_ends_at: null,
+              stripe_subscription_id: stripeSubscriptionId,
+              stripe_customer_id: session.customer,
+              current_period_start: new Date().toISOString(),
+              current_period_end: session.expires_at ? new Date(session.expires_at * 1000).toISOString() : null,
+              updated_at: new Date().toISOString()
+            })
+            .eq('id', existingSub.id)
+          
+          if (updateError) {
+            console.error('❌ Erreur mise à jour plugin:', updateError)
+            processedSessions.delete(sessionId)
+            return new Response('Erreur mise à jour plugin', { status: 500, headers: corsHeaders })
+          }
+          
+          console.log('✅ PLUGIN ACTIVÉ (mise à jour)')
+        } else {
+          console.log('➕ Création nouvelle souscription plugin...')
+          
+          // Créer une nouvelle souscription
+          const { error: insertError } = await supabaseClient
+            .from('plugin_subscriptions')
+            .insert({
+              user_id: userId,
+              plugin_id: pluginId,
+              status: 'active',
+              is_trial: false,
+              stripe_subscription_id: stripeSubscriptionId,
+              stripe_customer_id: session.customer,
+              current_period_start: new Date().toISOString(),
+              current_period_end: session.expires_at ? new Date(session.expires_at * 1000).toISOString() : null
+            })
+          
+          if (insertError) {
+            console.error('❌ Erreur création plugin:', insertError)
+            processedSessions.delete(sessionId)
+            return new Response('Erreur création plugin', { status: 500, headers: corsHeaders })
+          }
+          
+          console.log('✅ PLUGIN ACTIVÉ (création)')
+        }
         
         const result = { 
           success: true, 
@@ -171,7 +217,9 @@ Deno.serve(async (req) => {
         })
       }
 
-      // Abonnement plateforme
+      // Abonnement plateforme (ancien système avec metadata)
+      const metadata = session.metadata || {}
+      
       if (metadata.payment_type === 'platform_subscription') {
         console.log('💳 ABONNEMENT PLATEFORME')
         
