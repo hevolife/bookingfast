@@ -1,4 +1,5 @@
 import React, { useState, useEffect } from 'react';
+import { useTranslation } from 'react-i18next';
 import { User, Mail, Phone, Search, Filter, ChevronLeft, ChevronRight, CreditCard as Edit, Eye, Trash2, Plus, Calendar, ArrowUpDown, AlertTriangle } from 'lucide-react';
 import { useClients } from '../../hooks/useClients';
 import { useBookings } from '../../hooks/useBookings';
@@ -14,6 +15,7 @@ interface ClientsPageProps {
 }
 
 export function ClientsPage({ onEditClient }: ClientsPageProps) {
+  const { t } = useTranslation();
   const { clients, loading, deleteClient } = useClients();
   const { bookings } = useBookings();
   const { hasPermission } = useTeam();
@@ -29,11 +31,9 @@ export function ClientsPage({ onEditClient }: ClientsPageProps) {
 
   const itemsPerPage = 12;
 
-  // Filtrer et trier les clients
   useEffect(() => {
     let filtered = [...clients];
 
-    // Filtrer par terme de recherche
     if (searchTerm) {
       filtered = filtered.filter(client =>
         client.firstname.toLowerCase().includes(searchTerm.toLowerCase()) ||
@@ -43,7 +43,6 @@ export function ClientsPage({ onEditClient }: ClientsPageProps) {
       );
     }
 
-    // Trier
     filtered.sort((a, b) => {
       let comparison = 0;
       
@@ -69,7 +68,6 @@ export function ClientsPage({ onEditClient }: ClientsPageProps) {
     setCurrentPage(1);
   }, [clients, searchTerm, sortBy, sortOrder]);
 
-  // Calculer la pagination
   const totalPages = Math.ceil(filteredClients.length / itemsPerPage);
   const startIndex = (currentPage - 1) * itemsPerPage;
   const endIndex = startIndex + itemsPerPage;
@@ -86,7 +84,7 @@ export function ClientsPage({ onEditClient }: ClientsPageProps) {
 
   const formatDate = (date?: string) => {
     if (!date) return 'N/A';
-    return new Date(date).toLocaleDateString('fr-FR', {
+    return new Date(date).toLocaleDateString(t('common.language') === 'Français' ? 'fr-FR' : 'en-US', {
       day: '2-digit',
       month: '2-digit',
       year: 'numeric'
@@ -111,16 +109,14 @@ export function ClientsPage({ onEditClient }: ClientsPageProps) {
       setShowDeleteModal(false);
       setClientToDelete(null);
     } catch (error) {
-      alert(`Erreur lors de la suppression: ${error instanceof Error ? error.message : 'Erreur inconnue'}`);
+      alert(`${t('common.error')}: ${error instanceof Error ? error.message : t('common.error')}`);
     }
   };
 
-  // Obtenir les réservations d'un client
   const getClientBookings = (clientEmail: string): Booking[] => {
     return bookings.filter(booking => booking.client_email === clientEmail);
   };
 
-  // Calculer les statistiques d'un client
   const getClientStats = (client: Client) => {
     const clientBookings = getClientBookings(client.email);
     const totalBookings = clientBookings.length;
@@ -148,8 +144,8 @@ export function ClientsPage({ onEditClient }: ClientsPageProps) {
       <div className="flex items-center justify-center h-64">
         <div className="text-center p-8 bg-red-50 rounded-2xl border border-red-200">
           <AlertTriangle className="w-16 h-16 text-red-500 mx-auto mb-4" />
-          <h3 className="text-lg font-bold text-red-800 mb-2">Accès refusé</h3>
-          <p className="text-red-600">Vous n'avez pas les permissions pour voir la liste des clients.</p>
+          <h3 className="text-lg font-bold text-red-800 mb-2">{t('clients.accessDenied.title')}</h3>
+          <p className="text-red-600">{t('clients.accessDenied.message')}</p>
         </div>
       </div>
     );
@@ -158,32 +154,28 @@ export function ClientsPage({ onEditClient }: ClientsPageProps) {
   return (
     <>
       <div className="p-4 sm:p-6 bg-gradient-to-br from-blue-50 via-purple-50 to-pink-50 mobile-optimized">
-        {/* Header */}
         <div className="mb-6 sm:mb-8">
           <h1 className="text-2xl sm:text-3xl font-bold bg-gradient-to-r from-purple-600 to-pink-600 bg-clip-text text-transparent">
-            Mes Clients
+            {t('clients.title')}
           </h1>
           <p className="text-sm sm:text-base text-gray-600 mt-2">
-            Liste complète de tous vos clients ({filteredClients.length})
+            {t('clients.subtitle')} ({filteredClients.length})
           </p>
         </div>
 
-        {/* Filtres et recherche */}
         <div className="bg-white rounded-xl sm:rounded-2xl shadow-lg p-4 sm:p-6 mb-6">
           <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4">
-            {/* Recherche */}
             <div className="relative">
               <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 text-gray-400 w-5 h-5" />
               <input
                 type="text"
                 value={searchTerm}
                 onChange={(e) => setSearchTerm(e.target.value)}
-                placeholder="Rechercher un client..."
+                placeholder={t('clients.search')}
                 className="w-full pl-10 pr-4 py-3 border border-gray-300 rounded-xl focus:ring-2 focus:ring-purple-500 focus:border-purple-500 transition-all duration-300 text-sm"
               />
             </div>
 
-            {/* Tri */}
             <div>
               <select
                 value={`${sortBy}-${sortOrder}`}
@@ -194,28 +186,25 @@ export function ClientsPage({ onEditClient }: ClientsPageProps) {
                 }}
                 className="w-full p-3 border border-gray-300 rounded-xl focus:ring-2 focus:ring-purple-500 focus:border-purple-500 transition-all duration-300 text-sm"
               >
-                <option value="created-desc">Plus récent</option>
-                <option value="created-asc">Plus ancien</option>
-                <option value="name-asc">Nom (A-Z)</option>
-                <option value="name-desc">Nom (Z-A)</option>
-                <option value="email-asc">Email (A-Z)</option>
-                <option value="email-desc">Email (Z-A)</option>
+                <option value="created-desc">{t('clients.sortBy.newest')}</option>
+                <option value="created-asc">{t('clients.sortBy.oldest')}</option>
+                <option value="name-asc">{t('clients.sortBy.nameAsc')}</option>
+                <option value="name-desc">{t('clients.sortBy.nameDesc')}</option>
+                <option value="email-asc">{t('clients.sortBy.emailAsc')}</option>
+                <option value="email-desc">{t('clients.sortBy.emailDesc')}</option>
               </select>
             </div>
 
-            {/* Statistiques rapides */}
             <div className="bg-gradient-to-r from-purple-50 to-pink-50 border border-purple-200 rounded-xl p-3 text-center">
               <div className="text-lg font-bold text-purple-600">{clients.length}</div>
-              <div className="text-xs text-purple-700">Clients total</div>
+              <div className="text-xs text-purple-700">{t('clients.totalClients')}</div>
             </div>
           </div>
         </div>
 
-        {/* Liste des clients */}
         <div className="bg-white rounded-xl sm:rounded-2xl shadow-lg overflow-hidden">
           {currentClients.length > 0 ? (
             <>
-              {/* Version desktop - Table */}
               <div className="hidden lg:block overflow-x-auto">
                 <table className="w-full">
                   <thead className="bg-gradient-to-r from-gray-50 to-purple-50 border-b border-gray-200">
@@ -225,7 +214,7 @@ export function ClientsPage({ onEditClient }: ClientsPageProps) {
                           onClick={() => handleSort('name')}
                           className="flex items-center gap-2 text-sm font-bold text-gray-700 hover:text-purple-600 transition-colors"
                         >
-                          Client
+                          {t('clients.name')}
                           <ArrowUpDown className="w-4 h-4" />
                         </button>
                       </th>
@@ -234,21 +223,21 @@ export function ClientsPage({ onEditClient }: ClientsPageProps) {
                           onClick={() => handleSort('email')}
                           className="flex items-center gap-2 text-sm font-bold text-gray-700 hover:text-purple-600 transition-colors"
                         >
-                          Contact
+                          {t('clients.email')}
                           <ArrowUpDown className="w-4 h-4" />
                         </button>
                       </th>
-                      <th className="px-6 py-4 text-left">Réservations</th>
+                      <th className="px-6 py-4 text-left">{t('clients.bookings')}</th>
                       <th className="px-6 py-4 text-left">
                         <button
                           onClick={() => handleSort('created')}
                           className="flex items-center gap-2 text-sm font-bold text-gray-700 hover:text-purple-600 transition-colors"
                         >
-                          Inscription
+                          {t('clients.clientSince')}
                           <ArrowUpDown className="w-4 h-4" />
                         </button>
                       </th>
-                      <th className="px-6 py-4 text-left">Actions</th>
+                      <th className="px-6 py-4 text-left">{t('clients.actions')}</th>
                     </tr>
                   </thead>
                   <tbody className="divide-y divide-gray-100">
@@ -271,7 +260,7 @@ export function ClientsPage({ onEditClient }: ClientsPageProps) {
                                   {client.firstname} {client.lastname}
                                 </div>
                                 <div className="text-sm text-gray-600">
-                                  Client depuis {formatDate(client.created_at)}
+                                  {t('clients.clientSince')} {formatDate(client.created_at)}
                                 </div>
                               </div>
                             </div>
@@ -302,13 +291,13 @@ export function ClientsPage({ onEditClient }: ClientsPageProps) {
                           
                           <td className="px-6 py-4">
                             <div>
-                              <div className="font-bold text-purple-600">{stats.totalBookings} réservation(s)</div>
+                              <div className="font-bold text-purple-600">{stats.totalBookings} {t('clients.bookings')}</div>
                               <div className="text-sm text-gray-600">
-                                Total dépensé: {stats.totalSpent.toFixed(2)}€
+                                {t('clients.totalSpent')}: {stats.totalSpent.toFixed(2)}€
                               </div>
                               {stats.lastBooking && (
                                 <div className="text-xs text-gray-500">
-                                  Dernier RDV: {formatDate(stats.lastBooking.date)}
+                                  {t('clients.lastBooking')}: {formatDate(stats.lastBooking.date)}
                                 </div>
                               )}
                             </div>
@@ -323,7 +312,7 @@ export function ClientsPage({ onEditClient }: ClientsPageProps) {
                               <button
                                 onClick={() => handleViewDetails(client)}
                                 className="p-2 bg-blue-500 text-white rounded-lg hover:bg-blue-600 transition-colors transform hover:scale-110"
-                                title="Voir les détails"
+                                title={t('clients.viewDetails')}
                               >
                                 <Eye className="w-4 h-4" />
                               </button>
@@ -332,7 +321,7 @@ export function ClientsPage({ onEditClient }: ClientsPageProps) {
                                   <button
                                     onClick={() => onEditClient(client)}
                                     className="p-2 bg-green-500 text-white rounded-lg hover:bg-green-600 transition-colors transform hover:scale-110"
-                                    title="Modifier"
+                                    title={t('clients.edit')}
                                   >
                                     <Edit className="w-4 h-4" />
                                   </button>
@@ -342,7 +331,7 @@ export function ClientsPage({ onEditClient }: ClientsPageProps) {
                                 <button
                                   onClick={() => handleDeleteClick(client)}
                                   className="p-2 bg-red-500 text-white rounded-lg hover:bg-red-600 transition-colors transform hover:scale-110"
-                                  title="Supprimer"
+                                  title={t('clients.delete')}
                                 >
                                   <Trash2 className="w-4 h-4" />
                                 </button>
@@ -356,7 +345,6 @@ export function ClientsPage({ onEditClient }: ClientsPageProps) {
                 </table>
               </div>
 
-              {/* Version mobile - Cards */}
               <div className="lg:hidden space-y-4 p-4">
                 {currentClients.map((client, index) => {
                   const stats = getClientStats(client);
@@ -367,7 +355,6 @@ export function ClientsPage({ onEditClient }: ClientsPageProps) {
                       className="bg-gradient-to-r from-gray-50 to-purple-50 rounded-xl border border-purple-200 p-4 hover:shadow-md transition-all duration-300 animate-fadeIn"
                       style={{ animationDelay: `${index * 100}ms` }}
                     >
-                      {/* Header */}
                       <div className="flex items-center justify-between mb-3">
                         <div className="flex items-center gap-3">
                           <div className="w-10 h-10 bg-gradient-to-r from-purple-500 to-pink-500 rounded-xl flex items-center justify-center text-white font-bold text-sm">
@@ -385,7 +372,7 @@ export function ClientsPage({ onEditClient }: ClientsPageProps) {
                           <button
                             onClick={() => handleViewDetails(client)}
                             className="p-2 bg-blue-500 text-white rounded-lg hover:bg-blue-600 transition-colors mobile-tap-target"
-                            title="Voir les détails"
+                            title={t('clients.viewDetails')}
                           >
                             <Eye className="w-4 h-4" />
                           </button>
@@ -394,7 +381,7 @@ export function ClientsPage({ onEditClient }: ClientsPageProps) {
                               <button
                                 onClick={() => onEditClient(client)}
                                 className="p-2 bg-green-500 text-white rounded-lg hover:bg-green-600 transition-colors mobile-tap-target"
-                                title="Modifier"
+                                title={t('clients.edit')}
                               >
                                 <Edit className="w-4 h-4" />
                               </button>
@@ -404,7 +391,7 @@ export function ClientsPage({ onEditClient }: ClientsPageProps) {
                             <button
                               onClick={() => handleDeleteClick(client)}
                               className="p-2 bg-red-500 text-white rounded-lg hover:bg-red-600 transition-colors mobile-tap-target"
-                              title="Supprimer"
+                              title={t('clients.delete')}
                             >
                               <Trash2 className="w-4 h-4" />
                             </button>
@@ -412,7 +399,6 @@ export function ClientsPage({ onEditClient }: ClientsPageProps) {
                         </div>
                       </div>
 
-                      {/* Informations de contact */}
                       <div className="grid grid-cols-1 gap-2 mb-3">
                         <div className="flex items-center gap-2">
                           <Mail className="w-4 h-4 text-blue-500" />
@@ -435,15 +421,14 @@ export function ClientsPage({ onEditClient }: ClientsPageProps) {
                         </div>
                       </div>
 
-                      {/* Statistiques */}
                       <div className="flex items-center justify-between">
                         <div className="flex flex-col gap-1">
-                          <div className="text-xs text-gray-600">Réservations</div>
+                          <div className="text-xs text-gray-600">{t('clients.bookings')}</div>
                           <div className="font-bold text-purple-600">{stats.totalBookings}</div>
                         </div>
                         
                         <div className="text-right">
-                          <div className="text-xs text-gray-600">Total dépensé</div>
+                          <div className="text-xs text-gray-600">{t('clients.totalSpent')}</div>
                           <div className="font-bold text-green-600">{stats.totalSpent.toFixed(2)}€</div>
                         </div>
                       </div>
@@ -452,11 +437,10 @@ export function ClientsPage({ onEditClient }: ClientsPageProps) {
                 })}
               </div>
 
-              {/* Pagination */}
               {totalPages > 1 && (
                 <div className="flex items-center justify-between p-4 sm:p-6 border-t border-gray-200">
                   <div className="text-sm text-gray-600">
-                    Affichage {startIndex + 1}-{Math.min(endIndex, filteredClients.length)} sur {filteredClients.length}
+                    {t('clients.showing')} {startIndex + 1}-{Math.min(endIndex, filteredClients.length)} {t('clients.of')} {filteredClients.length}
                   </div>
                   
                   <div className="flex items-center gap-2">
@@ -514,29 +498,24 @@ export function ClientsPage({ onEditClient }: ClientsPageProps) {
                 <User className="w-8 h-8 text-gray-400" />
               </div>
               <h3 className="text-lg font-medium text-gray-900 mb-2">
-                {searchTerm ? 'Aucun client trouvé' : 'Aucun client'}
+                {searchTerm ? t('clients.noResults') : t('clients.noClients')}
               </h3>
               <p className="text-gray-500">
-                {searchTerm
-                  ? 'Aucun client ne correspond à votre recherche'
-                  : 'Les clients apparaîtront ici une fois créés'
-                }
+                {searchTerm ? t('clients.noResultsDesc') : t('clients.noClientsDesc')}
               </p>
             </div>
           )}
         </div>
       </div>
 
-      {/* Modal de détails */}
       {showDetailsModal && selectedClient && (
         <Modal
           isOpen={showDetailsModal}
           onClose={() => setShowDetailsModal(false)}
-          title="Détails du client"
+          title={t('clients.details.title')}
           size="md"
         >
           <div className="space-y-6">
-            {/* Informations client */}
             <div className="bg-gradient-to-r from-purple-50 to-pink-50 rounded-2xl p-6 border border-purple-200">
               <div className="flex items-center gap-3 mb-4">
                 <div className="w-12 h-12 bg-gradient-to-r from-purple-500 to-pink-500 rounded-xl flex items-center justify-center text-white font-bold text-lg">
@@ -547,7 +526,7 @@ export function ClientsPage({ onEditClient }: ClientsPageProps) {
                     {selectedClient.firstname} {selectedClient.lastname}
                   </h3>
                   <div className="text-sm text-gray-600">
-                    Client depuis {formatDate(selectedClient.created_at)}
+                    {t('clients.details.since')} {formatDate(selectedClient.created_at)}
                   </div>
                 </div>
               </div>
@@ -574,38 +553,37 @@ export function ClientsPage({ onEditClient }: ClientsPageProps) {
               </div>
             </div>
 
-            {/* Statistiques du client */}
             {(() => {
               const stats = getClientStats(selectedClient);
               return (
                 <div className="bg-gradient-to-r from-blue-50 to-cyan-50 rounded-2xl p-6 border border-blue-200">
                   <h4 className="font-bold text-blue-800 mb-4 flex items-center gap-2">
                     <Calendar className="w-5 h-5" />
-                    Historique des réservations
+                    {t('clients.details.history')}
                   </h4>
                   
                   <div className="grid grid-cols-3 gap-4 text-center mb-4">
                     <div>
                       <div className="text-2xl font-bold text-blue-600">{stats.totalBookings}</div>
-                      <div className="text-xs text-blue-700">Réservations</div>
+                      <div className="text-xs text-blue-700">{t('clients.details.totalBookings')}</div>
                     </div>
                     <div>
                       <div className="text-2xl font-bold text-green-600">{stats.totalSpent.toFixed(2)}€</div>
-                      <div className="text-xs text-green-700">Total dépensé</div>
+                      <div className="text-xs text-green-700">{t('clients.details.totalSpent')}</div>
                     </div>
                     <div>
                       <div className="text-2xl font-bold text-purple-600">
                         {stats.totalBookings > 0 ? (stats.totalSpent / stats.totalBookings).toFixed(2) : '0.00'}€
                       </div>
-                      <div className="text-xs text-purple-700">Panier moyen</div>
+                      <div className="text-xs text-purple-700">{t('clients.details.averageBasket')}</div>
                     </div>
                   </div>
 
                   {stats.lastBooking && (
                     <div className="bg-white border border-blue-300 rounded-xl p-3">
-                      <div className="text-sm text-blue-800 font-medium mb-1">Dernière réservation</div>
+                      <div className="text-sm text-blue-800 font-medium mb-1">{t('clients.details.lastBooking')}</div>
                       <div className="text-xs text-blue-700">
-                        {stats.lastBooking.service?.name} - {formatDate(stats.lastBooking.date)} à {stats.lastBooking.time.slice(0, 5)}
+                        {stats.lastBooking.service?.name} - {formatDate(stats.lastBooking.date)} {t('common.at')} {stats.lastBooking.time.slice(0, 5)}
                       </div>
                     </div>
                   )}
@@ -613,7 +591,6 @@ export function ClientsPage({ onEditClient }: ClientsPageProps) {
               );
             })()}
 
-            {/* Réservations récentes */}
             {(() => {
               const clientBookings = getClientBookings(selectedClient.email)
                 .sort((a, b) => new Date(b.date).getTime() - new Date(a.date).getTime())
@@ -623,7 +600,7 @@ export function ClientsPage({ onEditClient }: ClientsPageProps) {
                 <div className="bg-gradient-to-r from-green-50 to-emerald-50 rounded-2xl p-6 border border-green-200">
                   <h4 className="font-bold text-green-800 mb-4 flex items-center gap-2">
                     <Calendar className="w-5 h-5" />
-                    Réservations récentes ({clientBookings.length})
+                    {t('clients.details.recentBookings')} ({clientBookings.length})
                   </h4>
                   
                   <div className="space-y-3 max-h-40 overflow-y-auto">
@@ -637,7 +614,7 @@ export function ClientsPage({ onEditClient }: ClientsPageProps) {
                             {booking.service?.name}
                           </div>
                           <div className="text-xs text-green-600">
-                            {formatDate(booking.date)} à {booking.time.slice(0, 5)}
+                            {formatDate(booking.date)} {t('common.at')} {booking.time.slice(0, 5)}
                           </div>
                         </div>
                         <div className="text-right">
@@ -649,8 +626,8 @@ export function ClientsPage({ onEditClient }: ClientsPageProps) {
                               ? 'bg-orange-100 text-orange-700'
                               : 'bg-red-100 text-red-700'
                           }`}>
-                            {booking.payment_status === 'completed' ? '✅ Payé' :
-                             booking.payment_status === 'partial' ? '⏳ Acompte' : '❌ Non payé'}
+                            {booking.payment_status === 'completed' ? t('clients.details.paid') :
+                             booking.payment_status === 'partial' ? t('clients.details.partial') : t('clients.details.unpaid')}
                           </div>
                         </div>
                       </div>
@@ -660,20 +637,19 @@ export function ClientsPage({ onEditClient }: ClientsPageProps) {
               ) : (
                 <div className="bg-gradient-to-r from-gray-50 to-gray-100 rounded-2xl p-6 border border-gray-200 text-center">
                   <Calendar className="w-12 h-12 text-gray-300 mx-auto mb-3" />
-                  <h4 className="text-lg font-medium text-gray-900 mb-2">Aucune réservation</h4>
-                  <p className="text-gray-500">Ce client n'a pas encore de réservation</p>
+                  <h4 className="text-lg font-medium text-gray-900 mb-2">{t('clients.details.noBookings')}</h4>
+                  <p className="text-gray-500">{t('clients.details.noBookingsDesc')}</p>
                 </div>
               );
             })()}
 
-            {/* Actions */}
             <div className="flex gap-3">
               <Button
                 variant="secondary"
                 onClick={() => setShowDetailsModal(false)}
                 className="flex-1"
               >
-                Fermer
+                {t('clients.details.close')}
               </Button>
               <PermissionGate permission="manage_clients" showMessage={false}>
                 {onEditClient && (
@@ -685,7 +661,7 @@ export function ClientsPage({ onEditClient }: ClientsPageProps) {
                     className="flex-1"
                   >
                     <Edit className="w-4 h-4" />
-                    Modifier
+                    {t('clients.edit')}
                   </Button>
                 )}
               </PermissionGate>
@@ -694,12 +670,11 @@ export function ClientsPage({ onEditClient }: ClientsPageProps) {
         </Modal>
       )}
 
-      {/* Modal de confirmation de suppression */}
       {showDeleteModal && clientToDelete && (
         <Modal
           isOpen={showDeleteModal}
           onClose={() => setShowDeleteModal(false)}
-          title="Confirmer la suppression"
+          title={t('clients.deleteConfirm.title')}
           size="sm"
         >
           <div className="space-y-4">
@@ -707,13 +682,13 @@ export function ClientsPage({ onEditClient }: ClientsPageProps) {
               <div className="w-16 h-16 bg-gradient-to-r from-red-500 to-pink-500 rounded-full flex items-center justify-center mx-auto mb-4">
                 <AlertTriangle className="w-8 h-8 text-white" />
               </div>
-              <h4 className="text-lg font-bold text-gray-900 mb-2">Supprimer le client</h4>
+              <h4 className="text-lg font-bold text-gray-900 mb-2">{t('clients.delete')}</h4>
               <p className="text-gray-600">
-                Êtes-vous sûr de vouloir supprimer définitivement le client{' '}
+                {t('clients.deleteConfirm.message')}{' '}
                 <strong>{clientToDelete.firstname} {clientToDelete.lastname}</strong> ?
               </p>
               <p className="text-red-600 text-sm mt-2 font-medium">
-                ⚠️ Cette action est irréversible !
+                {t('clients.deleteConfirm.warning')}
               </p>
             </div>
             
@@ -723,7 +698,7 @@ export function ClientsPage({ onEditClient }: ClientsPageProps) {
                 onClick={() => setShowDeleteModal(false)}
                 className="flex-1"
               >
-                Annuler
+                {t('clients.deleteConfirm.cancel')}
               </Button>
               <Button
                 variant="danger"
@@ -731,7 +706,7 @@ export function ClientsPage({ onEditClient }: ClientsPageProps) {
                 className="flex-1"
               >
                 <Trash2 className="w-4 h-4" />
-                Supprimer
+                {t('clients.deleteConfirm.confirm')}
               </Button>
             </div>
           </div>

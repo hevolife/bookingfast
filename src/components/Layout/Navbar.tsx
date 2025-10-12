@@ -2,6 +2,8 @@ import React, { useState, useEffect } from 'react';
 import { Calendar, Settings, LayoutDashboard, Package, Mail, BarChart3, Users, ShoppingCart, LogOut, Menu, X, ChevronDown, ChevronRight, Puzzle, List, UserCircle } from 'lucide-react';
 import { useAuth } from '../../contexts/AuthContext';
 import { usePlugins } from '../../hooks/usePlugins';
+import { useTranslation } from 'react-i18next';
+import { LanguageSwitcher } from '../UI/LanguageSwitcher';
 
 interface NavbarProps {
   currentPage: string;
@@ -11,6 +13,7 @@ interface NavbarProps {
 export function Navbar({ currentPage, onPageChange }: NavbarProps) {
   const { signOut } = useAuth();
   const { userPlugins, loading } = usePlugins();
+  const { t } = useTranslation();
   const [mobileMenuOpen, setMobileMenuOpen] = useState(false);
   const [pluginsMenuOpen, setPluginsMenuOpen] = useState(false);
   const [calendarMenuOpen, setCalendarMenuOpen] = useState(false);
@@ -25,9 +28,9 @@ export function Navbar({ currentPage, onPageChange }: NavbarProps) {
   const hasPOSAccess = userPlugins.some(p => p.plugin_slug === 'pos');
 
   const calendarSubItems = [
-    { id: 'calendar', label: 'Planning', icon: Calendar, gradient: 'from-blue-500 to-cyan-500' },
-    { id: 'bookings-list', label: 'Liste de réservations', icon: List, gradient: 'from-indigo-500 to-purple-500' },
-    { id: 'clients', label: 'Clients', icon: UserCircle, gradient: 'from-pink-500 to-rose-500' }
+    { id: 'calendar', label: t('nav.calendar'), icon: Calendar, gradient: 'from-blue-500 to-cyan-500' },
+    { id: 'bookings-list', label: t('nav.bookingsList'), icon: List, gradient: 'from-indigo-500 to-purple-500' },
+    { id: 'clients', label: t('nav.clients'), icon: UserCircle, gradient: 'from-pink-500 to-rose-500' }
   ];
 
   const pluginNavItems = [
@@ -59,21 +62,6 @@ export function Navbar({ currentPage, onPageChange }: NavbarProps) {
     setCalendarMenuOpen(false);
   };
 
-  const getActiveViewLabel = () => {
-    const calendarItem = calendarSubItems.find(item => item.id === currentPage);
-    if (calendarItem) return calendarItem.label;
-    
-    const pluginItem = pluginNavItems.find(item => item.id === currentPage);
-    if (pluginItem) return pluginItem.label;
-    
-    if (currentPage === 'dashboard') return 'Dashboard';
-    if (currentPage === 'services') return 'Services';
-    if (currentPage === 'emails') return 'Emails';
-    if (currentPage === 'admin') return 'Paramètres';
-    
-    return 'Dashboard';
-  };
-
   return (
     <>
       <nav 
@@ -92,7 +80,7 @@ export function Navbar({ currentPage, onPageChange }: NavbarProps) {
                 <Calendar className="w-6 h-6 text-white" />
               </div>
               <span className="text-xl font-bold bg-gradient-to-r from-purple-600 to-pink-600 bg-clip-text text-transparent">
-                BookingFast
+                {t('app.name')}
               </span>
             </div>
 
@@ -107,7 +95,7 @@ export function Navbar({ currentPage, onPageChange }: NavbarProps) {
                 }`}
               >
                 <LayoutDashboard className="w-5 h-5" />
-                <span>Dashboard</span>
+                <span>{t('nav.dashboard')}</span>
               </button>
 
               {/* Menu Calendrier avec sous-menu */}
@@ -121,7 +109,7 @@ export function Navbar({ currentPage, onPageChange }: NavbarProps) {
                   }`}
                 >
                   <Calendar className="w-5 h-5" />
-                  <span>Calendrier</span>
+                  <span>{t('nav.calendar')}</span>
                   {calendarMenuOpen ? (
                     <ChevronDown className="w-4 h-4" />
                   ) : (
@@ -166,7 +154,7 @@ export function Navbar({ currentPage, onPageChange }: NavbarProps) {
                 }`}
               >
                 <Package className="w-5 h-5" />
-                <span>Services</span>
+                <span>{t('nav.services')}</span>
               </button>
 
               {/* Emails */}
@@ -179,7 +167,7 @@ export function Navbar({ currentPage, onPageChange }: NavbarProps) {
                 }`}
               >
                 <Mail className="w-5 h-5" />
-                <span>Emails</span>
+                <span>{t('nav.emails')}</span>
               </button>
 
               {hasPlugins && (
@@ -193,7 +181,7 @@ export function Navbar({ currentPage, onPageChange }: NavbarProps) {
                     }`}
                   >
                     <Puzzle className="w-5 h-5" />
-                    <span>Plugins</span>
+                    <span>{t('nav.plugins')}</span>
                     {pluginsMenuOpen ? (
                       <ChevronDown className="w-4 h-4" />
                     ) : (
@@ -238,17 +226,19 @@ export function Navbar({ currentPage, onPageChange }: NavbarProps) {
                 }`}
               >
                 <Settings className="w-5 h-5" />
-                <span>Paramètres</span>
+                <span>{t('nav.settings')}</span>
               </button>
             </div>
 
             <div className="flex items-center gap-2">
+              <LanguageSwitcher />
+              
               <button
                 onClick={signOut}
                 className="hidden sm:flex items-center gap-2 px-4 py-2 rounded-xl font-medium text-red-600 hover:bg-red-50 transition-colors"
               >
                 <LogOut className="w-5 h-5" />
-                <span className="hidden md:inline">Déconnexion</span>
+                <span className="hidden md:inline">{t('nav.logout')}</span>
               </button>
 
               <button
@@ -288,13 +278,13 @@ export function Navbar({ currentPage, onPageChange }: NavbarProps) {
                     <Calendar className="w-6 h-6 text-white" />
                   </div>
                 </div>
-                <h2 className="text-2xl font-bold text-white mb-2">BookingFast</h2>
-                <p className="text-purple-200 text-sm">Gestion de réservations</p>
+                <h2 className="text-2xl font-bold text-white mb-2">{t('app.name')}</h2>
+                <p className="text-purple-200 text-sm">{t('app.tagline')}</p>
               </div>
 
               <div className="space-y-2">
                 <div className="text-xs font-bold text-purple-200 uppercase tracking-wider px-4 mb-3">
-                  Menu Principal
+                  {t('nav.mainMenu')}
                 </div>
                 
                 {/* Dashboard */}
@@ -314,9 +304,9 @@ export function Navbar({ currentPage, onPageChange }: NavbarProps) {
                     <LayoutDashboard className="w-6 h-6 text-white" />
                   </div>
                   <div className="flex-1 text-left">
-                    <div className="font-bold">Dashboard</div>
+                    <div className="font-bold">{t('nav.dashboard')}</div>
                     <div className={`text-xs ${currentPage === 'dashboard' ? 'text-gray-500' : 'text-purple-200'}`}>
-                      Vue d'ensemble
+                      {t('nav.overview')}
                     </div>
                   </div>
                   {currentPage === 'dashboard' && (
@@ -329,7 +319,7 @@ export function Navbar({ currentPage, onPageChange }: NavbarProps) {
               <div className="space-y-2 mt-6">
                 <div className="text-xs font-bold text-purple-200 uppercase tracking-wider px-4 mb-3 flex items-center gap-2">
                   <Calendar className="w-4 h-4" />
-                  Calendrier
+                  {t('nav.calendar')}
                 </div>
                 <button
                   onClick={handleCalendarToggle}
@@ -347,9 +337,9 @@ export function Navbar({ currentPage, onPageChange }: NavbarProps) {
                     <Calendar className="w-6 h-6 text-white" />
                   </div>
                   <div className="flex-1 text-left">
-                    <div className="font-bold">Calendrier</div>
+                    <div className="font-bold">{t('nav.calendar')}</div>
                     <div className={`text-xs ${isCalendarPageActive ? 'text-gray-500' : 'text-purple-200'}`}>
-                      {calendarSubItems.length} option(s)
+                      {calendarSubItems.length} {t('nav.options')}
                     </div>
                   </div>
                   <div className="transition-transform duration-300" style={{ transform: calendarMenuOpen ? 'rotate(180deg)' : 'rotate(0deg)' }}>
@@ -395,7 +385,7 @@ export function Navbar({ currentPage, onPageChange }: NavbarProps) {
 
               <div className="space-y-2 mt-6">
                 <div className="text-xs font-bold text-purple-200 uppercase tracking-wider px-4 mb-3">
-                  Autres
+                  {t('nav.other')}
                 </div>
                 
                 {/* Services */}
@@ -415,9 +405,9 @@ export function Navbar({ currentPage, onPageChange }: NavbarProps) {
                     <Package className="w-6 h-6 text-white" />
                   </div>
                   <div className="flex-1 text-left">
-                    <div className="font-bold">Services</div>
+                    <div className="font-bold">{t('nav.services')}</div>
                     <div className={`text-xs ${currentPage === 'services' ? 'text-gray-500' : 'text-purple-200'}`}>
-                      Vos prestations
+                      {t('nav.yourServices')}
                     </div>
                   </div>
                   {currentPage === 'services' && (
@@ -442,9 +432,9 @@ export function Navbar({ currentPage, onPageChange }: NavbarProps) {
                     <Mail className="w-6 h-6 text-white" />
                   </div>
                   <div className="flex-1 text-left">
-                    <div className="font-bold">Emails</div>
+                    <div className="font-bold">{t('nav.emails')}</div>
                     <div className={`text-xs ${currentPage === 'emails' ? 'text-gray-500' : 'text-purple-200'}`}>
-                      Communication
+                      {t('nav.communication')}
                     </div>
                   </div>
                   {currentPage === 'emails' && (
@@ -457,7 +447,7 @@ export function Navbar({ currentPage, onPageChange }: NavbarProps) {
                 <div className="space-y-2 mt-6">
                   <div className="text-xs font-bold text-purple-200 uppercase tracking-wider px-4 mb-3 flex items-center gap-2">
                     <Puzzle className="w-4 h-4" />
-                    Extensions
+                    {t('nav.extensions')}
                   </div>
                   <button
                     onClick={handlePluginsToggle}
@@ -475,9 +465,9 @@ export function Navbar({ currentPage, onPageChange }: NavbarProps) {
                       <Puzzle className="w-6 h-6 text-white" />
                     </div>
                     <div className="flex-1 text-left">
-                      <div className="font-bold">Plugins</div>
+                      <div className="font-bold">{t('nav.plugins')}</div>
                       <div className={`text-xs ${isPluginPageActive ? 'text-gray-500' : 'text-purple-200'}`}>
-                        {pluginNavItems.length} extension(s)
+                        {pluginNavItems.length} {t('nav.extension')}
                       </div>
                     </div>
                     <div className="transition-transform duration-300" style={{ transform: pluginsMenuOpen ? 'rotate(180deg)' : 'rotate(0deg)' }}>
@@ -524,7 +514,7 @@ export function Navbar({ currentPage, onPageChange }: NavbarProps) {
 
               <div className="space-y-2 mt-6">
                 <div className="text-xs font-bold text-purple-200 uppercase tracking-wider px-4 mb-3">
-                  Paramètres
+                  {t('nav.settings')}
                 </div>
                 <button
                   onClick={() => handleNavigation('admin')}
@@ -542,9 +532,9 @@ export function Navbar({ currentPage, onPageChange }: NavbarProps) {
                     <Settings className="w-6 h-6 text-white" />
                   </div>
                   <div className="flex-1 text-left">
-                    <div className="font-bold">Paramètres</div>
+                    <div className="font-bold">{t('nav.settings')}</div>
                     <div className={`text-xs ${currentPage === 'admin' ? 'text-gray-500' : 'text-purple-200'}`}>
-                      Configuration
+                      {t('nav.configuration')}
                     </div>
                   </div>
                   {currentPage === 'admin' && (
@@ -565,8 +555,8 @@ export function Navbar({ currentPage, onPageChange }: NavbarProps) {
                     <LogOut className="w-6 h-6" />
                   </div>
                   <div className="flex-1 text-left">
-                    <div className="font-bold">Déconnexion</div>
-                    <div className="text-xs text-red-100">Quitter l'application</div>
+                    <div className="font-bold">{t('nav.logout')}</div>
+                    <div className="text-xs text-red-100">{t('nav.quitApp')}</div>
                   </div>
                 </button>
               </div>

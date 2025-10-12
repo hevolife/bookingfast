@@ -9,6 +9,7 @@ import { IframeBookingPage } from './components/IframeBooking/IframeBookingPage'
 import { PrivacyPolicy } from './components/Legal/PrivacyPolicy';
 import { TermsOfService } from './components/Legal/TermsOfService';
 import App from './App';
+import './i18n/config';
 import './index.css';
 
 ReactDOM.createRoot(document.getElementById('root')!).render(
