@@ -140,7 +140,6 @@ export function usePlugins() {
     try {
       console.log('🎯 Début souscription plugin (trial):', pluginId);
 
-      // Vérifier si une souscription existe déjà
       const { data: existingSub, error: checkError } = await supabase
         .from('plugin_subscriptions')
         .select('*')
@@ -153,7 +152,6 @@ export function usePlugins() {
       if (existingSub) {
         console.log('📋 Souscription existante trouvée:', existingSub.status);
         
-        // Si la souscription est expirée ou annulée, on la réactive en trial
         if (existingSub.status === 'expired' || existingSub.status === 'cancelled') {
           console.log('🔄 Réactivation de la souscription en trial');
           
@@ -183,7 +181,6 @@ export function usePlugins() {
           return updatedSub;
         }
         
-        // Si la souscription existe mais n'a pas les champs trial, on les ajoute
         if (existingSub.status === 'trial' && (!existingSub.is_trial || !existingSub.trial_ends_at)) {
           console.log('🔧 Correction des champs trial manquants');
           
@@ -214,7 +211,6 @@ export function usePlugins() {
         return existingSub as PluginSubscription;
       }
 
-      // Créer une nouvelle souscription en trial (7 jours)
       console.log('➕ Création nouvelle souscription trial (7 jours)');
       
       const trialEnd = new Date();
@@ -258,7 +254,9 @@ export function usePlugins() {
     }
 
     try {
-      console.log('💳 Création session Checkout pour plugin:', pluginId);
+      console.log('💳 === APPEL EDGE FUNCTION ===');
+      console.log('User ID:', user.id);
+      console.log('Plugin ID:', pluginId);
 
       const { data, error } = await supabase.functions.invoke('create-plugin-checkout', {
         body: {
@@ -267,9 +265,21 @@ export function usePlugins() {
         }
       });
 
-      if (error) throw error;
+      console.log('📦 Réponse Edge Function:', { data, error });
+
+      if (error) {
+        console.error('❌ Erreur Edge Function:', error);
+        throw new Error(error.message || 'Erreur lors de la création de la session');
+      }
+
+      if (!data || !data.url) {
+        console.error('❌ Pas d\'URL dans la réponse:', data);
+        throw new Error('Aucune URL de checkout reçue');
+      }
 
       console.log('✅ Session créée:', data.sessionId);
+      console.log('🔗 URL:', data.url);
+      
       return data.url;
     } catch (err) {
       console.error('❌ Erreur création session:', err);
