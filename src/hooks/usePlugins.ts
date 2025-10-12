@@ -252,15 +252,29 @@ export function usePlugins() {
     }
   };
 
-  const getPluginPaymentLink = (plugin: Plugin): string | null => {
-    // Vérifier si le plugin a un Payment Link configuré
-    if (plugin.stripe_payment_link) {
-      console.log('✅ Payment Link trouvé pour', plugin.name);
-      return plugin.stripe_payment_link;
+  const createCheckoutSession = async (pluginId: string): Promise<string> => {
+    if (!supabase || !user) {
+      throw new Error('Configuration invalide');
     }
 
-    console.warn('⚠️ Pas de Payment Link configuré pour', plugin.name);
-    return null;
+    try {
+      console.log('💳 Création session Checkout pour plugin:', pluginId);
+
+      const { data, error } = await supabase.functions.invoke('create-plugin-checkout', {
+        body: {
+          userId: user.id,
+          pluginId: pluginId
+        }
+      });
+
+      if (error) throw error;
+
+      console.log('✅ Session créée:', data.sessionId);
+      return data.url;
+    } catch (err) {
+      console.error('❌ Erreur création session:', err);
+      throw err;
+    }
   };
 
   const cancelSubscription = async (subscriptionId: string) => {
@@ -307,7 +321,7 @@ export function usePlugins() {
     error,
     hasPluginAccess,
     subscribeToPlugin,
-    getPluginPaymentLink,
+    createCheckoutSession,
     cancelSubscription,
     refetch: async () => {
       console.log('🔄 Rechargement des données...');

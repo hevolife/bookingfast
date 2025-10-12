@@ -1,23 +1,30 @@
 /*
-  # Ajout du stripe_price_id aux plugins
+  # Ajout du champ stripe_price_id aux plugins
 
   1. Modifications
-    - Ajoute la colonne `stripe_price_id` à la table `plugins`
-    - Cette colonne stocke l'ID du prix récurrent Stripe pour chaque plugin
+    - Ajoute le champ `stripe_price_id` à la table `plugins`
+    - Ce champ contiendra l'ID du Price Stripe pour chaque plugin
+    
+  2. Notes
+    - Les Price IDs sont créés dans le dashboard Stripe
+    - Format: price_xxxxx
 */
 
--- Ajouter la colonne stripe_price_id
-ALTER TABLE plugins 
-ADD COLUMN IF NOT EXISTS stripe_price_id text;
+-- Ajouter le champ stripe_price_id
+DO $$
+BEGIN
+  IF NOT EXISTS (
+    SELECT 1 FROM information_schema.columns
+    WHERE table_name = 'plugins' AND column_name = 'stripe_price_id'
+  ) THEN
+    ALTER TABLE plugins ADD COLUMN stripe_price_id text;
+  END IF;
+END $$;
 
--- Créer un index pour les performances
-CREATE INDEX IF NOT EXISTS idx_plugins_stripe_price_id ON plugins(stripe_price_id);
-
--- Mettre à jour les plugins existants avec des Price IDs temporaires
--- IMPORTANT: Vous devrez remplacer ces IDs par vos vrais Price IDs Stripe
-
-UPDATE plugins SET stripe_price_id = 'price_plugin_reports' WHERE slug = 'reports';
-UPDATE plugins SET stripe_price_id = 'price_plugin_vtc' WHERE slug = 'vtc';
-UPDATE plugins SET stripe_price_id = 'price_plugin_multi_user' WHERE slug = 'multi-user';
-UPDATE plugins SET stripe_price_id = 'price_plugin_marketing' WHERE slug = 'marketing';
-UPDATE plugins SET stripe_price_id = 'price_plugin_inventory' WHERE slug = 'inventory';
+-- Mettre à jour les plugins existants avec des Price IDs de test
+-- IMPORTANT: Remplacez ces IDs par vos vrais Price IDs Stripe
+UPDATE plugins SET stripe_price_id = 'price_VOTRE_PRICE_ID_REPORTS' WHERE slug = 'reports';
+UPDATE plugins SET stripe_price_id = 'price_VOTRE_PRICE_ID_VTC' WHERE slug = 'vtc';
+UPDATE plugins SET stripe_price_id = 'price_VOTRE_PRICE_ID_MULTI_USER' WHERE slug = 'multi-user';
+UPDATE plugins SET stripe_price_id = 'price_VOTRE_PRICE_ID_MARKETING' WHERE slug = 'marketing';
+UPDATE plugins SET stripe_price_id = 'price_VOTRE_PRICE_ID_INVENTORY' WHERE slug = 'inventory';

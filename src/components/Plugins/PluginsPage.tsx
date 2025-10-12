@@ -8,7 +8,7 @@ import { useAuth } from '../../contexts/AuthContext';
 
 export function PluginsPage() {
   const { user } = useAuth();
-  const { plugins, userSubscriptions, loading, subscribeToPlugin, getPluginPaymentLink, refetch } = usePlugins();
+  const { plugins, userSubscriptions, loading, subscribeToPlugin, createCheckoutSession, refetch } = usePlugins();
   const [selectedPlugin, setSelectedPlugin] = useState<Plugin | null>(null);
   const [subscribing, setSubscribing] = useState(false);
   const [subscriptionError, setSubscriptionError] = useState<string | null>(null);
@@ -112,44 +112,30 @@ export function PluginsPage() {
     }
   };
 
-  const handleSubscribe = (plugin: Plugin) => {
+  const handleSubscribe = async (plugin: Plugin) => {
     if (!user) {
       alert('⚠️ Vous devez être connecté pour vous abonner');
       return;
     }
 
-    console.log('💳 Préparation redirection vers Stripe Payment Link pour:', plugin.name);
-    console.log('👤 User ID:', user.id);
-    console.log('🔌 Plugin ID:', plugin.id);
+    console.log('💳 Création session Checkout Stripe pour:', plugin.name);
     
-    const paymentLink = getPluginPaymentLink(plugin);
-    
-    if (!paymentLink) {
-      alert('⚠️ Le lien de paiement n\'est pas encore configuré pour ce plugin. Veuillez contacter le support.');
-      return;
-    }
+    setSubscribing(true);
+    setSubscriptionError(null);
 
     try {
-      // Créer l'URL avec les paramètres de métadonnées
-      const url = new URL(paymentLink);
+      const checkoutUrl = await createCheckoutSession(plugin.id);
       
-      // Format: user_id|plugin_id pour client_reference_id
-      const clientReferenceId = `${user.id}|${plugin.id}`;
-      url.searchParams.set('client_reference_id', clientReferenceId);
-      
-      // Pré-remplir l'email
-      url.searchParams.set('prefilled_email', user.email || '');
-      
-      console.log('📋 Métadonnées ajoutées:');
-      console.log('  - client_reference_id:', clientReferenceId);
-      console.log('  - prefilled_email:', user.email);
-      console.log('✅ URL finale:', url.toString());
+      console.log('✅ Redirection vers Stripe:', checkoutUrl);
       
       // Rediriger vers Stripe
-      window.location.href = url.toString();
+      window.location.href = checkoutUrl;
     } catch (error) {
-      console.error('❌ Erreur création URL:', error);
-      alert('Erreur lors de la préparation du paiement. Veuillez réessayer.');
+      console.error('❌ Erreur création session:', error);
+      const errorMessage = error instanceof Error ? error.message : 'Erreur lors de la création de la session';
+      setSubscriptionError(errorMessage);
+      alert(`Erreur: ${errorMessage}`);
+      setSubscribing(false);
     }
   };
 
@@ -532,8 +518,17 @@ function PluginModal({ plugin, isSubscribed, isTrialActive, isTrialExpired, tria
                       disabled={subscribing}
                       className="w-full bg-gradient-to-r from-green-600 to-emerald-600 text-white py-3 rounded-xl font-bold hover:from-green-700 hover:to-emerald-700 transition-all duration-300 shadow-lg hover:shadow-xl disabled:opacity-50 disabled:cursor-not-allowed flex items-center justify-center gap-2"
                     >
-                      <ExternalLink className="w-5 h-5" />
-                      S'abonner sur Stripe
+                      {subscribing ? (
+                        <>
+                          <LoadingSpinner size="sm" />
+                          Redirection...
+                        </>
+                      ) : (
+                        <>
+                          <ExternalLink className="w-5 h-5" />
+                          S'abonner maintenant
+                        </>
+                      )}
                     </button>
                   </div>
                 </div>
