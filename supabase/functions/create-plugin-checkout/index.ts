@@ -16,18 +16,15 @@ Deno.serve(async (req) => {
   try {
     console.log('🎯 === DÉBUT EDGE FUNCTION ===')
     console.log('📋 Method:', req.method)
+    console.log('📋 URL:', req.url)
+    console.log('📋 Headers:', Object.fromEntries(req.headers.entries()))
 
-    // ⚠️ CLÉS HARDCODÉES - À REMPLACER PAR VOS VRAIES CLÉS STRIPE
-    // TODO: Déplacer vers les secrets Supabase en production !
-    const HARDCODED_STRIPE_SECRET_KEY = 'STRIPE_SECRET_KEY=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'
-    
     // Configuration Supabase
     const supabaseUrl = Deno.env.get('SUPABASE_URL')
     const supabaseKey = Deno.env.get('SUPABASE_SERVICE_ROLE_KEY')
 
     console.log('🔑 SUPABASE_URL:', supabaseUrl ? '✅ Défini' : '❌ MANQUANT')
     console.log('🔑 SUPABASE_SERVICE_ROLE_KEY:', supabaseKey ? '✅ Défini' : '❌ MANQUANT')
-    console.log('🔑 STRIPE_SECRET_KEY: ✅ HARDCODÉE')
 
     if (!supabaseUrl || !supabaseKey) {
       throw new Error('Configuration Supabase manquante')
@@ -35,20 +32,13 @@ Deno.serve(async (req) => {
 
     const supabaseClient = createClient(supabaseUrl, supabaseKey)
 
-    // Initialiser Stripe avec la clé hardcodée
-    const stripe = new Stripe(HARDCODED_STRIPE_SECRET_KEY, {
-      apiVersion: '2024-12-18.acacia',
-    })
-
-    console.log('✅ Stripe initialisé avec clé hardcodée')
-
     // Parser le body
     let body
     try {
       const text = await req.text()
       console.log('📦 Body brut:', text)
       body = JSON.parse(text)
-      console.log('📦 Body parsé:', body)
+      console.log('📦 Body parsé:', JSON.stringify(body, null, 2))
     } catch (e) {
       console.error('❌ Erreur parsing body:', e)
       throw new Error('Body JSON invalide')
@@ -107,6 +97,24 @@ Deno.serve(async (req) => {
 
     console.log('✅ User trouvé:', user.email)
 
+    // ⚠️ CLÉ STRIPE HARDCODÉE
+    const STRIPE_KEY = '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'
+    
+    console.log('🔧 Initialisation Stripe...')
+    console.log('🔑 Clé commence par:', STRIPE_KEY.substring(0, 15) + '...')
+    console.log('🔑 Longueur clé:', STRIPE_KEY.length)
+
+    let stripe
+    try {
+      stripe = new Stripe(STRIPE_KEY, {
+        apiVersion: '2024-12-18.acacia',
+      })
+      console.log('✅ Stripe initialisé')
+    } catch (e) {
+      console.error('❌ Erreur initialisation Stripe:', e)
+      throw new Error(`Erreur init Stripe: ${e.message}`)
+    }
+
     // Créer ou récupérer le customer Stripe
     let customerId = user.stripe_customer_id
 
@@ -133,7 +141,8 @@ Deno.serve(async (req) => {
         }
       } catch (e) {
         console.error('❌ Erreur création customer Stripe:', e)
-        throw new Error(`Erreur Stripe: ${e.message}`)
+        console.error('❌ Détails:', JSON.stringify(e, null, 2))
+        throw new Error(`Erreur Stripe Customer: ${e.message}`)
       }
     } else {
       console.log('✅ Customer existant:', customerId)
@@ -141,8 +150,11 @@ Deno.serve(async (req) => {
 
     // Créer la session Checkout
     console.log('💳 Création session Checkout...')
+    console.log('💳 Price ID:', plugin.stripe_price_id)
+    console.log('💳 Customer ID:', customerId)
+    
     try {
-      const session = await stripe.checkout.sessions.create({
+      const sessionParams = {
         customer: customerId,
         client_reference_id: `${userId}|${pluginId}`,
         line_items: [
@@ -165,7 +177,11 @@ Deno.serve(async (req) => {
             plugin_id: pluginId
           }
         }
-      })
+      }
+
+      console.log('💳 Paramètres session:', JSON.stringify(sessionParams, null, 2))
+
+      const session = await stripe.checkout.sessions.create(sessionParams)
 
       console.log('✅ Session créée:', session.id)
       console.log('🔗 URL:', session.url)
@@ -182,17 +198,23 @@ Deno.serve(async (req) => {
       )
     } catch (e) {
       console.error('❌ Erreur création session Stripe:', e)
-      throw new Error(`Erreur Stripe: ${e.message}`)
+      console.error('❌ Type erreur:', e.type)
+      console.error('❌ Code erreur:', e.code)
+      console.error('❌ Message:', e.message)
+      console.error('❌ Détails complets:', JSON.stringify(e, null, 2))
+      throw new Error(`Erreur Stripe Session: ${e.message}`)
     }
 
   } catch (error) {
     console.error('❌ === ERREUR EDGE FUNCTION ===')
     console.error('Message:', error.message)
     console.error('Stack:', error.stack)
+    console.error('Type:', error.constructor.name)
     
     return new Response(
       JSON.stringify({ 
         error: error.message,
+        type: error.constructor.name,
         details: error.stack
       }),
       {
