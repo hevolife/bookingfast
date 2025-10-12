@@ -8,20 +8,37 @@ import { useAuth } from '../../contexts/AuthContext';
 
 export function PluginsPage() {
   const { user } = useAuth();
-  const { plugins, userSubscriptions, loading, subscribeToPlugin, createCheckoutSession, cancelSubscription, refetch } = usePlugins();
+  const { plugins, userSubscriptions, loading, hasUsedTrial, subscribeToPlugin, createCheckoutSession, cancelSubscription, refetch } = usePlugins();
   const [selectedPlugin, setSelectedPlugin] = useState<Plugin | null>(null);
   const [subscribing, setSubscribing] = useState(false);
   const [cancelling, setCancelling] = useState(false);
   const [subscriptionError, setSubscriptionError] = useState<string | null>(null);
+  const [trialUsedMap, setTrialUsedMap] = useState<Record<string, boolean>>({});
 
-  // Recharger les données toutes les 2 secondes pendant 10 secondes après un changement
+  useEffect(() => {
+    const checkTrialStatus = async () => {
+      if (!user) return;
+      
+      const trialStatus: Record<string, boolean> = {};
+      
+      for (const plugin of plugins) {
+        const used = await hasUsedTrial(plugin.id);
+        trialStatus[plugin.id] = used;
+      }
+      
+      setTrialUsedMap(trialStatus);
+    };
+
+    checkTrialStatus();
+  }, [plugins, user, hasUsedTrial]);
+
   const [shouldRefetch, setShouldRefetch] = useState(false);
   
   useEffect(() => {
     if (!shouldRefetch) return;
 
     let count = 0;
-    const maxCount = 5; // 5 fois * 2 secondes = 10 secondes
+    const maxCount = 5;
     
     const interval = setInterval(async () => {
       console.log('🔄 Rechargement automatique des données...');
@@ -94,10 +111,7 @@ export function PluginsPage() {
       
       console.log('✅ Essai gratuit démarré:', result);
       
-      // Déclencher le rechargement automatique
       setShouldRefetch(true);
-      
-      // Recharger immédiatement
       await refetch();
       
       setSelectedPlugin(null);
@@ -107,7 +121,7 @@ export function PluginsPage() {
       console.error('❌ Erreur démarrage essai:', err);
       const errorMessage = err instanceof Error ? err.message : 'Erreur lors du démarrage de l\'essai';
       setSubscriptionError(errorMessage);
-      alert(`Erreur: ${errorMessage}`);
+      alert(`⚠️ ${errorMessage}`);
     } finally {
       setSubscribing(false);
     }
@@ -129,7 +143,6 @@ export function PluginsPage() {
       
       console.log('✅ Redirection vers Stripe:', checkoutUrl);
       
-      // Rediriger vers Stripe
       window.location.href = checkoutUrl;
     } catch (error) {
       console.error('❌ Erreur création session:', error);
@@ -162,10 +175,7 @@ export function PluginsPage() {
       
       console.log('✅ Abonnement résilié');
       
-      // Déclencher le rechargement automatique
       setShouldRefetch(true);
-      
-      // Recharger immédiatement
       await refetch();
       
       alert('✅ Votre abonnement a été résilié. Vous conservez l\'accès jusqu\'à la fin de la période en cours.');
@@ -214,7 +224,7 @@ export function PluginsPage() {
               <Sparkles className="w-5 h-5 text-yellow-300" />
               <span className="font-bold">7 jours d'essai gratuit</span>
             </div>
-            <p className="text-sm text-white/80">Testez chaque plugin gratuitement</p>
+            <p className="text-sm text-white/80">Testez chaque plugin une seule fois</p>
           </div>
 
           <div className="bg-white/10 backdrop-blur-sm rounded-xl p-4">
@@ -251,6 +261,7 @@ export function PluginsPage() {
                 isTrialActive={isTrialActive(plugin.id)}
                 isTrialExpired={isTrialExpired(plugin.id)}
                 trialDaysLeft={getTrialDaysLeft(plugin.id)}
+                trialUsed={trialUsedMap[plugin.id] || false}
                 subscription={getSubscription(plugin.id)}
                 onSelect={() => setSelectedPlugin(plugin)}
               />
@@ -272,6 +283,7 @@ export function PluginsPage() {
                 isTrialActive={isTrialActive(plugin.id)}
                 isTrialExpired={isTrialExpired(plugin.id)}
                 trialDaysLeft={getTrialDaysLeft(plugin.id)}
+                trialUsed={trialUsedMap[plugin.id] || false}
                 subscription={getSubscription(plugin.id)}
                 onSelect={() => setSelectedPlugin(plugin)}
               />
@@ -287,6 +299,7 @@ export function PluginsPage() {
           isTrialActive={isTrialActive(selectedPlugin.id)}
           isTrialExpired={isTrialExpired(selectedPlugin.id)}
           trialDaysLeft={getTrialDaysLeft(selectedPlugin.id)}
+          trialUsed={trialUsedMap[selectedPlugin.id] || false}
           subscribing={subscribing}
           cancelling={cancelling}
           error={subscriptionError}
@@ -309,11 +322,12 @@ interface PluginCardProps {
   isTrialActive: boolean;
   isTrialExpired: boolean;
   trialDaysLeft: number;
+  trialUsed: boolean;
   subscription?: any;
   onSelect: () => void;
 }
 
-function PluginCard({ plugin, isSubscribed, isTrialActive, isTrialExpired, trialDaysLeft, subscription, onSelect }: PluginCardProps) {
+function PluginCard({ plugin, isSubscribed, isTrialActive, isTrialExpired, trialDaysLeft, trialUsed, subscription, onSelect }: PluginCardProps) {
   const IconComponent = (LucideIcons as any)[plugin.icon] || Package;
   const includedFeatures = plugin.features.filter(f => f.included);
 
@@ -336,11 +350,11 @@ function PluginCard({ plugin, isSubscribed, isTrialActive, isTrialExpired, trial
       );
     }
     
-    if (isTrialExpired) {
+    if (isTrialExpired || trialUsed) {
       return (
         <span className="bg-orange-100 text-orange-700 px-3 py-1 rounded-full text-xs font-bold flex items-center gap-1">
           <AlertCircle className="w-3 h-3" />
-          Essai expiré
+          Essai utilisé
         </span>
       );
     }
@@ -367,7 +381,7 @@ function PluginCard({ plugin, isSubscribed, isTrialActive, isTrialExpired, trial
       );
     }
     
-    if (isTrialExpired) {
+    if (isTrialExpired || trialUsed) {
       return (
         <span className="flex items-center justify-center gap-2">
           <CreditCard className="w-5 h-5" />
@@ -405,7 +419,7 @@ function PluginCard({ plugin, isSubscribed, isTrialActive, isTrialExpired, trial
         </div>
         {!isSubscribed && !isTrialActive && (
           <p className="text-sm text-purple-600 font-medium mt-1">
-            {isTrialExpired ? 'Abonnement mensuel' : '+ 7 jours d\'essai gratuit'}
+            {(isTrialExpired || trialUsed) ? 'Abonnement mensuel' : '+ 7 jours d\'essai gratuit'}
           </p>
         )}
       </div>
@@ -431,7 +445,7 @@ function PluginCard({ plugin, isSubscribed, isTrialActive, isTrialExpired, trial
           className={`w-full py-3 rounded-xl font-bold transition-all duration-300 ${
             isSubscribed || isTrialActive
               ? 'bg-gray-100 text-gray-700 hover:bg-gray-200'
-              : isTrialExpired
+              : (isTrialExpired || trialUsed)
               ? 'bg-gradient-to-r from-green-600 to-emerald-600 text-white hover:from-green-700 hover:to-emerald-700 shadow-lg hover:shadow-xl'
               : 'bg-gradient-to-r from-purple-600 to-pink-600 text-white hover:from-purple-700 hover:to-pink-700 shadow-lg hover:shadow-xl'
           }`}
@@ -449,6 +463,7 @@ interface PluginModalProps {
   isTrialActive: boolean;
   isTrialExpired: boolean;
   trialDaysLeft: number;
+  trialUsed: boolean;
   subscribing: boolean;
   cancelling: boolean;
   error: string | null;
@@ -458,7 +473,7 @@ interface PluginModalProps {
   onCancel: () => void;
 }
 
-function PluginModal({ plugin, isSubscribed, isTrialActive, isTrialExpired, trialDaysLeft, subscribing, cancelling, error, onClose, onStartTrial, onSubscribe, onCancel }: PluginModalProps) {
+function PluginModal({ plugin, isSubscribed, isTrialActive, isTrialExpired, trialDaysLeft, trialUsed, subscribing, cancelling, error, onClose, onStartTrial, onSubscribe, onCancel }: PluginModalProps) {
   const IconComponent = (LucideIcons as any)[plugin.icon] || Package;
   const includedFeatures = plugin.features.filter(f => f.included);
   const additionalFeatures = plugin.features.filter(f => !f.included);
@@ -554,16 +569,16 @@ function PluginModal({ plugin, isSubscribed, isTrialActive, isTrialExpired, tria
             </div>
           )}
 
-          {isTrialExpired && (
+          {(isTrialExpired || trialUsed) && !isSubscribed && !isTrialActive && (
             <div className="bg-gradient-to-r from-orange-50 to-red-50 border-2 border-orange-200 rounded-xl p-6">
               <div className="flex items-start gap-4">
                 <div className="w-12 h-12 bg-gradient-to-r from-orange-500 to-red-500 rounded-xl flex items-center justify-center flex-shrink-0">
                   <AlertCircle className="w-6 h-6 text-white" />
                 </div>
                 <div className="flex-1">
-                  <h3 className="text-xl font-bold text-orange-900 mb-2">Période d'essai expirée</h3>
+                  <h3 className="text-xl font-bold text-orange-900 mb-2">Essai gratuit déjà utilisé</h3>
                   <p className="text-orange-800 mb-4">
-                    Votre période d'essai gratuit de 7 jours est terminée. Continuez à profiter de toutes les fonctionnalités en souscrivant à l'abonnement mensuel.
+                    Vous avez déjà bénéficié de l'essai gratuit de 7 jours pour ce plugin. Pour continuer à profiter de toutes les fonctionnalités, souscrivez à l'abonnement mensuel.
                   </p>
                   <div className="bg-white rounded-xl p-6 border-2 border-orange-300 shadow-lg">
                     <div className="flex items-center justify-between mb-4">
@@ -667,7 +682,7 @@ function PluginModal({ plugin, isSubscribed, isTrialActive, isTrialExpired, tria
             >
               Fermer
             </button>
-            {!isSubscribed && !isTrialActive && !isTrialExpired && (
+            {!isSubscribed && !isTrialActive && !trialUsed && !isTrialExpired && (
               <button
                 onClick={onStartTrial}
                 disabled={subscribing || cancelling}

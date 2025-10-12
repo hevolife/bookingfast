@@ -129,6 +129,28 @@ export function usePlugins() {
     }
   }, [user?.id]);
 
+  const hasUsedTrial = useCallback(async (pluginId: string): Promise<boolean> => {
+    if (!supabase || !user) return false;
+
+    try {
+      const { data, error } = await supabase
+        .rpc('has_used_trial', {
+          p_user_id: user.id,
+          p_plugin_id: pluginId
+        });
+
+      if (error) {
+        console.error('❌ Erreur vérification trial:', error);
+        return false;
+      }
+
+      return data || false;
+    } catch (error) {
+      console.error('❌ Erreur vérification trial:', error);
+      return false;
+    }
+  }, [user?.id]);
+
   const subscribeToPlugin = async (
     pluginId: string,
     activatedFeatures: string[] = []
@@ -139,6 +161,13 @@ export function usePlugins() {
 
     try {
       console.log('🎯 Début souscription plugin (trial):', pluginId);
+
+      // ✅ Vérifier si l'utilisateur a déjà utilisé le trial
+      const trialUsed = await hasUsedTrial(pluginId);
+      
+      if (trialUsed) {
+        throw new Error('Vous avez déjà utilisé l\'essai gratuit pour ce plugin. Veuillez souscrire à l\'abonnement mensuel.');
+      }
 
       const { data: existingSub, error: checkError } = await supabase
         .from('plugin_subscriptions')
@@ -152,6 +181,11 @@ export function usePlugins() {
       if (existingSub) {
         console.log('📋 Souscription existante trouvée:', existingSub.status);
         
+        // ❌ Si trial déjà utilisé, ne pas permettre la réactivation
+        if (existingSub.trial_used) {
+          throw new Error('Vous avez déjà utilisé l\'essai gratuit pour ce plugin. Veuillez souscrire à l\'abonnement mensuel.');
+        }
+        
         if (existingSub.status === 'expired' || existingSub.status === 'cancelled') {
           console.log('🔄 Réactivation de la souscription en trial');
           
@@ -164,6 +198,7 @@ export function usePlugins() {
               status: 'trial',
               is_trial: true,
               trial_ends_at: trialEnd.toISOString(),
+              trial_used: true, // ✅ Marquer comme utilisé
               current_period_start: new Date().toISOString(),
               current_period_end: null,
               updated_at: new Date().toISOString()
@@ -192,6 +227,7 @@ export function usePlugins() {
             .update({
               is_trial: true,
               trial_ends_at: trialEnd.toISOString(),
+              trial_used: true, // ✅ Marquer comme utilisé
               updated_at: new Date().toISOString()
             })
             .eq('id', existingSub.id)
@@ -222,6 +258,7 @@ export function usePlugins() {
         status: 'trial',
         is_trial: true,
         trial_ends_at: trialEnd.toISOString(),
+        trial_used: true, // ✅ Marquer comme utilisé dès la création
         current_period_start: new Date().toISOString(),
         current_period_end: null
       };
@@ -293,7 +330,6 @@ export function usePlugins() {
     try {
       console.log('🔴 Annulation abonnement:', subscriptionId);
 
-      // Récupérer l'abonnement pour obtenir le stripe_subscription_id
       const { data: subscription, error: fetchError } = await supabase
         .from('plugin_subscriptions')
         .select('stripe_subscription_id')
@@ -308,7 +344,6 @@ export function usePlugins() {
 
       console.log('💳 Stripe Subscription ID:', subscription.stripe_subscription_id);
 
-      // Appeler l'Edge Function pour annuler sur Stripe
       const { data, error: cancelError } = await supabase.functions.invoke('cancel-subscription', {
         body: {
           subscription_id: subscription.stripe_subscription_id
@@ -319,7 +354,6 @@ export function usePlugins() {
 
       console.log('✅ Réponse Stripe:', data);
 
-      // Mettre à jour localement
       const { error: updateError } = await supabase
         .from('plugin_subscriptions')
         .update({
@@ -363,6 +397,7 @@ export function usePlugins() {
     loading,
     error,
     hasPluginAccess,
+    hasUsedTrial,
     subscribeToPlugin,
     createCheckoutSession,
     cancelSubscription,
