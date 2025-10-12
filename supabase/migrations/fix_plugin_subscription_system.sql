@@ -1,20 +1,16 @@
 /*
-  # Correction fonction get_user_active_plugins
+  # Correction système d'abonnement plugins
 
   1. Modifications
-    - Suppression référence colonne activated_features
-    - Retour d'un tableau JSON vide à la place
-    - Support trial et abonnements actifs
+    - Correction fonction get_user_active_plugins
+    - Suppression référence à activated_features
+    - Simplification de la structure
 
   2. Sécurité
     - RLS maintenu
-    - SECURITY DEFINER pour accès contrôlé
 */
 
--- Supprimer l'ancienne fonction
-DROP FUNCTION IF EXISTS get_user_active_plugins(uuid);
-
--- Recréer la fonction corrigée
+-- Fonction corrigée pour obtenir les plugins actifs
 CREATE OR REPLACE FUNCTION get_user_active_plugins(p_user_id uuid)
 RETURNS TABLE (
   plugin_id uuid,

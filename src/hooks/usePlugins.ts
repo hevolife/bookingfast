@@ -40,6 +40,8 @@ export function usePlugins() {
         return;
       }
 
+      console.log('🔍 Chargement abonnements pour:', user.id);
+
       const { data, error } = await supabase
         .from('plugin_subscriptions')
         .select(`
@@ -50,6 +52,8 @@ export function usePlugins() {
         .order('created_at', { ascending: false });
 
       if (error) throw error;
+
+      console.log('✅ Abonnements chargés:', data?.length || 0);
       setUserSubscriptions(data || []);
     } catch (err) {
       console.error('❌ Erreur chargement abonnements:', err);
@@ -63,165 +67,28 @@ export function usePlugins() {
         return;
       }
 
-      console.log('🔍 Chargement plugins pour utilisateur:', user.id);
+      console.log('🔍 Chargement plugins actifs pour:', user.id);
 
-      // ÉTAPE 1 : Vérifier l'abonnement principal (trial ou actif)
-      const { data: mainSubscription, error: subError } = await supabase
-        .from('subscriptions')
-        .select('status, is_trial, trial_ends_at')
-        .eq('user_id', user.id)
-        .maybeSingle();
+      const { data, error } = await supabase
+        .rpc('get_user_active_plugins', { p_user_id: user.id });
 
-      if (subError && subError.code !== 'PGRST116') {
-        throw subError;
+      if (error) {
+        console.error('❌ Erreur RPC:', error);
+        throw error;
       }
 
-      // Si l'utilisateur a un abonnement trial ou actif, accès complet
-      if (mainSubscription && (mainSubscription.status === 'trial' || mainSubscription.status === 'active')) {
-        console.log('✅ Abonnement principal actif:', mainSubscription.status);
-        
-        // Récupérer TOUS les plugins actifs
-        const { data: allPlugins, error: pluginsError } = await supabase
-          .from('plugins')
-          .select('id, name, slug, icon, category')
-          .eq('is_active', true);
+      const formattedPlugins: UserPlugin[] = (data || []).map((plugin: any) => ({
+        plugin_id: plugin.plugin_id,
+        plugin_name: plugin.plugin_name,
+        plugin_slug: plugin.plugin_slug,
+        plugin_icon: plugin.plugin_icon,
+        plugin_category: plugin.plugin_category,
+        activated_features: plugin.activated_features || [],
+        settings: plugin.settings || {}
+      }));
 
-        if (pluginsError) throw pluginsError;
-
-        const formattedPlugins: UserPlugin[] = (allPlugins || []).map((plugin: any) => ({
-          plugin_id: plugin.id,
-          plugin_name: plugin.name,
-          plugin_slug: plugin.slug,
-          plugin_icon: plugin.icon,
-          plugin_category: plugin.category,
-          activated_features: [],
-          settings: {}
-        }));
-
-        console.log('✅ Accès complet à tous les plugins (trial/actif):', formattedPlugins.length);
-        setUserPlugins(formattedPlugins);
-        return;
-      }
-
-      // ÉTAPE 2 : Vérifier si l'utilisateur est membre d'équipe
-      const { data: teamMember, error: teamError } = await supabase
-        .from('team_members')
-        .select('id, owner_id, role_name, is_active')
-        .eq('user_id', user.id)
-        .eq('is_active', true)
-        .maybeSingle();
-
-      if (teamError && teamError.code !== 'PGRST116') {
-        throw teamError;
-      }
-
-      // CAS 1 : Utilisateur est propriétaire (pas de team_member)
-      if (!teamMember) {
-        console.log('✅ Utilisateur propriétaire - vérification abonnements plugins');
-        
-        const { data, error } = await supabase
-          .from('plugin_subscriptions')
-          .select(`
-            plugin_id,
-            activated_features,
-            plugin:plugins(
-              id,
-              name,
-              slug,
-              icon,
-              category
-            )
-          `)
-          .eq('user_id', user.id)
-          .in('status', ['active', 'trial']);
-
-        if (error) throw error;
-
-        const formattedPlugins: UserPlugin[] = (data || [])
-          .filter((sub: any) => sub.plugin)
-          .map((sub: any) => ({
-            plugin_id: sub.plugin.id,
-            plugin_name: sub.plugin.name,
-            plugin_slug: sub.plugin.slug,
-            plugin_icon: sub.plugin.icon,
-            plugin_category: sub.plugin.category,
-            activated_features: sub.activated_features || [],
-            settings: {}
-          }));
-
-        console.log('✅ Plugins propriétaire:', formattedPlugins);
-        setUserPlugins(formattedPlugins);
-        return;
-      }
-
-      // CAS 2 : Utilisateur est membre d'équipe
-      console.log('👤 Utilisateur membre d\'équipe:', teamMember.id);
-      console.log('👤 Propriétaire:', teamMember.owner_id);
-
-      // Récupérer les plugins du propriétaire
-      const { data: ownerPlugins, error: pluginsError } = await supabase
-        .from('plugin_subscriptions')
-        .select(`
-          plugin_id,
-          activated_features,
-          plugin:plugins(
-            id,
-            name,
-            slug,
-            icon,
-            category
-          )
-        `)
-        .eq('user_id', teamMember.owner_id)
-        .in('status', ['active', 'trial']);
-
-      if (pluginsError) throw pluginsError;
-
-      console.log('📦 Plugins du propriétaire:', ownerPlugins?.length || 0);
-
-      if (!ownerPlugins || ownerPlugins.length === 0) {
-        console.log('ℹ️ Aucun plugin actif pour le propriétaire');
-        setUserPlugins([]);
-        return;
-      }
-
-      // Récupérer les permissions du membre pour chaque plugin
-      const { data: permissions, error: permError } = await supabase
-        .from('team_member_plugin_permissions')
-        .select('plugin_id, can_access')
-        .eq('team_member_id', teamMember.id);
-
-      if (permError && permError.code !== 'PGRST116') {
-        throw permError;
-      }
-
-      console.log('🔐 Permissions trouvées:', permissions);
-
-      // Créer un Map des permissions
-      const permissionsMap = new Map(
-        (permissions || []).map(p => [p.plugin_id, p.can_access])
-      );
-
-      // Filtrer les plugins selon les permissions
-      const allowedPlugins: UserPlugin[] = ownerPlugins
-        .filter((sub: any) => {
-          const hasPermission = permissionsMap.get(sub.plugin_id);
-          console.log(`🔍 Plugin ${sub.plugin?.slug}: permission =`, hasPermission);
-          return hasPermission === true;
-        })
-        .filter((sub: any) => sub.plugin)
-        .map((sub: any) => ({
-          plugin_id: sub.plugin.id,
-          plugin_name: sub.plugin.name,
-          plugin_slug: sub.plugin.slug,
-          plugin_icon: sub.plugin.icon,
-          plugin_category: sub.plugin.category,
-          activated_features: sub.activated_features || [],
-          settings: {}
-        }));
-
-      console.log('✅ Plugins autorisés pour le membre:', allowedPlugins);
-      setUserPlugins(allowedPlugins);
+      console.log('✅ Plugins actifs chargés:', formattedPlugins.length);
+      setUserPlugins(formattedPlugins);
 
     } catch (err) {
       console.error('❌ Erreur chargement plugins actifs:', err);
@@ -243,112 +110,19 @@ export function usePlugins() {
     try {
       console.log(`🔍 Vérification accès plugin: ${pluginSlug}`);
 
-      // ÉTAPE 1 : Vérifier l'abonnement principal (trial ou actif)
-      const { data: mainSubscription, error: subError } = await supabase
-        .from('subscriptions')
-        .select('status, is_trial, trial_ends_at')
-        .eq('user_id', user.id)
-        .maybeSingle();
+      const { data, error } = await supabase
+        .rpc('has_plugin_access', {
+          p_user_id: user.id,
+          p_plugin_slug: pluginSlug
+        });
 
-      if (subError && subError.code !== 'PGRST116') {
-        console.error('❌ Erreur vérification abonnement:', subError);
-      }
-
-      // Si l'utilisateur a un abonnement trial ou actif, accès complet
-      if (mainSubscription && (mainSubscription.status === 'trial' || mainSubscription.status === 'active')) {
-        console.log('✅ Accès autorisé via abonnement principal:', mainSubscription.status);
-        return true;
-      }
-
-      // Récupérer le plugin par son slug
-      const { data: pluginData, error: pluginError } = await supabase
-        .from('plugins')
-        .select('id')
-        .eq('slug', pluginSlug)
-        .maybeSingle();
-
-      if (pluginError || !pluginData) {
-        console.log('❌ Plugin non trouvé:', pluginSlug);
+      if (error) {
+        console.error('❌ Erreur vérification accès:', error);
         return false;
       }
 
-      console.log('📦 Plugin trouvé:', pluginData.id);
-
-      // Vérifier si l'utilisateur est propriétaire avec un abonnement actif
-      const { data: ownerSub, error: ownerSubError } = await supabase
-        .from('plugin_subscriptions')
-        .select('id, status')
-        .eq('user_id', user.id)
-        .eq('plugin_id', pluginData.id)
-        .in('status', ['active', 'trial'])
-        .maybeSingle();
-
-      if (ownerSubError && ownerSubError.code !== 'PGRST116') {
-        console.error('❌ Erreur vérification abonnement propriétaire:', ownerSubError);
-      }
-
-      if (ownerSub) {
-        console.log('✅ Propriétaire avec abonnement actif');
-        return true;
-      }
-
-      // Vérifier si membre d'équipe
-      const { data: teamMember, error: teamError } = await supabase
-        .from('team_members')
-        .select('id, owner_id, is_active')
-        .eq('user_id', user.id)
-        .eq('is_active', true)
-        .maybeSingle();
-
-      if (teamError && teamError.code !== 'PGRST116') {
-        console.error('❌ Erreur vérification membre équipe:', teamError);
-        return false;
-      }
-
-      if (!teamMember) {
-        console.log('❌ Pas membre d\'équipe et pas d\'abonnement');
-        return false;
-      }
-
-      console.log('👤 Membre d\'équipe trouvé:', teamMember.id);
-
-      // Vérifier si le propriétaire a le plugin
-      const { data: ownerPlugin, error: ownerPluginError } = await supabase
-        .from('plugin_subscriptions')
-        .select('plugin_id, status')
-        .eq('user_id', teamMember.owner_id)
-        .eq('plugin_id', pluginData.id)
-        .in('status', ['active', 'trial'])
-        .maybeSingle();
-
-      if (ownerPluginError && ownerPluginError.code !== 'PGRST116') {
-        console.error('❌ Erreur vérification plugin propriétaire:', ownerPluginError);
-      }
-
-      if (!ownerPlugin) {
-        console.log('❌ Le propriétaire n\'a pas ce plugin');
-        return false;
-      }
-
-      console.log('✅ Le propriétaire a le plugin');
-
-      // Vérifier la permission du membre
-      const { data: permission, error: permError } = await supabase
-        .from('team_member_plugin_permissions')
-        .select('can_access')
-        .eq('team_member_id', teamMember.id)
-        .eq('plugin_id', pluginData.id)
-        .maybeSingle();
-
-      if (permError && permError.code !== 'PGRST116') {
-        console.error('❌ Erreur vérification permission:', permError);
-        return false;
-      }
-
-      const hasAccess = permission?.can_access || false;
-      console.log(`🔐 Permission finale: ${hasAccess}`);
-      
-      return hasAccess;
+      console.log(`🔐 Accès plugin ${pluginSlug}:`, data);
+      return data || false;
     } catch (error) {
       console.error('❌ Erreur vérification accès:', error);
       return false;
@@ -364,7 +138,7 @@ export function usePlugins() {
     }
 
     try {
-      console.log('🎯 Début souscription plugin:', pluginId);
+      console.log('🎯 Début souscription plugin (trial):', pluginId);
 
       // Vérifier si une souscription existe déjà
       const { data: existingSub, error: checkError } = await supabase
@@ -383,13 +157,17 @@ export function usePlugins() {
         if (existingSub.status === 'expired' || existingSub.status === 'cancelled') {
           console.log('🔄 Réactivation de la souscription en trial');
           
+          const trialEnd = new Date();
+          trialEnd.setDate(trialEnd.getDate() + 7);
+          
           const { data: updatedSub, error: updateError } = await supabase
             .from('plugin_subscriptions')
             .update({
               status: 'trial',
-              activated_features: activatedFeatures,
+              is_trial: true,
+              trial_ends_at: trialEnd.toISOString(),
               current_period_start: new Date().toISOString(),
-              current_period_end: new Date(Date.now() + 7 * 24 * 60 * 60 * 1000).toISOString(),
+              current_period_end: null,
               updated_at: new Date().toISOString()
             })
             .eq('id', existingSub.id)
@@ -401,8 +179,34 @@ export function usePlugins() {
 
           if (updateError) throw updateError;
 
-          await fetchUserSubscriptions();
-          await fetchUserPlugins();
+          console.log('✅ Souscription réactivée avec trial_ends_at:', trialEnd.toISOString());
+          return updatedSub;
+        }
+        
+        // Si la souscription existe mais n'a pas les champs trial, on les ajoute
+        if (existingSub.status === 'trial' && (!existingSub.is_trial || !existingSub.trial_ends_at)) {
+          console.log('🔧 Correction des champs trial manquants');
+          
+          const trialEnd = new Date();
+          trialEnd.setDate(trialEnd.getDate() + 7);
+          
+          const { data: updatedSub, error: updateError } = await supabase
+            .from('plugin_subscriptions')
+            .update({
+              is_trial: true,
+              trial_ends_at: trialEnd.toISOString(),
+              updated_at: new Date().toISOString()
+            })
+            .eq('id', existingSub.id)
+            .select(`
+              *,
+              plugin:plugins(*)
+            `)
+            .single();
+
+          if (updateError) throw updateError;
+
+          console.log('✅ Champs trial corrigés, trial_ends_at:', trialEnd.toISOString());
           return updatedSub;
         }
         
@@ -410,17 +214,23 @@ export function usePlugins() {
         return existingSub as PluginSubscription;
       }
 
-      // Créer une nouvelle souscription en trial
-      console.log('➕ Création nouvelle souscription trial');
+      // Créer une nouvelle souscription en trial (7 jours)
+      console.log('➕ Création nouvelle souscription trial (7 jours)');
+      
+      const trialEnd = new Date();
+      trialEnd.setDate(trialEnd.getDate() + 7);
       
       const newSubscription = {
         user_id: user.id,
         plugin_id: pluginId,
         status: 'trial',
-        activated_features: activatedFeatures,
+        is_trial: true,
+        trial_ends_at: trialEnd.toISOString(),
         current_period_start: new Date().toISOString(),
-        current_period_end: new Date(Date.now() + 7 * 24 * 60 * 60 * 1000).toISOString()
+        current_period_end: null
       };
+
+      console.log('📝 Données de la nouvelle souscription:', newSubscription);
 
       const { data, error } = await supabase
         .from('plugin_subscriptions')
@@ -433,10 +243,7 @@ export function usePlugins() {
 
       if (error) throw error;
 
-      console.log('✅ Souscription trial créée avec succès');
-
-      await fetchUserSubscriptions();
-      await fetchUserPlugins();
+      console.log('✅ Souscription trial créée avec trial_ends_at:', trialEnd.toISOString());
 
       return data;
     } catch (err) {
@@ -445,135 +252,15 @@ export function usePlugins() {
     }
   };
 
-  const createPluginSubscription = async (
-    pluginId: string,
-    pluginName: string,
-    pluginPrice: number
-  ): Promise<{ url: string }> => {
-    if (!supabase || !user) {
-      throw new Error('Configuration invalide');
+  const getPluginPaymentLink = (plugin: Plugin): string | null => {
+    // Vérifier si le plugin a un Payment Link configuré
+    if (plugin.stripe_payment_link) {
+      console.log('✅ Payment Link trouvé pour', plugin.name);
+      return plugin.stripe_payment_link;
     }
 
-    try {
-      console.log('💳 === DÉBUT CRÉATION ABONNEMENT PLUGIN ===');
-      console.log('📊 Données:', {
-        plugin_id: pluginId,
-        plugin_name: pluginName,
-        plugin_price: pluginPrice,
-        user_id: user.id,
-        user_email: user.email
-      });
-
-      // Appeler l'Edge Function Stripe
-      const { data, error } = await supabase.functions.invoke('stripe-checkout', {
-        body: {
-          amount: pluginPrice,
-          currency: 'eur',
-          success_url: `${window.location.origin}/plugins?success=true&plugin_id=${pluginId}`,
-          cancel_url: `${window.location.origin}/plugins?cancelled=true`,
-          customer_email: user.email,
-          service_name: pluginName,
-          metadata: {
-            payment_type: 'plugin_subscription',
-            user_id: user.id,
-            plugin_id: pluginId,
-            plugin_name: pluginName
-          }
-        }
-      });
-
-      console.log('📥 Réponse complète Stripe:', { data, error });
-
-      if (error) {
-        console.error('❌ Erreur Edge Function:', error);
-        console.error('❌ Détails erreur:', JSON.stringify(error, null, 2));
-        
-        // Essayer de parser le message d'erreur pour plus de détails
-        let errorMessage = error.message || 'Erreur lors de la création de l\'abonnement';
-        
-        if (error.context) {
-          console.error('❌ Contexte erreur:', error.context);
-          errorMessage += ` - ${JSON.stringify(error.context)}`;
-        }
-        
-        throw new Error(errorMessage);
-      }
-
-      if (!data) {
-        console.error('❌ Pas de données reçues');
-        throw new Error('Aucune donnée reçue de l\'Edge Function');
-      }
-
-      console.log('📦 Données reçues:', data);
-
-      if (!data.url) {
-        console.error('❌ Pas d\'URL de checkout dans la réponse:', data);
-        throw new Error('Pas d\'URL de checkout reçue');
-      }
-
-      console.log('✅ URL checkout reçue:', data.url);
-      console.log('💳 === FIN CRÉATION ABONNEMENT PLUGIN ===');
-      
-      return { url: data.url };
-    } catch (err) {
-      console.error('❌ === ERREUR CRÉATION ABONNEMENT ===');
-      console.error('Type:', err instanceof Error ? err.constructor.name : typeof err);
-      console.error('Message:', err instanceof Error ? err.message : String(err));
-      console.error('Stack:', err instanceof Error ? err.stack : 'N/A');
-      throw err;
-    }
-  };
-
-  const updatePluginFeatures = async (
-    subscriptionId: string,
-    activatedFeatures: string[]
-  ) => {
-    if (!supabase) throw new Error('Supabase non configuré');
-
-    try {
-      const { error } = await supabase
-        .from('plugin_subscriptions')
-        .update({
-          activated_features: activatedFeatures,
-          updated_at: new Date().toISOString()
-        })
-        .eq('id', subscriptionId);
-
-      if (error) throw error;
-
-      await fetchUserSubscriptions();
-      await fetchUserPlugins();
-    } catch (err) {
-      console.error('❌ Erreur mise à jour fonctionnalités:', err);
-      throw err;
-    }
-  };
-
-  const updatePluginConfiguration = async (
-    pluginId: string,
-    settings: Record<string, any>
-  ) => {
-    if (!supabase || !user) {
-      throw new Error('Configuration invalide');
-    }
-
-    try {
-      const { error } = await supabase
-        .from('plugin_configurations')
-        .upsert({
-          user_id: user.id,
-          plugin_id: pluginId,
-          settings,
-          updated_at: new Date().toISOString()
-        });
-
-      if (error) throw error;
-
-      await fetchUserPlugins();
-    } catch (err) {
-      console.error('❌ Erreur mise à jour configuration:', err);
-      throw err;
-    }
+    console.warn('⚠️ Pas de Payment Link configuré pour', plugin.name);
+    return null;
   };
 
   const cancelSubscription = async (subscriptionId: string) => {
@@ -620,16 +307,16 @@ export function usePlugins() {
     error,
     hasPluginAccess,
     subscribeToPlugin,
-    createPluginSubscription,
-    updatePluginFeatures,
-    updatePluginConfiguration,
+    getPluginPaymentLink,
     cancelSubscription,
     refetch: async () => {
+      console.log('🔄 Rechargement des données...');
       await Promise.all([
         fetchPlugins(),
         fetchUserSubscriptions(),
         fetchUserPlugins()
       ]);
+      console.log('✅ Données rechargées');
     }
   };
 }

@@ -1,65 +1,108 @@
-import React, { useState } from 'react';
-import { Package, Sparkles, Check, X, Settings as SettingsIcon, Crown, Zap, AlertCircle, CreditCard } from 'lucide-react';
+import React, { useState, useEffect } from 'react';
+import { Package, Sparkles, Check, X, Settings as SettingsIcon, Crown, Zap, AlertCircle, CreditCard, Clock, ExternalLink } from 'lucide-react';
 import * as LucideIcons from 'lucide-react';
 import { usePlugins } from '../../hooks/usePlugins';
-import { Plugin, PluginFeature } from '../../types/plugin';
+import { Plugin } from '../../types/plugin';
 import { LoadingSpinner } from '../UI/LoadingSpinner';
 
 export function PluginsPage() {
-  const { plugins, userSubscriptions, loading, subscribeToPlugin, createPluginSubscription, refetch } = usePlugins();
+  const { plugins, userSubscriptions, loading, subscribeToPlugin, getPluginPaymentLink, refetch } = usePlugins();
   const [selectedPlugin, setSelectedPlugin] = useState<Plugin | null>(null);
   const [subscribing, setSubscribing] = useState(false);
   const [subscriptionError, setSubscriptionError] = useState<string | null>(null);
 
-  const isSubscribed = (pluginId: string) => {
-    const subscribed = userSubscriptions.some(
-      sub => sub.plugin_id === pluginId && (sub.status === 'active' || sub.status === 'trial')
-    );
-    return subscribed;
-  };
+  // Recharger les données toutes les 2 secondes pendant 10 secondes après un changement
+  const [shouldRefetch, setShouldRefetch] = useState(false);
+  
+  useEffect(() => {
+    if (!shouldRefetch) return;
+
+    let count = 0;
+    const maxCount = 5; // 5 fois * 2 secondes = 10 secondes
+    
+    const interval = setInterval(async () => {
+      console.log('🔄 Rechargement automatique des données...');
+      await refetch();
+      count++;
+      
+      if (count >= maxCount) {
+        clearInterval(interval);
+        setShouldRefetch(false);
+        console.log('✅ Fin du rechargement automatique');
+      }
+    }, 2000);
+
+    return () => clearInterval(interval);
+  }, [shouldRefetch, refetch]);
 
   const getSubscription = (pluginId: string) => {
-    return userSubscriptions.find(
-      sub => sub.plugin_id === pluginId && (sub.status === 'active' || sub.status === 'trial')
-    );
+    return userSubscriptions.find(sub => sub.plugin_id === pluginId);
+  };
+
+  const isTrialActive = (pluginId: string) => {
+    const subscription = getSubscription(pluginId);
+    if (!subscription || subscription.status !== 'trial') return false;
+    
+    if (!subscription.trial_ends_at) return false;
+    
+    const endDate = new Date(subscription.trial_ends_at);
+    const now = new Date();
+    
+    return now < endDate;
   };
 
   const isTrialExpired = (pluginId: string) => {
     const subscription = getSubscription(pluginId);
     if (!subscription || subscription.status !== 'trial') return false;
     
-    if (!subscription.current_period_end) return false;
+    if (!subscription.trial_ends_at) return false;
     
-    const endDate = new Date(subscription.current_period_end);
+    const endDate = new Date(subscription.trial_ends_at);
     const now = new Date();
     
-    return now > endDate;
+    return now >= endDate;
   };
 
-  const handleSubscribe = async (plugin: Plugin) => {
-    console.log('🎯 Clic sur souscription:', plugin.name, plugin.id);
+  const isSubscribed = (pluginId: string) => {
+    const subscription = getSubscription(pluginId);
+    return subscription?.status === 'active';
+  };
+
+  const getTrialDaysLeft = (pluginId: string): number => {
+    const subscription = getSubscription(pluginId);
+    if (!subscription || !subscription.trial_ends_at) return 0;
+    
+    const endDate = new Date(subscription.trial_ends_at);
+    const now = new Date();
+    const diffTime = endDate.getTime() - now.getTime();
+    const diffDays = Math.ceil(diffTime / (1000 * 60 * 60 * 24));
+    
+    return Math.max(0, diffDays);
+  };
+
+  const handleStartTrial = async (plugin: Plugin) => {
+    console.log('🎯 Démarrage essai gratuit:', plugin.name);
     
     setSubscribing(true);
     setSubscriptionError(null);
     
     try {
-      const includedFeatures = plugin.features
-        .filter(f => f.included)
-        .map(f => f.id);
+      const result = await subscribeToPlugin(plugin.id, []);
       
-      console.log('📋 Fonctionnalités incluses:', includedFeatures);
+      console.log('✅ Essai gratuit démarré:', result);
       
-      const result = await subscribeToPlugin(plugin.id, includedFeatures);
+      // Déclencher le rechargement automatique
+      setShouldRefetch(true);
       
-      console.log('✅ Souscription réussie:', result);
-      
+      // Recharger immédiatement
       await refetch();
+      
       setSelectedPlugin(null);
       
       console.log('🎉 Processus terminé avec succès');
     } catch (err) {
-      console.error('❌ Erreur souscription:', err);
-      const errorMessage = err instanceof Error ? err.message : 'Erreur lors de la souscription';
+      console.error('❌ Erreur démarrage essai:', err);
+      const errorMessage = err instanceof Error ? err.message : 'Erreur lors du démarrage de l\'essai';
       setSubscriptionError(errorMessage);
       alert(`Erreur: ${errorMessage}`);
     } finally {
@@ -67,35 +110,23 @@ export function PluginsPage() {
     }
   };
 
-  const handleStartSubscription = async (plugin: Plugin) => {
-    console.log('💳 Démarrage abonnement Stripe pour:', plugin.name);
+  const handleSubscribe = (plugin: Plugin) => {
+    console.log('💳 Redirection vers Stripe Payment Link pour:', plugin.name);
     
-    setSubscribing(true);
-    setSubscriptionError(null);
+    const paymentLink = getPluginPaymentLink(plugin);
     
-    try {
-      console.log('🔄 Création session Stripe...', {
-        pluginId: plugin.id,
-        pluginName: plugin.name,
-        price: plugin.base_price
-      });
-
-      const { url } = await createPluginSubscription(
-        plugin.id,
-        plugin.name,
-        plugin.base_price
-      );
-      
-      console.log('✅ Redirection vers Stripe:', url);
-      window.location.href = url;
-      
-    } catch (err) {
-      console.error('❌ Erreur création abonnement:', err);
-      const errorMessage = err instanceof Error ? err.message : 'Erreur lors de la création de l\'abonnement';
-      setSubscriptionError(errorMessage);
-      alert(`Erreur: ${errorMessage}`);
-      setSubscribing(false);
+    if (!paymentLink) {
+      alert('⚠️ Le lien de paiement n\'est pas encore configuré pour ce plugin. Veuillez contacter le support.');
+      return;
     }
+
+    // Ajouter les paramètres client_reference_id et prefilled_email
+    const url = new URL(paymentLink);
+    url.searchParams.set('client_reference_id', plugin.id);
+    url.searchParams.set('prefilled_email', 'user@example.com'); // Remplacer par user.email si disponible
+    
+    console.log('✅ Redirection vers:', url.toString());
+    window.location.href = url.toString();
   };
 
   if (loading) {
@@ -145,9 +176,9 @@ export function PluginsPage() {
           <div className="bg-white/10 backdrop-blur-sm rounded-xl p-4">
             <div className="flex items-center gap-3 mb-2">
               <Crown className="w-5 h-5 text-yellow-300" />
-              <span className="font-bold">Support premium</span>
+              <span className="font-bold">Abonnement mensuel</span>
             </div>
-            <p className="text-sm text-white/80">Assistance dédiée pour chaque plugin</p>
+            <p className="text-sm text-white/80">Annulation à tout moment</p>
           </div>
         </div>
       </div>
@@ -165,7 +196,9 @@ export function PluginsPage() {
                 key={plugin.id}
                 plugin={plugin}
                 isSubscribed={isSubscribed(plugin.id)}
+                isTrialActive={isTrialActive(plugin.id)}
                 isTrialExpired={isTrialExpired(plugin.id)}
+                trialDaysLeft={getTrialDaysLeft(plugin.id)}
                 subscription={getSubscription(plugin.id)}
                 onSelect={() => setSelectedPlugin(plugin)}
               />
@@ -184,7 +217,9 @@ export function PluginsPage() {
                 key={plugin.id}
                 plugin={plugin}
                 isSubscribed={isSubscribed(plugin.id)}
+                isTrialActive={isTrialActive(plugin.id)}
                 isTrialExpired={isTrialExpired(plugin.id)}
+                trialDaysLeft={getTrialDaysLeft(plugin.id)}
                 subscription={getSubscription(plugin.id)}
                 onSelect={() => setSelectedPlugin(plugin)}
               />
@@ -197,15 +232,17 @@ export function PluginsPage() {
         <PluginModal
           plugin={selectedPlugin}
           isSubscribed={isSubscribed(selectedPlugin.id)}
+          isTrialActive={isTrialActive(selectedPlugin.id)}
           isTrialExpired={isTrialExpired(selectedPlugin.id)}
+          trialDaysLeft={getTrialDaysLeft(selectedPlugin.id)}
           subscribing={subscribing}
           error={subscriptionError}
           onClose={() => {
             setSelectedPlugin(null);
             setSubscriptionError(null);
           }}
+          onStartTrial={() => handleStartTrial(selectedPlugin)}
           onSubscribe={() => handleSubscribe(selectedPlugin)}
-          onStartSubscription={() => handleStartSubscription(selectedPlugin)}
         />
       )}
     </div>
@@ -215,17 +252,35 @@ export function PluginsPage() {
 interface PluginCardProps {
   plugin: Plugin;
   isSubscribed: boolean;
+  isTrialActive: boolean;
   isTrialExpired: boolean;
+  trialDaysLeft: number;
   subscription?: any;
   onSelect: () => void;
 }
 
-function PluginCard({ plugin, isSubscribed, isTrialExpired, subscription, onSelect }: PluginCardProps) {
+function PluginCard({ plugin, isSubscribed, isTrialActive, isTrialExpired, trialDaysLeft, subscription, onSelect }: PluginCardProps) {
   const IconComponent = (LucideIcons as any)[plugin.icon] || Package;
   const includedFeatures = plugin.features.filter(f => f.included);
 
   const getStatusBadge = () => {
-    if (!isSubscribed) return null;
+    if (isSubscribed) {
+      return (
+        <span className="bg-green-100 text-green-700 px-3 py-1 rounded-full text-xs font-bold flex items-center gap-1">
+          <Check className="w-3 h-3" />
+          Actif
+        </span>
+      );
+    }
+    
+    if (isTrialActive) {
+      return (
+        <span className="bg-blue-100 text-blue-700 px-3 py-1 rounded-full text-xs font-bold flex items-center gap-1">
+          <Clock className="w-3 h-3" />
+          Essai ({trialDaysLeft}j)
+        </span>
+      );
+    }
     
     if (isTrialExpired) {
       return (
@@ -236,20 +291,41 @@ function PluginCard({ plugin, isSubscribed, isTrialExpired, subscription, onSele
       );
     }
     
-    if (subscription?.status === 'trial') {
-      const daysLeft = Math.ceil((new Date(subscription.current_period_end).getTime() - Date.now()) / (1000 * 60 * 60 * 24));
+    return null;
+  };
+
+  const getButtonText = () => {
+    if (isSubscribed) {
       return (
-        <span className="bg-blue-100 text-blue-700 px-3 py-1 rounded-full text-xs font-bold flex items-center gap-1">
-          <Sparkles className="w-3 h-3" />
-          Essai ({daysLeft}j)
+        <span className="flex items-center justify-center gap-2">
+          <SettingsIcon className="w-5 h-5" />
+          Gérer
+        </span>
+      );
+    }
+    
+    if (isTrialActive) {
+      return (
+        <span className="flex items-center justify-center gap-2">
+          <SettingsIcon className="w-5 h-5" />
+          Voir détails
+        </span>
+      );
+    }
+    
+    if (isTrialExpired) {
+      return (
+        <span className="flex items-center justify-center gap-2">
+          <CreditCard className="w-5 h-5" />
+          S'abonner maintenant
         </span>
       );
     }
     
     return (
-      <span className="bg-green-100 text-green-700 px-3 py-1 rounded-full text-xs font-bold flex items-center gap-1">
-        <Check className="w-3 h-3" />
-        Actif
+      <span className="flex items-center justify-center gap-2">
+        <Sparkles className="w-5 h-5" />
+        Essai gratuit 7j
       </span>
     );
   };
@@ -273,9 +349,9 @@ function PluginCard({ plugin, isSubscribed, isTrialExpired, subscription, onSele
           <span className="text-3xl font-bold text-gray-900">{plugin.base_price}€</span>
           <span className="text-gray-600">/mois</span>
         </div>
-        {!isSubscribed && (
+        {!isSubscribed && !isTrialActive && (
           <p className="text-sm text-purple-600 font-medium mt-1">
-            + 7 jours d'essai gratuit
+            {isTrialExpired ? 'Abonnement mensuel' : '+ 7 jours d\'essai gratuit'}
           </p>
         )}
       </div>
@@ -299,24 +375,14 @@ function PluginCard({ plugin, isSubscribed, isTrialExpired, subscription, onSele
         <button
           onClick={onSelect}
           className={`w-full py-3 rounded-xl font-bold transition-all duration-300 ${
-            isSubscribed
+            isSubscribed || isTrialActive
               ? 'bg-gray-100 text-gray-700 hover:bg-gray-200'
+              : isTrialExpired
+              ? 'bg-gradient-to-r from-green-600 to-emerald-600 text-white hover:from-green-700 hover:to-emerald-700 shadow-lg hover:shadow-xl'
               : 'bg-gradient-to-r from-purple-600 to-pink-600 text-white hover:from-purple-700 hover:to-pink-700 shadow-lg hover:shadow-xl'
           }`}
         >
-          {isTrialExpired ? (
-            <span className="flex items-center justify-center gap-2">
-              <CreditCard className="w-5 h-5" />
-              S'abonner
-            </span>
-          ) : isSubscribed ? (
-            <span className="flex items-center justify-center gap-2">
-              <SettingsIcon className="w-5 h-5" />
-              Gérer
-            </span>
-          ) : (
-            'Essayer gratuitement'
-          )}
+          {getButtonText()}
         </button>
       </div>
     </div>
@@ -326,15 +392,17 @@ function PluginCard({ plugin, isSubscribed, isTrialExpired, subscription, onSele
 interface PluginModalProps {
   plugin: Plugin;
   isSubscribed: boolean;
+  isTrialActive: boolean;
   isTrialExpired: boolean;
+  trialDaysLeft: number;
   subscribing: boolean;
   error: string | null;
   onClose: () => void;
+  onStartTrial: () => void;
   onSubscribe: () => void;
-  onStartSubscription: () => void;
 }
 
-function PluginModal({ plugin, isSubscribed, isTrialExpired, subscribing, error, onClose, onSubscribe, onStartSubscription }: PluginModalProps) {
+function PluginModal({ plugin, isSubscribed, isTrialActive, isTrialExpired, trialDaysLeft, subscribing, error, onClose, onStartTrial, onSubscribe }: PluginModalProps) {
   const IconComponent = (LucideIcons as any)[plugin.icon] || Package;
   const includedFeatures = plugin.features.filter(f => f.included);
   const additionalFeatures = plugin.features.filter(f => !f.included);
@@ -372,33 +440,94 @@ function PluginModal({ plugin, isSubscribed, isTrialExpired, subscribing, error,
             <div className="bg-red-50 border-2 border-red-200 rounded-xl p-4 flex items-start gap-3">
               <AlertCircle className="w-5 h-5 text-red-600 flex-shrink-0 mt-0.5" />
               <div>
-                <p className="font-bold text-red-900">Erreur de souscription</p>
+                <p className="font-bold text-red-900">Erreur</p>
                 <p className="text-sm text-red-700 mt-1">{error}</p>
               </div>
             </div>
           )}
 
-          {isTrialExpired && (
-            <div className="bg-orange-50 border-2 border-orange-200 rounded-xl p-6">
+          {isTrialActive && (
+            <div className="bg-blue-50 border-2 border-blue-200 rounded-xl p-6">
               <div className="flex items-start gap-4">
-                <div className="w-12 h-12 bg-orange-500 rounded-xl flex items-center justify-center flex-shrink-0">
+                <div className="w-12 h-12 bg-blue-500 rounded-xl flex items-center justify-center flex-shrink-0">
+                  <Clock className="w-6 h-6 text-white" />
+                </div>
+                <div className="flex-1">
+                  <h3 className="text-xl font-bold text-blue-900 mb-2">Essai gratuit en cours</h3>
+                  <p className="text-blue-800 mb-2">
+                    Il vous reste <strong>{trialDaysLeft} jour{trialDaysLeft > 1 ? 's' : ''}</strong> d'essai gratuit.
+                  </p>
+                  <p className="text-sm text-blue-700">
+                    Profitez de toutes les fonctionnalités sans engagement. Vous pourrez souscrire à l'abonnement mensuel avant la fin de l'essai.
+                  </p>
+                </div>
+              </div>
+            </div>
+          )}
+
+          {isTrialExpired && (
+            <div className="bg-gradient-to-r from-orange-50 to-red-50 border-2 border-orange-200 rounded-xl p-6">
+              <div className="flex items-start gap-4">
+                <div className="w-12 h-12 bg-gradient-to-r from-orange-500 to-red-500 rounded-xl flex items-center justify-center flex-shrink-0">
                   <AlertCircle className="w-6 h-6 text-white" />
                 </div>
                 <div className="flex-1">
                   <h3 className="text-xl font-bold text-orange-900 mb-2">Période d'essai expirée</h3>
                   <p className="text-orange-800 mb-4">
-                    Votre période d'essai gratuit de 7 jours est terminée. Pour continuer à utiliser ce plugin, 
-                    veuillez souscrire à l'abonnement mensuel.
+                    Votre période d'essai gratuit de 7 jours est terminée. Continuez à profiter de toutes les fonctionnalités en souscrivant à l'abonnement mensuel.
                   </p>
-                  <div className="bg-white rounded-lg p-4 border-2 border-orange-300">
-                    <div className="flex items-center justify-between mb-2">
-                      <span className="text-gray-700 font-medium">Abonnement mensuel</span>
-                      <span className="text-2xl font-bold text-orange-600">{plugin.base_price}€/mois</span>
+                  <div className="bg-white rounded-xl p-6 border-2 border-orange-300 shadow-lg">
+                    <div className="flex items-center justify-between mb-4">
+                      <div>
+                        <p className="text-sm text-gray-600 mb-1">Abonnement mensuel</p>
+                        <div className="flex items-baseline gap-2">
+                          <span className="text-3xl font-bold text-gray-900">{plugin.base_price}€</span>
+                          <span className="text-gray-600">/mois</span>
+                        </div>
+                      </div>
+                      <div className="w-16 h-16 bg-gradient-to-r from-green-500 to-emerald-500 rounded-xl flex items-center justify-center">
+                        <CreditCard className="w-8 h-8 text-white" />
+                      </div>
                     </div>
-                    <p className="text-sm text-gray-600">
-                      Facturation mensuelle • Annulation à tout moment
-                    </p>
+                    <ul className="space-y-2 mb-4">
+                      <li className="flex items-center gap-2 text-sm text-gray-700">
+                        <Check className="w-4 h-4 text-green-600" />
+                        Facturation mensuelle automatique
+                      </li>
+                      <li className="flex items-center gap-2 text-sm text-gray-700">
+                        <Check className="w-4 h-4 text-green-600" />
+                        Annulation à tout moment
+                      </li>
+                      <li className="flex items-center gap-2 text-sm text-gray-700">
+                        <Check className="w-4 h-4 text-green-600" />
+                        Accès immédiat après paiement
+                      </li>
+                    </ul>
+                    <button
+                      onClick={onSubscribe}
+                      disabled={subscribing}
+                      className="w-full bg-gradient-to-r from-green-600 to-emerald-600 text-white py-3 rounded-xl font-bold hover:from-green-700 hover:to-emerald-700 transition-all duration-300 shadow-lg hover:shadow-xl disabled:opacity-50 disabled:cursor-not-allowed flex items-center justify-center gap-2"
+                    >
+                      <ExternalLink className="w-5 h-5" />
+                      S'abonner sur Stripe
+                    </button>
                   </div>
+                </div>
+              </div>
+            </div>
+          )}
+
+          {isSubscribed && (
+            <div className="bg-green-50 border-2 border-green-200 rounded-xl p-6">
+              <div className="flex items-start gap-4">
+                <div className="w-12 h-12 bg-green-500 rounded-xl flex items-center justify-center flex-shrink-0">
+                  <Check className="w-6 h-6 text-white" />
+                </div>
+                <div className="flex-1">
+                  <h3 className="text-xl font-bold text-green-900 mb-2">Abonnement actif</h3>
+                  <p className="text-green-800">
+                    Vous avez un accès complet à toutes les fonctionnalités de ce plugin.
+                  </p>
                 </div>
               </div>
             </div>
@@ -456,37 +585,22 @@ function PluginModal({ plugin, isSubscribed, isTrialExpired, subscribing, error,
             >
               Fermer
             </button>
-            {isTrialExpired ? (
+            {!isSubscribed && !isTrialActive && !isTrialExpired && (
               <button
-                onClick={onStartSubscription}
-                disabled={subscribing}
-                className="flex-1 bg-gradient-to-r from-orange-600 to-red-600 text-white py-4 rounded-xl font-bold hover:from-orange-700 hover:to-red-700 transition-all duration-300 shadow-lg hover:shadow-xl disabled:opacity-50 disabled:cursor-not-allowed"
-              >
-                {subscribing ? (
-                  <span className="flex items-center justify-center gap-2">
-                    <LoadingSpinner size="sm" />
-                    Redirection vers Stripe...
-                  </span>
-                ) : (
-                  <span className="flex items-center justify-center gap-2">
-                    <CreditCard className="w-5 h-5" />
-                    S'abonner maintenant - {plugin.base_price}€/mois
-                  </span>
-                )}
-              </button>
-            ) : !isSubscribed && (
-              <button
-                onClick={onSubscribe}
+                onClick={onStartTrial}
                 disabled={subscribing}
                 className="flex-1 bg-gradient-to-r from-purple-600 to-pink-600 text-white py-4 rounded-xl font-bold hover:from-purple-700 hover:to-pink-700 transition-all duration-300 shadow-lg hover:shadow-xl disabled:opacity-50 disabled:cursor-not-allowed"
               >
                 {subscribing ? (
                   <span className="flex items-center justify-center gap-2">
                     <LoadingSpinner size="sm" />
-                    Activation en cours...
+                    Activation...
                   </span>
                 ) : (
-                  'Commencer l\'essai gratuit'
+                  <span className="flex items-center justify-center gap-2">
+                    <Sparkles className="w-5 h-5" />
+                    Démarrer l'essai gratuit (7 jours)
+                  </span>
                 )}
               </button>
             )}

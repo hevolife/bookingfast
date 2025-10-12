@@ -1,6 +1,6 @@
 import React, { useEffect, useState } from 'react';
-import { Lock, Sparkles, ArrowRight } from 'lucide-react';
-import { usePluginPermissions } from '../../hooks/usePluginPermissions';
+import { Lock, Sparkles, ArrowRight, Clock } from 'lucide-react';
+import { usePlugins } from '../../hooks/usePlugins';
 import { LoadingSpinner } from '../UI/LoadingSpinner';
 
 interface PluginGuardProps {
@@ -9,7 +9,7 @@ interface PluginGuardProps {
 }
 
 export function PluginGuard({ pluginSlug, children }: PluginGuardProps) {
-  const { checkPluginAccess } = usePluginPermissions();
+  const { hasPluginAccess } = usePlugins();
   const [hasAccess, setHasAccess] = useState<boolean | null>(null);
   const [loading, setLoading] = useState(true);
 
@@ -20,7 +20,7 @@ export function PluginGuard({ pluginSlug, children }: PluginGuardProps) {
       try {
         setLoading(true);
         console.log(`🔒 PluginGuard - Vérification accès: ${pluginSlug}`);
-        const access = await checkPluginAccess(pluginSlug);
+        const access = await hasPluginAccess(pluginSlug);
         console.log(`🔒 PluginGuard - Résultat: ${access}`);
         
         if (mounted) {
@@ -43,7 +43,7 @@ export function PluginGuard({ pluginSlug, children }: PluginGuardProps) {
     return () => {
       mounted = false;
     };
-  }, [pluginSlug, checkPluginAccess]);
+  }, [pluginSlug, hasPluginAccess]);
 
   if (loading) {
     return (
@@ -62,9 +62,9 @@ export function PluginGuard({ pluginSlug, children }: PluginGuardProps) {
             <div className="w-20 h-20 bg-white/20 rounded-full flex items-center justify-center mx-auto mb-4 backdrop-blur-sm">
               <Lock className="w-10 h-10" />
             </div>
-            <h1 className="text-3xl font-bold mb-2">Accès Refusé</h1>
+            <h1 className="text-3xl font-bold mb-2">Plugin non activé</h1>
             <p className="text-white/90 text-lg">
-              Vous n'avez pas accès à ce plugin
+              Démarrez votre essai gratuit pour accéder à ce plugin
             </p>
           </div>
 
@@ -72,20 +72,38 @@ export function PluginGuard({ pluginSlug, children }: PluginGuardProps) {
             <div className="bg-purple-50 rounded-2xl p-6 border-2 border-purple-200">
               <div className="flex items-start gap-4">
                 <div className="w-12 h-12 bg-purple-600 rounded-xl flex items-center justify-center flex-shrink-0">
-                  <Sparkles className="w-6 h-6 text-white" />
+                  <Clock className="w-6 h-6 text-white" />
                 </div>
                 <div>
                   <h3 className="text-xl font-bold text-gray-900 mb-2">
-                    Plugin non activé
+                    7 jours d'essai gratuit
                   </h3>
-                  <p className="text-gray-600">
-                    Ce plugin n'est pas activé sur votre compte. Contactez le propriétaire du compte pour obtenir l'accès.
+                  <p className="text-gray-600 mb-3">
+                    Testez ce plugin gratuitement pendant 7 jours, sans engagement. 
+                    Vous pourrez ensuite souscrire à l'abonnement mensuel si vous le souhaitez.
                   </p>
-                  <p className="text-sm text-gray-500 mt-2">
-                    Plugin: <code className="bg-gray-100 px-2 py-1 rounded">{pluginSlug}</code>
-                  </p>
+                  <ul className="space-y-2">
+                    <li className="flex items-center gap-2 text-sm text-gray-700">
+                      <Sparkles className="w-4 h-4 text-purple-600" />
+                      Accès complet à toutes les fonctionnalités
+                    </li>
+                    <li className="flex items-center gap-2 text-sm text-gray-700">
+                      <Sparkles className="w-4 h-4 text-purple-600" />
+                      Aucune carte bancaire requise
+                    </li>
+                    <li className="flex items-center gap-2 text-sm text-gray-700">
+                      <Sparkles className="w-4 h-4 text-purple-600" />
+                      Annulation à tout moment
+                    </li>
+                  </ul>
                 </div>
               </div>
+            </div>
+
+            <div className="bg-gray-50 rounded-xl p-4 border border-gray-200">
+              <p className="text-sm text-gray-600">
+                Plugin: <code className="bg-gray-200 px-2 py-1 rounded font-mono text-xs">{pluginSlug}</code>
+              </p>
             </div>
 
             <div className="flex gap-4 pt-4">
@@ -99,7 +117,7 @@ export function PluginGuard({ pluginSlug, children }: PluginGuardProps) {
                 onClick={() => window.location.href = '/?page=plugins'}
                 className="flex-1 bg-gradient-to-r from-purple-600 to-pink-600 text-white py-4 rounded-xl font-bold hover:from-purple-700 hover:to-pink-700 transition-all duration-300 shadow-lg hover:shadow-xl flex items-center justify-center gap-2"
               >
-                <span>Voir les plugins</span>
+                <span>Démarrer l'essai gratuit</span>
                 <ArrowRight className="w-5 h-5" />
               </button>
             </div>
