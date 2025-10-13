@@ -1,5 +1,4 @@
 import React, { useState, useEffect } from 'react';
-import { useTranslation } from 'react-i18next';
 import { 
   Calendar, 
   TrendingUp, 
@@ -48,7 +47,6 @@ interface DashboardStats {
 }
 
 export function DashboardPage() {
-  const { t } = useTranslation();
   const { bookings, loading: bookingsLoading } = useBookings();
   const { services, loading: servicesLoading } = useServices();
   const { hasPermission, getUserRoleInfo, getUsageLimits, canViewFinancialData } = useTeam();
@@ -125,24 +123,37 @@ export function DashboardPage() {
       })
       .slice(0, 5);
 
-    // 🐛 FIX: Exclure les réservations avec 0€ restant à payer
+    // 🔧 FIX: Calculer le montant restant et filtrer correctement
     const pendingPayments = bookings
       .filter(b => {
         if (b.booking_status === 'cancelled') return false;
         
         const remainingAmount = b.total_amount - (b.payment_amount || 0);
         
-        // ✅ Exclure si le montant restant est 0 ou négatif
-        if (remainingAmount <= 0) return false;
+        // Debug log pour voir les valeurs
+        console.log('🔍 Booking:', {
+          client: `${b.client_firstname} ${b.client_name}`,
+          total: b.total_amount,
+          paid: b.payment_amount || 0,
+          remaining: remainingAmount,
+          status: b.payment_status
+        });
         
-        // ✅ Inclure si le statut est pending ou si le montant payé est inférieur au total
-        return b.payment_status === 'pending' || (b.payment_amount || 0) < b.total_amount;
+        // ✅ CORRECTION: Vérifier si le montant restant est > 0.01€ (pour éviter les erreurs d'arrondi)
+        return remainingAmount > 0.01;
       })
       .sort((a, b) => a.date.localeCompare(b.date))
       .slice(0, 5);
 
+    console.log('📊 Paiements en attente:', pendingPayments.length);
+
     const completedPayments = bookings
-      .filter(b => b.payment_status === 'completed' && b.booking_status !== 'cancelled')
+      .filter(b => {
+        if (b.booking_status === 'cancelled') return false;
+        const remainingAmount = b.total_amount - (b.payment_amount || 0);
+        // ✅ Considérer comme payé si le montant restant est <= 0.01€
+        return remainingAmount <= 0.01;
+      })
       .sort((a, b) => new Date(b.updated_at).getTime() - new Date(a.updated_at).getTime())
       .slice(0, 5);
 
@@ -196,15 +207,6 @@ export function DashboardPage() {
     }
   };
 
-  const getPeriodLabel = () => {
-    switch (selectedPeriod) {
-      case 'today': return t('dashboard.periods.day');
-      case 'week': return t('dashboard.periods.weekLabel');
-      case 'month': return t('dashboard.periods.monthLabel');
-      default: return t('dashboard.periods.day');
-    }
-  };
-
   const formatTime = (time: string) => {
     return time.slice(0, 5);
   };
@@ -231,9 +233,9 @@ export function DashboardPage() {
     setProcessingInvitation(invitationId);
     try {
       await acceptInvitation(invitationId);
-      alert(t('dashboard.invitations.accepted'));
+      alert('✅ Invitation acceptée ! Vous faites maintenant partie de l\'équipe.');
     } catch (error) {
-      alert(`${t('common.error')}: ${error instanceof Error ? error.message : t('common.error')}`);
+      alert(`Erreur: ${error instanceof Error ? error.message : 'Erreur inconnue'}`);
     } finally {
       setProcessingInvitation(null);
     }
@@ -243,9 +245,9 @@ export function DashboardPage() {
     setProcessingInvitation(invitationId);
     try {
       await rejectInvitation(invitationId);
-      alert(t('dashboard.invitations.rejected'));
+      alert('Invitation refusée');
     } catch (error) {
-      alert(`${t('common.error')}: ${error instanceof Error ? error.message : t('common.error')}`);
+      alert(`Erreur: ${error instanceof Error ? error.message : 'Erreur inconnue'}`);
     } finally {
       setProcessingInvitation(null);
     }
@@ -326,17 +328,17 @@ export function DashboardPage() {
               </div>
               <div className="flex-1">
                 <h3 className="font-bold text-orange-800 mb-1">
-                  {pendingInvitations.length} {t('dashboard.invitations.pending')}
+                  {pendingInvitations.length} invitation(s) en attente
                 </h3>
                 <p className="text-sm text-orange-700 mb-3">
-                  {t('dashboard.invitations.invited')} {pendingInvitations.length === 1 ? t('dashboard.invitations.team') : t('dashboard.invitations.teams')}
+                  Vous avez été invité à rejoindre {pendingInvitations.length === 1 ? 'une équipe' : 'des équipes'}
                 </p>
                 <button
                   onClick={() => setShowInvitationsModal(true)}
                   className="bg-gradient-to-r from-orange-500 to-pink-500 text-white px-4 py-2 rounded-lg hover:from-orange-600 hover:to-pink-600 transition-all duration-300 font-medium text-sm flex items-center gap-2"
                 >
                   <Eye className="w-4 h-4" />
-                  {t('dashboard.invitations.view')}
+                  Voir les invitations
                 </button>
               </div>
             </div>
@@ -347,9 +349,9 @@ export function DashboardPage() {
           <div className="flex items-center justify-between mb-4">
             <div>
               <h1 className="text-2xl sm:text-3xl font-bold bg-gradient-to-r from-blue-600 to-purple-600 bg-clip-text text-transparent">
-                {t('dashboard.title')}
+                Dashboard
               </h1>
-              <p className="text-sm sm:text-base text-gray-600 mt-2">{t('dashboard.overview')}</p>
+              <p className="text-sm sm:text-base text-gray-600 mt-2">Vue d'ensemble de votre activité</p>
             </div>
             
             <div className={`bg-gradient-to-r ${roleBgGradient} border-2 ${roleBorderColor} rounded-xl p-3 shadow-lg hover:shadow-xl transition-all duration-300`}>
@@ -360,7 +362,7 @@ export function DashboardPage() {
                 <div>
                   <div className="font-bold text-gray-900 text-sm">{userRole.name}</div>
                   <div className={`text-xs font-bold bg-gradient-to-r ${roleGradient} bg-clip-text text-transparent`}>
-                    {t('dashboard.role.level')} {userRole.level}
+                    Niveau {userRole.level}
                   </div>
                 </div>
               </div>
@@ -371,9 +373,9 @@ export function DashboardPage() {
         <div className="mb-4 sm:mb-6">
           <div className="flex gap-1 sm:gap-2 bg-white rounded-2xl p-2 shadow-lg w-full sm:w-fit overflow-x-auto">
             {[
-              { key: 'today', label: t('dashboard.periods.today') },
-              { key: 'week', label: t('dashboard.periods.week') },
-              { key: 'month', label: t('dashboard.periods.month') }
+              { key: 'today', label: 'Aujourd\'hui' },
+              { key: 'week', label: 'Semaine' },
+              { key: 'month', label: 'Ce mois' }
             ].map(period => (
               <button
                 key={period.key}
@@ -400,7 +402,7 @@ export function DashboardPage() {
                   </div>
                 </div>
                 <div className="text-xl sm:text-3xl font-bold mb-1 sm:mb-2">***</div>
-                <div className="text-gray-200 text-xs sm:text-sm">{t('dashboard.stats.restrictedAccess')}</div>
+                <div className="text-gray-200 text-xs sm:text-sm">Accès restreint</div>
               </div>
             }
           >
@@ -415,7 +417,7 @@ export function DashboardPage() {
                 {getRevenueForPeriod().toFixed(2)}€
               </div>
               <div className="text-green-100 text-xs sm:text-sm">
-                {t('dashboard.stats.revenue')} {getPeriodLabel()}
+                CA {selectedPeriod === 'today' ? 'jour' : selectedPeriod === 'week' ? 'semaine' : 'mois'}
               </div>
             </div>
           </PermissionGate>
@@ -431,7 +433,7 @@ export function DashboardPage() {
               {getBookingsForPeriod()}
             </div>
             <div className="text-blue-100 text-xs sm:text-sm">
-              {t('nav.calendar')} {getPeriodLabel()}
+              RDV {selectedPeriod === 'today' ? 'jour' : selectedPeriod === 'week' ? 'semaine' : 'mois'}
             </div>
           </div>
 
@@ -444,7 +446,7 @@ export function DashboardPage() {
                   </div>
                 </div>
                 <div className="text-xl sm:text-3xl font-bold mb-1 sm:mb-2">***</div>
-                <div className="text-gray-200 text-xs sm:text-sm">{t('dashboard.stats.restrictedAccess')}</div>
+                <div className="text-gray-200 text-xs sm:text-sm">Accès restreint</div>
               </div>
             }
           >
@@ -459,7 +461,7 @@ export function DashboardPage() {
                 {stats.pendingPayments.length}
               </div>
               <div className="text-orange-100 text-xs sm:text-sm">
-                {t('dashboard.stats.pending')}
+                En attente
               </div>
             </div>
           </PermissionGate>
@@ -473,7 +475,7 @@ export function DashboardPage() {
                   </div>
                 </div>
                 <div className="text-xl sm:text-3xl font-bold mb-1 sm:mb-2">***</div>
-                <div className="text-gray-200 text-xs sm:text-sm">{t('dashboard.stats.restrictedAccess')}</div>
+                <div className="text-gray-200 text-xs sm:text-sm">Accès restreint</div>
               </div>
             }
           >
@@ -488,7 +490,7 @@ export function DashboardPage() {
                 {stats.completedPayments.length}
               </div>
               <div className="text-purple-100 text-xs sm:text-sm">
-                {t('dashboard.stats.completed')}
+                Complétés
               </div>
             </div>
           </PermissionGate>
@@ -502,8 +504,8 @@ export function DashboardPage() {
                   <Clock className="w-4 h-4 sm:w-5 sm:h-5 text-white" />
                 </div>
                 <div>
-                  <h2 className="text-lg sm:text-xl font-bold text-gray-900">{t('dashboard.upcomingBookings.title')}</h2>
-                  <p className="text-gray-600 text-xs sm:text-sm">{t('dashboard.upcomingBookings.subtitle')}</p>
+                  <h2 className="text-lg sm:text-xl font-bold text-gray-900">Prochaines réservations</h2>
+                  <p className="text-gray-600 text-xs sm:text-sm">Dans les 24 prochaines heures</p>
                 </div>
               </div>
 
@@ -524,7 +526,7 @@ export function DashboardPage() {
                           {booking.client_firstname} {booking.client_name}
                         </div>
                         <div className="text-xs text-gray-500 flex items-center gap-1 mt-1 sm:hidden">
-                          {booking.booking_status === 'confirmed' ? `✅ ${t('dashboard.upcomingBookings.confirmed')}` : `⏳ ${t('dashboard.upcomingBookings.pending')}`}
+                          {booking.booking_status === 'confirmed' ? '✅ Confirmée' : '⏳ En attente'}
                         </div>
                         <div className="text-xs sm:text-sm text-gray-600">
                           {services.find(s => s.id === booking.service_id)?.name}
@@ -533,13 +535,13 @@ export function DashboardPage() {
                       
                       <div className="text-left sm:text-right w-full sm:w-auto">
                         <div className="font-bold text-blue-600 text-sm sm:text-base">
-                          {formatDate(booking.date)} {t('common.at')} {formatTime(booking.time)}
+                          {formatDate(booking.date)} à {formatTime(booking.time)}
                         </div>
                         <div className="text-xs sm:text-sm text-gray-500">
-                          {booking.duration_minutes}min • {booking.quantity} {t('dashboard.upcomingBookings.persons')}
+                          {booking.duration_minutes}min • {booking.quantity} pers.
                         </div>
                         <div className="text-xs text-gray-500 flex items-center gap-1 mt-1 sm:hidden">
-                          {booking.booking_status === 'confirmed' ? `✅ ${t('dashboard.upcomingBookings.confirmed')}` : `⏳ ${t('dashboard.upcomingBookings.pending')}`}
+                          {booking.booking_status === 'confirmed' ? '✅ Confirmée' : '⏳ En attente'}
                         </div>
                       </div>
 
@@ -547,13 +549,13 @@ export function DashboardPage() {
                         <button
                           onClick={() => handleViewBooking(booking)}
                           className="p-2 bg-blue-500 text-white rounded-lg hover:bg-blue-600 transition-colors transform hover:scale-110 mobile-tap-target"
-                          title={t('dashboard.upcomingBookings.viewDetails')}>
+                          title="Voir les détails">
                           <Eye className="w-4 h-4" />
                         </button>
                         <button
                           onClick={() => handleCallClient(booking)}
                           className="p-2 bg-green-500 text-white rounded-lg hover:bg-green-600 transition-colors transform hover:scale-110 mobile-tap-target"
-                          title={`${t('dashboard.upcomingBookings.callClient')} ${booking.client_phone}`}>
+                          title={`Appeler ${booking.client_phone}`}>
                           <Phone className="w-4 h-4" />
                         </button>
                       </div>
@@ -562,7 +564,7 @@ export function DashboardPage() {
                 ) : (
                   <div className="text-center py-8">
                     <Clock className="w-8 h-8 sm:w-12 sm:h-12 text-gray-300 mx-auto mb-4" />
-                    <p className="text-gray-500 text-sm sm:text-base">{t('dashboard.upcomingBookings.noBookings')}</p>
+                    <p className="text-gray-500 text-sm sm:text-base">Aucune réservation dans les 24h</p>
                   </div>
                 )}
               </div>
@@ -577,8 +579,8 @@ export function DashboardPage() {
                     <BarChart3 className="w-4 h-4 sm:w-5 sm:h-5 text-white" />
                   </div>
                   <div>
-                    <h3 className="text-base sm:text-lg font-bold text-gray-900">{t('dashboard.popularServices.title')}</h3>
-                    <p className="text-gray-600 text-xs sm:text-sm">{t('dashboard.popularServices.subtitle')}</p>
+                    <h3 className="text-base sm:text-lg font-bold text-gray-900">Services populaires</h3>
+                    <p className="text-gray-600 text-xs sm:text-sm">Ce mois</p>
                   </div>
                 </div>
 
@@ -590,7 +592,7 @@ export function DashboardPage() {
                       </div>
                       <div className="flex-1">
                         <div className="font-medium text-gray-900 text-xs sm:text-sm">{item.service.name}</div>
-                        <div className="text-xs text-gray-500">{item.count} {t('dashboard.popularServices.bookings')}</div>
+                        <div className="text-xs text-gray-500">{item.count} réservations</div>
                       </div>
                       <PermissionGate permission="view_revenue" showMessage={false}>
                         <div className="text-right">
@@ -610,32 +612,35 @@ export function DashboardPage() {
                     <AlertTriangle className="w-4 h-4 sm:w-5 sm:h-5 text-white" />
                   </div>
                   <div>
-                    <h3 className="text-base sm:text-lg font-bold text-gray-900">{t('dashboard.pendingPayments.title')}</h3>
-                    <p className="text-gray-600 text-xs sm:text-sm">{stats.pendingPayments.length} {t('dashboard.pendingPayments.count')}</p>
+                    <h3 className="text-base sm:text-lg font-bold text-gray-900">Paiements en attente</h3>
+                    <p className="text-gray-600 text-xs sm:text-sm">{stats.pendingPayments.length} en attente</p>
                   </div>
                 </div>
 
                 <div className="space-y-3">
-                  {stats.pendingPayments.slice(0, 3).map((booking) => (
-                    <div key={booking.id} className="flex items-center gap-2 sm:gap-3 p-3 bg-orange-50 rounded-xl border border-orange-200">
-                      <div className="w-6 h-6 sm:w-8 sm:h-8 bg-orange-500 rounded-lg flex items-center justify-center text-white font-bold text-xs">
-                        {booking.client_firstname.charAt(0)}
-                      </div>
-                      <div className="flex-1">
-                        <div className="font-medium text-gray-900 text-xs sm:text-sm">
-                          {booking.client_firstname} {booking.client_name}
+                  {stats.pendingPayments.slice(0, 3).map((booking) => {
+                    const remainingAmount = booking.total_amount - (booking.payment_amount || 0);
+                    return (
+                      <div key={booking.id} className="flex items-center gap-2 sm:gap-3 p-3 bg-orange-50 rounded-xl border border-orange-200">
+                        <div className="w-6 h-6 sm:w-8 sm:h-8 bg-orange-500 rounded-lg flex items-center justify-center text-white font-bold text-xs">
+                          {booking.client_firstname.charAt(0)}
                         </div>
-                        <div className="text-xs text-gray-500">
-                          {formatDate(booking.date)} • {(booking.total_amount - (booking.payment_amount || 0)).toFixed(2)}€
+                        <div className="flex-1">
+                          <div className="font-medium text-gray-900 text-xs sm:text-sm">
+                            {booking.client_firstname} {booking.client_name}
+                          </div>
+                          <div className="text-xs text-gray-500">
+                            {formatDate(booking.date)} • {remainingAmount.toFixed(2)}€
+                          </div>
                         </div>
+                        <PermissionGate permission="create_payment_link" showMessage={false}>
+                          <button className="p-2 bg-orange-500 text-white rounded-lg hover:bg-orange-600 transition-colors mobile-tap-target">
+                            <Mail className="w-3 h-3 sm:w-4 sm:h-4" />
+                          </button>
+                        </PermissionGate>
                       </div>
-                      <PermissionGate permission="create_payment_link" showMessage={false}>
-                        <button className="p-2 bg-orange-500 text-white rounded-lg hover:bg-orange-600 transition-colors mobile-tap-target">
-                          <Mail className="w-3 h-3 sm:w-4 sm:h-4" />
-                        </button>
-                      </PermissionGate>
-                    </div>
-                  ))}
+                    );
+                  })}
                 </div>
               </div>
             </PermissionGate>
@@ -647,7 +652,7 @@ export function DashboardPage() {
         <Modal
           isOpen={showInvitationsModal}
           onClose={() => setShowInvitationsModal(false)}
-          title={t('dashboard.invitations.title')}
+          title="Invitations en attente"
           size="md"
         >
           <div className="space-y-4">
@@ -661,13 +666,13 @@ export function DashboardPage() {
                     {invitation.email.charAt(0).toUpperCase()}
                   </div>
                   <div className="flex-1">
-                    <h4 className="font-bold text-gray-900">{t('dashboard.invitations.title')}</h4>
-                    <p className="text-sm text-gray-600">{t('dashboard.invitations.from')} {invitation.email}</p>
+                    <h4 className="font-bold text-gray-900">Invitation d'équipe</h4>
+                    <p className="text-sm text-gray-600">De: {invitation.email}</p>
                     <p className="text-xs text-gray-500 mt-1">
-                      {t('dashboard.invitations.role')} {invitation.role_name} • {invitation.permissions.length} {t('dashboard.invitations.permissions')}
+                      Rôle: {invitation.role_name} • {invitation.permissions.length} permissions
                     </p>
                     <p className="text-xs text-gray-500">
-                      {t('dashboard.invitations.expires')} {new Date(invitation.expires_at).toLocaleDateString()}
+                      Expire le: {new Date(invitation.expires_at).toLocaleDateString('fr-FR')}
                     </p>
                   </div>
                 </div>
@@ -683,7 +688,7 @@ export function DashboardPage() {
                     ) : (
                       <>
                         <Check className="w-4 h-4" />
-                        {t('dashboard.invitations.accept')}
+                        Accepter
                       </>
                     )}
                   </button>
@@ -697,7 +702,7 @@ export function DashboardPage() {
                     ) : (
                       <>
                         <X className="w-4 h-4" />
-                        {t('dashboard.invitations.reject')}
+                        Refuser
                       </>
                     )}
                   </button>
@@ -712,7 +717,7 @@ export function DashboardPage() {
         <Modal
           isOpen={showBookingModal}
           onClose={() => setShowBookingModal(false)}
-          title={t('dashboard.bookingDetails.title')}
+          title="Détails de la réservation"
           size="md"
         >
           <div className="space-y-4 sm:space-y-6">
@@ -730,7 +735,7 @@ export function DashboardPage() {
                       ? 'bg-green-100 text-green-700' 
                       : 'bg-orange-100 text-orange-700'
                   }`}>
-                    {selectedBooking.booking_status === 'confirmed' ? t('dashboard.bookingDetails.confirmed') : t('dashboard.bookingDetails.pending')}
+                    {selectedBooking.booking_status === 'confirmed' ? '✅ Confirmée' : '⏳ En attente'}
                   </div>
                 </div>
               </div>
@@ -760,29 +765,29 @@ export function DashboardPage() {
             <div className="bg-gradient-to-r from-purple-50 to-pink-50 rounded-xl sm:rounded-2xl p-4 sm:p-6 border border-purple-200">
               <h4 className="font-bold text-purple-800 mb-3 sm:mb-4 flex items-center gap-2 text-sm sm:text-base">
                 <Calendar className="w-4 h-4 sm:w-5 sm:h-5" />
-                {t('dashboard.bookingDetails.details')}
+                Détails de la réservation
               </h4>
               
               <div className="space-y-2 sm:space-y-3 text-xs sm:text-sm">
                 <div className="flex justify-between">
-                  <span className="text-purple-700">{t('dashboard.bookingDetails.service')}</span>
+                  <span className="text-purple-700">Service</span>
                   <span className="font-medium text-purple-800">
                     {services.find(s => s.id === selectedBooking.service_id)?.name}
                   </span>
                 </div>
                 <div className="flex justify-between">
-                  <span className="text-purple-700">{t('dashboard.bookingDetails.dateTime')}</span>
+                  <span className="text-purple-700">Date et heure</span>
                   <span className="font-medium text-purple-800">
-                    {formatDate(selectedBooking.date)} {t('common.at')} {formatTime(selectedBooking.time)}
+                    {formatDate(selectedBooking.date)} à {formatTime(selectedBooking.time)}
                   </span>
                 </div>
                 <div className="flex justify-between">
-                  <span className="text-purple-700">{t('dashboard.bookingDetails.duration')}</span>
-                  <span className="font-medium text-purple-800">{selectedBooking.duration_minutes} {t('dashboard.bookingDetails.minutes')}</span>
+                  <span className="text-purple-700">Durée</span>
+                  <span className="font-medium text-purple-800">{selectedBooking.duration_minutes} minutes</span>
                 </div>
                 <div className="flex justify-between">
-                  <span className="text-purple-700">{t('dashboard.bookingDetails.participants')}</span>
-                  <span className="font-medium text-purple-800">{selectedBooking.quantity} {t('dashboard.bookingDetails.person')}</span>
+                  <span className="text-purple-700">Participants</span>
+                  <span className="font-medium text-purple-800">{selectedBooking.quantity} personne(s)</span>
                 </div>
               </div>
             </div>
@@ -790,35 +795,35 @@ export function DashboardPage() {
             <div className="bg-gradient-to-r from-green-50 to-emerald-50 rounded-xl sm:rounded-2xl p-4 sm:p-6 border border-green-200">
               <h4 className="font-bold text-green-800 mb-3 sm:mb-4 flex items-center gap-2 text-sm sm:text-base">
                 <Euro className="w-4 h-4 sm:w-5 sm:h-5" />
-                {t('dashboard.bookingDetails.payment')}
+                Paiement
               </h4>
               
               <div className="space-y-2 sm:space-y-3 text-xs sm:text-sm">
                 <div className="flex justify-between">
-                  <span className="text-green-700">{t('dashboard.bookingDetails.totalAmount')}</span>
+                  <span className="text-green-700">Montant total</span>
                   <span className="font-bold text-green-800">{selectedBooking.total_amount.toFixed(2)}€</span>
                 </div>
                 <div className="flex justify-between">
-                  <span className="text-green-700">{t('dashboard.bookingDetails.paidAmount')}</span>
+                  <span className="text-green-700">Montant payé</span>
                   <span className="font-medium text-green-800">{(selectedBooking.payment_amount || 0).toFixed(2)}€</span>
                 </div>
                 <div className="flex justify-between">
-                  <span className="text-green-700">{t('dashboard.bookingDetails.remaining')}</span>
+                  <span className="text-green-700">Restant à payer</span>
                   <span className="font-bold text-green-800">
                     {(selectedBooking.total_amount - (selectedBooking.payment_amount || 0)).toFixed(2)}€
                   </span>
                 </div>
                 <div className="flex justify-between">
-                  <span className="text-green-700">{t('dashboard.bookingDetails.status')}</span>
+                  <span className="text-green-700">Statut</span>
                   <span className={`px-2 sm:px-3 py-1 rounded-full text-xs sm:text-sm font-medium ${
-                    selectedBooking.payment_status === 'completed' 
+                    (selectedBooking.total_amount - (selectedBooking.payment_amount || 0)) <= 0.01
                       ? 'bg-green-100 text-green-700'
-                      : selectedBooking.payment_status === 'partial'
+                      : (selectedBooking.payment_amount || 0) > 0
                       ? 'bg-orange-100 text-orange-700'
                       : 'bg-red-100 text-red-700'
                   }`}>
-                    {selectedBooking.payment_status === 'completed' ? t('dashboard.bookingDetails.paid') :
-                     selectedBooking.payment_status === 'partial' ? t('dashboard.bookingDetails.partial') : t('dashboard.bookingDetails.unpaid')}
+                    {(selectedBooking.total_amount - (selectedBooking.payment_amount || 0)) <= 0.01 ? '✅ Payé' :
+                     (selectedBooking.payment_amount || 0) > 0 ? '💵 Partiellement' : '❌ Non payé'}
                   </span>
                 </div>
               </div>
@@ -830,14 +835,14 @@ export function DashboardPage() {
                 className="flex-1 bg-gradient-to-r from-green-500 to-emerald-500 text-white px-4 sm:px-6 py-3 rounded-xl sm:rounded-2xl hover:from-green-600 hover:to-emerald-600 transition-all duration-300 transform hover:scale-105 shadow-lg font-medium flex items-center justify-center gap-2 text-sm sm:text-base"
               >
                 <Phone className="w-4 h-4 sm:w-5 sm:h-5" />
-                {t('dashboard.bookingDetails.callClient')}
+                Appeler le client
               </button>
               <button
                 onClick={() => window.open(`mailto:${selectedBooking.client_email}`, '_blank')}
                 className="flex-1 bg-gradient-to-r from-blue-500 to-cyan-500 text-white px-4 sm:px-6 py-3 rounded-xl sm:rounded-2xl hover:from-blue-600 hover:to-cyan-600 transition-all duration-300 transform hover:scale-105 shadow-lg font-medium flex items-center justify-center gap-2 text-sm sm:text-base"
               >
                 <Mail className="w-4 h-4 sm:w-5 sm:h-5" />
-                {t('dashboard.bookingDetails.sendEmail')}
+                Envoyer un email
               </button>
             </div>
           </div>

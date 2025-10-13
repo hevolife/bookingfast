@@ -1,5 +1,4 @@
 import React, { useState, useEffect } from 'react';
-import { useTranslation } from 'react-i18next';
 import { CalendarGrid } from './CalendarGrid';
 import { BookingsList } from './BookingsList';
 import { ClientsPage } from '../Clients/ClientsPage';
@@ -17,7 +16,6 @@ interface CalendarPageProps {
 }
 
 export function CalendarPage({ view = 'calendar' }: CalendarPageProps) {
-  const { t } = useTranslation();
   console.log('🔍 CalendarPage - Rendu, view:', view);
   
   const [currentDate] = useState(new Date());
@@ -79,12 +77,12 @@ export function CalendarPage({ view = 'calendar' }: CalendarPageProps) {
 
   const handleTimeSlotClick = (date: string, time: string) => {
     if (!hasPermission('create_booking')) {
-      alert(t('calendar.noPermission'));
+      alert('Vous n\'avez pas la permission de créer des réservations');
       return;
     }
     
     if (usageLimits.maxBookingsPerDay && todayBookingsCount >= usageLimits.maxBookingsPerDay) {
-      alert(t('calendar.limitReached', { max: usageLimits.maxBookingsPerDay }));
+      alert(`Limite atteinte: ${usageLimits.maxBookingsPerDay} réservations par jour maximum pour votre rôle`);
       return;
     }
     
@@ -95,7 +93,7 @@ export function CalendarPage({ view = 'calendar' }: CalendarPageProps) {
 
   const handleBookingClick = (booking: Booking) => {
     if (!canEditBooking(booking)) {
-      alert(t('calendar.cannotEdit'));
+      alert('Vous n\'avez pas la permission de modifier cette réservation');
       return;
     }
     
@@ -113,7 +111,7 @@ export function CalendarPage({ view = 'calendar' }: CalendarPageProps) {
   const handleDeleteBooking = async (bookingId: string) => {
     const booking = bookings.find(b => b.id === bookingId);
     if (booking && !canDeleteBooking(booking)) {
-      alert(t('calendar.cannotDelete'));
+      alert('Vous n\'avez pas la permission de supprimer cette réservation');
       return;
     }
     
@@ -155,7 +153,7 @@ export function CalendarPage({ view = 'calendar' }: CalendarPageProps) {
           <div className="flex items-center gap-3">
             <div className="hidden md:flex items-center gap-2 text-gray-700 flex-shrink-0">
               <UserCheck className="w-5 h-5 text-purple-600" />
-              <span className="font-medium text-sm">{t('calendar.filterByMember')}</span>
+              <span className="font-medium text-sm">Filtrer par membre :</span>
             </div>
             
             <div className="flex-1 flex items-center gap-2">
@@ -166,7 +164,7 @@ export function CalendarPage({ view = 'calendar' }: CalendarPageProps) {
                 disabled={membersLoading}
               >
                 <option value="all">
-                  {membersLoading ? t('calendar.loading') : `${t('calendar.allMembers')} (${teamMembers.length})`}
+                  {membersLoading ? 'Chargement...' : `Tous les membres (${teamMembers.length})`}
                 </option>
                 {teamMembers.map(member => {
                   const displayName = getMemberDisplayName(member);
@@ -177,17 +175,17 @@ export function CalendarPage({ view = 'calendar' }: CalendarPageProps) {
                     </option>
                   );
                 })}
-                <option value="unassigned">{t('calendar.unassigned')}</option>
+                <option value="unassigned">Non assigné</option>
               </select>
               
               {selectedTeamMember !== 'all' && (
                 <button
                   onClick={() => setSelectedTeamMember('all')}
                   className="px-3 py-2 text-sm text-white bg-purple-600 hover:bg-purple-700 rounded-lg transition-colors flex items-center gap-1"
-                  title={t('calendar.resetFilter')}
+                  title="Réinitialiser le filtre"
                 >
                   <X className="w-4 h-4" />
-                  <span className="hidden md:inline">{t('calendar.resetFilter')}</span>
+                  <span className="hidden md:inline">Réinitialiser</span>
                 </button>
               )}
             </div>
@@ -195,18 +193,18 @@ export function CalendarPage({ view = 'calendar' }: CalendarPageProps) {
           
           {selectedTeamMember !== 'all' && (
             <div className="mt-2 flex items-center gap-2 text-xs text-purple-700 bg-purple-50 px-3 py-2 rounded-lg">
-              <span className="font-medium">{t('calendar.activeFilter')}</span>
+              <span className="font-medium">Filtre actif :</span>
               <span>
                 {selectedTeamMember === 'unassigned' 
-                  ? t('calendar.unassignedBookings')
+                  ? 'Réservations non assignées'
                   : (() => {
                       const member = teamMembers.find(m => m.user_id === selectedTeamMember);
-                      return member ? getMemberDisplayName(member) : t('calendar.unknownMember');
+                      return member ? getMemberDisplayName(member) : 'Membre inconnu';
                     })()
                 }
               </span>
               <span className="ml-auto font-bold">
-                {filteredBookings.length} {t('calendar.bookingsCount')}
+                {filteredBookings.length} réservation(s)
               </span>
             </div>
           )}
