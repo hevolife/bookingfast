@@ -80,7 +80,7 @@ export function Navbar({ currentPage, onPageChange }: NavbarProps) {
                 <Calendar className="w-6 h-6 text-white" />
               </div>
               <span className="text-xl font-bold bg-gradient-to-r from-purple-600 to-pink-600 bg-clip-text text-transparent">
-                {t('app.name')}
+                BookingFast
               </span>
             </div>
 
@@ -278,7 +278,7 @@ export function Navbar({ currentPage, onPageChange }: NavbarProps) {
                     <Calendar className="w-6 h-6 text-white" />
                   </div>
                 </div>
-                <h2 className="text-2xl font-bold text-white mb-2">{t('app.name')}</h2>
+                <h2 className="text-2xl font-bold text-white mb-2">BookingFast</h2>
                 <p className="text-purple-200 text-sm">{t('app.tagline')}</p>
               </div>
 
