@@ -123,37 +123,13 @@ export function DashboardPage() {
       })
       .slice(0, 5);
 
-    // 🔧 FIX: Calculer le montant restant et filtrer correctement
     const pendingPayments = bookings
-      .filter(b => {
-        if (b.booking_status === 'cancelled') return false;
-        
-        const remainingAmount = b.total_amount - (b.payment_amount || 0);
-        
-        // Debug log pour voir les valeurs
-        console.log('🔍 Booking:', {
-          client: `${b.client_firstname} ${b.client_name}`,
-          total: b.total_amount,
-          paid: b.payment_amount || 0,
-          remaining: remainingAmount,
-          status: b.payment_status
-        });
-        
-        // ✅ CORRECTION: Vérifier si le montant restant est > 0.01€ (pour éviter les erreurs d'arrondi)
-        return remainingAmount > 0.01;
-      })
+      .filter(b => (b.payment_status === 'pending' || (b.payment_amount || 0) < b.total_amount) && b.booking_status !== 'cancelled')
       .sort((a, b) => a.date.localeCompare(b.date))
       .slice(0, 5);
 
-    console.log('📊 Paiements en attente:', pendingPayments.length);
-
     const completedPayments = bookings
-      .filter(b => {
-        if (b.booking_status === 'cancelled') return false;
-        const remainingAmount = b.total_amount - (b.payment_amount || 0);
-        // ✅ Considérer comme payé si le montant restant est <= 0.01€
-        return remainingAmount <= 0.01;
-      })
+      .filter(b => b.payment_status === 'completed' && b.booking_status !== 'cancelled')
       .sort((a, b) => new Date(b.updated_at).getTime() - new Date(a.updated_at).getTime())
       .slice(0, 5);
 
@@ -618,29 +594,26 @@ export function DashboardPage() {
                 </div>
 
                 <div className="space-y-3">
-                  {stats.pendingPayments.slice(0, 3).map((booking) => {
-                    const remainingAmount = booking.total_amount - (booking.payment_amount || 0);
-                    return (
-                      <div key={booking.id} className="flex items-center gap-2 sm:gap-3 p-3 bg-orange-50 rounded-xl border border-orange-200">
-                        <div className="w-6 h-6 sm:w-8 sm:h-8 bg-orange-500 rounded-lg flex items-center justify-center text-white font-bold text-xs">
-                          {booking.client_firstname.charAt(0)}
-                        </div>
-                        <div className="flex-1">
-                          <div className="font-medium text-gray-900 text-xs sm:text-sm">
-                            {booking.client_firstname} {booking.client_name}
-                          </div>
-                          <div className="text-xs text-gray-500">
-                            {formatDate(booking.date)} • {remainingAmount.toFixed(2)}€
-                          </div>
-                        </div>
-                        <PermissionGate permission="create_payment_link" showMessage={false}>
-                          <button className="p-2 bg-orange-500 text-white rounded-lg hover:bg-orange-600 transition-colors mobile-tap-target">
-                            <Mail className="w-3 h-3 sm:w-4 sm:h-4" />
-                          </button>
-                        </PermissionGate>
+                  {stats.pendingPayments.slice(0, 3).map((booking) => (
+                    <div key={booking.id} className="flex items-center gap-2 sm:gap-3 p-3 bg-orange-50 rounded-xl border border-orange-200">
+                      <div className="w-6 h-6 sm:w-8 sm:h-8 bg-orange-500 rounded-lg flex items-center justify-center text-white font-bold text-xs">
+                        {booking.client_firstname.charAt(0)}
                       </div>
-                    );
-                  })}
+                      <div className="flex-1">
+                        <div className="font-medium text-gray-900 text-xs sm:text-sm">
+                          {booking.client_firstname} {booking.client_name}
+                        </div>
+                        <div className="text-xs text-gray-500">
+                          {formatDate(booking.date)} • {(booking.total_amount - (booking.payment_amount || 0)).toFixed(2)}€
+                        </div>
+                      </div>
+                      <PermissionGate permission="create_payment_link" showMessage={false}>
+                        <button className="p-2 bg-orange-500 text-white rounded-lg hover:bg-orange-600 transition-colors mobile-tap-target">
+                          <Mail className="w-3 h-3 sm:w-4 sm:h-4" />
+                        </button>
+                      </PermissionGate>
+                    </div>
+                  ))}
                 </div>
               </div>
             </PermissionGate>
@@ -816,14 +789,14 @@ export function DashboardPage() {
                 <div className="flex justify-between">
                   <span className="text-green-700">Statut</span>
                   <span className={`px-2 sm:px-3 py-1 rounded-full text-xs sm:text-sm font-medium ${
-                    (selectedBooking.total_amount - (selectedBooking.payment_amount || 0)) <= 0.01
+                    selectedBooking.payment_status === 'completed' 
                       ? 'bg-green-100 text-green-700'
-                      : (selectedBooking.payment_amount || 0) > 0
+                      : selectedBooking.payment_status === 'partial'
                       ? 'bg-orange-100 text-orange-700'
                       : 'bg-red-100 text-red-700'
                   }`}>
-                    {(selectedBooking.total_amount - (selectedBooking.payment_amount || 0)) <= 0.01 ? '✅ Payé' :
-                     (selectedBooking.payment_amount || 0) > 0 ? '💵 Partiellement' : '❌ Non payé'}
+                    {selectedBooking.payment_status === 'completed' ? '✅ Payé' :
+                     selectedBooking.payment_status === 'partial' ? '💵 Partiellement' : '❌ Non payé'}
                   </span>
                 </div>
               </div>

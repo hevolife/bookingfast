@@ -119,8 +119,9 @@ export function CalendarPage({ view = 'calendar' }: CalendarPageProps) {
   };
 
   const handleBookingSuccess = async () => {
+    console.log('✅ CalendarPage - handleBookingSuccess appelé');
     handleCloseModal();
-    await refetch();
+    // Le refetch sera déclenché automatiquement par les événements dans BookingsList
   };
 
   const getMemberDisplayName = (member: typeof teamMembers[0]) => {

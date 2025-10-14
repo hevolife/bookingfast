@@ -6,13 +6,14 @@ import { Booking } from '../../types';
 import { LoadingSpinner } from '../UI/LoadingSpinner';
 import { Modal } from '../UI/Modal';
 import { Button } from '../UI/Button';
+import { bookingEvents } from '../../lib/bookingEvents';
 
 interface BookingsListProps {
   onEditBooking?: (booking: Booking) => void;
 }
 
 export function BookingsList({ onEditBooking }: BookingsListProps) {
-  const { bookings, loading } = useBookings();
+  const { bookings, loading, refetch } = useBookings();
   const { services } = useServices();
   const [filteredBookings, setFilteredBookings] = useState<Booking[]>([]);
   const [currentPage, setCurrentPage] = useState(1);
@@ -25,6 +26,39 @@ export function BookingsList({ onEditBooking }: BookingsListProps) {
   const [showDetailsModal, setShowDetailsModal] = useState(false);
 
   const itemsPerPage = 12;
+
+  // 🔥 NOUVEAU : Écouter les événements de modification de réservation
+  useEffect(() => {
+    console.log('📡 BookingsList - Configuration des listeners d\'événements');
+    
+    const handleBookingUpdated = (updatedBooking: Booking) => {
+      console.log('🔄 BookingsList - Réservation mise à jour détectée:', updatedBooking.id);
+      refetch();
+    };
+
+    const handleBookingCreated = (newBooking: Booking) => {
+      console.log('✨ BookingsList - Nouvelle réservation détectée:', newBooking.id);
+      refetch();
+    };
+
+    const handleBookingDeleted = (bookingId: string) => {
+      console.log('🗑️ BookingsList - Réservation supprimée détectée:', bookingId);
+      refetch();
+    };
+
+    // S'abonner aux événements
+    bookingEvents.on('bookingUpdated', handleBookingUpdated);
+    bookingEvents.on('bookingCreated', handleBookingCreated);
+    bookingEvents.on('bookingDeleted', handleBookingDeleted);
+
+    // Nettoyer les listeners au démontage
+    return () => {
+      console.log('🧹 BookingsList - Nettoyage des listeners');
+      bookingEvents.off('bookingUpdated', handleBookingUpdated);
+      bookingEvents.off('bookingCreated', handleBookingCreated);
+      bookingEvents.off('bookingDeleted', handleBookingDeleted);
+    };
+  }, [refetch]);
 
   // Fonction pour calculer le statut de paiement réel basé sur les montants
   const getActualPaymentStatus = (booking: Booking): 'pending' | 'partial' | 'completed' => {
