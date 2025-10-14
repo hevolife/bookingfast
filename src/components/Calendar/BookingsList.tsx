@@ -6,19 +6,18 @@ import { Booking } from '../../types';
 import { LoadingSpinner } from '../UI/LoadingSpinner';
 import { Modal } from '../UI/Modal';
 import { Button } from '../UI/Button';
-import { bookingEvents } from '../../lib/bookingEvents';
 
 interface BookingsListProps {
   onEditBooking?: (booking: Booking) => void;
 }
 
 export function BookingsList({ onEditBooking }: BookingsListProps) {
-  const { bookings, loading, refetch } = useBookings();
+  const { bookings, loading } = useBookings();
   const { services } = useServices();
   const [filteredBookings, setFilteredBookings] = useState<Booking[]>([]);
   const [currentPage, setCurrentPage] = useState(1);
   const [searchTerm, setSearchTerm] = useState('');
-  const [statusFilter, setStatusFilter] = useState<'all' | 'pending' | 'confirmed'>('all');
+  const [statusFilter, setStatusFilter] = useState<'all' | 'pending' | 'confirmed' | 'cancelled'>('all');
   const [paymentFilter, setPaymentFilter] = useState<'all' | 'pending' | 'partial' | 'completed'>('all');
   const [sortBy, setSortBy] = useState<'date' | 'client' | 'service' | 'amount'>('date');
   const [sortOrder, setSortOrder] = useState<'asc' | 'desc'>('desc');
@@ -26,39 +25,6 @@ export function BookingsList({ onEditBooking }: BookingsListProps) {
   const [showDetailsModal, setShowDetailsModal] = useState(false);
 
   const itemsPerPage = 12;
-
-  // 🔥 NOUVEAU : Écouter les événements de modification de réservation
-  useEffect(() => {
-    console.log('📡 BookingsList - Configuration des listeners d\'événements');
-    
-    const handleBookingUpdated = (updatedBooking: Booking) => {
-      console.log('🔄 BookingsList - Réservation mise à jour détectée:', updatedBooking.id);
-      refetch();
-    };
-
-    const handleBookingCreated = (newBooking: Booking) => {
-      console.log('✨ BookingsList - Nouvelle réservation détectée:', newBooking.id);
-      refetch();
-    };
-
-    const handleBookingDeleted = (bookingId: string) => {
-      console.log('🗑️ BookingsList - Réservation supprimée détectée:', bookingId);
-      refetch();
-    };
-
-    // S'abonner aux événements
-    bookingEvents.on('bookingUpdated', handleBookingUpdated);
-    bookingEvents.on('bookingCreated', handleBookingCreated);
-    bookingEvents.on('bookingDeleted', handleBookingDeleted);
-
-    // Nettoyer les listeners au démontage
-    return () => {
-      console.log('🧹 BookingsList - Nettoyage des listeners');
-      bookingEvents.off('bookingUpdated', handleBookingUpdated);
-      bookingEvents.off('bookingCreated', handleBookingCreated);
-      bookingEvents.off('bookingDeleted', handleBookingDeleted);
-    };
-  }, [refetch]);
 
   // Fonction pour calculer le statut de paiement réel basé sur les montants
   const getActualPaymentStatus = (booking: Booking): 'pending' | 'partial' | 'completed' => {
@@ -93,6 +59,8 @@ export function BookingsList({ onEditBooking }: BookingsListProps) {
   };
 
   useEffect(() => {
+    // ✅ CORRECTION: Ne plus filtrer les réservations annulées
+    // Elles doivent apparaître dans la liste pour l'historique
     let filtered = [...bookings];
 
     if (searchTerm) {
@@ -159,6 +127,8 @@ export function BookingsList({ onEditBooking }: BookingsListProps) {
         return 'bg-green-100 text-green-700 border-green-200';
       case 'pending':
         return 'bg-orange-100 text-orange-700 border-orange-200';
+      case 'cancelled':
+        return 'bg-red-100 text-red-700 border-red-200';
       default:
         return 'bg-gray-100 text-gray-700 border-gray-200';
     }
@@ -253,6 +223,7 @@ export function BookingsList({ onEditBooking }: BookingsListProps) {
                 <option value="all">Tous les statuts</option>
                 <option value="pending">En attente</option>
                 <option value="confirmed">Confirmées</option>
+                <option value="cancelled">Annulées</option>
               </select>
             </div>
 
@@ -344,7 +315,9 @@ export function BookingsList({ onEditBooking }: BookingsListProps) {
                     {currentBookings.map((booking, index) => (
                       <tr
                         key={booking.id}
-                        className="hover:bg-gray-50 transition-colors animate-fadeIn"
+                        className={`hover:bg-gray-50 transition-colors animate-fadeIn ${
+                          booking.booking_status === 'cancelled' ? 'opacity-60' : ''
+                        }`}
                         style={{ animationDelay: `${index * 50}ms` }}
                       >
                         <td className="px-6 py-4">
@@ -389,18 +362,22 @@ export function BookingsList({ onEditBooking }: BookingsListProps) {
                               {booking.booking_status === 'confirmed' ? '✅ Confirmée' : 
                                booking.booking_status === 'cancelled' ? '❌ Annulée' : '⏳ En attente'}
                             </span>
-                            <span className={`inline-flex items-center px-3 py-1 rounded-full text-xs font-medium border ${getPaymentStatusColor(booking)}`}>
-                              {getPaymentStatusText(booking)}
-                            </span>
+                            {booking.booking_status !== 'cancelled' && (
+                              <span className={`inline-flex items-center px-3 py-1 rounded-full text-xs font-medium border ${getPaymentStatusColor(booking)}`}>
+                                {getPaymentStatusText(booking)}
+                              </span>
+                            )}
                           </div>
                         </td>
                         
                         <td className="px-6 py-4">
                           <div>
                             <div className="font-bold text-green-600">{booking.total_amount.toFixed(2)}€</div>
-                            <div className="text-sm text-gray-600">
-                              Payé: {(booking.payment_amount || 0).toFixed(2)}€
-                            </div>
+                            {booking.booking_status !== 'cancelled' && (
+                              <div className="text-sm text-gray-600">
+                                Payé: {(booking.payment_amount || 0).toFixed(2)}€
+                              </div>
+                            )}
                           </div>
                         </td>
                         
@@ -413,7 +390,7 @@ export function BookingsList({ onEditBooking }: BookingsListProps) {
                             >
                               <Eye className="w-4 h-4" />
                             </button>
-                            {onEditBooking && (
+                            {onEditBooking && booking.booking_status !== 'cancelled' && (
                               <button
                                 onClick={() => onEditBooking(booking)}
                                 className="p-2 bg-green-500 text-white rounded-lg hover:bg-green-600 transition-colors transform hover:scale-110"
@@ -435,7 +412,9 @@ export function BookingsList({ onEditBooking }: BookingsListProps) {
                 {currentBookings.map((booking, index) => (
                   <div
                     key={booking.id}
-                    className="bg-gradient-to-r from-gray-50 to-blue-50 rounded-xl border border-blue-200 p-4 hover:shadow-md transition-all duration-300 animate-fadeIn"
+                    className={`bg-gradient-to-r from-gray-50 to-blue-50 rounded-xl border border-blue-200 p-4 hover:shadow-md transition-all duration-300 animate-fadeIn ${
+                      booking.booking_status === 'cancelled' ? 'opacity-60' : ''
+                    }`}
                     style={{ animationDelay: `${index * 100}ms` }}
                   >
                     <div className="flex items-center justify-between mb-3">
@@ -459,7 +438,7 @@ export function BookingsList({ onEditBooking }: BookingsListProps) {
                         >
                           <Eye className="w-4 h-4" />
                         </button>
-                        {onEditBooking && (
+                        {onEditBooking && booking.booking_status !== 'cancelled' && (
                           <button
                             onClick={() => onEditBooking(booking)}
                             className="p-2 bg-green-500 text-white rounded-lg hover:bg-green-600 transition-colors mobile-tap-target"
@@ -506,16 +485,20 @@ export function BookingsList({ onEditBooking }: BookingsListProps) {
                           {booking.booking_status === 'confirmed' ? '✅ Confirmée' : 
                            booking.booking_status === 'cancelled' ? '❌ Annulée' : '⏳ En attente'}
                         </span>
-                        <span className={`inline-flex items-center px-2 py-1 rounded-full text-xs font-medium border ${getPaymentStatusColor(booking)}`}>
-                          {getPaymentStatusText(booking)}
-                        </span>
+                        {booking.booking_status !== 'cancelled' && (
+                          <span className={`inline-flex items-center px-2 py-1 rounded-full text-xs font-medium border ${getPaymentStatusColor(booking)}`}>
+                            {getPaymentStatusText(booking)}
+                          </span>
+                        )}
                       </div>
                       
                       <div className="text-right">
                         <div className="font-bold text-green-600 text-sm">{booking.total_amount.toFixed(2)}€</div>
-                        <div className="text-xs text-gray-500">
-                          Payé: {(booking.payment_amount || 0).toFixed(2)}€
-                        </div>
+                        {booking.booking_status !== 'cancelled' && (
+                          <div className="text-xs text-gray-500">
+                            Payé: {(booking.payment_amount || 0).toFixed(2)}€
+                          </div>
+                        )}
                       </div>
                     </div>
                   </div>
@@ -616,9 +599,12 @@ export function BookingsList({ onEditBooking }: BookingsListProps) {
                   <div className={`inline-flex items-center px-3 py-1 rounded-full text-sm font-medium ${
                     selectedBooking.booking_status === 'confirmed' 
                       ? 'bg-green-100 text-green-700' 
+                      : selectedBooking.booking_status === 'cancelled'
+                      ? 'bg-red-100 text-red-700'
                       : 'bg-orange-100 text-orange-700'
                   }`}>
-                    {selectedBooking.booking_status === 'confirmed' ? '✅ Confirmée' : '⏳ En attente'}
+                    {selectedBooking.booking_status === 'confirmed' ? '✅ Confirmée' : 
+                     selectedBooking.booking_status === 'cancelled' ? '❌ Annulée' : '⏳ En attente'}
                   </div>
                 </div>
               </div>
@@ -677,35 +663,37 @@ export function BookingsList({ onEditBooking }: BookingsListProps) {
               </div>
             </div>
 
-            <div className="bg-gradient-to-r from-green-50 to-emerald-50 rounded-xl sm:rounded-2xl p-4 sm:p-6 border border-green-200">
-              <h4 className="font-bold text-green-800 mb-3 sm:mb-4 flex items-center gap-2 text-sm sm:text-base">
-                <Euro className="w-4 h-4 sm:w-5 sm:h-5" />
-                Paiement
-              </h4>
-              
-              <div className="space-y-2 sm:space-y-3 text-xs sm:text-sm">
-                <div className="flex justify-between">
-                  <span className="text-green-700">Montant total</span>
-                  <span className="font-bold text-green-800">{selectedBooking.total_amount.toFixed(2)}€</span>
-                </div>
-                <div className="flex justify-between">
-                  <span className="text-green-700">Montant payé</span>
-                  <span className="font-medium text-green-800">{(selectedBooking.payment_amount || 0).toFixed(2)}€</span>
-                </div>
-                <div className="flex justify-between">
-                  <span className="text-green-700">Restant à payer</span>
-                  <span className="font-bold text-green-800">
-                    {(selectedBooking.total_amount - (selectedBooking.payment_amount || 0)).toFixed(2)}€
-                  </span>
-                </div>
-                <div className="flex justify-between">
-                  <span className="text-green-700">Statut</span>
-                  <span className={`px-2 sm:px-3 py-1 rounded-full text-xs sm:text-sm font-medium ${getPaymentStatusColor(selectedBooking)}`}>
-                    {getPaymentStatusText(selectedBooking)}
-                  </span>
+            {selectedBooking.booking_status !== 'cancelled' && (
+              <div className="bg-gradient-to-r from-green-50 to-emerald-50 rounded-xl sm:rounded-2xl p-4 sm:p-6 border border-green-200">
+                <h4 className="font-bold text-green-800 mb-3 sm:mb-4 flex items-center gap-2 text-sm sm:text-base">
+                  <Euro className="w-4 h-4 sm:w-5 sm:h-5" />
+                  Paiement
+                </h4>
+                
+                <div className="space-y-2 sm:space-y-3 text-xs sm:text-sm">
+                  <div className="flex justify-between">
+                    <span className="text-green-700">Montant total</span>
+                    <span className="font-bold text-green-800">{selectedBooking.total_amount.toFixed(2)}€</span>
+                  </div>
+                  <div className="flex justify-between">
+                    <span className="text-green-700">Montant payé</span>
+                    <span className="font-medium text-green-800">{(selectedBooking.payment_amount || 0).toFixed(2)}€</span>
+                  </div>
+                  <div className="flex justify-between">
+                    <span className="text-green-700">Restant à payer</span>
+                    <span className="font-bold text-green-800">
+                      {(selectedBooking.total_amount - (selectedBooking.payment_amount || 0)).toFixed(2)}€
+                    </span>
+                  </div>
+                  <div className="flex justify-between">
+                    <span className="text-green-700">Statut</span>
+                    <span className={`px-2 sm:px-3 py-1 rounded-full text-xs sm:text-sm font-medium ${getPaymentStatusColor(selectedBooking)}`}>
+                      {getPaymentStatusText(selectedBooking)}
+                    </span>
+                  </div>
                 </div>
               </div>
-            </div>
+            )}
 
             <div className="flex flex-col sm:flex-row gap-3">
               <button

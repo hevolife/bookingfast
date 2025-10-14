@@ -1,6 +1,7 @@
 import React, { useState } from 'react';
-import { X, Clock, User, Mail, Phone, CreditCard, CreditCard as Edit, Trash2, Calendar, Eye, FileText } from 'lucide-react';
+import { X, Clock, User, Mail, Phone, CreditCard, CreditCard as Edit, Trash2, Calendar, Eye, FileText, History } from 'lucide-react';
 import { Booking } from '../../types';
+import { BookingHistoryModal } from './BookingHistoryModal';
 
 interface ServiceBookingModalProps {
   isOpen: boolean;
@@ -28,6 +29,9 @@ export function ServiceBookingModal({
   onNewBooking
 }: ServiceBookingModalProps) {
   const [selectedBookingDetails, setSelectedBookingDetails] = useState<Booking | null>(null);
+  const [showHistory, setShowHistory] = useState(false);
+  const [historyBookingId, setHistoryBookingId] = useState<string | null>(null);
+  const [historyClientName, setHistoryClientName] = useState<string>('');
 
   if (!isOpen) return null;
 
@@ -103,257 +107,284 @@ export function ServiceBookingModal({
     return timeString.slice(0, 5);
   };
 
+  const handleShowHistory = (booking: Booking) => {
+    setHistoryBookingId(booking.id);
+    setHistoryClientName(`${booking.client_firstname} ${booking.client_name}`);
+    setShowHistory(true);
+  };
+
   // Modal de détails de réservation
   if (selectedBookingDetails) {
     const actualPaymentStatus = getActualPaymentStatus(selectedBookingDetails);
     
     return (
-      <div className="fixed inset-0 bg-black/60 backdrop-blur-sm flex items-end sm:items-center justify-center z-50 animate-fadeIn modal-container">
-        <div className="bg-white w-full sm:max-w-3xl max-h-[95vh] sm:max-h-[90vh] overflow-y-auto sm:rounded-3xl shadow-2xl transform animate-slideUp modal-content">
-          {/* Header */}
-          <div className="relative overflow-hidden touch-action-none sticky top-0 z-10 modal-header modal-safe-top">
-            <div className="absolute inset-0 bg-gradient-to-br from-purple-600 via-blue-600 to-cyan-600"></div>
-            <div className="absolute inset-0 bg-gradient-to-r from-transparent via-white/30 to-transparent -skew-x-12 animate-shimmer"></div>
-            <div className="absolute inset-0 opacity-10">
-              <div className="absolute top-0 left-0 w-32 h-32 bg-white rounded-full blur-3xl"></div>
-              <div className="absolute bottom-0 right-0 w-40 h-40 bg-white rounded-full blur-3xl"></div>
-            </div>
-            
-            <div className="relative z-10 p-3 sm:p-6">
-              <div className="flex items-center justify-between">
-                <div className="flex items-center gap-2 sm:gap-4 flex-1 pr-2">
-                  <div className="hidden sm:flex w-10 h-10 sm:w-12 sm:h-12 bg-white/20 backdrop-blur-sm rounded-xl sm:rounded-2xl items-center justify-center shadow-lg">
-                    <Eye className="w-5 h-5 sm:w-6 sm:h-6 text-white" />
+      <>
+        <div className="fixed inset-0 bg-black/60 backdrop-blur-sm flex items-end sm:items-center justify-center z-50 animate-fadeIn modal-container">
+          <div className="bg-white w-full sm:max-w-3xl max-h-[95vh] sm:max-h-[90vh] overflow-y-auto sm:rounded-3xl shadow-2xl transform animate-slideUp modal-content">
+            {/* Header */}
+            <div className="relative overflow-hidden touch-action-none sticky top-0 z-10 modal-header modal-safe-top">
+              <div className="absolute inset-0 bg-gradient-to-br from-purple-600 via-blue-600 to-cyan-600"></div>
+              <div className="absolute inset-0 bg-gradient-to-r from-transparent via-white/30 to-transparent -skew-x-12 animate-shimmer"></div>
+              <div className="absolute inset-0 opacity-10">
+                <div className="absolute top-0 left-0 w-32 h-32 bg-white rounded-full blur-3xl"></div>
+                <div className="absolute bottom-0 right-0 w-40 h-40 bg-white rounded-full blur-3xl"></div>
+              </div>
+              
+              <div className="relative z-10 p-3 sm:p-6">
+                <div className="flex items-center justify-between">
+                  <div className="flex items-center gap-2 sm:gap-4 flex-1 pr-2">
+                    <div className="hidden sm:flex w-10 h-10 sm:w-12 sm:h-12 bg-white/20 backdrop-blur-sm rounded-xl sm:rounded-2xl items-center justify-center shadow-lg">
+                      <Eye className="w-5 h-5 sm:w-6 sm:h-6 text-white" />
+                    </div>
+                    <div className="flex-1">
+                      <h2 className="text-base sm:text-2xl font-bold text-white drop-shadow-lg">
+                        Détails de la réservation
+                      </h2>
+                      <p className="text-xs sm:text-base text-white/80 mt-0.5 sm:mt-1">
+                        {selectedBookingDetails.client_firstname} {selectedBookingDetails.client_name}
+                      </p>
+                    </div>
                   </div>
-                  <div className="flex-1">
-                    <h2 className="text-base sm:text-2xl font-bold text-white drop-shadow-lg">
-                      Détails de la réservation
-                    </h2>
-                    <p className="text-xs sm:text-base text-white/80 mt-0.5 sm:mt-1">
+                  
+                  <button
+                    onClick={() => setSelectedBookingDetails(null)}
+                    className="group relative p-1.5 sm:p-3 text-white hover:bg-white/20 rounded-lg sm:rounded-2xl transition-all duration-300 transform hover:scale-110 hover:rotate-90 mobile-tap-target flex-shrink-0 backdrop-blur-sm"
+                    aria-label="Fermer"
+                  >
+                    <div className="absolute inset-0 bg-white/10 rounded-lg sm:rounded-2xl opacity-0 group-hover:opacity-100 transition-opacity duration-300"></div>
+                    <X className="w-5 h-5 sm:w-6 sm:h-6 relative z-10" />
+                  </button>
+                </div>
+              </div>
+              
+              <div className="absolute bottom-0 left-0 right-0 h-1 bg-gradient-to-r from-transparent via-white/50 to-transparent"></div>
+            </div>
+
+            {/* Contenu */}
+            <div className="p-4 sm:p-6 space-y-4 sm:space-y-6">
+              {/* Bouton Historique */}
+              <button
+                onClick={() => handleShowHistory(selectedBookingDetails)}
+                className="w-full bg-gradient-to-r from-indigo-500 to-purple-500 text-white p-3 sm:p-4 rounded-xl hover:from-indigo-600 hover:to-purple-600 transition-all duration-300 transform hover:scale-[1.02] shadow-lg flex items-center justify-center gap-2 sm:gap-3 font-bold"
+              >
+                <History className="w-5 h-5 sm:w-6 sm:h-6" />
+                <span className="text-sm sm:text-base">Historique de la réservation</span>
+              </button>
+
+              {/* Informations client */}
+              <div className="bg-gradient-to-r from-blue-50 to-purple-50 rounded-xl sm:rounded-2xl p-4 sm:p-6 border border-blue-200">
+                <h3 className="text-base sm:text-lg font-bold text-gray-900 mb-4 flex items-center gap-2">
+                  <User className="w-5 h-5 text-blue-600" />
+                  Informations client
+                </h3>
+                <div className="grid grid-cols-1 sm:grid-cols-2 gap-3 sm:gap-4">
+                  <div>
+                    <div className="text-xs sm:text-sm text-gray-600 mb-1">Nom complet</div>
+                    <div className="font-medium text-gray-900 text-sm sm:text-base">
                       {selectedBookingDetails.client_firstname} {selectedBookingDetails.client_name}
-                    </p>
+                    </div>
+                  </div>
+                  <div>
+                    <div className="text-xs sm:text-sm text-gray-600 mb-1">Email</div>
+                    <div className="font-medium text-gray-900 text-sm sm:text-base break-all">
+                      {selectedBookingDetails.client_email}
+                    </div>
+                  </div>
+                  <div>
+                    <div className="text-xs sm:text-sm text-gray-600 mb-1">Téléphone</div>
+                    <a 
+                      href={`tel:${selectedBookingDetails.client_phone}`}
+                      className="font-medium text-blue-600 hover:text-blue-800 hover:underline transition-colors text-sm sm:text-base"
+                    >
+                      {selectedBookingDetails.client_phone}
+                    </a>
                   </div>
                 </div>
-                
+              </div>
+
+              {/* Informations réservation */}
+              <div className="bg-gradient-to-r from-green-50 to-emerald-50 rounded-xl sm:rounded-2xl p-4 sm:p-6 border border-green-200">
+                <h3 className="text-base sm:text-lg font-bold text-gray-900 mb-4 flex items-center gap-2">
+                  <Calendar className="w-5 h-5 text-green-600" />
+                  Détails de la réservation
+                </h3>
+                <div className="grid grid-cols-1 sm:grid-cols-2 gap-3 sm:gap-4">
+                  <div>
+                    <div className="text-xs sm:text-sm text-gray-600 mb-1">Service</div>
+                    <div className="font-medium text-gray-900 text-sm sm:text-base">
+                      {selectedBookingDetails.custom_service_data?.name || selectedBookingDetails.service?.name || 'Service personnalisé'}
+                    </div>
+                  </div>
+                  <div>
+                    <div className="text-xs sm:text-sm text-gray-600 mb-1">Date</div>
+                    <div className="font-medium text-gray-900 text-sm sm:text-base">
+                      {formatDate(selectedBookingDetails.date)}
+                    </div>
+                  </div>
+                  <div>
+                    <div className="text-xs sm:text-sm text-gray-600 mb-1">Heure</div>
+                    <div className="font-medium text-gray-900 text-sm sm:text-base">
+                      {formatTime(selectedBookingDetails.time)}
+                    </div>
+                  </div>
+                  <div>
+                    <div className="text-xs sm:text-sm text-gray-600 mb-1">Durée</div>
+                    <div className="font-medium text-gray-900 text-sm sm:text-base">
+                      {selectedBookingDetails.duration_minutes} minutes
+                    </div>
+                  </div>
+                  <div>
+                    <div className="text-xs sm:text-sm text-gray-600 mb-1">Quantité</div>
+                    <div className="font-medium text-gray-900 text-sm sm:text-base">
+                      {selectedBookingDetails.quantity} {getPluralUnitName(selectedBookingDetails, selectedBookingDetails.quantity)}
+                    </div>
+                  </div>
+                  <div>
+                    <div className="text-xs sm:text-sm text-gray-600 mb-1">Statut</div>
+                    <div className={`inline-flex px-3 py-1 rounded-full text-xs font-medium border ${
+                      selectedBookingDetails.booking_status === 'confirmed' 
+                        ? 'bg-gradient-to-r from-green-100 to-emerald-100 text-green-700 border-green-200'
+                        : selectedBookingDetails.booking_status === 'cancelled'
+                        ? 'bg-gradient-to-r from-red-100 to-pink-100 text-red-700 border-red-200'
+                        : 'bg-gradient-to-r from-orange-100 to-yellow-100 text-orange-700 border-orange-200'
+                    }`}>
+                      {selectedBookingDetails.booking_status === 'confirmed' ? '✅ Confirmée' : 
+                       selectedBookingDetails.booking_status === 'cancelled' ? '❌ Annulée' : '⏳ En attente'}
+                    </div>
+                  </div>
+                </div>
+              </div>
+
+              {/* Notes internes */}
+              {selectedBookingDetails.notes && (
+                <div className="bg-gradient-to-r from-amber-50 to-yellow-50 rounded-xl sm:rounded-2xl p-4 sm:p-6 border border-amber-200">
+                  <h3 className="text-base sm:text-lg font-bold text-gray-900 mb-3 flex items-center gap-2">
+                    <FileText className="w-5 h-5 text-amber-600" />
+                    Notes internes
+                  </h3>
+                  <div className="bg-white rounded-lg p-3 sm:p-4 border border-amber-100">
+                    <p className="text-sm sm:text-base text-gray-700 whitespace-pre-wrap">
+                      {selectedBookingDetails.notes}
+                    </p>
+                  </div>
+                  <p className="text-xs text-amber-600 mt-2">
+                    📝 Ces notes sont visibles uniquement par vous et votre équipe
+                  </p>
+                </div>
+              )}
+
+              {/* Informations paiement */}
+              <div className="bg-gradient-to-r from-orange-50 to-yellow-50 rounded-xl sm:rounded-2xl p-4 sm:p-6 border border-orange-200">
+                <h3 className="text-base sm:text-lg font-bold text-gray-900 mb-4 flex items-center gap-2">
+                  <CreditCard className="w-5 h-5 text-orange-600" />
+                  Paiement
+                </h3>
+                <div className="space-y-3">
+                  <div className="flex justify-between items-center">
+                    <span className="text-sm sm:text-base text-gray-600">Montant total</span>
+                    <span className="text-base sm:text-lg font-bold text-gray-900">
+                      {selectedBookingDetails.total_amount.toFixed(2)}€
+                    </span>
+                  </div>
+                  <div className="flex justify-between items-center">
+                    <span className="text-sm sm:text-base text-gray-600">Montant payé</span>
+                    <span className="text-base sm:text-lg font-bold text-green-600">
+                      {(selectedBookingDetails.payment_amount || 0).toFixed(2)}€
+                    </span>
+                  </div>
+                  <div className="flex justify-between items-center pt-3 border-t border-orange-200">
+                    <span className="text-sm sm:text-base text-gray-600">Reste à payer</span>
+                    <span className="text-base sm:text-lg font-bold text-red-600">
+                      {(selectedBookingDetails.total_amount - (selectedBookingDetails.payment_amount || 0)).toFixed(2)}€
+                    </span>
+                  </div>
+                  <div className="pt-3 border-t border-orange-200">
+                    <div className="text-xs sm:text-sm text-gray-600 mb-2">Statut du paiement</div>
+                    <div className={`inline-flex px-3 py-1 rounded-full text-xs font-medium border ${getPaymentStatusColor(selectedBookingDetails)}`}>
+                      {getPaymentStatusText(selectedBookingDetails)}
+                    </div>
+                  </div>
+                </div>
+
+                {/* Transactions */}
+                {selectedBookingDetails.transactions && selectedBookingDetails.transactions.length > 0 && (
+                  <div className="mt-4 pt-4 border-t border-orange-200">
+                    <div className="text-sm font-medium text-gray-700 mb-3">Historique des transactions</div>
+                    <div className="space-y-2">
+                      {selectedBookingDetails.transactions.map((transaction, index) => (
+                        <div key={transaction.id || index} className="bg-white rounded-lg p-3 border border-orange-100">
+                          <div className="flex justify-between items-start">
+                            <div className="flex-1">
+                              <div className="flex items-center gap-2 mb-1">
+                                <span className="text-sm font-medium text-gray-900">
+                                  {transaction.amount.toFixed(2)}€
+                                </span>
+                                <span className={`text-xs px-2 py-0.5 rounded-full ${
+                                  transaction.status === 'completed' ? 'bg-green-100 text-green-700' :
+                                  transaction.status === 'pending' ? 'bg-yellow-100 text-yellow-700' :
+                                  'bg-red-100 text-red-700'
+                                }`}>
+                                  {transaction.status === 'completed' ? 'Payé' :
+                                   transaction.status === 'pending' ? 'En attente' : 'Annulé'}
+                                </span>
+                              </div>
+                              <div className="text-xs text-gray-600">
+                                {transaction.method === 'cash' ? '💵 Espèces' :
+                                 transaction.method === 'card' ? '💳 Carte bancaire' :
+                                 transaction.method === 'check' ? '📝 Chèque' :
+                                 transaction.method === 'transfer' ? '🏦 Virement' :
+                                 '🔗 Stripe'}
+                              </div>
+                              {transaction.note && (
+                                <div className="text-xs text-gray-500 mt-1 line-clamp-2">
+                                  {transaction.note}
+                                </div>
+                              )}
+                            </div>
+                            <div className="text-xs text-gray-500">
+                              {new Date(transaction.created_at).toLocaleDateString('fr-FR')}
+                            </div>
+                          </div>
+                        </div>
+                      ))}
+                    </div>
+                  </div>
+                )}
+              </div>
+
+              {/* Actions */}
+              <div className="flex flex-col sm:flex-row gap-3">
                 <button
                   onClick={() => setSelectedBookingDetails(null)}
-                  className="group relative p-1.5 sm:p-3 text-white hover:bg-white/20 rounded-lg sm:rounded-2xl transition-all duration-300 transform hover:scale-110 hover:rotate-90 mobile-tap-target flex-shrink-0 backdrop-blur-sm"
-                  aria-label="Fermer"
+                  className="w-full sm:w-auto sm:min-w-[120px] bg-gray-500 text-white px-6 py-3 rounded-xl hover:bg-gray-600 transition-colors font-medium text-sm sm:text-base"
                 >
-                  <div className="absolute inset-0 bg-white/10 rounded-lg sm:rounded-2xl opacity-0 group-hover:opacity-100 transition-opacity duration-300"></div>
-                  <X className="w-5 h-5 sm:w-6 sm:h-6 relative z-10" />
+                  Fermer
+                </button>
+                <button
+                  onClick={() => {
+                    onEditBooking(selectedBookingDetails);
+                    setSelectedBookingDetails(null);
+                  }}
+                  className="w-full sm:flex-1 bg-gradient-to-r from-blue-600 to-purple-600 text-white px-6 py-3 rounded-xl hover:from-blue-700 hover:to-purple-700 transition-all duration-300 font-medium flex items-center justify-center gap-2 text-sm sm:text-base"
+                >
+                  <Edit className="w-4 h-4 sm:w-5 sm:h-5" />
+                  Modifier
                 </button>
               </div>
             </div>
-            
-            <div className="absolute bottom-0 left-0 right-0 h-1 bg-gradient-to-r from-transparent via-white/50 to-transparent"></div>
-          </div>
-
-          {/* Contenu */}
-          <div className="p-4 sm:p-6 space-y-4 sm:space-y-6">
-            {/* Informations client */}
-            <div className="bg-gradient-to-r from-blue-50 to-purple-50 rounded-xl sm:rounded-2xl p-4 sm:p-6 border border-blue-200">
-              <h3 className="text-base sm:text-lg font-bold text-gray-900 mb-4 flex items-center gap-2">
-                <User className="w-5 h-5 text-blue-600" />
-                Informations client
-              </h3>
-              <div className="grid grid-cols-1 sm:grid-cols-2 gap-3 sm:gap-4">
-                <div>
-                  <div className="text-xs sm:text-sm text-gray-600 mb-1">Nom complet</div>
-                  <div className="font-medium text-gray-900 text-sm sm:text-base">
-                    {selectedBookingDetails.client_firstname} {selectedBookingDetails.client_name}
-                  </div>
-                </div>
-                <div>
-                  <div className="text-xs sm:text-sm text-gray-600 mb-1">Email</div>
-                  <div className="font-medium text-gray-900 text-sm sm:text-base break-all">
-                    {selectedBookingDetails.client_email}
-                  </div>
-                </div>
-                <div>
-                  <div className="text-xs sm:text-sm text-gray-600 mb-1">Téléphone</div>
-                  <a 
-                    href={`tel:${selectedBookingDetails.client_phone}`}
-                    className="font-medium text-blue-600 hover:text-blue-800 hover:underline transition-colors text-sm sm:text-base"
-                  >
-                    {selectedBookingDetails.client_phone}
-                  </a>
-                </div>
-              </div>
-            </div>
-
-            {/* Informations réservation */}
-            <div className="bg-gradient-to-r from-green-50 to-emerald-50 rounded-xl sm:rounded-2xl p-4 sm:p-6 border border-green-200">
-              <h3 className="text-base sm:text-lg font-bold text-gray-900 mb-4 flex items-center gap-2">
-                <Calendar className="w-5 h-5 text-green-600" />
-                Détails de la réservation
-              </h3>
-              <div className="grid grid-cols-1 sm:grid-cols-2 gap-3 sm:gap-4">
-                <div>
-                  <div className="text-xs sm:text-sm text-gray-600 mb-1">Service</div>
-                  <div className="font-medium text-gray-900 text-sm sm:text-base">
-                    {selectedBookingDetails.custom_service_data?.name || selectedBookingDetails.service?.name || 'Service personnalisé'}
-                  </div>
-                </div>
-                <div>
-                  <div className="text-xs sm:text-sm text-gray-600 mb-1">Date</div>
-                  <div className="font-medium text-gray-900 text-sm sm:text-base">
-                    {formatDate(selectedBookingDetails.date)}
-                  </div>
-                </div>
-                <div>
-                  <div className="text-xs sm:text-sm text-gray-600 mb-1">Heure</div>
-                  <div className="font-medium text-gray-900 text-sm sm:text-base">
-                    {formatTime(selectedBookingDetails.time)}
-                  </div>
-                </div>
-                <div>
-                  <div className="text-xs sm:text-sm text-gray-600 mb-1">Durée</div>
-                  <div className="font-medium text-gray-900 text-sm sm:text-base">
-                    {selectedBookingDetails.duration_minutes} minutes
-                  </div>
-                </div>
-                <div>
-                  <div className="text-xs sm:text-sm text-gray-600 mb-1">Quantité</div>
-                  <div className="font-medium text-gray-900 text-sm sm:text-base">
-                    {selectedBookingDetails.quantity} {getPluralUnitName(selectedBookingDetails, selectedBookingDetails.quantity)}
-                  </div>
-                </div>
-                <div>
-                  <div className="text-xs sm:text-sm text-gray-600 mb-1">Statut</div>
-                  <div className={`inline-flex px-3 py-1 rounded-full text-xs font-medium border ${
-                    selectedBookingDetails.booking_status === 'confirmed' 
-                      ? 'bg-gradient-to-r from-green-100 to-emerald-100 text-green-700 border-green-200'
-                      : selectedBookingDetails.booking_status === 'cancelled'
-                      ? 'bg-gradient-to-r from-red-100 to-pink-100 text-red-700 border-red-200'
-                      : 'bg-gradient-to-r from-orange-100 to-yellow-100 text-orange-700 border-orange-200'
-                  }`}>
-                    {selectedBookingDetails.booking_status === 'confirmed' ? '✅ Confirmée' : 
-                     selectedBookingDetails.booking_status === 'cancelled' ? '❌ Annulée' : '⏳ En attente'}
-                  </div>
-                </div>
-              </div>
-            </div>
-
-            {/* Notes internes */}
-            {selectedBookingDetails.notes && (
-              <div className="bg-gradient-to-r from-amber-50 to-yellow-50 rounded-xl sm:rounded-2xl p-4 sm:p-6 border border-amber-200">
-                <h3 className="text-base sm:text-lg font-bold text-gray-900 mb-3 flex items-center gap-2">
-                  <FileText className="w-5 h-5 text-amber-600" />
-                  Notes internes
-                </h3>
-                <div className="bg-white rounded-lg p-3 sm:p-4 border border-amber-100">
-                  <p className="text-sm sm:text-base text-gray-700 whitespace-pre-wrap">
-                    {selectedBookingDetails.notes}
-                  </p>
-                </div>
-                <p className="text-xs text-amber-600 mt-2">
-                  📝 Ces notes sont visibles uniquement par vous et votre équipe
-                </p>
-              </div>
-            )}
-
-            {/* Informations paiement */}
-            <div className="bg-gradient-to-r from-orange-50 to-yellow-50 rounded-xl sm:rounded-2xl p-4 sm:p-6 border border-orange-200">
-              <h3 className="text-base sm:text-lg font-bold text-gray-900 mb-4 flex items-center gap-2">
-                <CreditCard className="w-5 h-5 text-orange-600" />
-                Paiement
-              </h3>
-              <div className="space-y-3">
-                <div className="flex justify-between items-center">
-                  <span className="text-sm sm:text-base text-gray-600">Montant total</span>
-                  <span className="text-base sm:text-lg font-bold text-gray-900">
-                    {selectedBookingDetails.total_amount.toFixed(2)}€
-                  </span>
-                </div>
-                <div className="flex justify-between items-center">
-                  <span className="text-sm sm:text-base text-gray-600">Montant payé</span>
-                  <span className="text-base sm:text-lg font-bold text-green-600">
-                    {(selectedBookingDetails.payment_amount || 0).toFixed(2)}€
-                  </span>
-                </div>
-                <div className="flex justify-between items-center pt-3 border-t border-orange-200">
-                  <span className="text-sm sm:text-base text-gray-600">Reste à payer</span>
-                  <span className="text-base sm:text-lg font-bold text-red-600">
-                    {(selectedBookingDetails.total_amount - (selectedBookingDetails.payment_amount || 0)).toFixed(2)}€
-                  </span>
-                </div>
-                <div className="pt-3 border-t border-orange-200">
-                  <div className="text-xs sm:text-sm text-gray-600 mb-2">Statut du paiement</div>
-                  <div className={`inline-flex px-3 py-1 rounded-full text-xs font-medium border ${getPaymentStatusColor(selectedBookingDetails)}`}>
-                    {getPaymentStatusText(selectedBookingDetails)}
-                  </div>
-                </div>
-              </div>
-
-              {/* Transactions */}
-              {selectedBookingDetails.transactions && selectedBookingDetails.transactions.length > 0 && (
-                <div className="mt-4 pt-4 border-t border-orange-200">
-                  <div className="text-sm font-medium text-gray-700 mb-3">Historique des transactions</div>
-                  <div className="space-y-2">
-                    {selectedBookingDetails.transactions.map((transaction, index) => (
-                      <div key={transaction.id || index} className="bg-white rounded-lg p-3 border border-orange-100">
-                        <div className="flex justify-between items-start">
-                          <div className="flex-1">
-                            <div className="flex items-center gap-2 mb-1">
-                              <span className="text-sm font-medium text-gray-900">
-                                {transaction.amount.toFixed(2)}€
-                              </span>
-                              <span className={`text-xs px-2 py-0.5 rounded-full ${
-                                transaction.status === 'completed' ? 'bg-green-100 text-green-700' :
-                                transaction.status === 'pending' ? 'bg-yellow-100 text-yellow-700' :
-                                'bg-red-100 text-red-700'
-                              }`}>
-                                {transaction.status === 'completed' ? 'Payé' :
-                                 transaction.status === 'pending' ? 'En attente' : 'Annulé'}
-                              </span>
-                            </div>
-                            <div className="text-xs text-gray-600">
-                              {transaction.method === 'cash' ? '💵 Espèces' :
-                               transaction.method === 'card' ? '💳 Carte bancaire' :
-                               transaction.method === 'check' ? '📝 Chèque' :
-                               transaction.method === 'transfer' ? '🏦 Virement' :
-                               '🔗 Stripe'}
-                            </div>
-                            {transaction.note && (
-                              <div className="text-xs text-gray-500 mt-1 line-clamp-2">
-                                {transaction.note}
-                              </div>
-                            )}
-                          </div>
-                          <div className="text-xs text-gray-500">
-                            {new Date(transaction.created_at).toLocaleDateString('fr-FR')}
-                          </div>
-                        </div>
-                      </div>
-                    ))}
-                  </div>
-                </div>
-              )}
-            </div>
-
-            {/* Actions */}
-            <div className="flex flex-col sm:flex-row gap-3">
-              <button
-                onClick={() => setSelectedBookingDetails(null)}
-                className="w-full sm:w-auto sm:min-w-[120px] bg-gray-500 text-white px-6 py-3 rounded-xl hover:bg-gray-600 transition-colors font-medium text-sm sm:text-base"
-              >
-                Fermer
-              </button>
-              <button
-                onClick={() => {
-                  onEditBooking(selectedBookingDetails);
-                  setSelectedBookingDetails(null);
-                }}
-                className="w-full sm:flex-1 bg-gradient-to-r from-blue-600 to-purple-600 text-white px-6 py-3 rounded-xl hover:from-blue-700 hover:to-purple-700 transition-all duration-300 font-medium flex items-center justify-center gap-2 text-sm sm:text-base"
-              >
-                <Edit className="w-4 h-4 sm:w-5 sm:h-5" />
-                Modifier
-              </button>
-            </div>
           </div>
         </div>
-      </div>
+
+        {/* Modal Historique */}
+        {showHistory && historyBookingId && (
+          <BookingHistoryModal
+            isOpen={showHistory}
+            onClose={() => setShowHistory(false)}
+            bookingId={historyBookingId}
+            clientName={historyClientName}
+          />
+        )}
+      </>
     );
   }
 

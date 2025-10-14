@@ -98,9 +98,12 @@ export function DashboardPage() {
     startOfWeek.setDate(now.getDate() - now.getDay() + 1);
     const startOfMonth = new Date(now.getFullYear(), now.getMonth(), 1);
 
-    const todayBookings = bookings.filter(b => b.date === today);
-    const weekBookings = bookings.filter(b => new Date(b.date) >= startOfWeek);
-    const monthBookings = bookings.filter(b => new Date(b.date) >= startOfMonth);
+    // Filtrer les réservations actives (non annulées)
+    const activeBookings = bookings.filter(b => b.booking_status !== 'cancelled');
+
+    const todayBookings = activeBookings.filter(b => b.date === today);
+    const weekBookings = activeBookings.filter(b => new Date(b.date) >= startOfWeek);
+    const monthBookings = activeBookings.filter(b => new Date(b.date) >= startOfMonth);
 
     const todayRevenue = todayBookings.reduce((sum, b) => sum + b.total_amount, 0);
     const weekRevenue = weekBookings.reduce((sum, b) => sum + b.total_amount, 0);
@@ -111,11 +114,11 @@ export function DashboardPage() {
     const todayEnd = new Date(now);
     todayEnd.setHours(23, 59, 59, 999);
     
-    const upcomingBookings = bookings
+    const upcomingBookings = activeBookings
       .filter(b => {
         const bookingDate = new Date(b.date);
         const bookingDateTime = new Date(`${b.date}T${b.time}`);
-        return bookingDateTime >= now && bookingDate <= tomorrow && b.booking_status !== 'cancelled';
+        return bookingDateTime >= now && bookingDate <= tomorrow;
       })
       .sort((a, b) => {
         if (a.date !== b.date) return a.date.localeCompare(b.date);
@@ -123,13 +126,22 @@ export function DashboardPage() {
       })
       .slice(0, 5);
 
-    const pendingPayments = bookings
-      .filter(b => (b.payment_status === 'pending' || (b.payment_amount || 0) < b.total_amount) && b.booking_status !== 'cancelled')
+    // ✅ CORRECTION: Calculer le montant restant et vérifier qu'il est > 0
+    const pendingPayments = activeBookings
+      .filter(b => {
+        const remaining = b.total_amount - (b.payment_amount || 0);
+        // Ne garder que les réservations avec un montant restant > 0
+        return remaining > 0.01; // Utiliser 0.01 pour éviter les problèmes d'arrondi
+      })
       .sort((a, b) => a.date.localeCompare(b.date))
       .slice(0, 5);
 
-    const completedPayments = bookings
-      .filter(b => b.payment_status === 'completed' && b.booking_status !== 'cancelled')
+    // ✅ CORRECTION: Les paiements complétés sont ceux où le montant restant est <= 0
+    const completedPayments = activeBookings
+      .filter(b => {
+        const remaining = b.total_amount - (b.payment_amount || 0);
+        return remaining <= 0.01; // Considérer comme payé si restant <= 0.01€
+      })
       .sort((a, b) => new Date(b.updated_at).getTime() - new Date(a.updated_at).getTime())
       .slice(0, 5);
 
@@ -594,26 +606,29 @@ export function DashboardPage() {
                 </div>
 
                 <div className="space-y-3">
-                  {stats.pendingPayments.slice(0, 3).map((booking) => (
-                    <div key={booking.id} className="flex items-center gap-2 sm:gap-3 p-3 bg-orange-50 rounded-xl border border-orange-200">
-                      <div className="w-6 h-6 sm:w-8 sm:h-8 bg-orange-500 rounded-lg flex items-center justify-center text-white font-bold text-xs">
-                        {booking.client_firstname.charAt(0)}
-                      </div>
-                      <div className="flex-1">
-                        <div className="font-medium text-gray-900 text-xs sm:text-sm">
-                          {booking.client_firstname} {booking.client_name}
+                  {stats.pendingPayments.slice(0, 3).map((booking) => {
+                    const remaining = booking.total_amount - (booking.payment_amount || 0);
+                    return (
+                      <div key={booking.id} className="flex items-center gap-2 sm:gap-3 p-3 bg-orange-50 rounded-xl border border-orange-200">
+                        <div className="w-6 h-6 sm:w-8 sm:h-8 bg-orange-500 rounded-lg flex items-center justify-center text-white font-bold text-xs">
+                          {booking.client_firstname.charAt(0)}
                         </div>
-                        <div className="text-xs text-gray-500">
-                          {formatDate(booking.date)} • {(booking.total_amount - (booking.payment_amount || 0)).toFixed(2)}€
+                        <div className="flex-1">
+                          <div className="font-medium text-gray-900 text-xs sm:text-sm">
+                            {booking.client_firstname} {booking.client_name}
+                          </div>
+                          <div className="text-xs text-gray-500">
+                            {formatDate(booking.date)} • {remaining.toFixed(2)}€
+                          </div>
                         </div>
+                        <PermissionGate permission="create_payment_link" showMessage={false}>
+                          <button className="p-2 bg-orange-500 text-white rounded-lg hover:bg-orange-600 transition-colors mobile-tap-target">
+                            <Mail className="w-3 h-3 sm:w-4 sm:h-4" />
+                          </button>
+                        </PermissionGate>
                       </div>
-                      <PermissionGate permission="create_payment_link" showMessage={false}>
-                        <button className="p-2 bg-orange-500 text-white rounded-lg hover:bg-orange-600 transition-colors mobile-tap-target">
-                          <Mail className="w-3 h-3 sm:w-4 sm:h-4" />
-                        </button>
-                      </PermissionGate>
-                    </div>
-                  ))}
+                    );
+                  })}
                 </div>
               </div>
             </PermissionGate>
@@ -789,14 +804,14 @@ export function DashboardPage() {
                 <div className="flex justify-between">
                   <span className="text-green-700">Statut</span>
                   <span className={`px-2 sm:px-3 py-1 rounded-full text-xs sm:text-sm font-medium ${
-                    selectedBooking.payment_status === 'completed' 
+                    (selectedBooking.total_amount - (selectedBooking.payment_amount || 0)) <= 0.01
                       ? 'bg-green-100 text-green-700'
-                      : selectedBooking.payment_status === 'partial'
+                      : (selectedBooking.payment_amount || 0) > 0
                       ? 'bg-orange-100 text-orange-700'
                       : 'bg-red-100 text-red-700'
                   }`}>
-                    {selectedBooking.payment_status === 'completed' ? '✅ Payé' :
-                     selectedBooking.payment_status === 'partial' ? '💵 Partiellement' : '❌ Non payé'}
+                    {(selectedBooking.total_amount - (selectedBooking.payment_amount || 0)) <= 0.01 ? '✅ Payé' :
+                     (selectedBooking.payment_amount || 0) > 0 ? '💵 Partiellement' : '❌ Non payé'}
                   </span>
                 </div>
               </div>

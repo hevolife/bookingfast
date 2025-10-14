@@ -62,6 +62,8 @@ export function useBookings() {
         console.warn('⚠️ Erreur vérification équipe:', teamError);
       }
 
+      // ✅ CORRECTION: Ne plus filtrer les réservations annulées ici
+      // Chaque composant décidera s'il veut les afficher ou non
       console.log('🔍 fetchBookings - Requête bookings pour user_id:', targetUserId);
       const { data, error } = await supabase!
         .from('bookings')
@@ -78,7 +80,7 @@ export function useBookings() {
         throw error;
       }
 
-      console.log('✅ Bookings chargés:', data?.length || 0, 'réservations');
+      console.log('✅ Bookings chargés:', data?.length || 0, 'réservations (incluant annulées)');
       setBookings(data || []);
     } catch (err) {
       console.error('❌ Erreur lors du chargement des réservations:', err);
@@ -89,7 +91,7 @@ export function useBookings() {
       setLoading(false);
       fetchingRef.current = false;
     }
-  }, [user?.id]); // ✅ Seulement user.id comme dépendance
+  }, [user?.id]);
 
   const addBooking = async (bookingData: Omit<Booking, 'id' | 'created_at' | 'user_id'>) => {
     if (!isSupabaseConfigured || !user) {
@@ -268,7 +270,7 @@ export function useBookings() {
       setBookings([]);
       setLoading(false);
     }
-  }, [user?.id, fetchBookings]); // ✅ Dépendances stables
+  }, [user?.id, fetchBookings]);
 
   return {
     bookings,
