@@ -1,4 +1,5 @@
 import React, { useState, useEffect, lazy, Suspense } from 'react';
+import { Routes, Route, Navigate, useLocation, useNavigate } from 'react-router-dom';
 import { TeamProvider } from './contexts/TeamContext';
 import { Navbar } from './components/Layout/Navbar';
 import { LoadingSpinner } from './components/UI/LoadingSpinner';
@@ -17,10 +18,9 @@ const MultiUserSettingsPage = lazy(() => import('./components/MultiUser/MultiUse
 const POSPage = lazy(() => import('./components/POS/POSPage').then(m => ({ default: m.POSPage })));
 const PluginsPage = lazy(() => import('./components/Plugins/PluginsPage').then(m => ({ default: m.PluginsPage })));
 
-type PageType = 'dashboard' | 'calendar' | 'bookings-list' | 'clients' | 'services' | 'emails' | 'admin' | 'reports' | 'multi-user' | 'pos' | 'plugins';
-
 function App() {
-  const [currentPage, setCurrentPage] = useState<PageType>('dashboard');
+  const location = useLocation();
+  const navigate = useNavigate();
   const [isOAuthCallback, setIsOAuthCallback] = useState(false);
 
   // Détecter le callback OAuth Google Calendar
@@ -37,34 +37,28 @@ function App() {
     }
   }, []);
 
-  const renderPage = () => {
-    const pageComponents: Record<PageType, React.ReactNode> = {
-      dashboard: <DashboardPage />,
-      calendar: <CalendarPage />,
-      'bookings-list': <CalendarPage view="list" />,
-      clients: <ClientsPage />,
-      services: <ServicesPage />,
-      emails: <EmailWorkflowPage />,
-      admin: <AdminPage />,
-      reports: (
-        <PluginGuard pluginSlug="reports">
-          <ReportsPage />
-        </PluginGuard>
-      ),
-      'multi-user': (
-        <PluginGuard pluginSlug="multi-user">
-          <MultiUserSettingsPage />
-        </PluginGuard>
-      ),
-      pos: (
-        <PluginGuard pluginSlug="pos">
-          <POSPage />
-        </PluginGuard>
-      ),
-      plugins: <PluginsPage />
-    };
+  // Déterminer la page actuelle depuis l'URL
+  const getCurrentPage = () => {
+    const path = location.pathname;
+    if (path === '/dashboard' || path === '/') return 'dashboard';
+    if (path === '/calendar') return 'calendar';
+    if (path === '/bookings-list') return 'bookings-list';
+    if (path === '/clients') return 'clients';
+    if (path === '/services') return 'services';
+    if (path === '/emails') return 'emails';
+    if (path === '/admin') return 'admin';
+    if (path === '/reports') return 'reports';
+    if (path === '/multi-user') return 'multi-user';
+    if (path === '/pos') return 'pos';
+    if (path === '/plugins') return 'plugins';
+    return 'dashboard';
+  };
 
-    return pageComponents[currentPage] || <DashboardPage />;
+  const currentPage = getCurrentPage();
+
+  const handlePageChange = (page: string) => {
+    // Naviguer vers la nouvelle page
+    navigate(`/${page === 'dashboard' ? 'dashboard' : page}`);
   };
 
   // Si c'est un callback OAuth, afficher le composant de callback
@@ -83,7 +77,7 @@ function App() {
   return (
     <TeamProvider>
       <div className="app-container flex flex-col h-screen overflow-hidden bg-gradient-to-br from-blue-50 via-purple-50 to-pink-50">
-        <Navbar currentPage={currentPage} onPageChange={setCurrentPage} />
+        <Navbar currentPage={currentPage} onPageChange={handlePageChange} />
         <main 
           className="flex-1 overflow-y-auto scrollable-area"
           style={{ 
@@ -93,7 +87,43 @@ function App() {
           }}
         >
           <Suspense fallback={<LoadingSpinner />}>
-            {renderPage()}
+            <Routes>
+              <Route path="/" element={<Navigate to="/dashboard" replace />} />
+              <Route path="/dashboard" element={<DashboardPage />} />
+              <Route path="/calendar" element={<CalendarPage />} />
+              <Route path="/bookings-list" element={<CalendarPage view="list" />} />
+              <Route path="/clients" element={<ClientsPage />} />
+              <Route path="/services" element={<ServicesPage />} />
+              <Route path="/emails" element={<EmailWorkflowPage />} />
+              <Route path="/admin" element={<AdminPage />} />
+              <Route 
+                path="/reports" 
+                element={
+                  <PluginGuard pluginSlug="reports">
+                    <ReportsPage />
+                  </PluginGuard>
+                } 
+              />
+              <Route 
+                path="/multi-user" 
+                element={
+                  <PluginGuard pluginSlug="multi-user">
+                    <MultiUserSettingsPage />
+                  </PluginGuard>
+                } 
+              />
+              <Route 
+                path="/pos" 
+                element={
+                  <PluginGuard pluginSlug="pos">
+                    <POSPage />
+                  </PluginGuard>
+                } 
+              />
+              <Route path="/plugins" element={<PluginsPage />} />
+              <Route path="/auth/google/callback" element={<GoogleCalendarCallback />} />
+              <Route path="*" element={<Navigate to="/dashboard" replace />} />
+            </Routes>
           </Suspense>
         </main>
       </div>

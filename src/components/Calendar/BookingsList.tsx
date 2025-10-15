@@ -1,12 +1,11 @@
 import React, { useState, useEffect } from 'react';
-import { Calendar, Clock, User, Mail, Phone, Euro, Search, Filter, ChevronLeft, ChevronRight, CreditCard as Edit, Eye, Package, CreditCard, AlertCircle, CheckCircle, ArrowUpDown, History } from 'lucide-react';
+import { Calendar, Clock, User, Mail, Phone, Euro, Search, Filter, ChevronLeft, ChevronRight, CreditCard as Edit, Eye, Package, CreditCard, AlertCircle, CheckCircle, ArrowUpDown } from 'lucide-react';
 import { useBookings } from '../../hooks/useBookings';
 import { useServices } from '../../hooks/useServices';
 import { Booking } from '../../types';
 import { LoadingSpinner } from '../UI/LoadingSpinner';
 import { Modal } from '../UI/Modal';
 import { Button } from '../UI/Button';
-import { BookingHistoryModal } from './BookingHistoryModal';
 
 interface BookingsListProps {
   onEditBooking?: (booking: Booking) => void;
@@ -24,7 +23,6 @@ export function BookingsList({ onEditBooking }: BookingsListProps) {
   const [sortOrder, setSortOrder] = useState<'asc' | 'desc'>('desc');
   const [selectedBooking, setSelectedBooking] = useState<Booking | null>(null);
   const [showDetailsModal, setShowDetailsModal] = useState(false);
-  const [showHistoryModal, setShowHistoryModal] = useState(false);
 
   const itemsPerPage = 12;
 
@@ -179,13 +177,6 @@ export function BookingsList({ onEditBooking }: BookingsListProps) {
   const handleViewDetails = (booking: Booking) => {
     setSelectedBooking(booking);
     setShowDetailsModal(true);
-  };
-
-  const handleViewHistory = () => {
-    if (selectedBooking) {
-      setShowDetailsModal(false);
-      setShowHistoryModal(true);
-    }
   };
 
   if (loading) {
@@ -704,47 +695,24 @@ export function BookingsList({ onEditBooking }: BookingsListProps) {
               </div>
             )}
 
-            <div className="flex flex-col gap-3">
+            <div className="flex flex-col sm:flex-row gap-3">
               <button
-                onClick={handleViewHistory}
-                className="w-full bg-gradient-to-r from-indigo-500 to-purple-500 text-white px-4 sm:px-6 py-3 rounded-xl sm:rounded-2xl hover:from-indigo-600 hover:to-purple-600 transition-all duration-300 transform hover:scale-105 shadow-lg font-medium flex items-center justify-center gap-2 text-sm sm:text-base"
+                onClick={() => window.open(`tel:${selectedBooking.client_phone}`, '_self')}
+                className="flex-1 bg-gradient-to-r from-green-500 to-emerald-500 text-white px-4 sm:px-6 py-3 rounded-xl sm:rounded-2xl hover:from-green-600 hover:to-emerald-600 transition-all duration-300 transform hover:scale-105 shadow-lg font-medium flex items-center justify-center gap-2 text-sm sm:text-base"
               >
-                <History className="w-4 h-4 sm:w-5 sm:h-5" />
-                Voir l'historique
+                <Phone className="w-4 h-4 sm:w-5 sm:h-5" />
+                Appeler le client
               </button>
-
-              <div className="grid grid-cols-2 gap-3">
-                <button
-                  onClick={() => window.open(`tel:${selectedBooking.client_phone}`, '_self')}
-                  className="bg-gradient-to-r from-green-500 to-emerald-500 text-white px-4 sm:px-6 py-3 rounded-xl sm:rounded-2xl hover:from-green-600 hover:to-emerald-600 transition-all duration-300 transform hover:scale-105 shadow-lg font-medium flex items-center justify-center gap-2 text-sm sm:text-base"
-                >
-                  <Phone className="w-4 h-4 sm:w-5 sm:h-5" />
-                  Appeler
-                </button>
-                <button
-                  onClick={() => window.open(`mailto:${selectedBooking.client_email}`, '_blank')}
-                  className="bg-gradient-to-r from-blue-500 to-cyan-500 text-white px-4 sm:px-6 py-3 rounded-xl sm:rounded-2xl hover:from-blue-600 hover:to-cyan-600 transition-all duration-300 transform hover:scale-105 shadow-lg font-medium flex items-center justify-center gap-2 text-sm sm:text-base"
-                >
-                  <Mail className="w-4 h-4 sm:w-5 sm:h-5" />
-                  Email
-                </button>
-              </div>
+              <button
+                onClick={() => window.open(`mailto:${selectedBooking.client_email}`, '_blank')}
+                className="flex-1 bg-gradient-to-r from-blue-500 to-cyan-500 text-white px-4 sm:px-6 py-3 rounded-xl sm:rounded-2xl hover:from-blue-600 hover:to-cyan-600 transition-all duration-300 transform hover:scale-105 shadow-lg font-medium flex items-center justify-center gap-2 text-sm sm:text-base"
+              >
+                <Mail className="w-4 h-4 sm:w-5 sm:h-5" />
+                Envoyer un email
+              </button>
             </div>
           </div>
         </Modal>
-      )}
-
-      {/* Modal d'historique */}
-      {showHistoryModal && selectedBooking && (
-        <BookingHistoryModal
-          isOpen={showHistoryModal}
-          onClose={() => {
-            setShowHistoryModal(false);
-            setShowDetailsModal(true);
-          }}
-          bookingId={selectedBooking.id}
-          clientName={`${selectedBooking.client_firstname} ${selectedBooking.client_name}`}
-        />
       )}
     </>
   );
