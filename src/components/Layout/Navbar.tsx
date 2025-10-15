@@ -1,5 +1,4 @@
 import React, { useState, useEffect } from 'react';
-import { Link, useLocation } from 'react-router-dom';
 import { Calendar, Settings, LayoutDashboard, Package, Mail, BarChart3, Users, ShoppingCart, LogOut, Menu, X, ChevronDown, ChevronRight, Puzzle, List, UserCircle } from 'lucide-react';
 import { useAuth } from '../../contexts/AuthContext';
 import { usePlugins } from '../../hooks/usePlugins';
@@ -12,7 +11,6 @@ interface NavbarProps {
 export function Navbar({ currentPage, onPageChange }: NavbarProps) {
   const { signOut } = useAuth();
   const { userPlugins, loading } = usePlugins();
-  const location = useLocation();
   const [mobileMenuOpen, setMobileMenuOpen] = useState(false);
   const [pluginsMenuOpen, setPluginsMenuOpen] = useState(false);
   const [calendarMenuOpen, setCalendarMenuOpen] = useState(false);
@@ -27,20 +25,20 @@ export function Navbar({ currentPage, onPageChange }: NavbarProps) {
   const hasPOSAccess = userPlugins.some(p => p.plugin_slug === 'pos');
 
   const calendarSubItems = [
-    { id: 'calendar', label: 'Planning', icon: Calendar, gradient: 'from-blue-500 to-cyan-500', path: '/calendar' },
-    { id: 'bookings-list', label: 'Liste de réservations', icon: List, gradient: 'from-indigo-500 to-purple-500', path: '/bookings-list' },
-    { id: 'clients', label: 'Clients', icon: UserCircle, gradient: 'from-pink-500 to-rose-500', path: '/clients' }
+    { id: 'calendar', label: 'Planning', icon: Calendar, gradient: 'from-blue-500 to-cyan-500' },
+    { id: 'bookings-list', label: 'Liste de réservations', icon: List, gradient: 'from-indigo-500 to-purple-500' },
+    { id: 'clients', label: 'Clients', icon: UserCircle, gradient: 'from-pink-500 to-rose-500' }
   ];
 
   const pluginNavItems = [
-    ...(hasReportsAccess ? [{ id: 'reports', label: 'Rapports', icon: BarChart3, gradient: 'from-indigo-500 to-purple-500', path: '/reports' }] : []),
-    ...(hasMultiUserAccess ? [{ id: 'multi-user', label: 'Multi-Utilisateurs', icon: Users, gradient: 'from-pink-500 to-rose-500', path: '/multi-user' }] : []),
-    ...(hasPOSAccess ? [{ id: 'pos', label: 'POS', icon: ShoppingCart, gradient: 'from-cyan-500 to-blue-500', path: '/pos' }] : [])
+    ...(hasReportsAccess ? [{ id: 'reports', label: 'Rapports', icon: BarChart3, gradient: 'from-indigo-500 to-purple-500' }] : []),
+    ...(hasMultiUserAccess ? [{ id: 'multi-user', label: 'Multi-Utilisateurs', icon: Users, gradient: 'from-pink-500 to-rose-500' }] : []),
+    ...(hasPOSAccess ? [{ id: 'pos', label: 'POS', icon: ShoppingCart, gradient: 'from-cyan-500 to-blue-500' }] : [])
   ];
 
   const hasPlugins = pluginNavItems.length > 0;
-  const isPluginPageActive = pluginNavItems.some(item => location.pathname === item.path);
-  const isCalendarPageActive = calendarSubItems.some(item => location.pathname === item.path);
+  const isPluginPageActive = pluginNavItems.some(item => item.id === currentPage);
+  const isCalendarPageActive = calendarSubItems.some(item => item.id === currentPage);
 
   const handlePluginsToggle = (e: React.MouseEvent) => {
     e.preventDefault();
@@ -61,19 +59,20 @@ export function Navbar({ currentPage, onPageChange }: NavbarProps) {
     setCalendarMenuOpen(false);
   };
 
-  const NavButton = ({ to, isActive, children, onClick }: any) => (
-    <Link
-      to={to}
-      onClick={onClick}
-      className={`flex items-center gap-2 px-4 py-2 rounded-xl font-medium transition-all ${
-        isActive
-          ? 'bg-gradient-to-r from-purple-600 to-pink-600 text-white shadow-lg'
-          : 'text-gray-700 hover:bg-gray-100'
-      }`}
-    >
-      {children}
-    </Link>
-  );
+  const getActiveViewLabel = () => {
+    const calendarItem = calendarSubItems.find(item => item.id === currentPage);
+    if (calendarItem) return calendarItem.label;
+    
+    const pluginItem = pluginNavItems.find(item => item.id === currentPage);
+    if (pluginItem) return pluginItem.label;
+    
+    if (currentPage === 'dashboard') return 'Dashboard';
+    if (currentPage === 'services') return 'Services';
+    if (currentPage === 'emails') return 'Emails';
+    if (currentPage === 'admin') return 'Paramètres';
+    
+    return 'Dashboard';
+  };
 
   return (
     <>
@@ -88,21 +87,28 @@ export function Navbar({ currentPage, onPageChange }: NavbarProps) {
       >
         <div className="px-4 sm:px-6">
           <div className="flex items-center justify-between h-16">
-            <Link to="/dashboard" className="flex items-center gap-3">
+            <div className="flex items-center gap-3">
               <div className="w-10 h-10 bg-gradient-to-r from-purple-600 to-pink-600 rounded-xl flex items-center justify-center shadow-lg">
                 <Calendar className="w-6 h-6 text-white" />
               </div>
               <span className="text-xl font-bold bg-gradient-to-r from-purple-600 to-pink-600 bg-clip-text text-transparent">
                 BookingFast
               </span>
-            </Link>
+            </div>
 
             <div className="hidden lg:flex items-center gap-2">
               {/* Dashboard */}
-              <NavButton to="/dashboard" isActive={location.pathname === '/dashboard'}>
+              <button
+                onClick={() => onPageChange('dashboard')}
+                className={`flex items-center gap-2 px-4 py-2 rounded-xl font-medium transition-all ${
+                  currentPage === 'dashboard'
+                    ? 'bg-gradient-to-r from-purple-600 to-pink-600 text-white shadow-lg'
+                    : 'text-gray-700 hover:bg-gray-100'
+                }`}
+              >
                 <LayoutDashboard className="w-5 h-5" />
                 <span>Dashboard</span>
-              </NavButton>
+              </button>
 
               {/* Menu Calendrier avec sous-menu */}
               <div className="relative">
@@ -127,12 +133,14 @@ export function Navbar({ currentPage, onPageChange }: NavbarProps) {
                   <div className="absolute top-full left-0 mt-2 w-64 bg-white rounded-xl shadow-xl border border-gray-200 py-2 z-50">
                     {calendarSubItems.map(item => {
                       const Icon = item.icon;
-                      const isActive = location.pathname === item.path;
+                      const isActive = currentPage === item.id;
                       return (
-                        <Link
+                        <button
                           key={item.id}
-                          to={item.path}
-                          onClick={() => setCalendarMenuOpen(false)}
+                          onClick={() => {
+                            onPageChange(item.id);
+                            setCalendarMenuOpen(false);
+                          }}
                           className={`w-full flex items-center gap-3 px-4 py-3 font-medium transition-all ${
                             isActive
                               ? 'bg-gradient-to-r from-blue-50 to-cyan-50 text-blue-600'
@@ -141,7 +149,7 @@ export function Navbar({ currentPage, onPageChange }: NavbarProps) {
                         >
                           <Icon className="w-5 h-5" />
                           <span>{item.label}</span>
-                        </Link>
+                        </button>
                       );
                     })}
                   </div>
@@ -149,16 +157,30 @@ export function Navbar({ currentPage, onPageChange }: NavbarProps) {
               </div>
 
               {/* Services */}
-              <NavButton to="/services" isActive={location.pathname === '/services'}>
+              <button
+                onClick={() => onPageChange('services')}
+                className={`flex items-center gap-2 px-4 py-2 rounded-xl font-medium transition-all ${
+                  currentPage === 'services'
+                    ? 'bg-gradient-to-r from-green-600 to-emerald-600 text-white shadow-lg'
+                    : 'text-gray-700 hover:bg-gray-100'
+                }`}
+              >
                 <Package className="w-5 h-5" />
                 <span>Services</span>
-              </NavButton>
+              </button>
 
               {/* Emails */}
-              <NavButton to="/emails" isActive={location.pathname === '/emails'}>
+              <button
+                onClick={() => onPageChange('emails')}
+                className={`flex items-center gap-2 px-4 py-2 rounded-xl font-medium transition-all ${
+                  currentPage === 'emails'
+                    ? 'bg-gradient-to-r from-orange-600 to-red-600 text-white shadow-lg'
+                    : 'text-gray-700 hover:bg-gray-100'
+                }`}
+              >
                 <Mail className="w-5 h-5" />
                 <span>Emails</span>
-              </NavButton>
+              </button>
 
               {hasPlugins && (
                 <div className="relative">
@@ -183,12 +205,14 @@ export function Navbar({ currentPage, onPageChange }: NavbarProps) {
                     <div className="absolute top-full left-0 mt-2 w-64 bg-white rounded-xl shadow-xl border border-gray-200 py-2 z-50">
                       {pluginNavItems.map(item => {
                         const Icon = item.icon;
-                        const isActive = location.pathname === item.path;
+                        const isActive = currentPage === item.id;
                         return (
-                          <Link
+                          <button
                             key={item.id}
-                            to={item.path}
-                            onClick={() => setPluginsMenuOpen(false)}
+                            onClick={() => {
+                              onPageChange(item.id);
+                              setPluginsMenuOpen(false);
+                            }}
                             className={`w-full flex items-center gap-3 px-4 py-3 font-medium transition-all ${
                               isActive
                                 ? 'bg-gradient-to-r from-blue-50 to-cyan-50 text-blue-600'
@@ -197,7 +221,7 @@ export function Navbar({ currentPage, onPageChange }: NavbarProps) {
                           >
                             <Icon className="w-5 h-5" />
                             <span>{item.label}</span>
-                          </Link>
+                          </button>
                         );
                       })}
                     </div>
@@ -205,10 +229,17 @@ export function Navbar({ currentPage, onPageChange }: NavbarProps) {
                 </div>
               )}
 
-              <NavButton to="/admin" isActive={location.pathname === '/admin'}>
+              <button
+                onClick={() => onPageChange('admin')}
+                className={`flex items-center gap-2 px-4 py-2 rounded-xl font-medium transition-all ${
+                  currentPage === 'admin'
+                    ? 'bg-gradient-to-r from-purple-600 to-pink-600 text-white shadow-lg'
+                    : 'text-gray-700 hover:bg-gray-100'
+                }`}
+              >
                 <Settings className="w-5 h-5" />
                 <span>Paramètres</span>
-              </NavButton>
+              </button>
             </div>
 
             <div className="flex items-center gap-2">
@@ -267,17 +298,16 @@ export function Navbar({ currentPage, onPageChange }: NavbarProps) {
                 </div>
                 
                 {/* Dashboard */}
-                <Link
-                  to="/dashboard"
+                <button
                   onClick={() => handleNavigation('dashboard')}
                   className={`w-full flex items-center gap-4 p-4 rounded-2xl font-medium transition-all transform hover:scale-105 animate-slideUp ${
-                    location.pathname === '/dashboard'
+                    currentPage === 'dashboard'
                       ? 'bg-white text-gray-900 shadow-2xl'
                       : 'bg-white/10 text-white hover:bg-white/20 backdrop-blur-sm'
                   }`}
                 >
                   <div className={`w-12 h-12 rounded-xl flex items-center justify-center ${
-                    location.pathname === '/dashboard'
+                    currentPage === 'dashboard'
                       ? 'bg-gradient-to-r from-purple-500 to-pink-500'
                       : 'bg-white/20'
                   }`}>
@@ -285,14 +315,14 @@ export function Navbar({ currentPage, onPageChange }: NavbarProps) {
                   </div>
                   <div className="flex-1 text-left">
                     <div className="font-bold">Dashboard</div>
-                    <div className={`text-xs ${location.pathname === '/dashboard' ? 'text-gray-500' : 'text-purple-200'}`}>
+                    <div className={`text-xs ${currentPage === 'dashboard' ? 'text-gray-500' : 'text-purple-200'}`}>
                       Vue d'ensemble
                     </div>
                   </div>
-                  {location.pathname === '/dashboard' && (
+                  {currentPage === 'dashboard' && (
                     <div className="w-2 h-2 rounded-full bg-gradient-to-r from-purple-600 to-pink-600 animate-pulse"></div>
                   )}
-                </Link>
+                </button>
               </div>
 
               {/* Menu Calendrier avec sous-menu mobile */}
@@ -331,11 +361,10 @@ export function Navbar({ currentPage, onPageChange }: NavbarProps) {
                   <div className="ml-4 space-y-2 animate-slideDown">
                     {calendarSubItems.map((item, index) => {
                       const Icon = item.icon;
-                      const isActive = location.pathname === item.path;
+                      const isActive = currentPage === item.id;
                       return (
-                        <Link
+                        <button
                           key={item.id}
-                          to={item.path}
                           onClick={() => handleNavigation(item.id)}
                           className={`w-full flex items-center gap-4 p-4 rounded-2xl font-medium transition-all transform hover:scale-105 animate-slideUp ${
                             isActive
@@ -357,7 +386,7 @@ export function Navbar({ currentPage, onPageChange }: NavbarProps) {
                           {isActive && (
                             <div className="w-2 h-2 rounded-full bg-gradient-to-r from-blue-600 to-cyan-600 animate-pulse"></div>
                           )}
-                        </Link>
+                        </button>
                       );
                     })}
                   </div>
@@ -370,17 +399,16 @@ export function Navbar({ currentPage, onPageChange }: NavbarProps) {
                 </div>
                 
                 {/* Services */}
-                <Link
-                  to="/services"
+                <button
                   onClick={() => handleNavigation('services')}
                   className={`w-full flex items-center gap-4 p-4 rounded-2xl font-medium transition-all transform hover:scale-105 ${
-                    location.pathname === '/services'
+                    currentPage === 'services'
                       ? 'bg-white text-gray-900 shadow-2xl'
                       : 'bg-white/10 text-white hover:bg-white/20 backdrop-blur-sm'
                   }`}
                 >
                   <div className={`w-12 h-12 rounded-xl flex items-center justify-center ${
-                    location.pathname === '/services'
+                    currentPage === 'services'
                       ? 'bg-gradient-to-r from-green-500 to-emerald-500'
                       : 'bg-white/20'
                   }`}>
@@ -388,27 +416,26 @@ export function Navbar({ currentPage, onPageChange }: NavbarProps) {
                   </div>
                   <div className="flex-1 text-left">
                     <div className="font-bold">Services</div>
-                    <div className={`text-xs ${location.pathname === '/services' ? 'text-gray-500' : 'text-purple-200'}`}>
+                    <div className={`text-xs ${currentPage === 'services' ? 'text-gray-500' : 'text-purple-200'}`}>
                       Vos prestations
                     </div>
                   </div>
-                  {location.pathname === '/services' && (
+                  {currentPage === 'services' && (
                     <div className="w-2 h-2 rounded-full bg-gradient-to-r from-green-600 to-emerald-600 animate-pulse"></div>
                   )}
-                </Link>
+                </button>
 
                 {/* Emails */}
-                <Link
-                  to="/emails"
+                <button
                   onClick={() => handleNavigation('emails')}
                   className={`w-full flex items-center gap-4 p-4 rounded-2xl font-medium transition-all transform hover:scale-105 ${
-                    location.pathname === '/emails'
+                    currentPage === 'emails'
                       ? 'bg-white text-gray-900 shadow-2xl'
                       : 'bg-white/10 text-white hover:bg-white/20 backdrop-blur-sm'
                   }`}
                 >
                   <div className={`w-12 h-12 rounded-xl flex items-center justify-center ${
-                    location.pathname === '/emails'
+                    currentPage === 'emails'
                       ? 'bg-gradient-to-r from-orange-500 to-red-500'
                       : 'bg-white/20'
                   }`}>
@@ -416,14 +443,14 @@ export function Navbar({ currentPage, onPageChange }: NavbarProps) {
                   </div>
                   <div className="flex-1 text-left">
                     <div className="font-bold">Emails</div>
-                    <div className={`text-xs ${location.pathname === '/emails' ? 'text-gray-500' : 'text-purple-200'}`}>
+                    <div className={`text-xs ${currentPage === 'emails' ? 'text-gray-500' : 'text-purple-200'}`}>
                       Communication
                     </div>
                   </div>
-                  {location.pathname === '/emails' && (
+                  {currentPage === 'emails' && (
                     <div className="w-2 h-2 rounded-full bg-gradient-to-r from-orange-600 to-red-600 animate-pulse"></div>
                   )}
-                </Link>
+                </button>
               </div>
 
               {hasPlugins && (
@@ -462,11 +489,10 @@ export function Navbar({ currentPage, onPageChange }: NavbarProps) {
                     <div className="ml-4 space-y-2 animate-slideDown">
                       {pluginNavItems.map((item, index) => {
                         const Icon = item.icon;
-                        const isActive = location.pathname === item.path;
+                        const isActive = currentPage === item.id;
                         return (
-                          <Link
+                          <button
                             key={item.id}
-                            to={item.path}
                             onClick={() => handleNavigation(item.id)}
                             className={`w-full flex items-center gap-4 p-4 rounded-2xl font-medium transition-all transform hover:scale-105 animate-slideUp ${
                               isActive
@@ -488,7 +514,7 @@ export function Navbar({ currentPage, onPageChange }: NavbarProps) {
                             {isActive && (
                               <div className="w-2 h-2 rounded-full bg-gradient-to-r from-blue-600 to-cyan-600 animate-pulse"></div>
                             )}
-                          </Link>
+                          </button>
                         );
                       })}
                     </div>
@@ -500,17 +526,16 @@ export function Navbar({ currentPage, onPageChange }: NavbarProps) {
                 <div className="text-xs font-bold text-purple-200 uppercase tracking-wider px-4 mb-3">
                   Paramètres
                 </div>
-                <Link
-                  to="/admin"
+                <button
                   onClick={() => handleNavigation('admin')}
                   className={`w-full flex items-center gap-4 p-4 rounded-2xl font-medium transition-all transform hover:scale-105 ${
-                    location.pathname === '/admin'
+                    currentPage === 'admin'
                       ? 'bg-white text-gray-900 shadow-2xl'
                       : 'bg-white/10 text-white hover:bg-white/20 backdrop-blur-sm'
                   }`}
                 >
                   <div className={`w-12 h-12 rounded-xl flex items-center justify-center ${
-                    location.pathname === '/admin'
+                    currentPage === 'admin'
                       ? 'bg-gradient-to-r from-purple-600 to-pink-600'
                       : 'bg-white/20'
                   }`}>
@@ -518,14 +543,14 @@ export function Navbar({ currentPage, onPageChange }: NavbarProps) {
                   </div>
                   <div className="flex-1 text-left">
                     <div className="font-bold">Paramètres</div>
-                    <div className={`text-xs ${location.pathname === '/admin' ? 'text-gray-500' : 'text-purple-200'}`}>
+                    <div className={`text-xs ${currentPage === 'admin' ? 'text-gray-500' : 'text-purple-200'}`}>
                       Configuration
                     </div>
                   </div>
-                  {location.pathname === '/admin' && (
+                  {currentPage === 'admin' && (
                     <div className="w-2 h-2 rounded-full bg-gradient-to-r from-purple-600 to-pink-600 animate-pulse"></div>
                   )}
-                </Link>
+                </button>
               </div>
 
               <div className="pt-6 mt-6 border-t border-white/20">
