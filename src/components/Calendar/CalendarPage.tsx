@@ -10,6 +10,7 @@ import { usePlugins } from '../../hooks/usePlugins';
 import { PermissionGate, UsageLimitIndicator } from '../UI/PermissionGate';
 import { Booking } from '../../types';
 import { UserCheck, X } from 'lucide-react';
+import { bookingEvents } from '../../lib/bookingEvents';
 
 interface CalendarPageProps {
   view?: 'calendar' | 'list' | 'clients';
@@ -58,6 +59,28 @@ export function CalendarPage({ view = 'calendar' }: CalendarPageProps) {
 
     checkAccess();
   }, [hasPluginAccess, isOwner, hasPermission]);
+
+  // ✅ AJOUT: Écouter les événements de booking
+  useEffect(() => {
+    console.log('🔍 CalendarPage - Installation des listeners d\'événements');
+    
+    const handleBookingChange = (data: any) => {
+      console.log('🔔 CalendarPage - Événement booking reçu, rafraîchissement...', data);
+      refetch();
+    };
+
+    // Écouter tous les événements de booking
+    bookingEvents.on('bookingCreated', handleBookingChange);
+    bookingEvents.on('bookingUpdated', handleBookingChange);
+    bookingEvents.on('bookingDeleted', handleBookingChange);
+
+    return () => {
+      console.log('🧹 CalendarPage - Nettoyage des listeners');
+      bookingEvents.off('bookingCreated', handleBookingChange);
+      bookingEvents.off('bookingUpdated', handleBookingChange);
+      bookingEvents.off('bookingDeleted', handleBookingChange);
+    };
+  }, [refetch]);
 
   const usageLimits = getUsageLimits();
   const todayBookingsCount = bookings.filter(b => 
@@ -121,7 +144,7 @@ export function CalendarPage({ view = 'calendar' }: CalendarPageProps) {
   const handleBookingSuccess = async () => {
     console.log('✅ CalendarPage - handleBookingSuccess appelé');
     handleCloseModal();
-    // Le refetch sera déclenché automatiquement par les événements dans BookingsList
+    // Le refetch sera déclenché automatiquement par les événements
   };
 
   const getMemberDisplayName = (member: typeof teamMembers[0]) => {

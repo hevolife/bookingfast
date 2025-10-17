@@ -1,48 +1,197 @@
 import React, { useState, useEffect } from 'react';
-import { Calendar, Clock, User, Mail, Phone, Euro, Search, Filter, ChevronLeft, ChevronRight, CreditCard as Edit, Eye, Package, CreditCard, AlertCircle, CheckCircle, ArrowUpDown, History } from 'lucide-react';
+import { Calendar, Clock, User, Euro, Search, Filter, ChevronDown, ChevronUp, X, FileText, UserCheck } from 'lucide-react';
 import { useBookings } from '../../hooks/useBookings';
-import { useServices } from '../../hooks/useServices';
+import { useTeam } from '../../hooks/useTeam';
+import { useTeamMembers } from '../../hooks/useTeamMembers';
+import { usePlugins } from '../../hooks/usePlugins';
 import { Booking } from '../../types';
 import { LoadingSpinner } from '../UI/LoadingSpinner';
-import { Modal } from '../UI/Modal';
-import { Button } from '../UI/Button';
-import { BookingHistoryModal } from './BookingHistoryModal';
+import { bookingEvents } from '../../lib/bookingEvents';
 
 interface BookingsListProps {
-  onEditBooking?: (booking: Booking) => void;
+  onEditBooking: (booking: Booking) => void;
 }
 
 export function BookingsList({ onEditBooking }: BookingsListProps) {
-  const { bookings, loading } = useBookings();
-  const { services } = useServices();
-  const [filteredBookings, setFilteredBookings] = useState<Booking[]>([]);
-  const [currentPage, setCurrentPage] = useState(1);
+  const { bookings, loading, refetch } = useBookings();
+  const { canEditBooking, isOwner } = useTeam();
+  const { teamMembers, loading: membersLoading } = useTeamMembers();
+  const { hasPluginAccess } = usePlugins();
+  
   const [searchTerm, setSearchTerm] = useState('');
   const [statusFilter, setStatusFilter] = useState<'all' | 'pending' | 'confirmed' | 'cancelled'>('all');
-  const [paymentFilter, setPaymentFilter] = useState<'all' | 'pending' | 'partial' | 'completed'>('all');
-  const [sortBy, setSortBy] = useState<'date' | 'client' | 'service' | 'amount'>('date');
-  const [sortOrder, setSortOrder] = useState<'asc' | 'desc'>('desc');
-  const [selectedBooking, setSelectedBooking] = useState<Booking | null>(null);
-  const [showDetailsModal, setShowDetailsModal] = useState(false);
-  const [showHistoryModal, setShowHistoryModal] = useState(false);
+  const [dateFilter, setDateFilter] = useState<'all' | 'today' | 'week' | 'month'>('all');
+  const [expandedBooking, setExpandedBooking] = useState<string | null>(null);
+  const [selectedTeamMember, setSelectedTeamMember] = useState<string>('all');
+  const [canViewTeamFilter, setCanViewTeamFilter] = useState(false);
+  const [isMultiUserActive, setIsMultiUserActive] = useState(false);
 
-  const itemsPerPage = 12;
+  useEffect(() => {
+    const checkAccess = async () => {
+      const multiUserActive = await hasPluginAccess('multi-user');
+      setIsMultiUserActive(multiUserActive);
+      
+      if (isOwner && multiUserActive) {
+        setCanViewTeamFilter(true);
+      }
+    };
 
-  // Fonction pour calculer le statut de paiement réel basé sur les montants
-  const getActualPaymentStatus = (booking: Booking): 'pending' | 'partial' | 'completed' => {
-    const paid = booking.payment_amount || 0;
-    const total = booking.total_amount || 0;
-    
-    if (paid === 0) {
-      return 'pending';
-    } else if (paid >= total) {
-      return 'completed';
-    } else {
-      return 'partial';
+    checkAccess();
+  }, [hasPluginAccess, isOwner]);
+
+  // ✅ CORRECTION: Écouter les événements de booking pour rafraîchir
+  useEffect(() => {
+    const handleBookingChange = () => {
+      console.log('📋 BookingsList - Événement booking détecté, rafraîchissement...');
+      refetch();
+    };
+
+    // Écouter tous les événements de booking
+    bookingEvents.on('bookingCreated', handleBookingChange);
+    bookingEvents.on('bookingUpdated', handleBookingChange);
+    bookingEvents.on('bookingDeleted', handleBookingChange);
+
+    // Écouter aussi l'événement global de rafraîchissement
+    const handleRefresh = () => {
+      console.log('🔄 BookingsList - Rafraîchissement global demandé');
+      refetch();
+    };
+    window.addEventListener('refreshBookings', handleRefresh);
+
+    return () => {
+      bookingEvents.off('bookingCreated', handleBookingChange);
+      bookingEvents.off('bookingUpdated', handleBookingChange);
+      bookingEvents.off('bookingDeleted', handleBookingChange);
+      window.removeEventListener('refreshBookings', handleRefresh);
+    };
+  }, [refetch]);
+
+  const getMemberDisplayName = (member: typeof teamMembers[0]) => {
+    if (member.firstname && member.lastname) {
+      return `${member.firstname} ${member.lastname}`;
+    }
+    if (member.full_name) {
+      return member.full_name;
+    }
+    if (member.firstname) {
+      return member.firstname;
+    }
+    return member.email || 'Membre sans nom';
+  };
+
+  const getFilteredBookings = () => {
+    let filtered = bookings;
+
+    // ✅ CORRECTION: Ne plus filtrer les réservations annulées par défaut
+    // Chaque vue décide si elle veut les afficher ou non
+    if (statusFilter !== 'all') {
+      filtered = filtered.filter(b => b.booking_status === statusFilter);
+    }
+
+    if (selectedTeamMember !== 'all') {
+      filtered = filtered.filter(b => {
+        if (selectedTeamMember === 'unassigned') {
+          return !b.assigned_user_id;
+        }
+        return b.assigned_user_id === selectedTeamMember;
+      });
+    }
+
+    if (dateFilter !== 'all') {
+      const now = new Date();
+      const today = new Date(now.getFullYear(), now.getMonth(), now.getDate());
+      
+      filtered = filtered.filter(b => {
+        const bookingDate = new Date(b.date);
+        
+        switch (dateFilter) {
+          case 'today':
+            return bookingDate.toDateString() === today.toDateString();
+          case 'week':
+            const weekFromNow = new Date(today);
+            weekFromNow.setDate(today.getDate() + 7);
+            return bookingDate >= today && bookingDate <= weekFromNow;
+          case 'month':
+            const monthFromNow = new Date(today);
+            monthFromNow.setMonth(today.getMonth() + 1);
+            return bookingDate >= today && bookingDate <= monthFromNow;
+          default:
+            return true;
+        }
+      });
+    }
+
+    if (searchTerm) {
+      const term = searchTerm.toLowerCase();
+      filtered = filtered.filter(b =>
+        b.client_firstname?.toLowerCase().includes(term) ||
+        b.client_name?.toLowerCase().includes(term) ||
+        b.client_email?.toLowerCase().includes(term) ||
+        b.service?.name?.toLowerCase().includes(term) ||
+        (b.custom_service_data?.name && b.custom_service_data.name.toLowerCase().includes(term))
+      );
+    }
+
+    return filtered.sort((a, b) => {
+      const dateCompare = new Date(b.date).getTime() - new Date(a.date).getTime();
+      if (dateCompare !== 0) return dateCompare;
+      return b.time.localeCompare(a.time);
+    });
+  };
+
+  const filteredBookings = getFilteredBookings();
+
+  const getStatusBadge = (status: string) => {
+    switch (status) {
+      case 'confirmed':
+        return (
+          <span className="inline-flex items-center px-3 py-1 rounded-full text-xs font-bold bg-gradient-to-r from-green-100 to-emerald-100 text-green-700 border border-green-200">
+            ✅ Confirmée
+          </span>
+        );
+      case 'pending':
+        return (
+          <span className="inline-flex items-center px-3 py-1 rounded-full text-xs font-bold bg-gradient-to-r from-yellow-100 to-orange-100 text-yellow-700 border border-yellow-200">
+            ⏳ En attente
+          </span>
+        );
+      case 'cancelled':
+        return (
+          <span className="inline-flex items-center px-3 py-1 rounded-full text-xs font-bold bg-gradient-to-r from-red-100 to-pink-100 text-red-700 border border-red-200">
+            ❌ Annulée
+          </span>
+        );
+      default:
+        return null;
     }
   };
 
-  // Fonction pour obtenir le nom d'unité du service
+  const getPaymentStatusBadge = (booking: Booking) => {
+    const totalAmount = booking.total_amount;
+    const paidAmount = booking.payment_amount || 0;
+    const remainingAmount = totalAmount - paidAmount;
+
+    if (paidAmount >= totalAmount) {
+      return (
+        <span className="inline-flex items-center px-3 py-1 rounded-full text-xs font-bold bg-gradient-to-r from-green-100 to-emerald-100 text-green-700 border border-green-200">
+          💰 Payé
+        </span>
+      );
+    } else if (paidAmount > 0) {
+      return (
+        <span className="inline-flex items-center px-3 py-1 rounded-full text-xs font-bold bg-gradient-to-r from-blue-100 to-cyan-100 text-blue-700 border border-blue-200">
+          💳 Partiel ({paidAmount.toFixed(2)}€)
+        </span>
+      );
+    } else {
+      return (
+        <span className="inline-flex items-center px-3 py-1 rounded-full text-xs font-bold bg-gradient-to-r from-red-100 to-pink-100 text-red-700 border border-red-200">
+          ⚠️ Non payé
+        </span>
+      );
+    }
+  };
+
   const getUnitName = (booking: Booking) => {
     if (booking.service?.unit_name && booking.service.unit_name !== 'personnes') {
       return booking.service.unit_name;
@@ -50,142 +199,12 @@ export function BookingsList({ onEditBooking }: BookingsListProps) {
     return 'participants';
   };
 
-  // Fonction pour obtenir le pluriel du nom d'unité avec suffixe (s)
   const getPluralUnitName = (booking: Booking, quantity: number) => {
     const unitName = getUnitName(booking);
     if (quantity <= 1) {
-      // Retirer le 's' final si présent et ajouter (s) après
       return `${unitName.replace(/s$/, '')}(s)`;
     }
     return `${unitName}(s)`;
-  };
-
-  useEffect(() => {
-    // ✅ CORRECTION: Ne plus filtrer les réservations annulées
-    // Elles doivent apparaître dans la liste pour l'historique
-    let filtered = [...bookings];
-
-    if (searchTerm) {
-      filtered = filtered.filter(booking =>
-        booking.client_firstname.toLowerCase().includes(searchTerm.toLowerCase()) ||
-        booking.client_name.toLowerCase().includes(searchTerm.toLowerCase()) ||
-        booking.client_email.toLowerCase().includes(searchTerm.toLowerCase()) ||
-        booking.client_phone.includes(searchTerm) ||
-        booking.service?.name.toLowerCase().includes(searchTerm.toLowerCase())
-      );
-    }
-
-    if (statusFilter !== 'all') {
-      filtered = filtered.filter(booking => booking.booking_status === statusFilter);
-    }
-
-    if (paymentFilter !== 'all') {
-      // Utiliser le statut calculé au lieu du statut de la base de données
-      filtered = filtered.filter(booking => getActualPaymentStatus(booking) === paymentFilter);
-    }
-
-    filtered.sort((a, b) => {
-      let comparison = 0;
-      
-      switch (sortBy) {
-        case 'date':
-          comparison = new Date(a.date + 'T' + a.time).getTime() - new Date(b.date + 'T' + b.time).getTime();
-          break;
-        case 'client':
-          comparison = (a.client_firstname + ' ' + a.client_name).localeCompare(b.client_firstname + ' ' + b.client_name);
-          break;
-        case 'service':
-          comparison = (a.service?.name || '').localeCompare(b.service?.name || '');
-          break;
-        case 'amount':
-          comparison = a.total_amount - b.total_amount;
-          break;
-      }
-      
-      return sortOrder === 'asc' ? comparison : -comparison;
-    });
-
-    setFilteredBookings(filtered);
-    setCurrentPage(1);
-  }, [bookings, searchTerm, statusFilter, paymentFilter, sortBy, sortOrder]);
-
-  const totalPages = Math.ceil(filteredBookings.length / itemsPerPage);
-  const startIndex = (currentPage - 1) * itemsPerPage;
-  const endIndex = startIndex + itemsPerPage;
-  const currentBookings = filteredBookings.slice(startIndex, endIndex);
-
-  const handleSort = (field: typeof sortBy) => {
-    if (sortBy === field) {
-      setSortOrder(sortOrder === 'asc' ? 'desc' : 'asc');
-    } else {
-      setSortBy(field);
-      setSortOrder('asc');
-    }
-  };
-
-  const getStatusColor = (status: string) => {
-    switch (status) {
-      case 'confirmed':
-        return 'bg-green-100 text-green-700 border-green-200';
-      case 'pending':
-        return 'bg-orange-100 text-orange-700 border-orange-200';
-      case 'cancelled':
-        return 'bg-red-100 text-red-700 border-red-200';
-      default:
-        return 'bg-gray-100 text-gray-700 border-gray-200';
-    }
-  };
-
-  const getPaymentStatusColor = (booking: Booking) => {
-    const status = getActualPaymentStatus(booking);
-    switch (status) {
-      case 'completed':
-        return 'bg-green-100 text-green-700 border-green-200';
-      case 'partial':
-        return 'bg-orange-100 text-orange-700 border-orange-200';
-      case 'pending':
-        return 'bg-red-100 text-red-700 border-red-200';
-      default:
-        return 'bg-gray-100 text-gray-700 border-gray-200';
-    }
-  };
-
-  const getPaymentStatusText = (booking: Booking) => {
-    const status = getActualPaymentStatus(booking);
-    switch (status) {
-      case 'completed':
-        return '💰 Payé';
-      case 'partial':
-        return '💳 Acompte';
-      case 'pending':
-        return '❌ Non payé';
-      default:
-        return '❌ Non payé';
-    }
-  };
-
-  const formatDate = (date: string) => {
-    return new Date(date).toLocaleDateString('fr-FR', {
-      day: '2-digit',
-      month: '2-digit',
-      year: 'numeric'
-    });
-  };
-
-  const formatTime = (time: string) => {
-    return time.slice(0, 5);
-  };
-
-  const handleViewDetails = (booking: Booking) => {
-    setSelectedBooking(booking);
-    setShowDetailsModal(true);
-  };
-
-  const handleViewHistory = () => {
-    if (selectedBooking) {
-      setShowDetailsModal(false);
-      setShowHistoryModal(true);
-    }
   };
 
   if (loading) {
@@ -196,556 +215,311 @@ export function BookingsList({ onEditBooking }: BookingsListProps) {
     );
   }
 
+  const shouldShowTeamFilter = canViewTeamFilter && isMultiUserActive && teamMembers.length > 0;
+
   return (
-    <>
-      <div className="p-4 sm:p-6 bg-gradient-to-br from-blue-50 via-purple-50 to-pink-50 mobile-optimized">
-        {/* Header */}
-        <div className="mb-6 sm:mb-8">
-          <h1 className="text-2xl sm:text-3xl font-bold bg-gradient-to-r from-blue-600 to-purple-600 bg-clip-text text-transparent">
-            Mes Réservations
-          </h1>
-          <p className="text-sm sm:text-base text-gray-600 mt-2">
-            Liste complète de toutes vos réservations ({filteredBookings.length})
-          </p>
+    <div className="h-full flex flex-col bg-gradient-to-br from-blue-50 via-purple-50 to-pink-50">
+      <div className="bg-white/90 backdrop-blur-md border-b border-gray-100 shadow-lg p-4 flex-shrink-0">
+        <div className="flex items-center justify-between mb-4">
+          <div>
+            <h1 className="text-2xl font-bold bg-gradient-to-r from-purple-600 via-pink-600 to-red-600 bg-clip-text text-transparent">
+              Liste des réservations
+            </h1>
+            <p className="text-sm text-gray-600 mt-1">
+              {filteredBookings.length} réservation{filteredBookings.length > 1 ? 's' : ''}
+            </p>
+          </div>
         </div>
 
-        {/* Filtres et recherche */}
-        <div className="bg-white rounded-xl sm:rounded-2xl shadow-lg p-4 sm:p-6 mb-6">
-          <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4">
-            <div className="relative">
-              <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 text-gray-400 w-5 h-5" />
-              <input
-                type="text"
-                value={searchTerm}
-                onChange={(e) => setSearchTerm(e.target.value)}
-                placeholder="Rechercher..."
-                className="w-full pl-10 pr-4 py-3 border border-gray-300 rounded-xl focus:ring-2 focus:ring-blue-500 focus:border-blue-500 transition-all duration-300 text-sm"
-              />
-            </div>
+        <div className="space-y-3">
+          <div className="relative">
+            <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 text-gray-400 w-5 h-5" />
+            <input
+              type="text"
+              placeholder="Rechercher par nom, email, service..."
+              value={searchTerm}
+              onChange={(e) => setSearchTerm(e.target.value)}
+              className="w-full pl-10 pr-4 py-3 border border-gray-300 rounded-xl focus:ring-2 focus:ring-purple-500 focus:border-transparent transition-all duration-300"
+            />
+          </div>
 
+          <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-3">
             <div>
+              <label className="block text-xs font-medium text-gray-700 mb-1">Statut</label>
               <select
                 value={statusFilter}
                 onChange={(e) => setStatusFilter(e.target.value as any)}
-                className="w-full p-3 border border-gray-300 rounded-xl focus:ring-2 focus:ring-blue-500 focus:border-blue-500 transition-all duration-300 text-sm"
+                className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-purple-500 focus:border-transparent text-sm"
               >
                 <option value="all">Tous les statuts</option>
-                <option value="pending">En attente</option>
                 <option value="confirmed">Confirmées</option>
+                <option value="pending">En attente</option>
                 <option value="cancelled">Annulées</option>
               </select>
             </div>
 
             <div>
+              <label className="block text-xs font-medium text-gray-700 mb-1">Période</label>
               <select
-                value={paymentFilter}
-                onChange={(e) => setPaymentFilter(e.target.value as any)}
-                className="w-full p-3 border border-gray-300 rounded-xl focus:ring-2 focus:ring-blue-500 focus:border-blue-500 transition-all duration-300 text-sm"
+                value={dateFilter}
+                onChange={(e) => setDateFilter(e.target.value as any)}
+                className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-purple-500 focus:border-transparent text-sm"
               >
-                <option value="all">Tous les paiements</option>
-                <option value="pending">Non payé</option>
-                <option value="partial">Acompte</option>
-                <option value="completed">Payé</option>
+                <option value="all">Toutes les dates</option>
+                <option value="today">Aujourd'hui</option>
+                <option value="week">Cette semaine</option>
+                <option value="month">Ce mois</option>
               </select>
             </div>
 
-            <div>
-              <select
-                value={`${sortBy}-${sortOrder}`}
-                onChange={(e) => {
-                  const [field, order] = e.target.value.split('-');
-                  setSortBy(field as any);
-                  setSortOrder(order as any);
-                }}
-                className="w-full p-3 border border-gray-300 rounded-xl focus:ring-2 focus:ring-blue-500 focus:border-blue-500 transition-all duration-300 text-sm"
-              >
-                <option value="date-desc">Date (récent)</option>
-                <option value="date-asc">Date (ancien)</option>
-                <option value="client-asc">Client (A-Z)</option>
-                <option value="client-desc">Client (Z-A)</option>
-                <option value="service-asc">Service (A-Z)</option>
-                <option value="amount-desc">Montant (élevé)</option>
-                <option value="amount-asc">Montant (faible)</option>
-              </select>
-            </div>
+            {shouldShowTeamFilter && (
+              <div>
+                <label className="block text-xs font-medium text-gray-700 mb-1">Membre</label>
+                <select
+                  value={selectedTeamMember}
+                  onChange={(e) => setSelectedTeamMember(e.target.value)}
+                  className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-purple-500 focus:border-transparent text-sm"
+                  disabled={membersLoading}
+                >
+                  <option value="all">Tous les membres</option>
+                  {teamMembers.map(member => (
+                    <option key={member.user_id} value={member.user_id}>
+                      {getMemberDisplayName(member)}
+                    </option>
+                  ))}
+                  <option value="unassigned">Non assigné</option>
+                </select>
+              </div>
+            )}
           </div>
-        </div>
 
-        {/* Liste des réservations */}
-        <div className="bg-white rounded-xl sm:rounded-2xl shadow-lg overflow-hidden">
-          {currentBookings.length > 0 ? (
-            <>
-              {/* Version desktop - Table */}
-              <div className="hidden lg:block overflow-x-auto">
-                <table className="w-full">
-                  <thead className="bg-gradient-to-r from-gray-50 to-blue-50 border-b border-gray-200">
-                    <tr>
-                      <th className="px-6 py-4 text-left">
-                        <button
-                          onClick={() => handleSort('date')}
-                          className="flex items-center gap-2 text-sm font-bold text-gray-700 hover:text-blue-600 transition-colors"
-                        >
-                          Date & Heure
-                          <ArrowUpDown className="w-4 h-4" />
-                        </button>
-                      </th>
-                      <th className="px-6 py-4 text-left">
-                        <button
-                          onClick={() => handleSort('client')}
-                          className="flex items-center gap-2 text-sm font-bold text-gray-700 hover:text-blue-600 transition-colors"
-                        >
-                          Client
-                          <ArrowUpDown className="w-4 h-4" />
-                        </button>
-                      </th>
-                      <th className="px-6 py-4 text-left">
-                        <button
-                          onClick={() => handleSort('service')}
-                          className="flex items-center gap-2 text-sm font-bold text-gray-700 hover:text-blue-600 transition-colors"
-                        >
-                          Service
-                          <ArrowUpDown className="w-4 h-4" />
-                        </button>
-                      </th>
-                      <th className="px-6 py-4 text-left">Statut</th>
-                      <th className="px-6 py-4 text-left">
-                        <button
-                          onClick={() => handleSort('amount')}
-                          className="flex items-center gap-2 text-sm font-bold text-gray-700 hover:text-blue-600 transition-colors"
-                        >
-                          Montant
-                          <ArrowUpDown className="w-4 h-4" />
-                        </button>
-                      </th>
-                      <th className="px-6 py-4 text-left">Actions</th>
-                    </tr>
-                  </thead>
-                  <tbody className="divide-y divide-gray-100">
-                    {currentBookings.map((booking, index) => (
-                      <tr
-                        key={booking.id}
-                        className={`hover:bg-gray-50 transition-colors animate-fadeIn ${
-                          booking.booking_status === 'cancelled' ? 'opacity-60' : ''
-                        }`}
-                        style={{ animationDelay: `${index * 50}ms` }}
-                      >
-                        <td className="px-6 py-4">
-                          <div className="flex items-center gap-3">
-                            <div className="w-10 h-10 bg-gradient-to-r from-blue-500 to-purple-500 rounded-xl flex items-center justify-center text-white">
-                              <Calendar className="w-5 h-5" />
-                            </div>
-                            <div>
-                              <div className="font-bold text-gray-900">{formatDate(booking.date)}</div>
-                              <div className="text-sm text-gray-600">{formatTime(booking.time)}</div>
-                            </div>
-                          </div>
-                        </td>
-                        
-                        <td className="px-6 py-4">
-                          <div>
-                            <div className="font-bold text-gray-900">
-                              {booking.client_firstname} {booking.client_name}
-                            </div>
-                            <div className="text-sm text-gray-600">{booking.client_email}</div>
-                            <div className="text-sm text-gray-500">{booking.client_phone}</div>
-                          </div>
-                        </td>
-                        
-                        <td className="px-6 py-4">
-                          <div className="flex items-center gap-3">
-                            <div className="w-8 h-8 bg-gradient-to-r from-purple-500 to-pink-500 rounded-lg flex items-center justify-center text-white">
-                              <Package className="w-4 h-4" />
-                            </div>
-                            <div>
-                              <div className="font-medium text-gray-900">{booking.service?.name}</div>
-                              <div className="text-sm text-gray-600">
-                                {booking.duration_minutes}min • {booking.quantity} {getPluralUnitName(booking, booking.quantity)}
-                              </div>
-                            </div>
-                          </div>
-                        </td>
-                        
-                        <td className="px-6 py-4">
-                          <div className="space-y-2">
-                            <span className={`inline-flex items-center px-3 py-1 rounded-full text-xs font-medium border ${getStatusColor(booking.booking_status)}`}>
-                              {booking.booking_status === 'confirmed' ? '✅ Confirmée' : 
-                               booking.booking_status === 'cancelled' ? '❌ Annulée' : '⏳ En attente'}
-                            </span>
-                            {booking.booking_status !== 'cancelled' && (
-                              <span className={`inline-flex items-center px-3 py-1 rounded-full text-xs font-medium border ${getPaymentStatusColor(booking)}`}>
-                                {getPaymentStatusText(booking)}
-                              </span>
-                            )}
-                          </div>
-                        </td>
-                        
-                        <td className="px-6 py-4">
-                          <div>
-                            <div className="font-bold text-green-600">{booking.total_amount.toFixed(2)}€</div>
-                            {booking.booking_status !== 'cancelled' && (
-                              <div className="text-sm text-gray-600">
-                                Payé: {(booking.payment_amount || 0).toFixed(2)}€
-                              </div>
-                            )}
-                          </div>
-                        </td>
-                        
-                        <td className="px-6 py-4">
-                          <div className="flex gap-2">
-                            <button
-                              onClick={() => handleViewDetails(booking)}
-                              className="p-2 bg-blue-500 text-white rounded-lg hover:bg-blue-600 transition-colors transform hover:scale-110"
-                              title="Voir les détails"
-                            >
-                              <Eye className="w-4 h-4" />
-                            </button>
-                            {onEditBooking && booking.booking_status !== 'cancelled' && (
-                              <button
-                                onClick={() => onEditBooking(booking)}
-                                className="p-2 bg-green-500 text-white rounded-lg hover:bg-green-600 transition-colors transform hover:scale-110"
-                                title="Modifier"
-                              >
-                                <Edit className="w-4 h-4" />
-                              </button>
-                            )}
-                          </div>
-                        </td>
-                      </tr>
-                    ))}
-                  </tbody>
-                </table>
-              </div>
-
-              {/* Version mobile - Cards */}
-              <div className="lg:hidden space-y-4 p-4">
-                {currentBookings.map((booking, index) => (
-                  <div
-                    key={booking.id}
-                    className={`bg-gradient-to-r from-gray-50 to-blue-50 rounded-xl border border-blue-200 p-4 hover:shadow-md transition-all duration-300 animate-fadeIn ${
-                      booking.booking_status === 'cancelled' ? 'opacity-60' : ''
-                    }`}
-                    style={{ animationDelay: `${index * 100}ms` }}
-                  >
-                    <div className="flex items-center justify-between mb-3">
-                      <div className="flex items-center gap-3">
-                        <div className="w-10 h-10 bg-gradient-to-r from-blue-500 to-purple-500 rounded-xl flex items-center justify-center text-white font-bold text-sm">
-                          {booking.client_firstname.charAt(0)}{booking.client_name.charAt(0)}
-                        </div>
-                        <div>
-                          <div className="font-bold text-gray-900 text-sm">
-                            {booking.client_firstname} {booking.client_name}
-                          </div>
-                          <div className="text-xs text-gray-600">{booking.client_email}</div>
-                        </div>
-                      </div>
-                      
-                      <div className="flex gap-2">
-                        <button
-                          onClick={() => handleViewDetails(booking)}
-                          className="p-2 bg-blue-500 text-white rounded-lg hover:bg-blue-600 transition-colors mobile-tap-target"
-                          title="Voir les détails"
-                        >
-                          <Eye className="w-4 h-4" />
-                        </button>
-                        {onEditBooking && booking.booking_status !== 'cancelled' && (
-                          <button
-                            onClick={() => onEditBooking(booking)}
-                            className="p-2 bg-green-500 text-white rounded-lg hover:bg-green-600 transition-colors mobile-tap-target"
-                            title="Modifier"
-                          >
-                            <Edit className="w-4 h-4" />
-                          </button>
-                        )}
-                      </div>
-                    </div>
-
-                    <div className="grid grid-cols-2 gap-3 mb-3">
-                      <div className="flex items-center gap-2">
-                        <Calendar className="w-4 h-4 text-blue-500" />
-                        <div>
-                          <div className="text-xs text-gray-600">Date</div>
-                          <div className="font-medium text-gray-900 text-sm">{formatDate(booking.date)}</div>
-                        </div>
-                      </div>
-                      
-                      <div className="flex items-center gap-2">
-                        <Clock className="w-4 h-4 text-purple-500" />
-                        <div>
-                          <div className="text-xs text-gray-600">Heure</div>
-                          <div className="font-medium text-gray-900 text-sm">{formatTime(booking.time)}</div>
-                        </div>
-                      </div>
-                    </div>
-
-                    <div className="flex items-center gap-2 mb-3">
-                      <Package className="w-4 h-4 text-green-500" />
-                      <div className="flex-1">
-                        <div className="text-xs text-gray-600">Service</div>
-                        <div className="font-medium text-gray-900 text-sm">{booking.service?.name}</div>
-                        <div className="text-xs text-gray-500">
-                          {booking.duration_minutes}min • {booking.quantity} {getPluralUnitName(booking, booking.quantity)}
-                        </div>
-                      </div>
-                    </div>
-
-                    <div className="flex items-center justify-between">
-                      <div className="flex flex-col gap-2">
-                        <span className={`inline-flex items-center px-2 py-1 rounded-full text-xs font-medium border ${getStatusColor(booking.booking_status)}`}>
-                          {booking.booking_status === 'confirmed' ? '✅ Confirmée' : 
-                           booking.booking_status === 'cancelled' ? '❌ Annulée' : '⏳ En attente'}
-                        </span>
-                        {booking.booking_status !== 'cancelled' && (
-                          <span className={`inline-flex items-center px-2 py-1 rounded-full text-xs font-medium border ${getPaymentStatusColor(booking)}`}>
-                            {getPaymentStatusText(booking)}
-                          </span>
-                        )}
-                      </div>
-                      
-                      <div className="text-right">
-                        <div className="font-bold text-green-600 text-sm">{booking.total_amount.toFixed(2)}€</div>
-                        {booking.booking_status !== 'cancelled' && (
-                          <div className="text-xs text-gray-500">
-                            Payé: {(booking.payment_amount || 0).toFixed(2)}€
-                          </div>
-                        )}
-                      </div>
-                    </div>
-                  </div>
-                ))}
-              </div>
-
-              {/* Pagination */}
-              {totalPages > 1 && (
-                <div className="flex items-center justify-between p-4 sm:p-6 border-t border-gray-200">
-                  <div className="text-sm text-gray-600">
-                    Affichage {startIndex + 1}-{Math.min(endIndex, filteredBookings.length)} sur {filteredBookings.length}
-                  </div>
-                  
-                  <div className="flex items-center gap-2">
-                    <button
-                      onClick={() => setCurrentPage(prev => Math.max(1, prev - 1))}
-                      disabled={currentPage === 1}
-                      className="p-2 border border-gray-300 rounded-lg hover:bg-gray-50 disabled:opacity-50 disabled:cursor-not-allowed transition-colors mobile-tap-target"
-                    >
-                      <ChevronLeft className="w-4 h-4" />
-                    </button>
-                    
-                    <div className="flex gap-1">
-                      {Array.from({ length: Math.min(5, totalPages) }, (_, i) => {
-                        let pageNum;
-                        if (totalPages <= 5) {
-                          pageNum = i + 1;
-                        } else if (currentPage <= 3) {
-                          pageNum = i + 1;
-                        } else if (currentPage >= totalPages - 2) {
-                          pageNum = totalPages - 4 + i;
-                        } else {
-                          pageNum = currentPage - 2 + i;
-                        }
-                        
-                        return (
-                          <button
-                            key={pageNum}
-                            onClick={() => setCurrentPage(pageNum)}
-                            className={`w-8 h-8 rounded-lg text-sm font-medium transition-all duration-300 mobile-tap-target ${
-                              currentPage === pageNum
-                                ? 'bg-gradient-to-r from-blue-500 to-purple-500 text-white shadow-lg'
-                                : 'border border-gray-300 text-gray-700 hover:bg-gray-50'
-                            }`}
-                          >
-                            {pageNum}
-                          </button>
-                        );
-                      })}
-                    </div>
-                    
-                    <button
-                      onClick={() => setCurrentPage(prev => Math.min(totalPages, prev + 1))}
-                      disabled={currentPage === totalPages}
-                      className="p-2 border border-gray-300 rounded-lg hover:bg-gray-50 disabled:opacity-50 disabled:cursor-not-allowed transition-colors mobile-tap-target"
-                    >
-                      <ChevronRight className="w-4 h-4" />
-                    </button>
-                  </div>
-                </div>
+          {(searchTerm || statusFilter !== 'all' || dateFilter !== 'all' || selectedTeamMember !== 'all') && (
+            <div className="flex items-center gap-2 flex-wrap">
+              <span className="text-xs text-gray-600">Filtres actifs:</span>
+              {searchTerm && (
+                <button
+                  onClick={() => setSearchTerm('')}
+                  className="inline-flex items-center gap-1 px-2 py-1 bg-purple-100 text-purple-700 rounded-lg text-xs hover:bg-purple-200 transition-colors"
+                >
+                  Recherche: "{searchTerm}"
+                  <X className="w-3 h-3" />
+                </button>
               )}
-            </>
-          ) : (
-            <div className="text-center py-12">
-              <div className="w-16 h-16 bg-gray-100 rounded-full flex items-center justify-center mx-auto mb-4">
-                <Calendar className="w-8 h-8 text-gray-400" />
-              </div>
-              <h3 className="text-lg font-medium text-gray-900 mb-2">Aucune réservation</h3>
-              <p className="text-gray-500">
-                {searchTerm
-                  ? 'Aucune réservation ne correspond à votre recherche'
-                  : 'Les réservations apparaîtront ici une fois créées'
-                }
-              </p>
+              {statusFilter !== 'all' && (
+                <button
+                  onClick={() => setStatusFilter('all')}
+                  className="inline-flex items-center gap-1 px-2 py-1 bg-blue-100 text-blue-700 rounded-lg text-xs hover:bg-blue-200 transition-colors"
+                >
+                  Statut: {statusFilter}
+                  <X className="w-3 h-3" />
+                </button>
+              )}
+              {dateFilter !== 'all' && (
+                <button
+                  onClick={() => setDateFilter('all')}
+                  className="inline-flex items-center gap-1 px-2 py-1 bg-green-100 text-green-700 rounded-lg text-xs hover:bg-green-200 transition-colors"
+                >
+                  Période: {dateFilter}
+                  <X className="w-3 h-3" />
+                </button>
+              )}
+              {selectedTeamMember !== 'all' && (
+                <button
+                  onClick={() => setSelectedTeamMember('all')}
+                  className="inline-flex items-center gap-1 px-2 py-1 bg-pink-100 text-pink-700 rounded-lg text-xs hover:bg-pink-200 transition-colors"
+                >
+                  Membre: {selectedTeamMember === 'unassigned' ? 'Non assigné' : getMemberDisplayName(teamMembers.find(m => m.user_id === selectedTeamMember)!)}
+                  <X className="w-3 h-3" />
+                </button>
+              )}
             </div>
           )}
         </div>
       </div>
 
-      {/* Modal de détails */}
-      {showDetailsModal && selectedBooking && (
-        <Modal
-          isOpen={showDetailsModal}
-          onClose={() => setShowDetailsModal(false)}
-          title="Détails de la réservation"
-          size="md"
-        >
-          <div className="space-y-4 sm:space-y-6">
-            <div className="bg-gradient-to-r from-blue-50 to-cyan-50 rounded-xl sm:rounded-2xl p-4 sm:p-6 border border-blue-200">
-              <div className="flex items-center gap-3 mb-3 sm:mb-4">
-                <div className="w-10 h-10 sm:w-12 sm:h-12 bg-gradient-to-r from-blue-500 to-purple-500 rounded-lg sm:rounded-xl flex items-center justify-center text-white font-bold text-sm sm:text-lg">
-                  {selectedBooking.client_firstname.charAt(0)}{selectedBooking.client_name.charAt(0)}
-                </div>
-                <div>
-                  <h3 className="text-lg sm:text-xl font-bold text-gray-900">
-                    {selectedBooking.client_firstname} {selectedBooking.client_name}
-                  </h3>
-                  <div className={`inline-flex items-center px-3 py-1 rounded-full text-sm font-medium ${
-                    selectedBooking.booking_status === 'confirmed' 
-                      ? 'bg-green-100 text-green-700' 
-                      : selectedBooking.booking_status === 'cancelled'
-                      ? 'bg-red-100 text-red-700'
-                      : 'bg-orange-100 text-orange-700'
-                  }`}>
-                    {selectedBooking.booking_status === 'confirmed' ? '✅ Confirmée' : 
-                     selectedBooking.booking_status === 'cancelled' ? '❌ Annulée' : '⏳ En attente'}
-                  </div>
-                </div>
+      <div className="flex-1 overflow-y-auto p-4 space-y-3">
+        {filteredBookings.length === 0 ? (
+          <div className="flex items-center justify-center h-64">
+            <div className="text-center p-8 bg-white/80 backdrop-blur-sm rounded-3xl shadow-xl">
+              <div className="w-20 h-20 bg-gradient-to-r from-gray-100 to-gray-200 rounded-full flex items-center justify-center mx-auto mb-6">
+                <Calendar className="w-10 h-10 text-gray-400" />
               </div>
-              
-              <div className="grid grid-cols-1 gap-3 sm:grid-cols-2 sm:gap-4 text-xs sm:text-sm">
-                <div className="flex items-center gap-2">
-                  <Mail className="w-3 h-3 sm:w-4 sm:h-4 text-blue-500" />
-                  <a 
-                    href={`mailto:${selectedBooking.client_email}`}
-                    className="text-blue-600 hover:text-blue-800 hover:underline font-medium"
-                  >
-                    {selectedBooking.client_email}
-                  </a>
-                </div>
-                <div className="flex items-center gap-2">
-                  <Phone className="w-3 h-3 sm:w-4 sm:h-4 text-green-500" />
-                  <button
-                    onClick={() => window.open(`tel:${selectedBooking.client_phone}`, '_self')}
-                    className="text-green-600 hover:text-green-800 hover:underline font-medium"
-                  >
-                    {selectedBooking.client_phone}
-                  </button>
-                </div>
-              </div>
-            </div>
-
-            <div className="bg-gradient-to-r from-purple-50 to-pink-50 rounded-xl sm:rounded-2xl p-4 sm:p-6 border border-purple-200">
-              <h4 className="font-bold text-purple-800 mb-3 sm:mb-4 flex items-center gap-2 text-sm sm:text-base">
-                <Calendar className="w-4 h-4 sm:w-5 sm:h-5" />
-                Détails de la réservation
-              </h4>
-              
-              <div className="space-y-2 sm:space-y-3 text-xs sm:text-sm">
-                <div className="flex justify-between">
-                  <span className="text-purple-700">Service</span>
-                  <span className="font-medium text-purple-800">
-                    {services.find(s => s.id === selectedBooking.service_id)?.name}
-                  </span>
-                </div>
-                <div className="flex justify-between">
-                  <span className="text-purple-700">Date et heure</span>
-                  <span className="font-medium text-purple-800">
-                    {formatDate(selectedBooking.date)} à {formatTime(selectedBooking.time)}
-                  </span>
-                </div>
-                <div className="flex justify-between">
-                  <span className="text-purple-700">Durée</span>
-                  <span className="font-medium text-purple-800">{selectedBooking.duration_minutes} minutes</span>
-                </div>
-                <div className="flex justify-between">
-                  <span className="text-purple-700">Quantité</span>
-                  <span className="font-medium text-purple-800">
-                    {selectedBooking.quantity} {getPluralUnitName(selectedBooking, selectedBooking.quantity)}
-                  </span>
-                </div>
-              </div>
-            </div>
-
-            {selectedBooking.booking_status !== 'cancelled' && (
-              <div className="bg-gradient-to-r from-green-50 to-emerald-50 rounded-xl sm:rounded-2xl p-4 sm:p-6 border border-green-200">
-                <h4 className="font-bold text-green-800 mb-3 sm:mb-4 flex items-center gap-2 text-sm sm:text-base">
-                  <Euro className="w-4 h-4 sm:w-5 sm:h-5" />
-                  Paiement
-                </h4>
-                
-                <div className="space-y-2 sm:space-y-3 text-xs sm:text-sm">
-                  <div className="flex justify-between">
-                    <span className="text-green-700">Montant total</span>
-                    <span className="font-bold text-green-800">{selectedBooking.total_amount.toFixed(2)}€</span>
-                  </div>
-                  <div className="flex justify-between">
-                    <span className="text-green-700">Montant payé</span>
-                    <span className="font-medium text-green-800">{(selectedBooking.payment_amount || 0).toFixed(2)}€</span>
-                  </div>
-                  <div className="flex justify-between">
-                    <span className="text-green-700">Restant à payer</span>
-                    <span className="font-bold text-green-800">
-                      {(selectedBooking.total_amount - (selectedBooking.payment_amount || 0)).toFixed(2)}€
-                    </span>
-                  </div>
-                  <div className="flex justify-between">
-                    <span className="text-green-700">Statut</span>
-                    <span className={`px-2 sm:px-3 py-1 rounded-full text-xs sm:text-sm font-medium ${getPaymentStatusColor(selectedBooking)}`}>
-                      {getPaymentStatusText(selectedBooking)}
-                    </span>
-                  </div>
-                </div>
-              </div>
-            )}
-
-            <div className="flex flex-col gap-3">
-              <button
-                onClick={handleViewHistory}
-                className="w-full bg-gradient-to-r from-indigo-500 to-purple-500 text-white px-4 sm:px-6 py-3 rounded-xl sm:rounded-2xl hover:from-indigo-600 hover:to-purple-600 transition-all duration-300 transform hover:scale-105 shadow-lg font-medium flex items-center justify-center gap-2 text-sm sm:text-base"
-              >
-                <History className="w-4 h-4 sm:w-5 sm:h-5" />
-                Voir l'historique
-              </button>
-
-              <div className="grid grid-cols-2 gap-3">
-                <button
-                  onClick={() => window.open(`tel:${selectedBooking.client_phone}`, '_self')}
-                  className="bg-gradient-to-r from-green-500 to-emerald-500 text-white px-4 sm:px-6 py-3 rounded-xl sm:rounded-2xl hover:from-green-600 hover:to-emerald-600 transition-all duration-300 transform hover:scale-105 shadow-lg font-medium flex items-center justify-center gap-2 text-sm sm:text-base"
-                >
-                  <Phone className="w-4 h-4 sm:w-5 sm:h-5" />
-                  Appeler
-                </button>
-                <button
-                  onClick={() => window.open(`mailto:${selectedBooking.client_email}`, '_blank')}
-                  className="bg-gradient-to-r from-blue-500 to-cyan-500 text-white px-4 sm:px-6 py-3 rounded-xl sm:rounded-2xl hover:from-blue-600 hover:to-cyan-600 transition-all duration-300 transform hover:scale-105 shadow-lg font-medium flex items-center justify-center gap-2 text-sm sm:text-base"
-                >
-                  <Mail className="w-4 h-4 sm:w-5 sm:h-5" />
-                  Email
-                </button>
-              </div>
+              <h3 className="text-xl font-bold text-gray-900 mb-2">Aucune réservation</h3>
+              <p className="text-gray-600">
+                {searchTerm || statusFilter !== 'all' || dateFilter !== 'all' || selectedTeamMember !== 'all'
+                  ? 'Aucune réservation ne correspond à vos critères'
+                  : 'Commencez par créer votre première réservation'}
+              </p>
             </div>
           </div>
-        </Modal>
-      )}
+        ) : (
+          filteredBookings.map((booking) => {
+            const isExpanded = expandedBooking === booking.id;
+            const canEdit = canEditBooking(booking);
+            const assignedMember = booking.assigned_user_id 
+              ? teamMembers.find(m => m.user_id === booking.assigned_user_id)
+              : null;
 
-      {/* Modal d'historique */}
-      {showHistoryModal && selectedBooking && (
-        <BookingHistoryModal
-          isOpen={showHistoryModal}
-          onClose={() => {
-            setShowHistoryModal(false);
-            setShowDetailsModal(true);
-          }}
-          bookingId={selectedBooking.id}
-          clientName={`${selectedBooking.client_firstname} ${selectedBooking.client_name}`}
-        />
-      )}
-    </>
+            return (
+              <div
+                key={booking.id}
+                className="bg-white rounded-2xl shadow-lg hover:shadow-xl transition-all duration-300 overflow-hidden border border-gray-100"
+              >
+                <div className="p-4">
+                  <div className="flex items-start justify-between mb-3">
+                    <div className="flex-1">
+                      <div className="flex items-center gap-2 mb-2">
+                        <h3 className="text-lg font-bold text-gray-900">
+                          {booking.client_firstname} {booking.client_name}
+                        </h3>
+                        {getStatusBadge(booking.booking_status || 'pending')}
+                        {getPaymentStatusBadge(booking)}
+                      </div>
+                      <div className="space-y-1 text-sm text-gray-600">
+                        <div className="flex items-center gap-2">
+                          <Calendar className="w-4 h-4 text-purple-500" />
+                          <span className="font-medium">
+                            {new Date(booking.date).toLocaleDateString('fr-FR', {
+                              weekday: 'long',
+                              day: 'numeric',
+                              month: 'long',
+                              year: 'numeric'
+                            })}
+                          </span>
+                        </div>
+                        <div className="flex items-center gap-2">
+                          <Clock className="w-4 h-4 text-blue-500" />
+                          <span>{booking.time.slice(0, 5)} ({booking.duration_minutes} min)</span>
+                        </div>
+                      </div>
+                    </div>
+                    <button
+                      onClick={() => setExpandedBooking(isExpanded ? null : booking.id)}
+                      className="p-2 hover:bg-gray-100 rounded-lg transition-colors"
+                    >
+                      {isExpanded ? (
+                        <ChevronUp className="w-5 h-5 text-gray-600" />
+                      ) : (
+                        <ChevronDown className="w-5 h-5 text-gray-600" />
+                      )}
+                    </button>
+                  </div>
+
+                  <div className="grid grid-cols-2 gap-3 mb-3">
+                    <div className="bg-gradient-to-r from-purple-50 to-pink-50 rounded-xl p-3">
+                      <div className="text-xs text-purple-600 font-medium mb-1">Service</div>
+                      <div className="font-bold text-gray-900 text-sm">
+                        {(() => {
+                          if (booking.service?.name === 'Service personnalisé' && booking.custom_service_data?.name) {
+                            return booking.custom_service_data.name;
+                          }
+                          return booking.service?.name || 'Service inconnu';
+                        })()}
+                      </div>
+                    </div>
+                    <div className="bg-gradient-to-r from-green-50 to-emerald-50 rounded-xl p-3">
+                      <div className="text-xs text-green-600 font-medium mb-1">Montant</div>
+                      <div className="font-bold text-gray-900 text-sm">{booking.total_amount.toFixed(2)}€</div>
+                    </div>
+                  </div>
+
+                  {isExpanded && (
+                    <div className="mt-4 pt-4 border-t border-gray-100 space-y-3 animate-fadeIn">
+                      <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
+                        <div>
+                          <div className="text-xs text-gray-600 mb-1">Email</div>
+                          <div className="font-medium text-gray-900 text-sm">{booking.client_email}</div>
+                        </div>
+                        {booking.client_phone && (
+                          <div>
+                            <div className="text-xs text-gray-600 mb-1">Téléphone</div>
+                            <div className="font-medium text-gray-900 text-sm">{booking.client_phone}</div>
+                          </div>
+                        )}
+                      </div>
+
+                      <div>
+                        <div className="text-xs text-gray-600 mb-1">Quantité</div>
+                        <div className="font-medium text-gray-900 text-sm">
+                          {booking.quantity} {getPluralUnitName(booking, booking.quantity)}
+                        </div>
+                      </div>
+
+                      {assignedMember && (
+                        <div className="bg-gradient-to-r from-blue-50 to-cyan-50 rounded-xl p-3">
+                          <div className="flex items-center gap-2 text-blue-700">
+                            <UserCheck className="w-4 h-4" />
+                            <div>
+                              <div className="text-xs font-medium">Assigné à</div>
+                              <div className="font-bold text-sm">{getMemberDisplayName(assignedMember)}</div>
+                            </div>
+                          </div>
+                        </div>
+                      )}
+
+                      {booking.notes && (
+                        <div className="bg-gradient-to-r from-yellow-50 to-orange-50 rounded-xl p-3">
+                          <div className="flex items-start gap-2 text-yellow-700">
+                            <FileText className="w-4 h-4 mt-0.5 flex-shrink-0" />
+                            <div className="flex-1">
+                              <div className="text-xs font-medium mb-1">Notes internes</div>
+                              <div className="text-sm whitespace-pre-wrap">{booking.notes}</div>
+                            </div>
+                          </div>
+                        </div>
+                      )}
+
+                      {booking.transactions && booking.transactions.length > 0 && (
+                        <div>
+                          <div className="text-xs text-gray-600 mb-2 font-medium">Paiements</div>
+                          <div className="space-y-2">
+                            {booking.transactions.map((transaction, index) => (
+                              <div
+                                key={index}
+                                className="flex items-center justify-between p-2 bg-gray-50 rounded-lg"
+                              >
+                                <div className="flex items-center gap-2">
+                                  <Euro className="w-4 h-4 text-green-600" />
+                                  <span className="text-sm font-medium">{transaction.amount.toFixed(2)}€</span>
+                                  <span className="text-xs text-gray-600">
+                                    ({transaction.method === 'card' ? 'Carte' : 
+                                      transaction.method === 'cash' ? 'Espèces' : 
+                                      transaction.method === 'check' ? 'Chèque' : 
+                                      transaction.method === 'transfer' ? 'Virement' : 'Stripe'})
+                                  </span>
+                                </div>
+                                <span className={`text-xs px-2 py-1 rounded-full ${
+                                  transaction.status === 'completed' 
+                                    ? 'bg-green-100 text-green-700'
+                                    : transaction.status === 'pending'
+                                    ? 'bg-yellow-100 text-yellow-700'
+                                    : 'bg-red-100 text-red-700'
+                                }`}>
+                                  {transaction.status === 'completed' ? 'Validé' :
+                                   transaction.status === 'pending' ? 'En attente' : 'Annulé'}
+                                </span>
+                              </div>
+                            ))}
+                          </div>
+                        </div>
+                      )}
+
+                      {canEdit && (
+                        <button
+                          onClick={() => onEditBooking(booking)}
+                          className="w-full mt-3 bg-gradient-to-r from-blue-500 to-purple-500 text-white px-4 py-3 rounded-xl hover:from-blue-600 hover:to-purple-600 transition-all duration-300 transform hover:scale-105 shadow-lg font-medium"
+                        >
+                          Modifier la réservation
+                        </button>
+                      )}
+                    </div>
+                  )}
+                </div>
+              </div>
+            );
+          })
+        )}
+      </div>
+    </div>
   );
 }

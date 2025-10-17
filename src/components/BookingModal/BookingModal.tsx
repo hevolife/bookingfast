@@ -224,18 +224,35 @@ export function BookingModal({
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
     
+    console.log('🚀 BookingModal - handleSubmit appelé');
+    console.log('📋 Données du formulaire:', {
+      selectedService,
+      isCustomService,
+      customServiceData,
+      selectedClient,
+      date,
+      time,
+      quantity,
+      bookingStatus,
+      assignedUserId,
+      notes
+    });
+    
     if ((!selectedService && !isCustomService) || !selectedClient) {
+      console.error('❌ Validation échouée: service ou client manquant');
       alert('Veuillez sélectionner un service et un client');
       return;
     }
     
     if (isCustomService && (!customServiceData.name || customServiceData.price <= 0)) {
+      console.error('❌ Validation échouée: données service personnalisé invalides');
       alert('Veuillez remplir le nom et le prix du service personnalisé');
       return;
     }
 
     // Vérifier la limite uniquement pour les nouvelles réservations
     if (!editingBooking && !canCreateBooking) {
+      console.error('❌ Limite de réservations atteinte');
       alert(
         `Limite de réservations atteinte !\n\n` +
         `Vous avez utilisé ${limitInfo?.current}/${limitInfo?.limit} réservations ce mois-ci.\n\n` +
@@ -244,29 +261,36 @@ export function BookingModal({
       return;
     }
 
+    console.log('✅ Validation passée, début de la sauvegarde...');
     setSaving(true);
     
     try {
+      console.log('🔍 Récupération/création du client...');
       const client = await getOrCreateClient({
         firstname: selectedClient.firstname,
         lastname: selectedClient.lastname,
         email: selectedClient.email,
         phone: selectedClient.phone
       });
+      console.log('✅ Client récupéré:', client);
 
       const totalAmount = calculateTotalAmount();
+      console.log('💰 Montant total calculé:', totalAmount);
       
       let serviceId: string | null = null;
       let serviceDuration;
       
       if (isCustomService) {
+        console.log('🔧 Service personnalisé détecté');
         let customServiceTemplate = services.find(s => s.description === 'Service personnalisé');
         
         if (!customServiceTemplate) {
+          console.log('⚠️ Template service personnalisé non trouvé, création...');
           try {
             customServiceTemplate = await ensureCustomServiceExists();
+            console.log('✅ Template créé:', customServiceTemplate);
           } catch (error) {
-            console.error('Erreur création service personnalisé:', error);
+            console.error('❌ Erreur création service personnalisé:', error);
             throw new Error('Impossible de créer le service personnalisé');
           }
         }
@@ -274,6 +298,7 @@ export function BookingModal({
         serviceId = customServiceTemplate.id;
         serviceDuration = customServiceData.duration;
       } else {
+        console.log('📦 Service standard sélectionné');
         serviceId = selectedService!.id;
         serviceDuration = selectedService!.duration_minutes;
       }
@@ -302,28 +327,44 @@ export function BookingModal({
         } : null
       };
 
+      console.log('📝 Données de réservation préparées:', bookingData);
+
       if (editingBooking) {
+        console.log('🔄 Mise à jour de la réservation existante:', editingBooking.id);
         const updatedBooking = await updateBooking(editingBooking.id, bookingData);
+        console.log('✅ Réservation mise à jour:', updatedBooking);
         
         if (updatedBooking) {
+          console.log('🔔 Émission événement bookingUpdated');
           bookingEvents.emit('bookingUpdated', updatedBooking);
         }
       } else {
+        console.log('➕ Création d\'une nouvelle réservation');
         const newBooking = await addBooking(bookingData);
+        console.log('✅ Nouvelle réservation créée:', newBooking);
         
         if (newBooking) {
+          console.log('🔔 Émission événement bookingCreated');
           bookingEvents.emit('bookingCreated', newBooking);
           // Rafraîchir les limites après création
+          console.log('🔄 Rafraîchissement des limites');
           refetchLimit();
+        } else {
+          console.error('❌ addBooking a retourné null/undefined');
         }
       }
 
+      console.log('✅ Sauvegarde terminée avec succès');
+      console.log('🎉 Appel de onSuccess()');
       onSuccess();
+      console.log('🚪 Fermeture du modal');
       handleClose();
     } catch (error) {
-      console.error('Erreur lors de la sauvegarde:', error);
+      console.error('❌ Erreur lors de la sauvegarde:', error);
+      console.error('Stack trace:', error instanceof Error ? error.stack : 'N/A');
       alert(`Erreur: ${error instanceof Error ? error.message : 'Erreur inconnue'}`);
     } finally {
+      console.log('🏁 Fin du processus de sauvegarde');
       setSaving(false);
     }
   };

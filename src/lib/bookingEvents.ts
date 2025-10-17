@@ -1,24 +1,40 @@
-// Système d'événements pour les réservations
+// Event emitter pour les événements de booking
+type BookingEventType = 'bookingCreated' | 'bookingUpdated' | 'bookingDeleted';
+type BookingEventListener = (data: any) => void;
+
 class BookingEventEmitter {
-  private listeners: { [key: string]: Function[] } = {};
+  private listeners: Map<BookingEventType, Set<BookingEventListener>> = new Map();
 
-  on(event: string, callback: Function) {
-    if (!this.listeners[event]) {
-      this.listeners[event] = [];
+  on(event: BookingEventType, listener: BookingEventListener) {
+    if (!this.listeners.has(event)) {
+      this.listeners.set(event, new Set());
     }
-    this.listeners[event].push(callback);
+    this.listeners.get(event)!.add(listener);
   }
 
-  off(event: string, callback: Function) {
-    if (this.listeners[event]) {
-      this.listeners[event] = this.listeners[event].filter(cb => cb !== callback);
+  off(event: BookingEventType, listener: BookingEventListener) {
+    const eventListeners = this.listeners.get(event);
+    if (eventListeners) {
+      eventListeners.delete(listener);
     }
   }
 
-  emit(event: string, data?: any) {
-    if (this.listeners[event]) {
-      this.listeners[event].forEach(callback => callback(data));
+  emit(event: BookingEventType, data?: any) {
+    console.log(`🔔 BookingEvent émis: ${event}`, data);
+    const eventListeners = this.listeners.get(event);
+    if (eventListeners) {
+      eventListeners.forEach(listener => {
+        try {
+          listener(data);
+        } catch (error) {
+          console.error(`❌ Erreur dans listener ${event}:`, error);
+        }
+      });
     }
+  }
+
+  clear() {
+    this.listeners.clear();
   }
 }
 

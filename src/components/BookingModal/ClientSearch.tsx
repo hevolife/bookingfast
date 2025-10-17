@@ -44,7 +44,21 @@ export function ClientSearch({ onClientSelect, selectedClient }: ClientSearchPro
     setSaving(true);
     
     try {
-      const updatedClient = await updateClient(selectedClient.id, editClientData);
+      console.log('🔍 Recherche du client réel par email:', editClientData.email);
+      
+      // Trouver le client réel dans la liste des clients par email
+      const realClient = clients.find(c => c.email.toLowerCase() === selectedClient.email.toLowerCase());
+      
+      if (!realClient) {
+        console.error('❌ Client non trouvé dans la base de données');
+        alert('Client non trouvé dans la base de données. Veuillez réessayer.');
+        return;
+      }
+      
+      console.log('✅ Client réel trouvé:', realClient.id);
+      
+      // Mettre à jour avec l'ID réel
+      const updatedClient = await updateClient(realClient.id, editClientData);
       
       if (!updatedClient) {
         throw new Error('Erreur lors de la modification du client');
