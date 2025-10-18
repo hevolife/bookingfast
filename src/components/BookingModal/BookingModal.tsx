@@ -8,7 +8,7 @@ import { usePlugins } from '../../hooks/usePlugins';
 import { useBookingLimit } from '../../hooks/useBookingLimit';
 import { Booking, Service, Client, Transaction } from '../../types';
 import { Modal } from '../UI/Modal';
-import { Button } from '../UI/Button';
+import { ModalFooter } from '../UI/ModalFooter';
 import { LoadingSpinner } from '../UI/LoadingSpinner';
 import { PaymentSection } from './PaymentSection';
 import { TimeSlotPicker } from './TimeSlotPicker';
@@ -224,35 +224,17 @@ export function BookingModal({
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
     
-    console.log('🚀 BookingModal - handleSubmit appelé');
-    console.log('📋 Données du formulaire:', {
-      selectedService,
-      isCustomService,
-      customServiceData,
-      selectedClient,
-      date,
-      time,
-      quantity,
-      bookingStatus,
-      assignedUserId,
-      notes
-    });
-    
     if ((!selectedService && !isCustomService) || !selectedClient) {
-      console.error('❌ Validation échouée: service ou client manquant');
       alert('Veuillez sélectionner un service et un client');
       return;
     }
     
     if (isCustomService && (!customServiceData.name || customServiceData.price <= 0)) {
-      console.error('❌ Validation échouée: données service personnalisé invalides');
       alert('Veuillez remplir le nom et le prix du service personnalisé');
       return;
     }
 
-    // Vérifier la limite uniquement pour les nouvelles réservations
     if (!editingBooking && !canCreateBooking) {
-      console.error('❌ Limite de réservations atteinte');
       alert(
         `Limite de réservations atteinte !\n\n` +
         `Vous avez utilisé ${limitInfo?.current}/${limitInfo?.limit} réservations ce mois-ci.\n\n` +
@@ -261,36 +243,28 @@ export function BookingModal({
       return;
     }
 
-    console.log('✅ Validation passée, début de la sauvegarde...');
     setSaving(true);
     
     try {
-      console.log('🔍 Récupération/création du client...');
       const client = await getOrCreateClient({
         firstname: selectedClient.firstname,
         lastname: selectedClient.lastname,
         email: selectedClient.email,
         phone: selectedClient.phone
       });
-      console.log('✅ Client récupéré:', client);
 
       const totalAmount = calculateTotalAmount();
-      console.log('💰 Montant total calculé:', totalAmount);
       
       let serviceId: string | null = null;
       let serviceDuration;
       
       if (isCustomService) {
-        console.log('🔧 Service personnalisé détecté');
         let customServiceTemplate = services.find(s => s.description === 'Service personnalisé');
         
         if (!customServiceTemplate) {
-          console.log('⚠️ Template service personnalisé non trouvé, création...');
           try {
             customServiceTemplate = await ensureCustomServiceExists();
-            console.log('✅ Template créé:', customServiceTemplate);
           } catch (error) {
-            console.error('❌ Erreur création service personnalisé:', error);
             throw new Error('Impossible de créer le service personnalisé');
           }
         }
@@ -298,7 +272,6 @@ export function BookingModal({
         serviceId = customServiceTemplate.id;
         serviceDuration = customServiceData.duration;
       } else {
-        console.log('📦 Service standard sélectionné');
         serviceId = selectedService!.id;
         serviceDuration = selectedService!.duration_minutes;
       }
@@ -327,44 +300,27 @@ export function BookingModal({
         } : null
       };
 
-      console.log('📝 Données de réservation préparées:', bookingData);
-
       if (editingBooking) {
-        console.log('🔄 Mise à jour de la réservation existante:', editingBooking.id);
         const updatedBooking = await updateBooking(editingBooking.id, bookingData);
-        console.log('✅ Réservation mise à jour:', updatedBooking);
         
         if (updatedBooking) {
-          console.log('🔔 Émission événement bookingUpdated');
           bookingEvents.emit('bookingUpdated', updatedBooking);
         }
       } else {
-        console.log('➕ Création d\'une nouvelle réservation');
         const newBooking = await addBooking(bookingData);
-        console.log('✅ Nouvelle réservation créée:', newBooking);
         
         if (newBooking) {
-          console.log('🔔 Émission événement bookingCreated');
           bookingEvents.emit('bookingCreated', newBooking);
-          // Rafraîchir les limites après création
-          console.log('🔄 Rafraîchissement des limites');
           refetchLimit();
-        } else {
-          console.error('❌ addBooking a retourné null/undefined');
         }
       }
 
-      console.log('✅ Sauvegarde terminée avec succès');
-      console.log('🎉 Appel de onSuccess()');
       onSuccess();
-      console.log('🚪 Fermeture du modal');
       handleClose();
     } catch (error) {
-      console.error('❌ Erreur lors de la sauvegarde:', error);
-      console.error('Stack trace:', error instanceof Error ? error.stack : 'N/A');
+      console.error('Erreur lors de la sauvegarde:', error);
       alert(`Erreur: ${error instanceof Error ? error.message : 'Erreur inconnue'}`);
     } finally {
-      console.log('🏁 Fin du processus de sauvegarde');
       setSaving(false);
     }
   };
@@ -375,12 +331,8 @@ export function BookingModal({
     setSaving(true);
     try {
       await deleteBooking(editingBooking.id);
-      
       bookingEvents.emit('bookingDeleted', editingBooking.id);
-      
-      // Rafraîchir les limites après suppression
       refetchLimit();
-      
       onSuccess();
       handleClose();
     } catch (error) {
@@ -412,6 +364,49 @@ export function BookingModal({
     return `${unitName}(s)`;
   };
 
+  // Configuration des boutons du footer
+  const footerButtons = [
+    ...(editingBooking ? [{
+      label: 'Supprimer',
+      onClick: () => setShowDeleteConfirm(true),
+      variant: 'danger' as const,
+      disabled: saving,
+      icon: '🗑️'
+    }] : []),
+    {
+      label: 'Annuler',
+      onClick: handleClose,
+      variant: 'secondary' as const,
+      disabled: saving
+    },
+    {
+      label: editingBooking ? 'Modifier' : 'Créer',
+      onClick: () => {},
+      variant: 'primary' as const,
+      disabled: saving || (!selectedService && (!isCustomService || !customServiceData.name || customServiceData.price <= 0)) || 
+        !selectedClient?.firstname || !selectedClient?.lastname || !selectedClient?.email || !selectedClient?.phone ||
+        (!editingBooking && !canCreateBooking),
+      loading: saving,
+      icon: editingBooking ? '✏️' : '✨'
+    }
+  ];
+
+  const deleteConfirmButtons = [
+    {
+      label: 'Annuler',
+      onClick: () => setShowDeleteConfirm(false),
+      variant: 'secondary' as const
+    },
+    {
+      label: 'Supprimer',
+      onClick: handleDelete,
+      variant: 'danger' as const,
+      disabled: saving,
+      loading: saving,
+      icon: '🗑️'
+    }
+  ];
+
   return (
     <>
       <Modal
@@ -420,8 +415,7 @@ export function BookingModal({
         title={editingBooking ? 'Modifier la réservation' : 'Nouvelle réservation'}
         size="xl"
       >
-        <form onSubmit={handleSubmit} className="space-y-4 sm:space-y-6 touch-action-pan-y">
-          {/* Afficher l'alerte de limite si applicable */}
+        <form onSubmit={handleSubmit} className="space-y-4 sm:space-y-6">
           {!editingBooking && limitInfo && !isUnlimited && (
             <div className={`rounded-xl p-4 ${
               canCreateBooking 
@@ -473,7 +467,7 @@ export function BookingModal({
           )}
 
           <div className="grid grid-cols-1 lg:grid-cols-2 gap-4 sm:gap-6">
-            <div className="space-y-4 sm:space-y-6 touch-action-pan-y">
+            <div className="space-y-4 sm:space-y-6">
               <div>
                 <label className="block text-sm font-medium text-gray-700 mb-2 sm:mb-3">
                   Service
@@ -839,52 +833,8 @@ export function BookingModal({
             </div>
           </div>
 
-          <div className="flex flex-col sm:flex-row gap-3 mt-6 pt-4 border-t border-gray-200">
-            <button
-              type="button"
-              onClick={handleClose}
-              className="w-full sm:w-auto sm:min-w-[120px] bg-gradient-to-r from-gray-500 to-gray-600 text-white px-6 py-3 rounded-xl hover:from-gray-600 hover:to-gray-700 transition-all duration-300 transform hover:scale-105 shadow-lg disabled:opacity-50 disabled:cursor-not-allowed disabled:transform-none font-medium text-sm sm:text-base"
-            >
-              Annuler
-            </button>
-            <button
-              type="submit"
-              disabled={saving || (!selectedService && (!isCustomService || !customServiceData.name || customServiceData.price <= 0)) || 
-                !selectedClient?.firstname || !selectedClient?.lastname || !selectedClient?.email || !selectedClient?.phone ||
-                (!editingBooking && !canCreateBooking)}
-              className="w-full sm:flex-1 inline-flex items-center justify-center gap-2 font-medium rounded-xl transition-all duration-300 transform hover:scale-105 shadow-lg disabled:opacity-50 disabled:cursor-not-allowed disabled:transform-none text-center bg-gradient-to-r from-blue-600 via-purple-600 to-pink-600 text-white hover:from-blue-700 hover:via-purple-700 hover:to-pink-700 px-6 py-3 text-sm sm:text-base"
-              style={{
-                background: 'rgb(13 163 26)',
-                borderColor: 'rgb(20 221 76)',
-                color: 'white'
-              }}
-            >
-              {saving ? (
-                <div className="flex items-center gap-2">
-                  <LoadingSpinner size="sm" />
-                  <span>Sauvegarde...</span>
-                </div>
-              ) : (
-                <span className="flex items-center justify-center">
-                  {editingBooking ? 'Modifier' : 'Créer'}
-                </span>
-              )}
-            </button>
-          </div>
+          <ModalFooter buttons={footerButtons} />
         </form>
-
-        {editingBooking && (
-          <div className="mt-4 pt-4 border-t border-gray-200">
-            <button
-              type="button"
-              onClick={() => setShowDeleteConfirm(true)}
-              disabled={saving}
-              className="w-full sm:w-auto bg-gradient-to-r from-red-500 to-pink-500 text-white px-6 py-3 rounded-xl hover:from-red-600 hover:to-pink-600 transition-all duration-300 transform hover:scale-105 shadow-lg disabled:opacity-50 disabled:cursor-not-allowed disabled:transform-none font-medium text-sm sm:text-base"
-            >
-              Supprimer la réservation
-            </button>
-          </div>
-        )}
       </Modal>
 
       <Modal
@@ -893,34 +843,12 @@ export function BookingModal({
         title="Confirmer la suppression"
         size="sm"
       >
-        <div className="space-y-4">
-          <p className="text-gray-700">
+        <div className="space-y-6">
+          <p className="text-gray-700 text-base">
             Êtes-vous sûr de vouloir supprimer cette réservation ? Cette action est irréversible.
           </p>
-          <div className="flex gap-3">
-            <button
-              type="button"
-              onClick={() => setShowDeleteConfirm(false)}
-              className="flex-1 bg-gradient-to-r from-gray-500 to-gray-600 text-white px-6 py-3 rounded-xl hover:from-gray-600 hover:to-gray-700 transition-all duration-300 transform hover:scale-105 shadow-lg font-medium text-sm sm:text-base"
-            >
-              Annuler
-            </button>
-            <button
-              type="button"
-              onClick={handleDelete}
-              disabled={saving}
-              className="flex-1 bg-gradient-to-r from-red-500 to-pink-500 text-white px-6 py-3 rounded-xl hover:from-red-600 hover:to-pink-600 transition-all duration-300 transform hover:scale-105 shadow-lg disabled:opacity-50 disabled:cursor-not-allowed disabled:transform-none font-medium text-sm sm:text-base"
-            >
-              {saving ? (
-                <div className="flex items-center gap-2">
-                  <LoadingSpinner size="sm" />
-                  <span>Suppression...</span>
-                </div>
-              ) : (
-                'Supprimer'
-              )}
-            </button>
-          </div>
+          
+          <ModalFooter buttons={deleteConfirmButtons} />
         </div>
       </Modal>
     </>

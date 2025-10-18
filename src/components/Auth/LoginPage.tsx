@@ -12,7 +12,9 @@ export function LoginPage() {
   const [isLogin, setIsLogin] = useState(true);
   const [email, setEmail] = useState('');
   const [password, setPassword] = useState('');
+  const [confirmPassword, setConfirmPassword] = useState('');
   const [showPassword, setShowPassword] = useState(false);
+  const [showConfirmPassword, setShowConfirmPassword] = useState(false);
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [showSecretCode, setShowSecretCode] = useState(false);
@@ -53,6 +55,20 @@ export function LoginPage() {
     setLoading(true);
     setError(null);
 
+    // Validation du mot de passe pour l'inscription
+    if (!isLogin) {
+      if (password !== confirmPassword) {
+        setError('Les mots de passe ne correspondent pas');
+        setLoading(false);
+        return;
+      }
+      if (password.length < 6) {
+        setError('Le mot de passe doit contenir au moins 6 caractères');
+        setLoading(false);
+        return;
+      }
+    }
+
     try {
       if (isLogin) {
         await signIn(email, password);
@@ -77,6 +93,7 @@ export function LoginPage() {
         setError('Compte créé avec succès ! Vérifiez votre email pour confirmer votre compte.');
         setIsLogin(true); // Basculer vers le mode connexion
         setPassword(''); // Vider le mot de passe
+        setConfirmPassword(''); // Vider la confirmation
         return;
       }
     } catch (err) {
@@ -105,6 +122,7 @@ export function LoginPage() {
     setError(null);
     setEmail('');
     setPassword('');
+    setConfirmPassword('');
   };
 
   return (
@@ -220,10 +238,54 @@ export function LoginPage() {
               )}
             </div>
 
+            {/* Confirmation mot de passe (uniquement en mode inscription) */}
+            {!isLogin && (
+              <div>
+                <label className="block text-sm font-medium text-gray-700 mb-2">
+                  Confirmer le mot de passe
+                </label>
+                <div className="relative">
+                  <Lock className="absolute left-4 top-1/2 transform -translate-y-1/2 text-gray-400 w-5 h-5" />
+                  <input
+                    type={showConfirmPassword ? 'text' : 'password'}
+                    value={confirmPassword}
+                    onChange={(e) => setConfirmPassword(e.target.value)}
+                    required
+                    minLength={6}
+                    className={`w-full pl-12 pr-12 py-4 border rounded-2xl focus:ring-4 transition-all duration-300 bg-white/80 backdrop-blur-sm ${
+                      confirmPassword && password !== confirmPassword
+                        ? 'border-red-300 focus:ring-red-200 focus:border-red-500'
+                        : 'border-gray-300 focus:ring-purple-200 focus:border-purple-500'
+                    }`}
+                    placeholder="••••••••"
+                  />
+                  <button
+                    type="button"
+                    onClick={() => setShowConfirmPassword(!showConfirmPassword)}
+                    className="absolute right-4 top-1/2 transform -translate-y-1/2 text-gray-400 hover:text-gray-600 transition-colors"
+                  >
+                    {showConfirmPassword ? <EyeOff className="w-5 h-5" /> : <Eye className="w-5 h-5" />}
+                  </button>
+                </div>
+                {confirmPassword && password !== confirmPassword && (
+                  <div className="text-xs text-red-600 mt-1 flex items-center gap-1">
+                    <span>❌</span>
+                    <span>Les mots de passe ne correspondent pas</span>
+                  </div>
+                )}
+                {confirmPassword && password === confirmPassword && (
+                  <div className="text-xs text-green-600 mt-1 flex items-center gap-1">
+                    <span>✅</span>
+                    <span>Les mots de passe correspondent</span>
+                  </div>
+                )}
+              </div>
+            )}
+
             {/* Bouton de soumission */}
             <button
               type="submit"
-              disabled={loading}
+              disabled={loading || (!isLogin && password !== confirmPassword)}
               className="w-full bg-gradient-to-r from-blue-600 via-purple-600 to-pink-600 text-white py-4 px-6 rounded-2xl font-bold text-lg hover:from-blue-700 hover:via-purple-700 hover:to-pink-700 disabled:opacity-50 disabled:cursor-not-allowed transition-all duration-300 transform hover:scale-105 shadow-lg flex items-center justify-center gap-2"
             >
               {loading ? (

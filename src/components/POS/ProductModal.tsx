@@ -1,6 +1,7 @@
 import React, { useState, useEffect } from 'react';
-import { X, Package, DollarSign, Hash, Clock, Palette } from 'lucide-react';
+import { Package, DollarSign, Hash, Clock, Palette } from 'lucide-react';
 import { Modal } from '../UI/Modal';
+import { ModalFooter } from '../UI/ModalFooter';
 import { POSProduct, POSCategory } from '../../types/pos';
 
 interface ProductModalProps {
@@ -31,7 +32,7 @@ export function ProductModal({ isOpen, onClose, product, categories, onSave, onD
     duration_minutes: '',
     category_id: '',
     color: 'blue',
-    is_ttc_price: true // Par défaut TTC
+    is_ttc_price: true
   });
   const [saving, setSaving] = useState(false);
 
@@ -86,6 +87,30 @@ export function ProductModal({ isOpen, onClose, product, categories, onSave, onD
       setSaving(false);
     }
   };
+
+  const footerButtons = [
+    ...(onDelete ? [{
+      label: 'Supprimer',
+      onClick: onDelete,
+      variant: 'danger' as const,
+      disabled: saving,
+      icon: '🗑️'
+    }] : []),
+    {
+      label: 'Annuler',
+      onClick: onClose,
+      variant: 'secondary' as const,
+      disabled: saving
+    },
+    {
+      label: 'Enregistrer',
+      onClick: () => {},
+      variant: 'primary' as const,
+      disabled: saving,
+      loading: saving,
+      icon: '💾'
+    }
+  ];
 
   return (
     <Modal
@@ -274,33 +299,7 @@ export function ProductModal({ isOpen, onClose, product, categories, onSave, onD
           </div>
         </div>
 
-        <div className="flex gap-3">
-          {onDelete && (
-            <button
-              type="button"
-              onClick={onDelete}
-              disabled={saving}
-              className="bg-red-100 text-red-700 px-6 py-3 rounded-xl font-medium hover:bg-red-200 transition-colors disabled:opacity-50"
-            >
-              Supprimer
-            </button>
-          )}
-          <button
-            type="button"
-            onClick={onClose}
-            disabled={saving}
-            className="flex-1 bg-gray-100 text-gray-700 py-3 rounded-xl font-medium hover:bg-gray-200 transition-colors disabled:opacity-50"
-          >
-            Annuler
-          </button>
-          <button
-            type="submit"
-            disabled={saving}
-            className="flex-1 bg-gradient-to-r from-purple-500 to-pink-500 text-white py-3 rounded-xl font-bold hover:from-purple-600 hover:to-pink-600 transition-all shadow-lg disabled:opacity-50"
-          >
-            {saving ? 'Enregistrement...' : 'Enregistrer'}
-          </button>
-        </div>
+        <ModalFooter buttons={footerButtons} />
       </form>
     </Modal>
   );
