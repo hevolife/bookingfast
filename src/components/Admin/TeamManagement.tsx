@@ -65,22 +65,28 @@ export function TeamManagement() {
       return;
     }
 
+    console.log('🔍 Vérification limite avant invitation:', {
+      canInviteMember,
+      teamLimitInfo,
+      hasPlugin
+    });
+
     // Vérifier la limite d'équipe
     if (!canInviteMember) {
-      // Si plan Starter (limite 0)
+      // Si limite 0 (plan Starter ou pas d'abonnement)
       if (teamLimitInfo?.limit === 0) {
         alert(
           `Limite de membres d'équipe atteinte !\n\n` +
-          `Votre plan Starter ne permet pas d'inviter des membres d'équipe.\n\n` +
+          `Votre plan ${teamLimitInfo.subscription_tier || 'actuel'} ne permet pas d'inviter des membres d'équipe.\n\n` +
           `Passez au plan Pro pour inviter jusqu'à 10 membres !`
         );
         setShowUpgradeModal(true);
       } 
-      // Si plan Pro (limite 10) sans plugin
-      else if (teamLimitInfo?.limit === 10 && !hasPlugin) {
+      // Si limite atteinte (plan Pro sans plugin)
+      else if (teamLimitInfo?.limit && teamLimitInfo.current >= teamLimitInfo.limit && !hasPlugin) {
         alert(
           `Limite de membres d'équipe atteinte !\n\n` +
-          `Votre plan Pro permet d'inviter jusqu'à 10 membres.\n\n` +
+          `Votre plan permet d'inviter jusqu'à ${teamLimitInfo.limit} membres.\n\n` +
           `Activez le plugin Pack Société pour des invitations illimitées !`
         );
         setShowPluginModal(true);
@@ -141,7 +147,6 @@ export function TeamManagement() {
   };
 
   const handleActivatePlugin = () => {
-    // Rediriger vers la page des plugins
     window.location.href = '/plugins';
   };
 
@@ -329,7 +334,7 @@ export function TeamManagement() {
               </div>
               <div className="flex items-baseline gap-2">
                 <div className="text-2xl font-bold text-purple-600">{teamLimitInfo?.current || 0}</div>
-                {!hasPlugin && (
+                {!hasPlugin && teamLimitInfo?.limit !== null && (
                   <div className="text-sm text-gray-500">/ {teamLimitInfo?.limit || 0}</div>
                 )}
               </div>
@@ -376,9 +381,9 @@ export function TeamManagement() {
                     {teamLimitInfo?.limit === 0 ? 'Besoin d\'inviter des membres ?' : 'Besoin de plus de membres ?'}
                   </h4>
                   <p className="text-sm text-orange-700 mb-3">
-                    {teamLimitInfo?.limit === 0 
-                      ? 'Votre plan Starter ne permet pas d\'inviter des membres d\'équipe. Passez au plan Pro pour inviter jusqu\'à 10 membres !'
-                      : 'Vous avez atteint la limite de 10 membres. Activez le plugin Pack Société pour des invitations illimitées !'
+                    {teamLimitInfo?.limit === 0
+                      ? `Votre plan ${teamLimitInfo.subscription_tier} ne permet pas d'inviter des membres d'équipe. Passez au plan Pro pour inviter jusqu'à 10 membres !`
+                      : `Vous avez atteint la limite de ${teamLimitInfo?.limit} membres. Activez le plugin Pack Société pour des invitations illimitées !`
                     }
                   </p>
                   <button

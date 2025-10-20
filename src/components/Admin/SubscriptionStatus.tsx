@@ -15,6 +15,7 @@ export function SubscriptionStatus() {
   const [showCodeRedemption, setShowCodeRedemption] = useState(false);
   const [allRedemptions, setAllRedemptions] = useState<any[]>([]);
   const [isTeamMember, setIsTeamMember] = useState(false);
+  const [activeSubscription, setActiveSubscription] = useState<any>(null);
 
   useEffect(() => {
     loadUserStatus();
@@ -22,7 +23,6 @@ export function SubscriptionStatus() {
   }, [user]);
 
   const loadSubscriptionPlans = async () => {
-    // Plans par défaut avec descriptions mises à jour
     const defaultPlans = [
       {
         id: 'starter',
@@ -93,6 +93,7 @@ export function SubscriptionStatus() {
     try {
       console.log('👑 Chargement des données d\'abonnement pour:', user.email);
       
+      // Vérifier si l'utilisateur est propriétaire d'équipe
       const { data: ownedTeamData, error: ownedTeamError } = await supabase
         .from('team_members')
         .select('user_id')
@@ -101,8 +102,8 @@ export function SubscriptionStatus() {
         .limit(1);
 
       const isOwner = !ownedTeamError && ownedTeamData && ownedTeamData.length > 0;
-      console.log('👑 Résultat propriétaire:', { isOwner, ownedMembers: ownedTeamData?.length || 0 });
 
+      // Vérifier si l'utilisateur est membre d'une équipe
       const { data: membershipCheck, error: membershipError } = await supabase
         .from('team_members')
         .select('owner_id, is_active')
@@ -113,14 +114,6 @@ export function SubscriptionStatus() {
       const isMember = !isOwner && !membershipError && membershipCheck?.owner_id;
       setIsTeamMember(isMember);
       
-      console.log('📊 Statut final:', { 
-        isOwner, 
-        isMember, 
-        userEmail: user.email,
-        ownedMembers: ownedTeamData?.length || 0,
-        memberOf: membershipCheck?.owner_id || 'aucun'
-      });
-      
       let targetUserId = user.id;
       
       if (isMember && membershipCheck?.owner_id) {
@@ -130,32 +123,47 @@ export function SubscriptionStatus() {
         console.log('👑 PROPRIÉTAIRE - Chargement données propres:', targetUserId);
       }
 
-      const { data: userData, error: userError } = await supabase
-        .from('users')
+      // ✅ CORRECTION : Charger l'abonnement depuis la table subscriptions
+      console.log('🔍 Recherche abonnement actif dans subscriptions...');
+      const { data: subscriptionData, error: subscriptionError } = await supabase
+        .from('subscriptions')
         .select('*')
-        .eq('id', targetUserId)
+        .eq('user_id', targetUserId)
+        .in('status', ['active', 'trial'])
+        .order('created_at', { ascending: false })
+        .limit(1)
         .maybeSingle();
 
-      if (userError) {
-        console.error('Erreur récupération données utilisateur:', userError);
-        setLoading(false);
-        return;
+      if (subscriptionError) {
+        console.error('❌ Erreur chargement abonnement:', subscriptionError);
+      } else if (subscriptionData) {
+        console.log('✅ Abonnement trouvé:', subscriptionData);
+        setActiveSubscription(subscriptionData);
+        
+        // Créer un objet userStatus compatible avec l'ancien format
+        setUserStatus({
+          id: targetUserId,
+          subscription_status: subscriptionData.status,
+          subscription_tier: subscriptionData.plan_type,
+          trial_ends_at: subscriptionData.trial_end,
+          created_at: subscriptionData.created_at
+        });
+      } else {
+        console.log('⚠️ Aucun abonnement actif trouvé');
+        
+        // Charger les données utilisateur de base
+        const { data: userData, error: userError } = await supabase
+          .from('users')
+          .select('*')
+          .eq('id', targetUserId)
+          .maybeSingle();
+
+        if (!userError && userData) {
+          setUserStatus(userData);
+        }
       }
 
-      if (!userData) {
-        console.log('⚠️ Aucun profil utilisateur trouvé pour:', isMember ? 'propriétaire' : 'utilisateur');
-        setLoading(false);
-        return;
-      }
-
-      console.log('📊 Données utilisateur chargées:', {
-        subscription_tier: userData.subscription_tier,
-        subscription_status: userData.subscription_status,
-        trial_ends_at: userData.trial_ends_at
-      });
-
-      setUserStatus(userData);
-
+      // Charger les codes d'accès
       const { data: redemptions, error: redemptionError } = await supabase
         .from('code_redemptions')
         .select('id, code_id, user_id, redeemed_at, access_granted_until, created_at, updated_at')
@@ -187,12 +195,8 @@ export function SubscriptionStatus() {
 
         if (activeRedemption) {
           setActiveAccessCode(activeRedemption.code);
-          console.log('✅ Code actif trouvé pour', isMember ? 'propriétaire' : 'utilisateur', ':', activeRedemption.code.code);
-        } else {
-          console.log('❌ Aucun code actif trouvé pour', isMember ? 'propriétaire' : 'utilisateur');
+          console.log('✅ Code actif trouvé:', activeRedemption.code.code);
         }
-      } else {
-        console.log('❌ Erreur ou aucune rédemption trouvée pour', isMember ? 'propriétaire' : 'utilisateur');
       }
     } catch (error) {
       console.error('Erreur chargement statut:', error);
@@ -225,9 +229,6 @@ export function SubscriptionStatus() {
       const baseUrl = supabaseUrl.endsWith('/') ? supabaseUrl.slice(0, -1) : supabaseUrl;
       const checkoutUrl = `${baseUrl}/functions/v1/stripe-checkout`;
       
-      console.log('🔗 URL Stripe checkout:', checkoutUrl);
-
-      // IMPORTANT: Utilise le Stripe de la PLATEFORME (pas celui de l'utilisateur)
       const response = await fetch(checkoutUrl, {
         method: 'POST',
         headers: {
@@ -244,32 +245,20 @@ export function SubscriptionStatus() {
             user_id: user.id,
             plan_id: planId,
             plan_type: planId,
-            payment_type: 'platform_subscription' // IMPORTANT: Indique que c'est un abonnement plateforme
+            payment_type: 'platform_subscription'
           },
         }),
       });
 
-      console.log('📡 Réponse Stripe:', {
-        status: response.status,
-        statusText: response.statusText,
-        ok: response.ok
-      });
-
       if (!response.ok) {
         const errorData = await response.json().catch(() => ({}));
-        console.error('❌ Erreur réponse Stripe:', errorData);
-        throw new Error(errorData.error || `Erreur HTTP ${response.status}: ${response.statusText}`);
+        throw new Error(errorData.error || `Erreur HTTP ${response.status}`);
       }
 
       const { url, error: stripeError } = await response.json();
       
-      if (stripeError) {
-        console.error('❌ Erreur Stripe:', stripeError);
-        throw new Error(stripeError);
-      }
-
+      if (stripeError) throw new Error(stripeError);
       if (url) {
-        console.log('✅ Redirection vers Stripe:', url);
         window.location.href = url;
       } else {
         throw new Error('URL de paiement non reçue');
@@ -299,13 +288,17 @@ export function SubscriptionStatus() {
     if (activeAccessCode?.access_type === 'lifetime') {
       return 'from-green-500 to-emerald-500';
     }
-    if (activeAccessCode || userStatus?.subscription_status === 'active') {
+    
+    // ✅ CORRECTION : Vérifier activeSubscription en priorité
+    if (activeSubscription?.status === 'active' || activeAccessCode || userStatus?.subscription_status === 'active') {
       return 'from-blue-500 to-cyan-500';
     }
-    if (userStatus?.subscription_status === 'trial') {
+    
+    if (activeSubscription?.status === 'trial' || userStatus?.subscription_status === 'trial') {
       const remainingDays = getRemainingTrialDays();
       return remainingDays <= 2 ? 'from-red-500 to-pink-500' : 'from-orange-500 to-yellow-500';
     }
+    
     return 'from-gray-500 to-gray-600';
   };
 
@@ -317,6 +310,7 @@ export function SubscriptionStatus() {
     if (activeAccessCode?.access_type === 'lifetime') {
       return '👑 Accès à vie';
     }
+    
     if (activeAccessCode) {
       return `🎫 Code actif (${activeAccessCode.access_duration} ${
         activeAccessCode.access_type === 'days' ? 'jour(s)' :
@@ -325,15 +319,18 @@ export function SubscriptionStatus() {
         activeAccessCode.access_type
       })`;
     }
-    if (userStatus?.subscription_status === 'active') {
-      // Afficher le tier d'abonnement
-      const tierName = userStatus.subscription_tier === 'starter' ? 'Starter' : 'Pro';
+    
+    // ✅ CORRECTION : Vérifier activeSubscription en priorité
+    if (activeSubscription?.status === 'active' || userStatus?.subscription_status === 'active') {
+      const tierName = (activeSubscription?.plan_type || userStatus?.subscription_tier) === 'starter' ? 'Starter' : 'Pro';
       return `✅ Abonnement ${tierName} actif`;
     }
-    if (userStatus?.subscription_status === 'trial') {
+    
+    if (activeSubscription?.status === 'trial' || userStatus?.subscription_status === 'trial') {
       const remainingDays = getRemainingTrialDays();
       return `⏳ Essai gratuit (${remainingDays} jour(s) restant(s))`;
     }
+    
     return '❌ Aucun accès actif';
   };
 
@@ -370,7 +367,7 @@ export function SubscriptionStatus() {
                 <Crown className="w-8 h-8 text-white" />
               ) : activeAccessCode ? (
                 <Gift className="w-8 h-8 text-white" />
-              ) : userStatus?.subscription_status === 'active' ? (
+              ) : (activeSubscription?.status === 'active' || userStatus?.subscription_status === 'active') ? (
                 <CheckCircle className="w-8 h-8 text-white" />
               ) : (
                 <Clock className="w-8 h-8 text-white" />
@@ -385,10 +382,10 @@ export function SubscriptionStatus() {
                   ? 'Vous êtes membre d\'une équipe avec accès complet aux fonctionnalités'
                   : activeAccessCode
                   ? `Code "${activeAccessCode.code}" - ${activeAccessCode.description || 'Code d\'accès secret'}`
-                  : userStatus?.subscription_status === 'active'
-                  ? `Plan ${userStatus.subscription_tier === 'starter' ? 'Starter' : 'Pro'} - Toutes les fonctionnalités disponibles`
-                  : userStatus?.subscription_status === 'trial'
-                  ? `Essai gratuit jusqu'au ${formatDate(userStatus.trial_ends_at)}`
+                  : (activeSubscription?.status === 'active' || userStatus?.subscription_status === 'active')
+                  ? `Plan ${(activeSubscription?.plan_type || userStatus?.subscription_tier) === 'starter' ? 'Starter' : 'Pro'} - Toutes les fonctionnalités disponibles`
+                  : (activeSubscription?.status === 'trial' || userStatus?.subscription_status === 'trial')
+                  ? `Essai gratuit jusqu'au ${formatDate(activeSubscription?.trial_end || userStatus?.trial_ends_at)}`
                   : 'Abonnez-vous pour accéder aux fonctionnalités'
                 }
               </p>
@@ -402,10 +399,10 @@ export function SubscriptionStatus() {
               <div className="text-lg font-bold">{formatDate(userStatus?.created_at)}</div>
             </div>
             
-            {userStatus?.subscription_status === 'trial' && (
+            {(activeSubscription?.status === 'trial' || userStatus?.subscription_status === 'trial') && (
               <div className="bg-white/20 backdrop-blur-sm rounded-xl p-4 text-center">
                 <div className="text-white/80 text-sm">Essai expire</div>
-                <div className="text-lg font-bold">{formatDate(userStatus?.trial_ends_at)}</div>
+                <div className="text-lg font-bold">{formatDate(activeSubscription?.trial_end || userStatus?.trial_ends_at)}</div>
               </div>
             )}
             
@@ -451,7 +448,10 @@ export function SubscriptionStatus() {
             </button>
 
             {/* S'abonner */}
-            {(!activeAccessCode || activeAccessCode.access_type !== 'lifetime') && userStatus?.subscription_status !== 'active' && !isTeamMember && (
+            {(!activeAccessCode || activeAccessCode.access_type !== 'lifetime') && 
+             !activeSubscription && 
+             userStatus?.subscription_status !== 'active' && 
+             !isTeamMember && (
               <button
                 onClick={() => {
                   document.getElementById('subscription-plans')?.scrollIntoView({ behavior: 'smooth' });
@@ -569,7 +569,10 @@ export function SubscriptionStatus() {
         )}
 
         {/* Plans d'abonnement */}
-        {(!activeAccessCode || activeAccessCode.access_type !== 'lifetime') && userStatus?.subscription_status !== 'active' && !isTeamMember && (
+        {(!activeAccessCode || activeAccessCode.access_type !== 'lifetime') && 
+         !activeSubscription && 
+         userStatus?.subscription_status !== 'active' && 
+         !isTeamMember && (
           <div id="subscription-plans" className="bg-white rounded-2xl shadow-lg p-6">
             <h3 className="text-xl font-bold text-gray-900 mb-6 flex items-center gap-3">
               <CreditCard className="w-6 h-6 text-blue-600" />

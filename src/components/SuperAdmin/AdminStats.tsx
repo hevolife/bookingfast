@@ -32,15 +32,21 @@ export function AdminStats() {
     );
   }
 
-  const totalUsers = users.length;
-  const activeUsers = users.filter(u => u.subscription_status === 'active').length;
-  const trialUsers = users.filter(u => u.subscription_status === 'trial').length;
-  const expiredUsers = users.filter(u => u.subscription_status === 'expired').length;
-  const superAdmins = users.filter(u => u.is_super_admin).length;
-  const activeCodes = accessCodes.filter(c => c.is_active).length;
+  // 🛡️ DEFENSIVE CHECKS - Ensure all data arrays exist
+  const safeUsers = users || [];
+  const safeAccessCodes = accessCodes || [];
+  const safeRedemptions = redemptions || [];
+  const safeBookings = bookings || [];
+
+  const totalUsers = safeUsers.length;
+  const activeUsers = safeUsers.filter(u => u.subscription_status === 'active').length;
+  const trialUsers = safeUsers.filter(u => u.subscription_status === 'trial').length;
+  const expiredUsers = safeUsers.filter(u => u.subscription_status === 'expired').length;
+  const superAdmins = safeUsers.filter(u => u.is_super_admin).length;
+  const activeCodes = safeAccessCodes.filter(c => c.is_active).length;
 
   const totalRevenue = activeUsers * 59.99; // Revenus mensuels estimés
-  const totalBookings = bookings.length;
+  const totalBookings = safeBookings.length;
 
   const conversionRate = totalUsers > 0 ? (activeUsers / totalUsers) * 100 : 0;
   const churnRate = totalUsers > 0 ? (expiredUsers / totalUsers) * 100 : 0;
@@ -188,7 +194,7 @@ export function AdminStats() {
           <div className="space-y-4">
             <div className="flex justify-between items-center p-4 bg-gradient-to-r from-purple-50 to-pink-50 rounded-xl border border-purple-200">
               <span className="text-purple-800 font-medium">Codes créés</span>
-              <span className="text-2xl font-bold text-purple-600">{accessCodes.length}</span>
+              <span className="text-2xl font-bold text-purple-600">{safeAccessCodes.length}</span>
             </div>
 
             <div className="flex justify-between items-center p-4 bg-gradient-to-r from-green-50 to-emerald-50 rounded-xl border border-green-200">
@@ -198,13 +204,13 @@ export function AdminStats() {
 
             <div className="flex justify-between items-center p-4 bg-gradient-to-r from-blue-50 to-cyan-50 rounded-xl border border-blue-200">
               <span className="text-blue-800 font-medium">Codes utilisés</span>
-              <span className="text-2xl font-bold text-blue-600">{redemptions.length}</span>
+              <span className="text-2xl font-bold text-blue-600">{safeRedemptions.length}</span>
             </div>
 
             <div className="flex justify-between items-center p-4 bg-gradient-to-r from-orange-50 to-yellow-50 rounded-xl border border-orange-200">
               <span className="text-orange-800 font-medium">Taux d'utilisation</span>
               <span className="text-2xl font-bold text-orange-600">
-                {accessCodes.length > 0 ? ((redemptions.length / accessCodes.length) * 100).toFixed(1) : 0}%
+                {safeAccessCodes.length > 0 ? ((safeRedemptions.length / safeAccessCodes.length) * 100).toFixed(1) : 0}%
               </span>
             </div>
           </div>
@@ -272,7 +278,7 @@ export function AdminStats() {
 
         <div className="space-y-4">
           {/* Nouveaux utilisateurs */}
-          {users.slice(0, 5).map((user, index) => {
+          {safeUsers.slice(0, 5).map((user, index) => {
             const createdDate = user.created_at ? new Date(user.created_at) : new Date();
             
             return (
@@ -306,7 +312,7 @@ export function AdminStats() {
           );
           })}
 
-          {users.length === 0 && (
+          {safeUsers.length === 0 && (
             <div className="text-center py-8">
               <Users className="w-12 h-12 text-gray-300 mx-auto mb-4" />
               <h4 className="text-lg font-medium text-gray-900 mb-2">Aucune activité</h4>
