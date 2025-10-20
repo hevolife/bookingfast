@@ -1,9 +1,10 @@
 import React, { useState, useRef, useEffect } from 'react';
-import { ChevronLeft, ChevronRight, Plus, Clock, Sparkles, Calendar as CalendarIcon } from 'lucide-react';
+import { ChevronLeft, ChevronRight, Plus, Clock, Sparkles, Calendar as CalendarIcon, ChevronDown } from 'lucide-react';
 import { createPortal } from 'react-dom';
 import { Booking } from '../../types';
 import { useBusinessSettings } from '../../hooks/useBusinessSettings';
 import { ServiceBookingModal } from './ServiceBookingModal';
+import { DatePicker } from './DatePicker';
 import { isSupabaseConfigured } from '../../lib/supabase';
 import { LoadingSpinner } from '../UI/LoadingSpinner';
 import { bookingEvents } from '../../lib/bookingEvents';
@@ -33,6 +34,8 @@ interface ColumnLayout {
 }
 
 export function CalendarGrid({ currentDate, onTimeSlotClick, onBookingClick, bookings: allBookings, loading, onDeleteBooking }: CalendarGridProps) {
+  console.log('🔍 CalendarPage - Rendu, view:', 'calendar');
+  
   const today = new Date();
   const todayString = `${today.getFullYear()}-${(today.getMonth() + 1).toString().padStart(2, '0')}-${today.getDate().toString().padStart(2, '0')}`;
   
@@ -41,10 +44,10 @@ export function CalendarGrid({ currentDate, onTimeSlotClick, onBookingClick, boo
   const [serviceModalOpen, setServiceModalOpen] = useState(false);
   const [selectedServiceBookings, setSelectedServiceBookings] = useState<Booking[]>([]);
   const [selectedServiceName, setSelectedServiceName] = useState('');
-  const [showMonthSelector, setShowMonthSelector] = useState(false);
-  const [dropdownPosition, setDropdownPosition] = useState({ top: 0, left: 0, width: 0 });
+  const [showDatePicker, setShowDatePicker] = useState(false);
   const scrollContainerRef = useRef<HTMLDivElement>(null);
   const timeGridRef = useRef<HTMLDivElement>(null);
+  const monthButtonRef = useRef<HTMLButtonElement>(null);
   const { settings } = useBusinessSettings();
   const [refreshTrigger, setRefreshTrigger] = useState(0);
 
@@ -213,6 +216,11 @@ export function CalendarGrid({ currentDate, onTimeSlotClick, onBookingClick, boo
     if (date.getMonth() !== viewMonth.getMonth() || date.getFullYear() !== viewMonth.getFullYear()) {
       setViewMonth(new Date(date.getFullYear(), date.getMonth(), 1));
     }
+  };
+
+  const handleDatePickerSelect = (date: Date) => {
+    setSelectedDate(date);
+    setViewMonth(new Date(date.getFullYear(), date.getMonth(), 1));
   };
 
   const generateTimeSlots = (date: Date) => {
@@ -433,45 +441,6 @@ export function CalendarGrid({ currentDate, onTimeSlotClick, onBookingClick, boo
     setServiceModalOpen(true);
   };
 
-  const getMonthOptions = () => {
-    const now = new Date();
-    const options = [];
-    
-    for (let i = 6; i >= 1; i--) {
-      const date = new Date(now.getFullYear(), now.getMonth() - i, 1);
-      options.push({
-        date,
-        label: date.toLocaleDateString('fr-FR', { month: 'long', year: 'numeric' }),
-        isCurrentMonth: false
-      });
-    }
-    
-    options.push({
-      date: new Date(now.getFullYear(), now.getMonth(), 1),
-      label: now.toLocaleDateString('fr-FR', { month: 'long', year: 'numeric' }),
-      isCurrentMonth: true
-    });
-    
-    for (let i = 1; i <= 6; i++) {
-      const date = new Date(now.getFullYear(), now.getMonth() + i, 1);
-      options.push({
-        date,
-        label: date.toLocaleDateString('fr-FR', { month: 'long', year: 'numeric' }),
-        isCurrentMonth: false
-      });
-    }
-    
-    return options;
-  };
-
-  const monthOptions = getMonthOptions();
-
-  const selectMonth = (date: Date) => {
-    setViewMonth(date);
-    setSelectedDate(new Date(date.getFullYear(), date.getMonth(), 1));
-    setShowMonthSelector(false);
-  };
-
   const getUnitName = (booking: Booking) => {
     if (booking.service?.unit_name && booking.service.unit_name !== 'personnes') {
       return booking.service.unit_name;
@@ -497,50 +466,6 @@ export function CalendarGrid({ currentDate, onTimeSlotClick, onBookingClick, boo
       </div>
     );
   }
-
-  const MonthDropdown = () => {
-    if (!showMonthSelector) return null;
-
-    return createPortal(
-      <>
-        <div 
-          className="fixed inset-0 z-[999998] bg-transparent" 
-          onClick={() => setShowMonthSelector(false)}
-        />
-        <div 
-          className="fixed z-[999999] bg-white border border-gray-200 rounded-2xl shadow-2xl min-w-64 max-h-80 overflow-y-auto"
-          style={{
-            top: `${dropdownPosition.top + 8}px`,
-            left: `${dropdownPosition.left}px`,
-            minWidth: `${Math.max(dropdownPosition.width, 256)}px`
-          }}
-        >
-          <div className="p-2">
-            {monthOptions.map((option, index) => (
-              <button
-                key={index}
-                onClick={() => selectMonth(option.date)}
-                className={`w-full text-left px-4 py-3 rounded-xl transition-all duration-300 flex items-center justify-between ${
-                  viewMonth.getMonth() === option.date.getMonth() && 
-                  viewMonth.getFullYear() === option.date.getFullYear()
-                    ? 'bg-gradient-to-r from-blue-500 to-purple-500 text-white shadow-lg'
-                    : option.isCurrentMonth
-                    ? 'bg-gradient-to-r from-green-50 to-emerald-50 text-green-700 hover:bg-green-100'
-                    : 'text-gray-700 hover:bg-gray-50'
-                }`}
-              >
-                <span className="font-medium">{option.label}</span>
-                {option.isCurrentMonth && (
-                  <div className="w-2 h-2 bg-green-500 rounded-full"></div>
-                )}
-              </button>
-            ))}
-          </div>
-        </div>
-      </>,
-      document.body
-    );
-  };
 
   return (
     <>
@@ -595,14 +520,21 @@ export function CalendarGrid({ currentDate, onTimeSlotClick, onBookingClick, boo
                 <ChevronLeft className="w-4 h-4 text-gray-600" />
               </button>
               
-              <div className="text-center">
-                <div className="text-lg font-bold text-gray-900">
-                  {viewMonth.toLocaleDateString('fr-FR', { 
-                    month: 'long', 
-                    year: 'numeric' 
-                  })}
+              <button
+                ref={monthButtonRef}
+                onClick={() => setShowDatePicker(true)}
+                className="group relative px-4 py-2 bg-white/80 backdrop-blur-sm rounded-xl border border-gray-200 hover:border-blue-300 hover:shadow-md transition-all duration-300"
+              >
+                <div className="flex items-center gap-2">
+                  <CalendarIcon className="w-4 h-4 text-gray-600" />
+                  <span className="text-lg font-bold text-gray-900 capitalize">
+                    {viewMonth.toLocaleDateString('fr-FR', { 
+                      month: 'long', 
+                      year: 'numeric' 
+                    })}
+                  </span>
                 </div>
-              </div>
+              </button>
               
               <button
                 onClick={() => changeMonth('next')}
@@ -809,18 +741,17 @@ export function CalendarGrid({ currentDate, onTimeSlotClick, onBookingClick, boo
                     
                     const duration = Math.ceil(bookings[0].duration_minutes / 30);
                     
-                    // RÉDUCTION DES ÉCARTS : Espacement minimal entre colonnes
-                    const columnGap = totalColumns > 1 ? 2 : 0; // Réduit de 4px à 2px
+                    const columnGap = totalColumns > 1 ? 2 : 0;
                     const columnWidth = totalColumns > 1 
                       ? `calc(${100 / totalColumns}% - ${(totalColumns - 1) * columnGap}px)` 
-                      : 'calc(100% - 4px)'; // Réduit de 8px à 4px
+                      : 'calc(100% - 4px)';
                     const columnLeft = totalColumns > 1 
-                      ? `calc(${(column * 100) / totalColumns}% + ${column * columnGap}px + 2px)` // Réduit de 4px à 2px
-                      : '2px'; // Réduit de 4px à 2px
+                      ? `calc(${(column * 100) / totalColumns}% + ${column * columnGap}px + 2px)` 
+                      : '2px';
 
                     const position = {
-                      top: `${timeIndex * 48 + 1}px`, // Réduit de 2px à 1px
-                      height: `${duration * 48 - 2}px`, // Réduit de 4px à 2px
+                      top: `${timeIndex * 48 + 1}px`,
+                      height: `${duration * 48 - 2}px`,
                     };
                     
                     const colorClass = getBookingColor(layoutIndex);
@@ -842,7 +773,7 @@ export function CalendarGrid({ currentDate, onTimeSlotClick, onBookingClick, boo
                         onClick={() => handleServiceBlockClick(group)}
                       >
                         <div className={`h-full flex flex-col justify-center relative overflow-hidden ${
-                          totalColumns > 2 ? 'p-1.5' : 'p-2' // Réduit le padding interne
+                          totalColumns > 2 ? 'p-1.5' : 'p-2'
                         }`}>
                           <div className="absolute inset-0 bg-gradient-to-r from-transparent via-white/10 to-transparent -skew-x-12"></div>
                           
@@ -923,7 +854,13 @@ export function CalendarGrid({ currentDate, onTimeSlotClick, onBookingClick, boo
         }}
       />
 
-      <MonthDropdown />
+      <DatePicker
+        selectedDate={selectedDate}
+        onDateSelect={handleDatePickerSelect}
+        isOpen={showDatePicker}
+        onClose={() => setShowDatePicker(false)}
+        buttonRef={monthButtonRef}
+      />
     </>
   );
 }
