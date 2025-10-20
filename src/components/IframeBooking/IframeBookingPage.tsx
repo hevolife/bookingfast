@@ -42,6 +42,7 @@ export function IframeBookingPage() {
     phone: ''
   });
   const [submitting, setSubmitting] = useState(false);
+  const [processingPayment, setProcessingPayment] = useState(false);
 
   // Récupérer les services autorisés depuis l'URL
   const allowedServices = searchParams.get('services')?.split(',').filter(Boolean) || [];
@@ -152,6 +153,7 @@ export function IframeBookingPage() {
       console.log('🔍 Indisponibilités reçues:', result.unavailabilities?.length || 0, result.unavailabilities);
       console.log('👥 Membres d\'équipe reçus:', result.teamMembers?.length || 0, result.teamMembers);
       console.log('⚙️ Paramètre iframe_enable_team_selection:', result.settings?.iframe_enable_team_selection);
+      console.log('💳 Stripe configuré:', result.settings?.stripe_enabled);
       
       if (!result.success) {
         throw new Error(result.error || 'Erreur lors de la récupération des données');
@@ -347,39 +349,101 @@ export function IframeBookingPage() {
     setCurrentStep(3);
   };
 
+  const handlePayment = async () => {
+    if (!selectedService || !data?.settings) return;
+
+    setProcessingPayment(true);
+
+    try {
+      const totalAmount = selectedService.price_ttc * quantity;
+      const depositPercentage = data.settings.default_deposit_percentage || 30;
+      
+      let depositAmount: number;
+      
+      if (data.settings.deposit_type === 'fixed_amount') {
+        const baseDeposit = data.settings.deposit_fixed_amount || 20;
+        depositAmount = data.settings.multiply_deposit_by_services 
+          ? baseDeposit * quantity 
+          : baseDeposit;
+      } else {
+        depositAmount = data.settings.multiply_deposit_by_services 
+          ? (selectedService.price_ttc * depositPercentage / 100) * quantity
+          : (totalAmount * depositPercentage) / 100;
+      }
+
+      console.log('💳 Création session Stripe:', {
+        amount: depositAmount,
+        service: selectedService.name,
+        client: clientData.email
+      });
+
+      // Créer la session Stripe
+      const supabaseUrl = import.meta.env.VITE_SUPABASE_URL?.replace(/\/$/, '');
+      const response = await fetch(`${supabaseUrl}/functions/v1/stripe-checkout`, {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+          'Authorization': `Bearer ${import.meta.env.VITE_SUPABASE_ANON_KEY}`,
+        },
+        body: JSON.stringify({
+          amount: depositAmount,
+          currency: 'eur',
+          customer_email: clientData.email,
+          service_name: selectedService.name,
+          success_url: `${window.location.origin}/payment-success?session_id={CHECKOUT_SESSION_ID}`,
+          cancel_url: window.location.href,
+          metadata: {
+            user_id: userId,
+            service_id: selectedService.id,
+            date: selectedDate,
+            time: selectedTime,
+            quantity: quantity.toString(),
+            client_firstname: clientData.firstname,
+            client_lastname: clientData.lastname,
+            client_phone: clientData.phone,
+            assigned_user_id: selectedTeamMember || undefined,
+            payment_type: 'booking_deposit'
+          }
+        })
+      });
+
+      if (!response.ok) {
+        throw new Error('Erreur lors de la création de la session de paiement');
+      }
+
+      const { url } = await response.json();
+      
+      if (url) {
+        // Rediriger vers Stripe Checkout
+        window.location.href = url;
+      } else {
+        throw new Error('URL de paiement manquante');
+      }
+    } catch (err) {
+      console.error('❌ Erreur paiement:', err);
+      alert('Erreur lors de la création du paiement. Veuillez réessayer.');
+    } finally {
+      setProcessingPayment(false);
+    }
+  };
+
   const handleSubmit = async () => {
     if (!selectedService || !selectedDate || !selectedTime || !clientData.email) {
       alert('Veuillez remplir tous les champs obligatoires');
       return;
     }
 
+    // Si Stripe est activé, rediriger vers le paiement
+    if (data?.settings?.stripe_enabled) {
+      await handlePayment();
+      return;
+    }
+
+    // Sinon, créer la réservation directement
     setSubmitting(true);
     
     try {
       const totalAmount = selectedService.price_ttc * quantity;
-      const depositPercentage = data?.settings?.default_deposit_percentage || 30;
-      
-      let depositAmount: number;
-      
-      if (data?.settings?.deposit_type === 'fixed_amount') {
-        const baseDeposit = data.settings.deposit_fixed_amount || 20;
-        depositAmount = data.settings.multiply_deposit_by_services 
-          ? baseDeposit * quantity 
-          : baseDeposit;
-      } else {
-        const baseDeposit = (totalAmount * depositPercentage) / 100;
-        depositAmount = data?.settings?.multiply_deposit_by_services 
-          ? (selectedService.price_ttc * depositPercentage / 100) * quantity
-          : baseDeposit;
-      }
-      
-      console.log('💰 Calcul acompte:', {
-        type: data?.settings?.deposit_type,
-        multiply: data?.settings?.multiply_deposit_by_services,
-        quantity,
-        totalAmount,
-        depositAmount
-      });
       
       if (isSupabaseConfigured) {
         const bookingData: any = {
@@ -399,7 +463,6 @@ export function IframeBookingPage() {
           booking_status: 'pending'
         };
 
-        // Ajouter assigned_user_id si un membre d'équipe est sélectionné
         if (selectedTeamMember) {
           bookingData.assigned_user_id = selectedTeamMember;
         }
@@ -480,6 +543,28 @@ export function IframeBookingPage() {
   const timeSlots = selectedDate && selectedService ? generateTimeSlots(selectedDate) : [];
   const availableDates = getAvailableDates();
   const showTeamSelection = data?.settings?.iframe_enable_team_selection && data?.teamMembers && data.teamMembers.length > 0;
+
+  // Calculer le montant de l'acompte
+  const calculateDepositAmount = () => {
+    if (!selectedService || !data?.settings) return 0;
+    
+    const totalAmount = selectedService.price_ttc * quantity;
+    const depositPercentage = data.settings.default_deposit_percentage || 30;
+    
+    if (data.settings.deposit_type === 'fixed_amount') {
+      const baseDeposit = data.settings.deposit_fixed_amount || 20;
+      return data.settings.multiply_deposit_by_services 
+        ? baseDeposit * quantity 
+        : baseDeposit;
+    } else {
+      return data.settings.multiply_deposit_by_services 
+        ? (selectedService.price_ttc * depositPercentage / 100) * quantity
+        : (totalAmount * depositPercentage) / 100;
+    }
+  };
+
+  const depositAmount = calculateDepositAmount();
+  const isStripeEnabled = data?.settings?.stripe_enabled;
 
   if (loading) {
     return (
@@ -933,12 +1018,32 @@ export function IframeBookingPage() {
                 </div>
               </div>
 
-              <div className="border-t-2 border-gray-200 pt-6">
-                <div className="flex justify-between items-center text-2xl font-bold">
-                  <span className="text-gray-900">Total</span>
-                  <span className="text-blue-600">{(selectedService.price_ttc * quantity).toFixed(2)}€</span>
+              <div className="border-t-2 border-gray-200 pt-6 space-y-3">
+                <div className="flex justify-between items-center text-lg">
+                  <span className="text-gray-700">Total</span>
+                  <span className="font-bold text-gray-900">{(selectedService.price_ttc * quantity).toFixed(2)}€</span>
                 </div>
+                
+                {isStripeEnabled && (
+                  <div className="flex justify-between items-center text-lg">
+                    <span className="text-gray-700">Acompte à payer</span>
+                    <span className="font-bold text-blue-600">{depositAmount.toFixed(2)}€</span>
+                  </div>
+                )}
               </div>
+
+              {isStripeEnabled && (
+                <div className="bg-gradient-to-r from-blue-50 to-purple-50 rounded-2xl p-4 border border-blue-200">
+                  <div className="flex items-center gap-3 mb-2">
+                    <CreditCard className="w-5 h-5 text-blue-600" />
+                    <h4 className="font-bold text-blue-900">Paiement sécurisé</h4>
+                  </div>
+                  <p className="text-sm text-blue-700">
+                    Un acompte de {depositAmount.toFixed(2)}€ sera demandé pour confirmer votre réservation. 
+                    Le solde de {((selectedService.price_ttc * quantity) - depositAmount).toFixed(2)}€ sera à régler sur place.
+                  </p>
+                </div>
+              )}
             </div>
 
             <div className="flex gap-4">
@@ -951,18 +1056,23 @@ export function IframeBookingPage() {
               </button>
               <button
                 onClick={handleSubmit}
-                disabled={submitting}
+                disabled={submitting || processingPayment}
                 className="flex-1 bg-gradient-to-r from-green-500 to-emerald-500 text-white py-4 px-6 rounded-2xl font-bold hover:shadow-xl transition-all disabled:opacity-50 disabled:cursor-not-allowed flex items-center justify-center gap-2"
               >
-                {submitting ? (
+                {processingPayment ? (
+                  <>
+                    <div className="w-5 h-5 border-2 border-white border-t-transparent rounded-full animate-spin" />
+                    Redirection...
+                  </>
+                ) : submitting ? (
                   <>
                     <div className="w-5 h-5 border-2 border-white border-t-transparent rounded-full animate-spin" />
                     Confirmation...
                   </>
                 ) : (
                   <>
-                    <Check className="w-5 h-5" />
-                    Confirmer la réservation
+                    {isStripeEnabled ? <CreditCard className="w-5 h-5" /> : <Check className="w-5 h-5" />}
+                    {isStripeEnabled ? 'Payer l\'acompte' : 'Confirmer la réservation'}
                   </>
                 )}
               </button>
