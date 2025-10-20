@@ -13,6 +13,7 @@ import { PermissionGate, UsageLimitIndicator } from '../UI/PermissionGate';
 import { Booking } from '../../types';
 import { UserCheck, X, Ban } from 'lucide-react';
 import { bookingEvents } from '../../lib/bookingEvents';
+import { unavailabilityEvents } from '../../lib/unavailabilityEvents';
 
 interface CalendarPageProps {
   view?: 'calendar' | 'list' | 'clients';
@@ -61,6 +62,7 @@ export function CalendarPage({ view = 'calendar' }: CalendarPageProps) {
     };
 
     const handleUnavailabilityChange = () => {
+      console.log('📢 CalendarPage - Événement unavailability reçu, rafraîchissement...');
       refetchUnavailabilities();
     };
 
@@ -68,13 +70,17 @@ export function CalendarPage({ view = 'calendar' }: CalendarPageProps) {
     bookingEvents.on('bookingUpdated', handleBookingChange);
     bookingEvents.on('bookingDeleted', handleBookingChange);
     
-    window.addEventListener('refreshUnavailabilities', handleUnavailabilityChange);
+    unavailabilityEvents.on('unavailabilityCreated', handleUnavailabilityChange);
+    unavailabilityEvents.on('unavailabilityUpdated', handleUnavailabilityChange);
+    unavailabilityEvents.on('unavailabilityDeleted', handleUnavailabilityChange);
 
     return () => {
       bookingEvents.off('bookingCreated', handleBookingChange);
       bookingEvents.off('bookingUpdated', handleBookingChange);
       bookingEvents.off('bookingDeleted', handleBookingChange);
-      window.removeEventListener('refreshUnavailabilities', handleUnavailabilityChange);
+      unavailabilityEvents.off('unavailabilityCreated', handleUnavailabilityChange);
+      unavailabilityEvents.off('unavailabilityUpdated', handleUnavailabilityChange);
+      unavailabilityEvents.off('unavailabilityDeleted', handleUnavailabilityChange);
     };
   }, [refetch, refetchUnavailabilities]);
 
@@ -164,10 +170,12 @@ export function CalendarPage({ view = 'calendar' }: CalendarPageProps) {
 
   const handleDeleteUnavailability = async (unavailabilityId: string) => {
     try {
+      console.log('🗑️ CalendarPage.handleDeleteUnavailability - ID:', unavailabilityId);
       await deleteUnavailability(unavailabilityId);
-      await refetchUnavailabilities();
+      console.log('✅ CalendarPage.handleDeleteUnavailability - Suppression terminée');
     } catch (error) {
-      console.error('Erreur suppression indisponibilité:', error);
+      console.error('❌ CalendarPage.handleDeleteUnavailability - Erreur:', error);
+      alert('Erreur lors de la suppression de l\'indisponibilité');
       throw error;
     }
   };
@@ -178,7 +186,6 @@ export function CalendarPage({ view = 'calendar' }: CalendarPageProps) {
 
   const handleSaveUnavailability = async (unavailabilityData: any) => {
     await addUnavailability(unavailabilityData);
-    await refetchUnavailabilities();
   };
 
   const getMemberDisplayName = (member: typeof teamMembers[0]) => {
@@ -291,6 +298,7 @@ export function CalendarPage({ view = 'calendar' }: CalendarPageProps) {
                 loading={loading}
                 onDeleteBooking={handleDeleteBooking}
                 onAddUnavailability={handleAddUnavailability}
+                onDeleteUnavailability={handleDeleteUnavailability}
               />
             </UsageLimitIndicator>
           ) : view === 'list' ? (

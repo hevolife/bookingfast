@@ -17,6 +17,7 @@ interface CalendarGridProps {
   unavailabilities: Unavailability[];
   loading: boolean;
   onDeleteBooking: (bookingId: string) => void;
+  onDeleteUnavailability: (unavailabilityId: string) => void;
   onAddUnavailability: (date?: string) => void;
 }
 
@@ -52,9 +53,15 @@ export function CalendarGrid({
   unavailabilities,
   loading, 
   onDeleteBooking,
+  onDeleteUnavailability,
   onAddUnavailability 
 }: CalendarGridProps) {
-  console.log('🔍 CalendarPage - Rendu, view:', 'calendar');
+  console.log('🔍 CalendarGrid - Rendu avec props:', {
+    bookingsCount: allBookings.length,
+    unavailabilitiesCount: unavailabilities.length,
+    hasDeleteBooking: !!onDeleteBooking,
+    hasDeleteUnavailability: !!onDeleteUnavailability
+  });
   
   const today = new Date();
   const todayString = `${today.getFullYear()}-${(today.getMonth() + 1).toString().padStart(2, '0')}-${today.getDate().toString().padStart(2, '0')}`;
@@ -494,17 +501,24 @@ export function CalendarGrid({
   const handleDeleteUnavailability = async (unavailabilityId: string, e: React.MouseEvent) => {
     e.stopPropagation();
     
+    console.log('🗑️ CalendarGrid.handleDeleteUnavailability - Début suppression ID:', unavailabilityId);
+    
     if (!confirm('Supprimer cette indisponibilité ?')) {
+      console.log('❌ CalendarGrid.handleDeleteUnavailability - Annulé par utilisateur');
       return;
     }
 
     setDeletingUnavailabilityId(unavailabilityId);
     
     try {
-      await onDeleteBooking(unavailabilityId);
+      console.log('🔄 CalendarGrid.handleDeleteUnavailability - Appel onDeleteUnavailability');
+      await onDeleteUnavailability(unavailabilityId);
+      console.log('✅ CalendarGrid.handleDeleteUnavailability - Suppression réussie');
+      
+      // Rafraîchir les indisponibilités
       window.dispatchEvent(new CustomEvent('refreshUnavailabilities'));
     } catch (error) {
-      console.error('Erreur suppression indisponibilité:', error);
+      console.error('❌ CalendarGrid.handleDeleteUnavailability - Erreur:', error);
       alert('Erreur lors de la suppression');
     } finally {
       setDeletingUnavailabilityId(null);
@@ -824,29 +838,18 @@ export function CalendarGrid({
                           animationDelay: `${blockIndex * 100}ms`,
                           zIndex: 20
                         }}
-                        onClick={(e) => handleDeleteUnavailability(block.id, e)}
                       >
-                        <div className="h-full flex flex-col justify-center relative overflow-hidden p-2">
+                        <div className="h-full flex items-center justify-between relative overflow-hidden px-3 py-2">
                           <div className="absolute inset-0 bg-gradient-to-r from-transparent via-white/10 to-transparent -skew-x-12"></div>
                           
-                          <div className="relative z-10 text-center sm:text-left">
-                            <div className="flex items-center justify-between gap-2">
-                              <div className="flex items-center gap-2 flex-1 min-w-0">
-                                <Ban className="w-4 h-4 flex-shrink-0" />
-                                <div className="font-bold text-xs sm:text-sm truncate">
-                                  Indisponible
-                                </div>
+                          <div className="relative z-10 flex-1 min-w-0">
+                            <div className="flex items-center gap-2 mb-1">
+                              <Ban className="w-5 h-5 flex-shrink-0" />
+                              <div className="font-bold text-sm truncate">
+                                Indisponible
                               </div>
-                              <button
-                                onClick={(e) => handleDeleteUnavailability(block.id, e)}
-                                disabled={deletingUnavailabilityId === block.id}
-                                className="flex-shrink-0 p-1.5 bg-white/20 hover:bg-white/30 rounded-lg transition-all opacity-0 group-hover:opacity-100"
-                                title="Supprimer"
-                              >
-                                <Trash2 className="w-3 h-3" />
-                              </button>
                             </div>
-                            <div className="opacity-90 text-xs flex items-center gap-1 mt-1">
+                            <div className="opacity-90 text-xs flex items-center gap-1">
                               <Clock className="w-3 h-3" />
                               {block.startTime} - {block.endTime}
                             </div>
@@ -856,6 +859,19 @@ export function CalendarGrid({
                               </div>
                             )}
                           </div>
+
+                          <button
+                            onClick={(e) => handleDeleteUnavailability(block.id, e)}
+                            disabled={deletingUnavailabilityId === block.id}
+                            className="relative z-10 flex-shrink-0 p-2.5 bg-white/20 hover:bg-red-600 rounded-xl transition-all duration-300 transform hover:scale-110 shadow-lg border border-white/30 ml-3"
+                            title="Supprimer"
+                          >
+                            {deletingUnavailabilityId === block.id ? (
+                              <div className="w-5 h-5 border-2 border-white border-t-transparent rounded-full animate-spin" />
+                            ) : (
+                              <Trash2 className="w-5 h-5" />
+                            )}
+                          </button>
                         </div>
                       </div>
                     );
