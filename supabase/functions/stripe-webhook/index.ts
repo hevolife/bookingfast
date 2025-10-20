@@ -81,7 +81,7 @@ Deno.serve(async (req) => {
       const sessionId = session.id
       
       console.log('💳 Session de paiement complétée:', sessionId)
-      console.log('📋 Client reference ID:', session.client_reference_id)
+      console.log('📋 Metadata:', JSON.stringify(session.metadata, null, 2))
       
       if (session.status !== 'complete' || session.payment_status !== 'paid') {
         console.log('⚠️ PAIEMENT NON COMPLET - Session ignorée')
@@ -112,6 +112,7 @@ Deno.serve(async (req) => {
 
       const customerEmail = session.customer_details?.email
       const clientReferenceId = session.client_reference_id
+      const metadata = session.metadata || {}
 
       if (!customerEmail) {
         console.error('❌ Email client manquant')
@@ -119,11 +120,98 @@ Deno.serve(async (req) => {
         return new Response('Email client manquant', { status: 400, headers: corsHeaders })
       }
 
-      // ABONNEMENT PLUGIN - Extraction depuis client_reference_id
+      // RÉSERVATION IFRAME (booking_deposit)
+      if (metadata.payment_type === 'booking_deposit') {
+        console.log('📅 === CRÉATION RÉSERVATION APRÈS PAIEMENT === 📅')
+        
+        const userId = metadata.user_id
+        const serviceId = metadata.service_id
+        const date = metadata.date
+        const time = metadata.time
+        const quantity = parseInt(metadata.quantity || '1')
+        const clientFirstname = metadata.client_firstname
+        const clientLastname = metadata.client_lastname
+        const clientPhone = metadata.client_phone
+        const assignedUserId = metadata.assigned_user_id
+
+        if (!userId || !serviceId || !date || !time) {
+          console.error('❌ Données réservation manquantes:', { userId, serviceId, date, time })
+          processedSessions.delete(sessionId)
+          return new Response('Données réservation manquantes', { status: 400, headers: corsHeaders })
+        }
+
+        // Récupérer les infos du service
+        const { data: service, error: serviceError } = await supabaseClient
+          .from('services')
+          .select('*')
+          .eq('id', serviceId)
+          .single()
+
+        if (serviceError || !service) {
+          console.error('❌ Service non trouvé:', serviceError)
+          processedSessions.delete(sessionId)
+          return new Response('Service non trouvé', { status: 404, headers: corsHeaders })
+        }
+
+        const totalAmount = service.price_ttc * quantity
+        const depositAmount = session.amount_total / 100 // Stripe envoie en centimes
+
+        // Créer la réservation
+        const bookingData: any = {
+          user_id: userId,
+          service_id: serviceId,
+          date: date,
+          time: time,
+          duration_minutes: service.duration_minutes,
+          quantity: quantity,
+          client_name: clientLastname,
+          client_firstname: clientFirstname,
+          client_email: customerEmail,
+          client_phone: clientPhone,
+          total_amount: totalAmount,
+          payment_status: 'paid',
+          payment_amount: depositAmount,
+          booking_status: 'confirmed',
+          stripe_session_id: sessionId
+        }
+
+        if (assignedUserId) {
+          bookingData.assigned_user_id = assignedUserId
+        }
+
+        console.log('📝 Création réservation:', bookingData)
+
+        const { data: booking, error: bookingError } = await supabaseClient
+          .from('bookings')
+          .insert(bookingData)
+          .select()
+          .single()
+
+        if (bookingError) {
+          console.error('❌ Erreur création réservation:', bookingError)
+          processedSessions.delete(sessionId)
+          return new Response('Erreur création réservation', { status: 500, headers: corsHeaders })
+        }
+
+        console.log('✅ RÉSERVATION CRÉÉE:', booking.id)
+
+        const result = { 
+          success: true, 
+          type: 'booking_created',
+          bookingId: booking.id
+        }
+        
+        processedSessions.set(sessionId, { timestamp: Date.now(), result })
+        
+        return new Response(JSON.stringify(result), {
+          headers: { ...corsHeaders, 'Content-Type': 'application/json' }
+        })
+      }
+
+      // ABONNEMENT PLUGIN
       if (clientReferenceId && clientReferenceId.includes('|')) {
         console.log('🔌 ABONNEMENT PLUGIN détecté via client_reference_id')
         
-        // Format: user_id|plugin_id
         const [userId, pluginId] = clientReferenceId.split('|')
         
         console.log('👤 User ID extrait:', userId)
@@ -137,7 +225,6 @@ Deno.serve(async (req) => {
         
         const stripeSubscriptionId = session.subscription
 
-        // Vérifier si une souscription existe déjà
         const { data: existingSub, error: checkError } = await supabaseClient
           .from('plugin_subscriptions')
           .select('*')
@@ -154,7 +241,6 @@ Deno.serve(async (req) => {
         if (existingSub) {
           console.log('📋 Souscription existante trouvée, mise à jour...')
           
-          // Mettre à jour l'abonnement existant
           const { error: updateError } = await supabaseClient
             .from('plugin_subscriptions')
             .update({
@@ -179,7 +265,6 @@ Deno.serve(async (req) => {
         } else {
           console.log('➕ Création nouvelle souscription plugin...')
           
-          // Créer une nouvelle souscription
           const { error: insertError } = await supabaseClient
             .from('plugin_subscriptions')
             .insert({
@@ -217,9 +302,7 @@ Deno.serve(async (req) => {
         })
       }
 
-      // Abonnement plateforme (ancien système avec metadata)
-      const metadata = session.metadata || {}
-      
+      // Abonnement plateforme
       if (metadata.payment_type === 'platform_subscription') {
         console.log('💳 ABONNEMENT PLATEFORME')
         
@@ -277,17 +360,8 @@ Deno.serve(async (req) => {
         })
       }
 
-      // Reste du code pour les réservations...
-      console.log('💳 PAIEMENT RÉSERVATION')
-      
-      const result = { 
-        success: true, 
-        type: 'booking_payment'
-      }
-      
-      processedSessions.set(sessionId, { timestamp: Date.now(), result })
-      
-      return new Response(JSON.stringify(result), {
+      console.log('⚠️ Type de paiement non reconnu')
+      return new Response(JSON.stringify({ received: true }), {
         headers: { ...corsHeaders, 'Content-Type': 'application/json' }
       })
     }

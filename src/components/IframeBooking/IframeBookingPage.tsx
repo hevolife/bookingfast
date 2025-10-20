@@ -82,10 +82,12 @@ export function IframeBookingPage() {
   useEffect(() => {
     if (paymentStatus === 'success' && sessionId) {
       console.log('✅ Retour paiement réussi, session:', sessionId);
+      // Afficher la confirmation
       setCurrentStep(5);
     } else if (paymentStatus === 'cancelled') {
       console.log('❌ Paiement annulé');
-      // Rester sur l'étape actuelle ou revenir à l'étape 4
+      // Rester sur l'étape 4 pour permettre de réessayer
+      setCurrentStep(4);
     }
   }, [paymentStatus, sessionId]);
 
@@ -435,7 +437,7 @@ export function IframeBookingPage() {
           service_name: selectedService.name,
           success_url: window.location.href,
           cancel_url: window.location.href,
-          parent_url: parentUrl || undefined, // 🌐 Envoyer l'URL parent si disponible
+          parent_url: parentUrl || undefined,
           metadata: {
             user_id: userId,
             service_id: selectedService.id,
@@ -458,26 +460,15 @@ export function IframeBookingPage() {
       const { url } = await response.json();
       
       if (url) {
-        // 🎯 OUVRIR DANS UN NOUVEL ONGLET
-        console.log('🚀 Ouverture Stripe dans un nouvel onglet:', url);
-        const newWindow = window.open(url, '_blank', 'noopener,noreferrer');
-        
-        if (!newWindow) {
-          // Si le popup est bloqué, afficher un message
-          alert('Veuillez autoriser les popups pour accéder au paiement sécurisé Stripe.');
-          // Fallback : redirection dans la même fenêtre
-          window.location.href = url;
-        } else {
-          // Succès : afficher un message de confirmation
-          setCurrentStep(5);
-        }
+        console.log('🚀 Redirection vers Stripe:', url);
+        // Rediriger directement dans la même fenêtre/iframe
+        window.location.href = url;
       } else {
         throw new Error('URL de paiement manquante');
       }
     } catch (err) {
       console.error('❌ Erreur paiement:', err);
       alert('Erreur lors de la création du paiement. Veuillez réessayer.');
-    } finally {
       setProcessingPayment(false);
     }
   };
@@ -1097,10 +1088,6 @@ export function IframeBookingPage() {
                     Un acompte de {depositAmount.toFixed(2)}€ sera demandé pour confirmer votre réservation. 
                     Le solde de {((selectedService.price_ttc * quantity) - depositAmount).toFixed(2)}€ sera à régler sur place.
                   </p>
-                  <div className="mt-3 flex items-center gap-2 text-sm text-blue-600">
-                    <ExternalLink className="w-4 h-4" />
-                    <span>Le paiement s'ouvrira dans un nouvel onglet</span>
-                  </div>
                 </div>
               )}
             </div>
@@ -1121,7 +1108,7 @@ export function IframeBookingPage() {
                 {processingPayment ? (
                   <>
                     <div className="w-5 h-5 border-2 border-white border-t-transparent rounded-full animate-spin" />
-                    Ouverture...
+                    Redirection...
                   </>
                 ) : submitting ? (
                   <>
@@ -1131,10 +1118,7 @@ export function IframeBookingPage() {
                 ) : (
                   <>
                     {isStripeEnabled ? (
-                      <>
-                        <CreditCard className="w-5 h-5" />
-                        <ExternalLink className="w-4 h-4" />
-                      </>
+                      <CreditCard className="w-5 h-5" />
                     ) : (
                       <Check className="w-5 h-5" />
                     )}
@@ -1153,15 +1137,10 @@ export function IframeBookingPage() {
               <Check className="w-12 h-12 text-white" />
             </div>
             <h2 className="text-3xl font-bold text-gray-900 mb-4">
-              {paymentStatus === 'success' ? 'Réservation confirmée !' : isStripeEnabled ? 'Paiement en cours...' : 'Réservation confirmée !'}
+              Réservation confirmée !
             </h2>
             <p className="text-gray-600 text-lg mb-8">
-              {paymentStatus === 'success' 
-                ? `Votre réservation a été confirmée ! Vous allez recevoir un email de confirmation à ${clientData.email}`
-                : isStripeEnabled 
-                ? 'Veuillez compléter le paiement dans le nouvel onglet. Vous recevrez un email de confirmation une fois le paiement effectué.'
-                : `Vous allez recevoir un email de confirmation à ${clientData.email}`
-              }
+              Votre réservation a été confirmée ! Vous allez recevoir un email de confirmation à {clientData.email}
             </p>
             <button
               onClick={() => {
