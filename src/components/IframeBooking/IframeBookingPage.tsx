@@ -1,6 +1,6 @@
 import React, { useState, useEffect } from 'react';
 import { useParams, useSearchParams } from 'react-router-dom';
-import { Calendar, Clock, User, Mail, Phone, CreditCard, Package, MapPin, Star, ArrowRight, ArrowLeft, Check, Building2, Euro, Users, Timer, ChevronRight, Sparkles, UserCheck, CheckCircle } from 'lucide-react';
+import { Calendar, Clock, User, Mail, Phone, CreditCard, Package, MapPin, Star, ArrowRight, ArrowLeft, Check, Building2, Euro, Users, Timer, ChevronRight, Sparkles, UserCheck, CheckCircle, ExternalLink } from 'lucide-react';
 import { Service, BusinessSettings, Booking, Unavailability, TeamMember } from '../../types';
 import { supabase, isSupabaseConfigured } from '../../lib/supabase';
 import { getBusinessTimezone, getCurrentDateInTimezone, formatInBusinessTimezone } from '../../lib/timezone';
@@ -414,8 +414,19 @@ export function IframeBookingPage() {
       const { url } = await response.json();
       
       if (url) {
-        // Rediriger vers Stripe Checkout
-        window.location.href = url;
+        // 🎯 OUVRIR DANS UN NOUVEL ONGLET
+        console.log('🚀 Ouverture Stripe dans un nouvel onglet:', url);
+        const newWindow = window.open(url, '_blank', 'noopener,noreferrer');
+        
+        if (!newWindow) {
+          // Si le popup est bloqué, afficher un message
+          alert('Veuillez autoriser les popups pour accéder au paiement sécurisé Stripe.');
+          // Fallback : redirection dans la même fenêtre
+          window.location.href = url;
+        } else {
+          // Succès : afficher un message de confirmation
+          setCurrentStep(5);
+        }
       } else {
         throw new Error('URL de paiement manquante');
       }
@@ -1042,6 +1053,10 @@ export function IframeBookingPage() {
                     Un acompte de {depositAmount.toFixed(2)}€ sera demandé pour confirmer votre réservation. 
                     Le solde de {((selectedService.price_ttc * quantity) - depositAmount).toFixed(2)}€ sera à régler sur place.
                   </p>
+                  <div className="mt-3 flex items-center gap-2 text-sm text-blue-600">
+                    <ExternalLink className="w-4 h-4" />
+                    <span>Le paiement s'ouvrira dans un nouvel onglet</span>
+                  </div>
                 </div>
               )}
             </div>
@@ -1062,7 +1077,7 @@ export function IframeBookingPage() {
                 {processingPayment ? (
                   <>
                     <div className="w-5 h-5 border-2 border-white border-t-transparent rounded-full animate-spin" />
-                    Redirection...
+                    Ouverture...
                   </>
                 ) : submitting ? (
                   <>
@@ -1071,7 +1086,14 @@ export function IframeBookingPage() {
                   </>
                 ) : (
                   <>
-                    {isStripeEnabled ? <CreditCard className="w-5 h-5" /> : <Check className="w-5 h-5" />}
+                    {isStripeEnabled ? (
+                      <>
+                        <CreditCard className="w-5 h-5" />
+                        <ExternalLink className="w-4 h-4" />
+                      </>
+                    ) : (
+                      <Check className="w-5 h-5" />
+                    )}
                     {isStripeEnabled ? 'Payer l\'acompte' : 'Confirmer la réservation'}
                   </>
                 )}
@@ -1087,10 +1109,13 @@ export function IframeBookingPage() {
               <Check className="w-12 h-12 text-white" />
             </div>
             <h2 className="text-3xl font-bold text-gray-900 mb-4">
-              Réservation confirmée !
+              {isStripeEnabled ? 'Paiement en cours...' : 'Réservation confirmée !'}
             </h2>
             <p className="text-gray-600 text-lg mb-8">
-              Vous allez recevoir un email de confirmation à {clientData.email}
+              {isStripeEnabled 
+                ? 'Veuillez compléter le paiement dans le nouvel onglet. Vous recevrez un email de confirmation une fois le paiement effectué.'
+                : `Vous allez recevoir un email de confirmation à ${clientData.email}`
+              }
             </p>
             <button
               onClick={() => {

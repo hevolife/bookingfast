@@ -10,15 +10,8 @@ const corsHeaders = {
 
 const PLATFORM_STRIPE_SECRET_KEY = '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';
 
-// Prix récurrents Stripe pour les plans
-const STRIPE_PRICES = {
-  starter: 'price_1QpCZhKiNbWQJGP3YourStarterPriceID',
-  monthly: 'price_1QpCZhKiNbWQJGP3YourMonthlyPriceID',
-  yearly: 'price_1QpCZhKiNbWQJGP3YourYearlyPriceID'
-}
-
 Deno.serve(async (req) => {
-  console.log('🚀 === STRIPE-CHECKOUT V9 - SELF-HOSTED DEBUG === 🚀')
+  console.log('🚀 === STRIPE-CHECKOUT V10 - IFRAME BOOKING DEBUG === 🚀')
   
   if (req.method === 'OPTIONS') {
     return new Response('ok', { headers: corsHeaders })
@@ -81,14 +74,168 @@ Deno.serve(async (req) => {
       customer_email,
       service_name,
       payment_type: metadata?.payment_type,
-      plan_id: metadata?.plan_id,
-      plugin_id: metadata?.plugin_id
+      amount
     })
 
     let stripeSecretKey: string | undefined;
     
-    // ABONNEMENT PLATEFORME (plans ou plugins)
-    if (metadata?.payment_type === 'platform_subscription' || metadata?.payment_type === 'plugin_subscription') {
+    // PAIEMENT RÉSERVATION IFRAME (booking_deposit)
+    if (metadata?.payment_type === 'booking_deposit') {
+      console.log('💳 === PAIEMENT RÉSERVATION IFRAME === 💳')
+      
+      const userId = metadata?.user_id
+      if (!userId) {
+        console.error('❌ user_id manquant dans metadata');
+        return new Response(
+          JSON.stringify({ error: 'user_id requis' }),
+          { status: 400, headers: corsHeaders }
+        )
+      }
+
+      console.log('🔍 Récupération configuration Stripe pour user_id:', userId);
+
+      const { data: settings, error: settingsError } = await supabaseClient
+        .from('business_settings')
+        .select('stripe_enabled, stripe_secret_key')
+        .eq('user_id', userId)
+        .single()
+
+      console.log('📦 Résultat requête business_settings:', {
+        success: !settingsError,
+        stripe_enabled: settings?.stripe_enabled,
+        has_secret_key: !!settings?.stripe_secret_key,
+        error: settingsError ? {
+          message: settingsError.message,
+          code: settingsError.code,
+          details: settingsError.details
+        } : null
+      });
+
+      if (settingsError) {
+        console.error('❌ Erreur récupération settings:', settingsError);
+        return new Response(
+          JSON.stringify({ 
+            error: 'Erreur récupération configuration Stripe',
+            details: settingsError.message
+          }),
+          { status: 500, headers: corsHeaders }
+        )
+      }
+
+      if (!settings?.stripe_enabled) {
+        console.error('❌ Stripe non activé pour cet utilisateur');
+        return new Response(
+          JSON.stringify({ error: 'Stripe non activé pour cet utilisateur' }),
+          { status: 400, headers: corsHeaders }
+        )
+      }
+
+      if (!settings?.stripe_secret_key) {
+        console.error('❌ Clé secrète Stripe manquante');
+        return new Response(
+          JSON.stringify({ error: 'Configuration Stripe incomplète' }),
+          { status: 400, headers: corsHeaders }
+        )
+      }
+
+      stripeSecretKey = settings.stripe_secret_key
+      console.log('✅ Clé Stripe utilisateur récupérée');
+
+      const stripe = new Stripe(stripeSecretKey, {
+        appInfo: {
+          name: 'BookingFast',
+          version: '1.0.0',
+        },
+      })
+
+      // Créer ou récupérer le client
+      let customerId
+      console.log('🔍 Recherche client Stripe avec email:', customer_email);
+      
+      const existingCustomers = await stripe.customers.list({
+        email: customer_email,
+        limit: 1,
+      })
+      
+      if (existingCustomers.data.length > 0) {
+        customerId = existingCustomers.data[0].id
+        console.log('✅ Client existant:', customerId)
+      } else {
+        const newCustomer = await stripe.customers.create({
+          email: customer_email,
+          metadata: metadata || {},
+        })
+        customerId = newCustomer.id
+        console.log('✅ Nouveau client créé:', customerId)
+      }
+
+      // PAIEMENT UNIQUE pour les réservations
+      console.log('💳 Création session PAIEMENT UNIQUE:', {
+        amount,
+        currency,
+        service_name
+      });
+
+      try {
+        const sessionData = {
+          customer: customerId,
+          payment_method_types: ['card'],
+          line_items: [
+            {
+              price_data: {
+                currency: currency,
+                product_data: {
+                  name: service_name,
+                  description: `Acompte - ${service_name}`,
+                },
+                unit_amount: Math.round(amount * 100),
+              },
+              quantity: 1,
+            },
+          ],
+          mode: 'payment',
+          success_url,
+          cancel_url,
+          metadata: metadata || {},
+        };
+
+        console.log('📋 Données session Stripe:', JSON.stringify(sessionData, null, 2));
+
+        const session = await stripe.checkout.sessions.create(sessionData);
+
+        console.log('✅ Session PAIEMENT créée:', session.id)
+        console.log('🔗 URL:', session.url)
+
+        return new Response(
+          JSON.stringify({ 
+            sessionId: session.id, 
+            url: session.url,
+            success: true,
+            type: 'payment'
+          }),
+          { headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
+        )
+      } catch (stripeError: any) {
+        console.error('❌ Erreur Stripe:', {
+          message: stripeError.message,
+          type: stripeError.type,
+          code: stripeError.code,
+          param: stripeError.param,
+          raw: stripeError.raw
+        });
+        return new Response(
+          JSON.stringify({ 
+            error: 'Erreur Stripe',
+            details: stripeError.message,
+            type: stripeError.type,
+            code: stripeError.code
+          }),
+          { status: 500, headers: corsHeaders }
+        )
+      }
+
+    } else if (metadata?.payment_type === 'platform_subscription' || metadata?.payment_type === 'plugin_subscription') {
+      // ABONNEMENT PLATEFORME (plans ou plugins)
       console.log('💳 CRÉATION ABONNEMENT RÉCURRENT')
       
       stripeSecretKey = PLATFORM_STRIPE_SECRET_KEY;
@@ -216,7 +363,13 @@ Deno.serve(async (req) => {
         console.log('✅ Price ID plugin récupéré:', priceId)
 
       } else {
-        // PLAN SUBSCRIPTION
+        // PLAN SUBSCRIPTION - Prix récurrents Stripe pour les plans
+        const STRIPE_PRICES = {
+          starter: 'price_1QpCZhKiNbWQJGP3YourStarterPriceID',
+          monthly: 'price_1QpCZhKiNbWQJGP3YourMonthlyPriceID',
+          yearly: 'price_1QpCZhKiNbWQJGP3YourYearlyPriceID'
+        }
+
         const planId = metadata?.plan_id || 'starter'
         priceId = STRIPE_PRICES[planId as keyof typeof STRIPE_PRICES]
 
@@ -293,88 +446,10 @@ Deno.serve(async (req) => {
       }
 
     } else {
-      // PAIEMENT UTILISATEUR (réservation)
-      console.log('💳 Paiement utilisateur - Utilisation Stripe utilisateur')
-      
-      const userId = metadata?.user_id
-      if (!userId) {
-        return new Response(
-          JSON.stringify({ error: 'user_id requis' }),
-          { status: 400, headers: corsHeaders }
-        )
-      }
-
-      const { data: settings, error: settingsError } = await supabaseClient
-        .from('business_settings')
-        .select('stripe_enabled, stripe_secret_key')
-        .eq('user_id', userId)
-        .single()
-
-      if (settingsError || !settings?.stripe_enabled || !settings?.stripe_secret_key) {
-        return new Response(
-          JSON.stringify({ error: 'Configuration Stripe utilisateur manquante' }),
-          { status: 400, headers: corsHeaders }
-        )
-      }
-
-      stripeSecretKey = settings.stripe_secret_key
-
-      const stripe = new Stripe(stripeSecretKey, {
-        appInfo: {
-          name: 'BookingFast',
-          version: '1.0.0',
-        },
-      })
-
-      let customerId
-      const existingCustomers = await stripe.customers.list({
-        email: customer_email,
-        limit: 1,
-      })
-      
-      if (existingCustomers.data.length > 0) {
-        customerId = existingCustomers.data[0].id
-      } else {
-        const newCustomer = await stripe.customers.create({
-          email: customer_email,
-          metadata: metadata || {},
-        })
-        customerId = newCustomer.id
-      }
-
-      // PAIEMENT UNIQUE pour les réservations
-      const session = await stripe.checkout.sessions.create({
-        customer: customerId,
-        payment_method_types: ['card'],
-        line_items: [
-          {
-            price_data: {
-              currency: currency,
-              product_data: {
-                name: service_name,
-                description: `Réservation - ${service_name}`,
-              },
-              unit_amount: Math.round(amount * 100),
-            },
-            quantity: 1,
-          },
-        ],
-        mode: 'payment',
-        success_url,
-        cancel_url,
-        metadata: metadata || {},
-      })
-
-      console.log('✅ Session paiement créée:', session.id)
-
+      console.error('❌ Type de paiement non reconnu:', metadata?.payment_type);
       return new Response(
-        JSON.stringify({ 
-          sessionId: session.id, 
-          url: session.url,
-          success: true,
-          type: 'payment'
-        }),
-        { headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
+        JSON.stringify({ error: 'Type de paiement non reconnu' }),
+        { status: 400, headers: corsHeaders }
       )
     }
 
