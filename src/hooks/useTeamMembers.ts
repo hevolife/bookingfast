@@ -33,51 +33,79 @@ export function useTeamMembers() {
         // Récupérer le membre actuel pour obtenir son owner_id
         const { data: currentMember, error: memberError } = await supabase
           .from('team_members')
-          .select('owner_id')
+          .select('owner_id, role_name')
           .eq('user_id', user.id)
           .maybeSingle();
 
-        if (memberError) throw memberError;
-
-        // Si l'utilisateur n'est pas dans team_members, retourner une liste vide
-        if (!currentMember) {
-          console.log('ℹ️ Utilisateur non membre d\'une équipe');
-          setTeamMembers([]);
-          setLoading(false);
-          return;
+        if (memberError) {
+          throw memberError;
         }
 
-        // Récupérer tous les membres de la même équipe (même owner_id)
-        const { data: members, error: membersError } = await supabase
-          .from('team_members')
-          .select('*')
-          .eq('owner_id', currentMember.owner_id)
-          .order('created_at', { ascending: true });
+        // Si l'utilisateur n'est pas dans team_members, il est propriétaire
+        if (!currentMember) {
+          // Récupérer tous les membres de l'équipe du propriétaire
+          const { data: teamData, error: teamError } = await supabase
+            .from('team_members')
+            .select('*')
+            .eq('owner_id', user.id)
+            .order('created_at', { ascending: true });
 
-        if (membersError) throw membersError;
+          if (teamError) {
+            throw teamError;
+          }
 
-        // Mapper role_name vers le type attendu
-        const roleMap: Record<string, 'owner' | 'admin' | 'member'> = {
-          'owner': 'owner',
-          'admin': 'admin',
-          'employee': 'member',
-          'member': 'member'
-        };
+          // Mapper role_name vers le type attendu
+          const roleMap: Record<string, 'owner' | 'admin' | 'member'> = {
+            'owner': 'owner',
+            'admin': 'admin',
+            'employee': 'member',
+            'member': 'member'
+          };
 
-        // Utiliser les données directement de team_members
-        const formattedMembers: TeamMember[] = (members || []).map(member => ({
-          id: member.id,
-          user_id: member.user_id,
-          full_name: member.full_name || `${member.firstname || ''} ${member.lastname || ''}`.trim() || 'Utilisateur',
-          email: member.email || '',
-          firstname: member.firstname,
-          lastname: member.lastname,
-          role: roleMap[member.role_name] || 'member'
-        }));
+          const formattedMembers: TeamMember[] = (teamData || []).map(member => ({
+            id: member.id,
+            user_id: member.user_id,
+            full_name: member.full_name || `${member.firstname || ''} ${member.lastname || ''}`.trim() || 'Utilisateur',
+            email: member.email || '',
+            firstname: member.firstname,
+            lastname: member.lastname,
+            role: roleMap[member.role_name] || 'member'
+          }));
 
-        setTeamMembers(formattedMembers);
+          setTeamMembers(formattedMembers);
+        } else {
+          // Récupérer tous les membres de la même équipe (même owner_id)
+          const { data: members, error: membersError } = await supabase
+            .from('team_members')
+            .select('*')
+            .eq('owner_id', currentMember.owner_id)
+            .order('created_at', { ascending: true });
+
+          if (membersError) {
+            throw membersError;
+          }
+
+          // Mapper role_name vers le type attendu
+          const roleMap: Record<string, 'owner' | 'admin' | 'member'> = {
+            'owner': 'owner',
+            'admin': 'admin',
+            'employee': 'member',
+            'member': 'member'
+          };
+
+          const formattedMembers: TeamMember[] = (members || []).map(member => ({
+            id: member.id,
+            user_id: member.user_id,
+            full_name: member.full_name || `${member.firstname || ''} ${member.lastname || ''}`.trim() || 'Utilisateur',
+            email: member.email || '',
+            firstname: member.firstname,
+            lastname: member.lastname,
+            role: roleMap[member.role_name] || 'member'
+          }));
+
+          setTeamMembers(formattedMembers);
+        }
       } catch (err) {
-        console.error('❌ Erreur chargement membres équipe:', err);
         setError(err instanceof Error ? err : new Error('Erreur inconnue'));
         setTeamMembers([]);
       } finally {

@@ -1,69 +1,77 @@
 export interface User {
   id: string;
   email: string;
-  created_at: string;
-}
-
-export interface Client {
-  id: string;
-  firstname: string;
-  lastname: string;
-  email: string;
-  phone: string;
+  full_name?: string;
   created_at?: string;
 }
 
 export interface Service {
   id: string;
+  user_id: string;
   name: string;
   description: string;
   duration_minutes: number;
-  price_ttc: number;
   price_ht: number;
+  price_ttc: number;
   capacity: number;
-  color: string;
-  user_id: string;
-  created_at: string;
+  image_url?: string;
+  created_at?: string;
   unit_name?: string;
-}
-
-export interface Transaction {
-  id: string;
-  amount: number;
-  method: 'cash' | 'card' | 'check' | 'transfer' | 'stripe';
-  note?: string;
-  status: 'pending' | 'completed' | 'cancelled';
-  created_at: string;
 }
 
 export interface Booking {
   id: string;
+  user_id: string;
   service_id: string;
   date: string;
   time: string;
   duration_minutes: number;
-  quantity: number;
   client_name: string;
-  client_firstname: string;
+  client_firstname?: string;
   client_email: string;
-  client_phone: string;
+  client_phone?: string;
   total_amount: number;
-  payment_status: 'pending' | 'partial' | 'completed';
+  payment_status: 'pending' | 'partial' | 'completed' | 'failed' | 'refunded';
   payment_amount: number;
-  payment_link?: string;
-  transactions: Transaction[];
-  user_id: string;
+  booking_status: 'pending' | 'confirmed' | 'cancelled' | 'completed';
+  notes?: string;
   created_at: string;
-  booking_status: 'pending' | 'confirmed' | 'cancelled';
-  assigned_user_id?: string | null;
-  notes?: string | null;
-  service?: Service;
-  custom_service_data?: {
-    name: string;
-    price: number;
-    duration: number;
-  } | null;
-  google_calendar_event_id?: string | null;
+  quantity?: number;
+  assigned_user_id?: string;
+}
+
+export interface Client {
+  id: string;
+  user_id: string;
+  firstname: string;
+  lastname: string;
+  email: string;
+  phone?: string;
+  notes?: string;
+  created_at: string;
+  total_bookings?: number;
+  total_spent?: number;
+  last_booking_date?: string;
+}
+
+export interface TimeRange {
+  start: string;
+  end: string;
+}
+
+export interface DaySchedule {
+  ranges: TimeRange[];
+  closed: boolean;
+}
+
+export interface OpeningHours {
+  monday: DaySchedule;
+  tuesday: DaySchedule;
+  wednesday: DaySchedule;
+  thursday: DaySchedule;
+  friday: DaySchedule;
+  saturday: DaySchedule;
+  sunday: DaySchedule;
 }
 
 export interface BusinessSettings {
@@ -72,12 +80,7 @@ export interface BusinessSettings {
   business_name: string;
   primary_color: string;
   secondary_color: string;
-  opening_hours: {
-    [key: string]: {
-      ranges: Array<{ start: string; end: string }>;
-      closed: boolean;
-    };
-  };
+  opening_hours: OpeningHours;
   buffer_minutes: number;
   default_deposit_percentage: number;
   minimum_booking_delay_hours: number;
@@ -94,12 +97,31 @@ export interface BusinessSettings {
   stripe_secret_key: string;
   stripe_webhook_secret: string;
   timezone: string;
-  tax_rate?: number;
   multiply_deposit_by_services?: boolean;
+  iframe_services?: string[];
+  iframe_enable_team_selection?: boolean;
   enable_user_assignment?: boolean;
-  google_calendar_enabled?: boolean;
-  google_calendar_id?: string | null;
-  google_calendar_sync_status?: 'disconnected' | 'connected' | 'error';
+}
+
+export interface PaymentLink {
+  id: string;
+  booking_id: string;
+  stripe_payment_intent_id?: string;
+  amount: number;
+  status: 'pending' | 'completed' | 'expired' | 'failed';
+  expires_at: string;
+  created_at: string;
+}
+
+export interface Unavailability {
+  id: string;
+  user_id: string;
+  date: string;
+  start_time: string;
+  end_time: string;
+  reason?: string;
+  created_at?: string;
+  assigned_user_id?: string;
 }
 
 export interface TeamMember {
@@ -107,57 +129,20 @@ export interface TeamMember {
   owner_id: string;
   user_id: string;
   email: string;
-  role: 'admin' | 'member';
+  role_name: string;
+  firstname?: string;
+  lastname?: string;
+  full_name?: string;
   is_active: boolean;
   created_at: string;
-  user?: {
-    email: string;
-  };
 }
 
-export interface Plugin {
+export interface TeamInvitation {
   id: string;
-  name: string;
-  slug: string;
-  description: string;
-  icon: string;
-  price: number;
-  features: string[];
-  is_active: boolean;
-}
-
-export interface UserPlugin {
-  id: string;
-  user_id: string;
-  plugin_id: string;
-  plugin_slug: string;
-  is_active: boolean;
-  activated_at: string;
-  expires_at?: string;
-}
-
-export interface Affiliate {
-  id: string;
-  user_id: string;
-  affiliate_code: string;
-  commission_rate: number;
-  total_referrals: number;
-  total_earnings: number;
+  owner_id: string;
+  email: string;
+  role_name: string;
+  status: 'pending' | 'accepted' | 'expired';
+  expires_at: string;
   created_at: string;
-}
-
-export interface AffiliateReferral {
-  id: string;
-  affiliate_id: string;
-  referred_user_id: string;
-  commission_amount: number;
-  status: 'pending' | 'paid';
-  created_at: string;
-}
-
-export interface BookingLimitInfo {
-  allowed: boolean;
-  limit: number | null;
-  current: number;
-  remaining: number | null;
 }

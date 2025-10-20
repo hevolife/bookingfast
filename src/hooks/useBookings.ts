@@ -62,8 +62,6 @@ export function useBookings() {
         console.warn('⚠️ Erreur vérification équipe:', teamError);
       }
 
-      // ✅ CORRECTION: Ne plus filtrer les réservations annulées ici
-      // Chaque composant décidera s'il veut les afficher ou non
       console.log('🔍 fetchBookings - Requête bookings pour user_id:', targetUserId);
       const { data, error } = await supabase!
         .from('bookings')
@@ -80,7 +78,7 @@ export function useBookings() {
         throw error;
       }
 
-      console.log('✅ Bookings chargés:', data?.length || 0, 'réservations (incluant annulées)');
+      console.log('✅ Bookings chargés:', data?.length || 0, 'réservations');
       setBookings(data || []);
     } catch (err) {
       console.error('❌ Erreur lors du chargement des réservations:', err);
@@ -209,7 +207,10 @@ export function useBookings() {
   };
 
   const deleteBooking = async (id: string) => {
+    console.log('🗑️ useBookings.deleteBooking - Début suppression:', id);
+    
     if (!isSupabaseConfigured || !user) {
+      console.error('❌ Supabase non configuré ou utilisateur non connecté');
       throw new Error('Supabase non configuré ou utilisateur non connecté');
     }
 
@@ -226,35 +227,58 @@ export function useBookings() {
 
         if (membershipData?.owner_id) {
           targetUserId = membershipData.owner_id;
+          console.log('🔍 useBookings.deleteBooking - targetUserId:', targetUserId);
         }
       } catch (teamError) {
         console.warn('⚠️ Erreur vérification équipe:', teamError);
       }
 
+      // Récupérer les infos de la réservation avant suppression
+      console.log('🔍 useBookings.deleteBooking - Récupération infos réservation...');
       const { data: bookingData } = await supabase!
         .from('bookings')
         .select('google_calendar_event_id')
         .eq('id', id)
         .single();
 
+      console.log('🔍 useBookings.deleteBooking - Infos réservation:', bookingData);
+
+      // Supprimer la réservation de la base de données
+      console.log('🔄 useBookings.deleteBooking - Suppression de la base de données...');
       const { error } = await supabase!
         .from('bookings')
         .delete()
         .eq('id', id);
 
-      if (error) throw error;
+      if (error) {
+        console.error('❌ useBookings.deleteBooking - Erreur suppression DB:', error);
+        throw error;
+      }
 
-      setBookings(prev => prev.filter(b => b.id !== id));
+      console.log('✅ useBookings.deleteBooking - Suppression DB réussie');
+
+      // Mettre à jour l'état local
+      console.log('🔄 useBookings.deleteBooking - Mise à jour état local...');
+      setBookings(prev => {
+        const newBookings = prev.filter(b => b.id !== id);
+        console.log('📊 useBookings.deleteBooking - Avant:', prev.length, 'Après:', newBookings.length);
+        return newBookings;
+      });
       
+      // Supprimer l'événement Google Calendar si nécessaire
       if (bookingData?.google_calendar_event_id) {
         try {
+          console.log('🔄 useBookings.deleteBooking - Suppression Google Calendar...');
           await GoogleCalendarService.deleteEvent(bookingData.google_calendar_event_id, targetUserId);
+          console.log('✅ useBookings.deleteBooking - Suppression Google Calendar réussie');
         } catch (calendarError) {
           console.warn('⚠️ Erreur suppression événement Google Calendar:', calendarError);
         }
       }
+
+      console.log('✅ useBookings.deleteBooking - Suppression terminée avec succès');
     } catch (err) {
-      console.error('Erreur lors de la suppression de la réservation:', err);
+      console.error('❌ useBookings.deleteBooking - Erreur:', err);
       throw err;
     }
   };

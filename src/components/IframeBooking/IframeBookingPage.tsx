@@ -1,7 +1,7 @@
 import React, { useState, useEffect } from 'react';
 import { useParams, useSearchParams } from 'react-router-dom';
-import { Calendar, Clock, User, Mail, Phone, CreditCard, Package, MapPin, Star, ArrowRight, ArrowLeft, Check, Building2, Euro, Users, Timer, ChevronRight, Sparkles } from 'lucide-react';
-import { Service, BusinessSettings, Booking } from '../../types';
+import { Calendar, Clock, User, Mail, Phone, CreditCard, Package, MapPin, Star, ArrowRight, ArrowLeft, Check, Building2, Euro, Users, Timer, ChevronRight, Sparkles, UserCheck, CheckCircle } from 'lucide-react';
+import { Service, BusinessSettings, Booking, Unavailability, TeamMember } from '../../types';
 import { supabase, isSupabaseConfigured } from '../../lib/supabase';
 import { getBusinessTimezone, getCurrentDateInTimezone, formatInBusinessTimezone } from '../../lib/timezone';
 import { validateBookingDateTime, getNextAvailableDateTime } from '../../lib/bookingValidation';
@@ -12,6 +12,8 @@ interface PublicBookingData {
   services: Service[];
   settings: BusinessSettings;
   bookings: Booking[];
+  unavailabilities: Unavailability[];
+  teamMembers: TeamMember[];
 }
 
 interface TimeSlot {
@@ -31,6 +33,7 @@ export function IframeBookingPage() {
   const [selectedService, setSelectedService] = useState<Service | null>(null);
   const [selectedDate, setSelectedDate] = useState('');
   const [selectedTime, setSelectedTime] = useState('');
+  const [selectedTeamMember, setSelectedTeamMember] = useState<string>('');
   const [quantity, setQuantity] = useState(1);
   const [clientData, setClientData] = useState({
     firstname: '',
@@ -112,9 +115,12 @@ export function IframeBookingPage() {
             stripe_secret_key: '',
             stripe_webhook_secret: '',
             timezone: 'Europe/Paris',
-            multiply_deposit_by_services: false
+            multiply_deposit_by_services: false,
+            iframe_enable_team_selection: false
           },
-          bookings: []
+          bookings: [],
+          unavailabilities: [],
+          teamMembers: []
         };
         setData(demoData);
         setLoading(false);
@@ -143,6 +149,9 @@ export function IframeBookingPage() {
 
       const result = await response.json();
       console.log('✅ Données reçues:', result);
+      console.log('🔍 Indisponibilités reçues:', result.unavailabilities?.length || 0, result.unavailabilities);
+      console.log('👥 Membres d\'équipe reçus:', result.teamMembers?.length || 0, result.teamMembers);
+      console.log('⚙️ Paramètre iframe_enable_team_selection:', result.settings?.iframe_enable_team_selection);
       
       if (!result.success) {
         throw new Error(result.error || 'Erreur lors de la récupération des données');
@@ -169,7 +178,9 @@ export function IframeBookingPage() {
       
       setData({
         ...result,
-        services: filteredServices
+        services: filteredServices,
+        unavailabilities: result.unavailabilities || [],
+        teamMembers: result.teamMembers || []
       });
     } catch (err) {
       console.error('❌ Erreur chargement données publiques:', err);
@@ -191,9 +202,42 @@ export function IframeBookingPage() {
     }
   }, [data?.settings, selectedDate]);
 
+  const isTimeBlockedByUnavailability = (date: string, time: string, durationMinutes: number): boolean => {
+    if (!data?.unavailabilities || data.unavailabilities.length === 0) {
+      return false;
+    }
+
+    const [startHour, startMinute] = time.split(':').map(Number);
+    const slotStartMinutes = startHour * 60 + startMinute;
+    const slotEndMinutes = slotStartMinutes + durationMinutes;
+
+    // Filtrer par membre d'équipe si sélectionné
+    const relevantUnavailabilities = selectedTeamMember
+      ? data.unavailabilities.filter(u => 
+          u.date === date && 
+          (!u.assigned_user_id || u.assigned_user_id === selectedTeamMember)
+        )
+      : data.unavailabilities.filter(u => u.date === date);
+
+    for (const unavailability of relevantUnavailabilities) {
+      const [unavailStartHour, unavailStartMinute] = unavailability.start_time.split(':').map(Number);
+      const [unavailEndHour, unavailEndMinute] = unavailability.end_time.split(':').map(Number);
+      
+      const unavailStartMinutes = unavailStartHour * 60 + unavailStartMinute;
+      const unavailEndMinutes = unavailEndHour * 60 + unavailEndMinute;
+
+      const hasOverlap = (slotStartMinutes < unavailEndMinutes && slotEndMinutes > unavailStartMinutes);
+      
+      if (hasOverlap) {
+        return true;
+      }
+    }
+
+    return false;
+  };
+
   const generateTimeSlots = (date: string): TimeSlot[] => {
     if (!data?.settings || !date) {
-      console.log('⚠️ generateTimeSlots: Pas de settings ou date');
       return [];
     }
     
@@ -201,7 +245,6 @@ export function IframeBookingPage() {
     const daySettings = data.settings.opening_hours[dayName];
     
     if (!daySettings || daySettings.closed) {
-      console.log('⚠️ generateTimeSlots: Jour fermé');
       return [];
     }
     
@@ -232,15 +275,20 @@ export function IframeBookingPage() {
       }
     });
     
-    console.log('✅ generateTimeSlots: Créneaux générés:', slots.length);
     return slots.sort((a, b) => a.time.localeCompare(b.time));
   };
 
   const isTimeSlotAvailable = (time: string, service: Service | null): boolean => {
     if (!service || !selectedDate) return false;
     
+    // Vérifier la validation de base (délai minimum, etc.)
     const validation = validateBookingDateTime(selectedDate, time, data?.settings, true);
     if (!validation.isValid) {
+      return false;
+    }
+    
+    // Vérifier si le créneau est bloqué par une indisponibilité
+    if (isTimeBlockedByUnavailability(selectedDate, time, service.duration_minutes)) {
       return false;
     }
     
@@ -248,7 +296,13 @@ export function IframeBookingPage() {
     const startTime = startHour * 60 + startMinute;
     const endTime = startTime + service.duration_minutes;
     
-    const dayBookings = data?.bookings?.filter(booking => booking.date === selectedDate) || [];
+    // Filtrer les réservations par membre d'équipe si sélectionné
+    let dayBookings = data?.bookings?.filter(booking => booking.date === selectedDate) || [];
+    if (selectedTeamMember) {
+      dayBookings = dayBookings.filter(booking => 
+        !booking.assigned_user_id || booking.assigned_user_id === selectedTeamMember
+      );
+    }
     
     for (const booking of dayBookings) {
       const [bookingHour, bookingMinute] = booking.time.split(':').map(Number);
@@ -328,24 +382,31 @@ export function IframeBookingPage() {
       });
       
       if (isSupabaseConfigured) {
+        const bookingData: any = {
+          user_id: userId,
+          service_id: selectedService.id,
+          date: selectedDate,
+          time: selectedTime,
+          duration_minutes: selectedService.duration_minutes,
+          quantity,
+          client_name: clientData.lastname,
+          client_firstname: clientData.firstname,
+          client_email: clientData.email,
+          client_phone: clientData.phone,
+          total_amount: totalAmount,
+          payment_status: 'pending',
+          payment_amount: 0,
+          booking_status: 'pending'
+        };
+
+        // Ajouter assigned_user_id si un membre d'équipe est sélectionné
+        if (selectedTeamMember) {
+          bookingData.assigned_user_id = selectedTeamMember;
+        }
+
         const { data: booking, error: bookingError } = await supabase
           .from('bookings')
-          .insert({
-            user_id: userId,
-            service_id: selectedService.id,
-            date: selectedDate,
-            time: selectedTime,
-            duration_minutes: selectedService.duration_minutes,
-            quantity,
-            client_name: clientData.lastname,
-            client_firstname: clientData.firstname,
-            client_email: clientData.email,
-            client_phone: clientData.phone,
-            total_amount: totalAmount,
-            payment_status: 'pending',
-            payment_amount: 0,
-            booking_status: 'pending'
-          })
+          .insert(bookingData)
           .select()
           .single();
 
@@ -370,7 +431,6 @@ export function IframeBookingPage() {
 
   const getAvailableDates = () => {
     if (!data?.settings) {
-      console.log('⚠️ getAvailableDates: Pas de settings');
       return [];
     }
     
@@ -401,12 +461,25 @@ export function IframeBookingPage() {
       }
     }
     
-    console.log('✅ getAvailableDates: Dates disponibles:', dates.length);
     return dates;
+  };
+
+  const getMemberDisplayName = (member: TeamMember) => {
+    if (member.firstname && member.lastname) {
+      return `${member.firstname} ${member.lastname}`;
+    }
+    if (member.full_name) {
+      return member.full_name;
+    }
+    if (member.firstname) {
+      return member.firstname;
+    }
+    return member.email || 'Membre';
   };
 
   const timeSlots = selectedDate && selectedService ? generateTimeSlots(selectedDate) : [];
   const availableDates = getAvailableDates();
+  const showTeamSelection = data?.settings?.iframe_enable_team_selection && data?.teamMembers && data.teamMembers.length > 0;
 
   if (loading) {
     return (
@@ -591,6 +664,47 @@ export function IframeBookingPage() {
                 </button>
               </div>
             </div>
+
+            {/* Sélection membre d'équipe - AVANT la sélection de date/heure */}
+            {showTeamSelection && (
+              <div className="bg-gradient-to-r from-purple-50 to-pink-50 rounded-2xl p-6 border border-purple-200">
+                <div className="flex items-center gap-3 mb-4">
+                  <div className="w-12 h-12 bg-gradient-to-r from-purple-500 to-pink-500 rounded-xl flex items-center justify-center">
+                    <UserCheck className="w-6 h-6 text-white" />
+                  </div>
+                  <div>
+                    <h3 className="text-xl font-bold text-purple-800">Choisissez votre praticien</h3>
+                    <p className="text-purple-600">Sélectionnez le membre de l'équipe de votre choix</p>
+                  </div>
+                </div>
+
+                <select
+                  value={selectedTeamMember}
+                  onChange={(e) => {
+                    setSelectedTeamMember(e.target.value);
+                    // Réinitialiser la date et l'heure pour forcer un nouveau calcul des disponibilités
+                    setSelectedTime('');
+                  }}
+                  className="w-full px-4 py-3 border-2 border-purple-300 rounded-xl focus:border-purple-500 focus:ring-2 focus:ring-purple-200 transition-all bg-white"
+                >
+                  <option value="">Aucune préférence</option>
+                  {data.teamMembers.map(member => (
+                    <option key={member.user_id} value={member.user_id}>
+                      {getMemberDisplayName(member)}
+                    </option>
+                  ))}
+                </select>
+
+                {selectedTeamMember && (
+                  <div className="mt-3 flex items-center gap-2 text-sm text-purple-700 bg-purple-100 px-4 py-2 rounded-lg">
+                    <CheckCircle className="w-4 h-4" />
+                    <span>
+                      Réservation avec <strong>{getMemberDisplayName(data.teamMembers.find(m => m.user_id === selectedTeamMember)!)}</strong>
+                    </span>
+                  </div>
+                )}
+              </div>
+            )}
 
             {/* Date Picker */}
             <DatePicker
@@ -780,6 +894,18 @@ export function IframeBookingPage() {
                   </div>
                 </div>
 
+                {selectedTeamMember && (
+                  <div className="flex items-start gap-4 p-4 bg-purple-50 rounded-2xl">
+                    <UserCheck className="w-6 h-6 text-purple-600 flex-shrink-0 mt-1" />
+                    <div className="flex-1">
+                      <h3 className="font-bold text-gray-900 mb-1">Praticien</h3>
+                      <p className="text-gray-600">
+                        {getMemberDisplayName(data.teamMembers.find(m => m.user_id === selectedTeamMember)!)}
+                      </p>
+                    </div>
+                  </div>
+                )}
+
                 <div className="flex items-start gap-4 p-4 bg-purple-50 rounded-2xl">
                   <Calendar className="w-6 h-6 text-purple-600 flex-shrink-0 mt-1" />
                   <div className="flex-1">
@@ -862,6 +988,7 @@ export function IframeBookingPage() {
                 setSelectedService(null);
                 setSelectedDate('');
                 setSelectedTime('');
+                setSelectedTeamMember('');
                 setQuantity(1);
                 setClientData({ firstname: '', lastname: '', email: '', phone: '' });
               }}

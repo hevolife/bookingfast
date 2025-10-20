@@ -81,7 +81,7 @@ serve(async (req) => {
     // Récupérer les réservations existantes
     const { data: bookingsData, error: bookingsError } = await supabaseClient
       .from('bookings')
-      .select('date, time, duration_minutes, service_id, booking_status, quantity')
+      .select('date, time, duration_minutes, service_id, booking_status, quantity, assigned_user_id')
       .eq('user_id', userId)
       .in('booking_status', ['pending', 'confirmed'])
 
@@ -91,18 +91,63 @@ serve(async (req) => {
 
     console.log('✅ Réservations récupérées:', bookingsData?.length || 0)
 
+    // Récupération des indisponibilités
+    console.log('🔍 Tentative de récupération des indisponibilités pour userId:', userId)
+    
+    const { data: unavailabilitiesData, error: unavailabilitiesError } = await supabaseClient
+      .from('unavailabilities')
+      .select('*')
+      .eq('user_id', userId)
+      .order('date', { ascending: true })
+      .order('start_time', { ascending: true })
+
+    if (unavailabilitiesError) {
+      console.error('❌ ERREUR chargement indisponibilités:', unavailabilitiesError)
+    } else {
+      console.log('✅ Indisponibilités récupérées:', unavailabilitiesData?.length || 0)
+    }
+
+    // Récupération des membres d'équipe ACTIFS
+    console.log('🔍 Tentative de récupération des membres d\'équipe pour userId:', userId)
+    
+    const { data: teamMembersData, error: teamMembersError } = await supabaseClient
+      .from('team_members')
+      .select('user_id, email, firstname, lastname, full_name, role_name')
+      .eq('owner_id', userId)
+      .eq('is_active', true)
+      .order('created_at', { ascending: true })
+
+    if (teamMembersError) {
+      console.error('❌ ERREUR chargement membres d\'équipe:', teamMembersError)
+    } else {
+      console.log('✅ Membres d\'équipe récupérés:', teamMembersData?.length || 0)
+      if (teamMembersData && teamMembersData.length > 0) {
+        console.log('📋 Liste des membres:', teamMembersData.map(m => ({
+          id: m.user_id,
+          name: m.full_name || `${m.firstname} ${m.lastname}` || m.email
+        })))
+      }
+    }
+
+    const responseData = { 
+      success: true,
+      user: {
+        id: userData.user.id,
+        email: userData.user.email,
+        full_name: userData.user.user_metadata?.full_name || userData.user.email
+      },
+      services: servicesData || [],
+      settings: settingsData,
+      bookings: bookingsData || [],
+      unavailabilities: unavailabilitiesData || [],
+      teamMembers: teamMembersData || []
+    }
+
+    console.log('📤 Réponse finale - unavailabilities:', responseData.unavailabilities?.length || 0)
+    console.log('📤 Réponse finale - teamMembers:', responseData.teamMembers?.length || 0)
+
     return new Response(
-      JSON.stringify({ 
-        success: true,
-        user: {
-          id: userData.user.id,
-          email: userData.user.email,
-          full_name: userData.user.user_metadata?.full_name || userData.user.email
-        },
-        services: servicesData || [],
-        settings: settingsData,
-        bookings: bookingsData || []
-      }),
+      JSON.stringify(responseData),
       { headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
     )
 

@@ -1,7 +1,7 @@
 import React, { useState, useRef, useEffect } from 'react';
-import { ChevronLeft, ChevronRight, Plus, Clock, Sparkles, Calendar as CalendarIcon, ChevronDown } from 'lucide-react';
+import { ChevronLeft, ChevronRight, Plus, Clock, Sparkles, Calendar as CalendarIcon, ChevronDown, Ban, Trash2 } from 'lucide-react';
 import { createPortal } from 'react-dom';
-import { Booking } from '../../types';
+import { Booking, Unavailability } from '../../types';
 import { useBusinessSettings } from '../../hooks/useBusinessSettings';
 import { ServiceBookingModal } from './ServiceBookingModal';
 import { DatePicker } from './DatePicker';
@@ -14,8 +14,10 @@ interface CalendarGridProps {
   onTimeSlotClick: (date: string, time: string) => void;
   onBookingClick: (booking: Booking) => void;
   bookings: Booking[];
+  unavailabilities: Unavailability[];
   loading: boolean;
   onDeleteBooking: (bookingId: string) => void;
+  onAddUnavailability: (date?: string) => void;
 }
 
 interface ServiceGroup {
@@ -27,13 +29,31 @@ interface ServiceGroup {
   startTime: string;
 }
 
+interface UnavailabilityBlock {
+  id: string;
+  timeIndex: number;
+  duration: number;
+  reason?: string;
+  startTime: string;
+  endTime: string;
+}
+
 interface ColumnLayout {
   column: number;
   totalColumns: number;
   group: ServiceGroup;
 }
 
-export function CalendarGrid({ currentDate, onTimeSlotClick, onBookingClick, bookings: allBookings, loading, onDeleteBooking }: CalendarGridProps) {
+export function CalendarGrid({ 
+  currentDate, 
+  onTimeSlotClick, 
+  onBookingClick, 
+  bookings: allBookings, 
+  unavailabilities,
+  loading, 
+  onDeleteBooking,
+  onAddUnavailability 
+}: CalendarGridProps) {
   console.log('🔍 CalendarPage - Rendu, view:', 'calendar');
   
   const today = new Date();
@@ -45,6 +65,7 @@ export function CalendarGrid({ currentDate, onTimeSlotClick, onBookingClick, boo
   const [selectedServiceBookings, setSelectedServiceBookings] = useState<Booking[]>([]);
   const [selectedServiceName, setSelectedServiceName] = useState('');
   const [showDatePicker, setShowDatePicker] = useState(false);
+  const [deletingUnavailabilityId, setDeletingUnavailabilityId] = useState<string | null>(null);
   const scrollContainerRef = useRef<HTMLDivElement>(null);
   const timeGridRef = useRef<HTMLDivElement>(null);
   const monthButtonRef = useRef<HTMLButtonElement>(null);
@@ -308,26 +329,17 @@ export function CalendarGrid({ currentDate, onTimeSlotClick, onBookingClick, boo
       const selectedIndex = days.findIndex(day => isSelected(day.date));
       
       if (selectedIndex !== -1) {
-        // Obtenir les dimensions réelles du premier élément de date
         const firstDateElement = container.querySelector('button');
         if (firstDateElement) {
           const dateRect = firstDateElement.getBoundingClientRect();
           const dateWidth = dateRect.width;
           
-          // Calculer le gap entre les éléments (en utilisant getComputedStyle)
           const containerStyle = window.getComputedStyle(container.firstElementChild as Element);
-          const gap = parseFloat(containerStyle.gap) || 8; // Fallback à 8px si gap n'est pas défini
+          const gap = parseFloat(containerStyle.gap) || 8;
           
-          // Largeur totale d'un élément incluant le gap
           const totalItemWidth = dateWidth + gap;
-          
-          // Position de l'élément sélectionné
           const itemPosition = selectedIndex * totalItemWidth;
-          
-          // Largeur visible du conteneur
           const containerWidth = container.clientWidth;
-          
-          // Calculer la position de scroll pour centrer l'élément
           const scrollPosition = itemPosition - (containerWidth / 2) + (dateWidth / 2);
           
           container.scrollTo({
@@ -339,7 +351,6 @@ export function CalendarGrid({ currentDate, onTimeSlotClick, onBookingClick, boo
     }
   };
 
-  // Auto-scroll vers la date sélectionnée au changement
   useEffect(() => {
     const timer = setTimeout(() => {
       scrollToSelectedDate();
@@ -347,7 +358,6 @@ export function CalendarGrid({ currentDate, onTimeSlotClick, onBookingClick, boo
     return () => clearTimeout(timer);
   }, [selectedDate, viewMonth]);
 
-  // Auto-scroll initial
   useEffect(() => {
     const timer = setTimeout(() => {
       scrollToSelectedDate();
@@ -359,6 +369,33 @@ export function CalendarGrid({ currentDate, onTimeSlotClick, onBookingClick, boo
     const dateString = `${date.getFullYear()}-${(date.getMonth() + 1).toString().padStart(2, '0')}-${date.getDate().toString().padStart(2, '0')}`;
     const dayBookings = allBookings.filter(b => b.date === dateString);
     return dayBookings.sort((a, b) => a.time.localeCompare(b.time));
+  };
+
+  const getUnavailabilitiesForDay = (date: Date): UnavailabilityBlock[] => {
+    const dateString = `${date.getFullYear()}-${(date.getMonth() + 1).toString().padStart(2, '0')}-${date.getDate().toString().padStart(2, '0')}`;
+    const dayUnavailabilities = unavailabilities.filter(u => u.date === dateString);
+    
+    return dayUnavailabilities.map(unavailability => {
+      const startTime = unavailability.start_time.slice(0, 5);
+      const endTime = unavailability.end_time.slice(0, 5);
+      const timeIndex = timeSlots.findIndex(slot => slot.time === startTime);
+      
+      if (timeIndex === -1) return null;
+      
+      const [startHour, startMinute] = startTime.split(':').map(Number);
+      const [endHour, endMinute] = endTime.split(':').map(Number);
+      const durationMinutes = (endHour * 60 + endMinute) - (startHour * 60 + startMinute);
+      const duration = Math.ceil(durationMinutes / 30);
+      
+      return {
+        id: unavailability.id,
+        timeIndex,
+        duration,
+        reason: unavailability.reason,
+        startTime,
+        endTime
+      };
+    }).filter((block): block is UnavailabilityBlock => block !== null);
   };
 
   const groupBookingsByServiceAndTime = (bookings: Booking[]): ServiceGroup[] => {
@@ -444,6 +481,7 @@ export function CalendarGrid({ currentDate, onTimeSlotClick, onBookingClick, boo
   };
 
   const dayBookings = getBookingsForDay(selectedDate);
+  const dayUnavailabilities = timeSlots.length > 0 ? getUnavailabilitiesForDay(selectedDate) : [];
   const serviceGroups = timeSlots.length > 0 ? groupBookingsByServiceAndTime(dayBookings) : [];
   const columnLayouts = calculateColumnLayout(serviceGroups);
 
@@ -451,6 +489,26 @@ export function CalendarGrid({ currentDate, onTimeSlotClick, onBookingClick, boo
     setSelectedServiceBookings(group.bookings);
     setSelectedServiceName(group.serviceName);
     setServiceModalOpen(true);
+  };
+
+  const handleDeleteUnavailability = async (unavailabilityId: string, e: React.MouseEvent) => {
+    e.stopPropagation();
+    
+    if (!confirm('Supprimer cette indisponibilité ?')) {
+      return;
+    }
+
+    setDeletingUnavailabilityId(unavailabilityId);
+    
+    try {
+      await onDeleteBooking(unavailabilityId);
+      window.dispatchEvent(new CustomEvent('refreshUnavailabilities'));
+    } catch (error) {
+      console.error('Erreur suppression indisponibilité:', error);
+      alert('Erreur lors de la suppression');
+    } finally {
+      setDeletingUnavailabilityId(null);
+    }
   };
 
   const getUnitName = (booking: Booking) => {
@@ -749,6 +807,62 @@ export function CalendarGrid({ currentDate, onTimeSlotClick, onBookingClick, boo
                   </button>
                 ))}
 
+                {/* Indisponibilités */}
+                <div className="absolute inset-0 z-20 pointer-events-none">
+                  {dayUnavailabilities.map((block, blockIndex) => {
+                    const position = {
+                      top: `${block.timeIndex * 48 + 1}px`,
+                      height: `${block.duration * 48 - 2}px`,
+                    };
+
+                    return (
+                      <div
+                        key={block.id}
+                        className="absolute left-1 right-1 bg-gradient-to-r from-red-500/90 to-orange-500/90 text-white rounded-xl shadow-lg cursor-pointer hover:shadow-2xl transition-all duration-300 transform hover:scale-[1.02] animate-fadeIn pointer-events-auto border-2 border-red-300/50 group"
+                        style={{
+                          ...position,
+                          animationDelay: `${blockIndex * 100}ms`,
+                          zIndex: 20
+                        }}
+                        onClick={(e) => handleDeleteUnavailability(block.id, e)}
+                      >
+                        <div className="h-full flex flex-col justify-center relative overflow-hidden p-2">
+                          <div className="absolute inset-0 bg-gradient-to-r from-transparent via-white/10 to-transparent -skew-x-12"></div>
+                          
+                          <div className="relative z-10 text-center sm:text-left">
+                            <div className="flex items-center justify-between gap-2">
+                              <div className="flex items-center gap-2 flex-1 min-w-0">
+                                <Ban className="w-4 h-4 flex-shrink-0" />
+                                <div className="font-bold text-xs sm:text-sm truncate">
+                                  Indisponible
+                                </div>
+                              </div>
+                              <button
+                                onClick={(e) => handleDeleteUnavailability(block.id, e)}
+                                disabled={deletingUnavailabilityId === block.id}
+                                className="flex-shrink-0 p-1.5 bg-white/20 hover:bg-white/30 rounded-lg transition-all opacity-0 group-hover:opacity-100"
+                                title="Supprimer"
+                              >
+                                <Trash2 className="w-3 h-3" />
+                              </button>
+                            </div>
+                            <div className="opacity-90 text-xs flex items-center gap-1 mt-1">
+                              <Clock className="w-3 h-3" />
+                              {block.startTime} - {block.endTime}
+                            </div>
+                            {block.reason && (
+                              <div className="text-xs opacity-80 mt-1 truncate">
+                                {block.reason}
+                              </div>
+                            )}
+                          </div>
+                        </div>
+                      </div>
+                    );
+                  })}
+                </div>
+
+                {/* Réservations */}
                 <div className="absolute inset-0 z-30 pointer-events-none">
                   {columnLayouts.map((layout, layoutIndex) => {
                     const { column, totalColumns, group } = layout;

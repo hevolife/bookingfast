@@ -1,7 +1,8 @@
 import React, { useState } from 'react';
-import { X, Clock, User, Mail, Phone, CreditCard, CreditCard as Edit, Trash2, Calendar, Eye, FileText, History } from 'lucide-react';
+import { X, Clock, User, Mail, Phone, CreditCard, CreditCard as Edit, Trash2, Calendar, Eye, FileText, History, UserCheck } from 'lucide-react';
 import { Booking } from '../../types';
 import { BookingHistoryModal } from './BookingHistoryModal';
+import { useTeamMembers } from '../../hooks/useTeamMembers';
 
 interface ServiceBookingModalProps {
   isOpen: boolean;
@@ -32,11 +33,21 @@ export function ServiceBookingModal({
   const [showHistory, setShowHistory] = useState(false);
   const [historyBookingId, setHistoryBookingId] = useState<string | null>(null);
   const [historyClientName, setHistoryClientName] = useState<string>('');
+  const { teamMembers } = useTeamMembers();
 
   if (!isOpen) return null;
 
   const totalAmount = bookings.reduce((sum, booking) => sum + booking.total_amount, 0);
   const totalPaid = bookings.reduce((sum, booking) => sum + (booking.payment_amount || 0), 0);
+
+  // Fonction pour obtenir les informations de l'utilisateur assigné
+  const getAssignedUser = (booking: Booking) => {
+    if (!booking.assigned_user_id) {
+      return null;
+    }
+    
+    return teamMembers.find(member => member.user_id === booking.assigned_user_id);
+  };
 
   // Fonction pour calculer le statut de paiement réel basé sur les montants
   const getActualPaymentStatus = (booking: Booking): 'pending' | 'partial' | 'completed' => {
@@ -113,9 +124,31 @@ export function ServiceBookingModal({
     setShowHistory(true);
   };
 
+  // 🔥 FONCTION DE SUPPRESSION AMÉLIORÉE
+  const handleDeleteBooking = async (bookingId: string, clientName: string) => {
+    console.log('🗑️ Tentative de suppression de la réservation:', bookingId);
+    
+    if (!window.confirm(`Êtes-vous sûr de vouloir supprimer la réservation de ${clientName} ?\n\nCette action est irréversible.`)) {
+      console.log('❌ Suppression annulée par l\'utilisateur');
+      return;
+    }
+
+    try {
+      console.log('🔄 Appel de onDeleteBooking...');
+      await onDeleteBooking(bookingId);
+      console.log('✅ Réservation supprimée avec succès');
+      
+      // Fermer la modal après suppression
+      onClose();
+    } catch (error) {
+      console.error('❌ Erreur lors de la suppression:', error);
+      alert('Erreur lors de la suppression de la réservation. Veuillez réessayer.');
+    }
+  };
+
   // Modal de détails de réservation
   if (selectedBookingDetails) {
-    const actualPaymentStatus = getActualPaymentStatus(selectedBookingDetails);
+    const assignedUser = getAssignedUser(selectedBookingDetails);
     
     return (
       <>
@@ -170,6 +203,41 @@ export function ServiceBookingModal({
                 <History className="w-5 h-5 sm:w-6 sm:h-6" />
                 <span className="text-sm sm:text-base">Historique de la réservation</span>
               </button>
+
+              {/* Utilisateur assigné */}
+              {assignedUser && (
+                <div className="bg-gradient-to-r from-indigo-50 to-blue-50 rounded-xl sm:rounded-2xl p-4 sm:p-6 border border-indigo-200">
+                  <h3 className="text-base sm:text-lg font-bold text-gray-900 mb-4 flex items-center gap-2">
+                    <UserCheck className="w-5 h-5 text-indigo-600" />
+                    Utilisateur assigné
+                  </h3>
+                  <div className="flex items-center gap-3 sm:gap-4">
+                    <div className="w-10 h-10 sm:w-12 sm:h-12 bg-gradient-to-r from-indigo-500 to-blue-500 rounded-xl sm:rounded-2xl flex items-center justify-center text-white font-bold text-sm sm:text-lg flex-shrink-0">
+                      {assignedUser.full_name.split(' ').map(n => n[0]).join('').toUpperCase()}
+                    </div>
+                    <div className="flex-1">
+                      <div className="font-medium text-gray-900 text-sm sm:text-base">
+                        {assignedUser.full_name}
+                      </div>
+                      <div className="text-xs sm:text-sm text-gray-600">
+                        {assignedUser.email}
+                      </div>
+                      <div className="mt-1">
+                        <span className={`inline-flex px-2 py-0.5 rounded-full text-xs font-medium ${
+                          assignedUser.role === 'owner' 
+                            ? 'bg-gradient-to-r from-purple-100 to-pink-100 text-purple-700 border border-purple-200'
+                            : assignedUser.role === 'admin'
+                            ? 'bg-gradient-to-r from-blue-100 to-cyan-100 text-blue-700 border border-blue-200'
+                            : 'bg-gradient-to-r from-gray-100 to-slate-100 text-gray-700 border border-gray-200'
+                        }`}>
+                          {assignedUser.role === 'owner' ? '👑 Propriétaire' : 
+                           assignedUser.role === 'admin' ? '⭐ Administrateur' : '👤 Membre'}
+                        </span>
+                      </div>
+                    </div>
+                  </div>
+                </div>
+              )}
 
               {/* Informations client */}
               <div className="bg-gradient-to-r from-blue-50 to-purple-50 rounded-xl sm:rounded-2xl p-4 sm:p-6 border border-blue-200">
@@ -468,114 +536,121 @@ export function ServiceBookingModal({
           </div>
 
           <div className="space-y-3 sm:space-y-4">
-            {bookings.map((booking, index) => (
-              <div
-                key={booking.id}
-                className="bg-gradient-to-r from-gray-50 to-white rounded-xl sm:rounded-2xl border border-gray-200 p-4 sm:p-6 hover:shadow-lg transition-all duration-300 transform hover:scale-[1.02] animate-fadeIn"
-                style={{ animationDelay: `${index * 100}ms` }}
-              >
-                <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4">
-                  <div className="flex items-center gap-3 sm:gap-4 flex-1">
-                    <div className="w-10 h-10 sm:w-12 sm:h-12 bg-gradient-to-r from-blue-500 to-purple-500 rounded-xl sm:rounded-2xl flex items-center justify-center text-white font-bold text-sm sm:text-lg flex-shrink-0">
-                      {booking.client_firstname.charAt(0)}{booking.client_name.charAt(0)}
-                    </div>
-                    
-                    <div className="flex-1">
-                      <div className="flex flex-col sm:flex-row sm:items-center gap-2 sm:gap-3 mb-2">
-                        <h3 className="text-base sm:text-lg font-bold text-gray-900">
-                          {booking.client_firstname} {booking.client_name}
-                        </h3>
-                        <div className="flex gap-2">
-                          <div className={`px-2 sm:px-3 py-1 rounded-full text-xs font-medium border self-start ${
-                            booking.booking_status === 'confirmed' 
-                              ? 'bg-gradient-to-r from-green-100 to-emerald-100 text-green-700 border-green-200'
-                              : booking.booking_status === 'cancelled'
-                              ? 'bg-gradient-to-r from-red-100 to-pink-100 text-red-700 border-red-200'
-                              : 'bg-gradient-to-r from-orange-100 to-yellow-100 text-orange-700 border-orange-200'
-                          }`}>
-                            {booking.booking_status === 'confirmed' ? '✅ Confirmée' : 
-                             booking.booking_status === 'cancelled' ? '❌ Annulée' : '⏳ En attente'}
-                          </div>
-                          <div className={`px-2 sm:px-3 py-1 rounded-full text-xs font-medium border self-start ${getPaymentStatusColor(booking)}`}>
-                            {getPaymentStatusText(booking)}
-                          </div>
-                        </div>
+            {bookings.map((booking, index) => {
+              const assignedUser = getAssignedUser(booking);
+              
+              return (
+                <div
+                  key={booking.id}
+                  className="bg-gradient-to-r from-gray-50 to-white rounded-xl sm:rounded-2xl border border-gray-200 p-4 sm:p-6 hover:shadow-lg transition-all duration-300 transform hover:scale-[1.02] animate-fadeIn"
+                  style={{ animationDelay: `${index * 100}ms` }}
+                >
+                  <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4">
+                    <div className="flex items-center gap-3 sm:gap-4 flex-1">
+                      <div className="w-10 h-10 sm:w-12 sm:h-12 bg-gradient-to-r from-blue-500 to-purple-500 rounded-xl sm:rounded-2xl flex items-center justify-center text-white font-bold text-sm sm:text-lg flex-shrink-0">
+                        {booking.client_firstname.charAt(0)}{booking.client_name.charAt(0)}
                       </div>
                       
-                      <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-2 sm:gap-4 text-xs sm:text-sm text-gray-600">
-                        <div className="flex items-center gap-2">
-                          <Clock className="w-3 h-3 sm:w-4 sm:h-4 text-blue-500 flex-shrink-0" />
-                          <span>{booking.time.slice(0, 5)} ({booking.duration_minutes}min)</span>
+                      <div className="flex-1">
+                        <div className="flex flex-col sm:flex-row sm:items-center gap-2 sm:gap-3 mb-2">
+                          <h3 className="text-base sm:text-lg font-bold text-gray-900">
+                            {booking.client_firstname} {booking.client_name}
+                          </h3>
+                          <div className="flex gap-2">
+                            <div className={`px-2 sm:px-3 py-1 rounded-full text-xs font-medium border self-start ${
+                              booking.booking_status === 'confirmed' 
+                                ? 'bg-gradient-to-r from-green-100 to-emerald-100 text-green-700 border-green-200'
+                                : booking.booking_status === 'cancelled'
+                                ? 'bg-gradient-to-r from-red-100 to-pink-100 text-red-700 border-red-200'
+                                : 'bg-gradient-to-r from-orange-100 to-yellow-100 text-orange-700 border-orange-200'
+                            }`}>
+                              {booking.booking_status === 'confirmed' ? '✅ Confirmée' : 
+                               booking.booking_status === 'cancelled' ? '❌ Annulée' : '⏳ En attente'}
+                            </div>
+                            <div className={`px-2 sm:px-3 py-1 rounded-full text-xs font-medium border self-start ${getPaymentStatusColor(booking)}`}>
+                              {getPaymentStatusText(booking)}
+                            </div>
+                          </div>
                         </div>
-                        <div className="flex items-center gap-2">
-                          <User className="w-3 h-3 sm:w-4 sm:h-4 text-purple-500 flex-shrink-0" />
-                          <span>{booking.quantity} {getPluralUnitName(booking, booking.quantity)}</span>
-                        </div>
-                        <div className="flex items-center gap-2">
-                          <Mail className="w-3 h-3 sm:w-4 sm:h-4 text-green-500 flex-shrink-0" />
-                          <span className="truncate">{booking.client_email}</span>
-                        </div>
-                        <div className="flex items-center gap-2">
-                          <Phone className="w-3 h-3 sm:w-4 sm:h-4 text-orange-500 flex-shrink-0" />
-                          <a 
-                            href={`tel:${booking.client_phone}`}
-                            className="text-orange-600 hover:text-orange-800 hover:underline transition-colors font-medium"
-                            title={`Appeler ${booking.client_phone}`}
-                          >
-                            {booking.client_phone}
-                          </a>
-                        </div>
-                      </div>
-                      
-                      <div className="flex items-center gap-2 sm:gap-4 mt-2 sm:mt-3">
-                        <div className="flex items-center gap-2">
-                          <CreditCard className="w-3 h-3 sm:w-4 sm:h-4 text-green-600 flex-shrink-0" />
-                          <span className="font-medium text-green-600 text-xs sm:text-sm">
-                            {booking.payment_amount?.toFixed(2) || '0.00'}€ / {booking.total_amount.toFixed(2)}€
-                          </span>
-                        </div>
-                        {booking.notes && (
-                          <div className="flex items-center gap-1 text-amber-600">
-                            <FileText className="w-3 h-3 sm:w-4 sm:h-4 flex-shrink-0" />
-                            <span className="text-xs">Note</span>
+                        
+                        {/* Utilisateur assigné - Affichage compact dans la liste */}
+                        {assignedUser && (
+                          <div className="flex items-center gap-2 mb-2 text-xs sm:text-sm text-indigo-600 bg-indigo-50 rounded-lg px-2 py-1 w-fit">
+                            <UserCheck className="w-3 h-3 sm:w-4 sm:h-4 flex-shrink-0" />
+                            <span className="font-medium">{assignedUser.full_name}</span>
                           </div>
                         )}
+                        
+                        <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-2 sm:gap-4 text-xs sm:text-sm text-gray-600">
+                          <div className="flex items-center gap-2">
+                            <Clock className="w-3 h-3 sm:w-4 sm:h-4 text-blue-500 flex-shrink-0" />
+                            <span>{booking.time.slice(0, 5)} ({booking.duration_minutes}min)</span>
+                          </div>
+                          <div className="flex items-center gap-2">
+                            <User className="w-3 h-3 sm:w-4 sm:h-4 text-purple-500 flex-shrink-0" />
+                            <span>{booking.quantity} {getPluralUnitName(booking, booking.quantity)}</span>
+                          </div>
+                          <div className="flex items-center gap-2">
+                            <Mail className="w-3 h-3 sm:w-4 sm:h-4 text-green-500 flex-shrink-0" />
+                            <span className="truncate">{booking.client_email}</span>
+                          </div>
+                          <div className="flex items-center gap-2">
+                            <Phone className="w-3 h-3 sm:w-4 sm:h-4 text-orange-500 flex-shrink-0" />
+                            <a 
+                              href={`tel:${booking.client_phone}`}
+                              className="text-orange-600 hover:text-orange-800 hover:underline transition-colors font-medium"
+                              title={`Appeler ${booking.client_phone}`}
+                            >
+                              {booking.client_phone}
+                            </a>
+                          </div>
+                        </div>
+                        
+                        <div className="flex items-center gap-2 sm:gap-4 mt-2 sm:mt-3">
+                          <div className="flex items-center gap-2">
+                            <CreditCard className="w-3 h-3 sm:w-4 sm:h-4 text-green-600 flex-shrink-0" />
+                            <span className="font-medium text-green-600 text-xs sm:text-sm">
+                              {booking.payment_amount?.toFixed(2) || '0.00'}€ / {booking.total_amount.toFixed(2)}€
+                            </span>
+                          </div>
+                          {booking.notes && (
+                            <div className="flex items-center gap-1 text-amber-600">
+                              <FileText className="w-3 h-3 sm:w-4 sm:h-4 flex-shrink-0" />
+                              <span className="text-xs">Note</span>
+                            </div>
+                          )}
+                        </div>
                       </div>
                     </div>
-                  </div>
 
-                  {/* Actions */}
-                  <div className="flex gap-2 sm:gap-3 self-start sm:self-center">
-                    <button
-                      onClick={() => setSelectedBookingDetails(booking)}
-                      className="p-2 sm:p-3 bg-gradient-to-r from-purple-500 to-pink-500 text-white rounded-lg sm:rounded-xl hover:from-purple-600 hover:to-pink-600 transition-all duration-300 transform hover:scale-110 shadow-lg flex items-center justify-center"
-                      title="Voir les détails"
-                    >
-                      <Eye className="w-3 h-3 sm:w-4 sm:h-4" />
-                    </button>
-                    <button
-                      onClick={() => onEditBooking(booking)}
-                      className="p-2 sm:p-3 bg-gradient-to-r from-blue-500 to-cyan-500 text-white rounded-lg sm:rounded-xl hover:from-blue-600 hover:to-cyan-600 transition-all duration-300 transform hover:scale-110 shadow-lg flex items-center justify-center"
-                      title="Modifier"
-                    >
-                      <Edit className="w-3 h-3 sm:w-4 sm:h-4" />
-                    </button>
-                    <button
-                      onClick={() => {
-                        if (window.confirm(`Supprimer la réservation de ${booking.client_firstname} ${booking.client_name} ?`)) {
-                          onDeleteBooking(booking.id);
-                          onClose();
-                        }
-                      }}
-                      className="p-2 sm:p-3 bg-gradient-to-r from-red-500 to-pink-500 text-white rounded-lg sm:rounded-xl hover:from-red-600 hover:to-pink-600 transition-all duration-300 transform hover:scale-110 shadow-lg flex items-center justify-center"
-                      title="Supprimer"
-                    >
-                      <Trash2 className="w-3 h-3 sm:w-4 sm:h-4" />
-                    </button>
+                    {/* Actions */}
+                    <div className="flex gap-2 sm:gap-3 self-start sm:self-center">
+                      <button
+                        onClick={() => setSelectedBookingDetails(booking)}
+                        className="p-2 sm:p-3 bg-gradient-to-r from-purple-500 to-pink-500 text-white rounded-lg sm:rounded-xl hover:from-purple-600 hover:to-pink-600 transition-all duration-300 transform hover:scale-110 shadow-lg flex items-center justify-center"
+                        title="Voir les détails"
+                      >
+                        <Eye className="w-3 h-3 sm:w-4 sm:h-4" />
+                      </button>
+                      <button
+                        onClick={() => onEditBooking(booking)}
+                        className="p-2 sm:p-3 bg-gradient-to-r from-blue-500 to-cyan-500 text-white rounded-lg sm:rounded-xl hover:from-blue-600 hover:to-cyan-600 transition-all duration-300 transform hover:scale-110 shadow-lg flex items-center justify-center"
+                        title="Modifier"
+                      >
+                        <Edit className="w-3 h-3 sm:w-4 sm:h-4" />
+                      </button>
+                      <button
+                        onClick={() => handleDeleteBooking(booking.id, `${booking.client_firstname} ${booking.client_name}`)}
+                        className="p-2 sm:p-3 bg-gradient-to-r from-red-500 to-pink-500 text-white rounded-lg sm:rounded-xl hover:from-red-600 hover:to-pink-600 transition-all duration-300 transform hover:scale-110 shadow-lg flex items-center justify-center"
+                        title="Supprimer"
+                      >
+                        <Trash2 className="w-3 h-3 sm:w-4 sm:h-4" />
+                      </button>
+                    </div>
                   </div>
                 </div>
-              </div>
-            ))}
+              );
+            })}
           </div>
 
           {bookings.length === 0 && (

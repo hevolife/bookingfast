@@ -3,13 +3,15 @@ import { CalendarGrid } from './CalendarGrid';
 import { BookingsList } from './BookingsList';
 import { ClientsPage } from '../Clients/ClientsPage';
 import BookingModal from '../BookingModal/BookingModal';
+import { UnavailabilityModal } from './UnavailabilityModal';
 import { useBookings } from '../../hooks/useBookings';
+import { useUnavailabilities } from '../../hooks/useUnavailabilities';
 import { useTeam } from '../../hooks/useTeam';
 import { useTeamMembers } from '../../hooks/useTeamMembers';
 import { usePlugins } from '../../hooks/usePlugins';
 import { PermissionGate, UsageLimitIndicator } from '../UI/PermissionGate';
 import { Booking } from '../../types';
-import { UserCheck, X } from 'lucide-react';
+import { UserCheck, X, Ban } from 'lucide-react';
 import { bookingEvents } from '../../lib/bookingEvents';
 
 interface CalendarPageProps {
@@ -17,21 +19,16 @@ interface CalendarPageProps {
 }
 
 export function CalendarPage({ view = 'calendar' }: CalendarPageProps) {
-  console.log('🔍 CalendarPage - Rendu, view:', view);
-  
   const [currentDate] = useState(new Date());
   const [isModalOpen, setIsModalOpen] = useState(false);
+  const [isUnavailabilityModalOpen, setIsUnavailabilityModalOpen] = useState(false);
   const [selectedDate, setSelectedDate] = useState(new Date().toISOString().split('T')[0]);
   const [selectedTime, setSelectedTime] = useState('');
   const [editingBooking, setEditingBooking] = useState<Booking | null>(null);
   const [selectedTeamMember, setSelectedTeamMember] = useState<string>('all');
   
   const { bookings, loading, addBooking, updateBooking, deleteBooking, refetch } = useBookings();
-  
-  console.log('🔍 CalendarPage - useBookings retourné:', { 
-    bookingsCount: bookings.length, 
-    loading 
-  });
+  const { unavailabilities, addUnavailability, updateUnavailability, deleteUnavailability, refetch: refetchUnavailabilities } = useUnavailabilities();
   
   const { hasPermission, canEditBooking, canDeleteBooking, getUsageLimits, isOwner } = useTeam();
   const { teamMembers, loading: membersLoading } = useTeamMembers();
@@ -41,8 +38,6 @@ export function CalendarPage({ view = 'calendar' }: CalendarPageProps) {
   const [isMultiUserActive, setIsMultiUserActive] = useState(false);
 
   useEffect(() => {
-    console.log('🔍 CalendarPage - useEffect checkAccess');
-    
     const checkAccess = async () => {
       const multiUserActive = await hasPluginAccess('multi-user');
       setIsMultiUserActive(multiUserActive);
@@ -60,27 +55,28 @@ export function CalendarPage({ view = 'calendar' }: CalendarPageProps) {
     checkAccess();
   }, [hasPluginAccess, isOwner, hasPermission]);
 
-  // ✅ AJOUT: Écouter les événements de booking
   useEffect(() => {
-    console.log('🔍 CalendarPage - Installation des listeners d\'événements');
-    
     const handleBookingChange = (data: any) => {
-      console.log('🔔 CalendarPage - Événement booking reçu, rafraîchissement...', data);
       refetch();
     };
 
-    // Écouter tous les événements de booking
+    const handleUnavailabilityChange = () => {
+      refetchUnavailabilities();
+    };
+
     bookingEvents.on('bookingCreated', handleBookingChange);
     bookingEvents.on('bookingUpdated', handleBookingChange);
     bookingEvents.on('bookingDeleted', handleBookingChange);
+    
+    window.addEventListener('refreshUnavailabilities', handleUnavailabilityChange);
 
     return () => {
-      console.log('🧹 CalendarPage - Nettoyage des listeners');
       bookingEvents.off('bookingCreated', handleBookingChange);
       bookingEvents.off('bookingUpdated', handleBookingChange);
       bookingEvents.off('bookingDeleted', handleBookingChange);
+      window.removeEventListener('refreshUnavailabilities', handleUnavailabilityChange);
     };
-  }, [refetch]);
+  }, [refetch, refetchUnavailabilities]);
 
   const usageLimits = getUsageLimits();
   const todayBookingsCount = bookings.filter(b => 
@@ -96,7 +92,14 @@ export function CalendarPage({ view = 'calendar' }: CalendarPageProps) {
         return b.assigned_user_id === selectedTeamMember;
       });
 
-  console.log('🔍 CalendarPage - Bookings filtrés:', filteredBookings.length);
+  const filteredUnavailabilities = selectedTeamMember === 'all'
+    ? unavailabilities
+    : unavailabilities.filter(u => {
+        if (selectedTeamMember === 'unassigned') {
+          return !u.assigned_user_id;
+        }
+        return u.assigned_user_id === selectedTeamMember;
+      });
 
   const handleTimeSlotClick = (date: string, time: string) => {
     if (!hasPermission('create_booking')) {
@@ -112,6 +115,13 @@ export function CalendarPage({ view = 'calendar' }: CalendarPageProps) {
     setSelectedDate(date);
     setSelectedTime(time);
     setIsModalOpen(true);
+  };
+
+  const handleAddUnavailability = (date?: string) => {
+    if (date) {
+      setSelectedDate(date);
+    }
+    setIsUnavailabilityModalOpen(true);
   };
 
   const handleBookingClick = (booking: Booking) => {
@@ -132,19 +142,43 @@ export function CalendarPage({ view = 'calendar' }: CalendarPageProps) {
   };
 
   const handleDeleteBooking = async (bookingId: string) => {
+    console.log('🔍 CalendarPage.handleDeleteBooking - ID:', bookingId);
+    
     const booking = bookings.find(b => b.id === bookingId);
     if (booking && !canDeleteBooking(booking)) {
       alert('Vous n\'avez pas la permission de supprimer cette réservation');
       return;
     }
     
-    await deleteBooking(bookingId);
+    console.log('🔄 CalendarPage.handleDeleteBooking - Appel deleteBooking du hook...');
+    try {
+      await deleteBooking(bookingId);
+      console.log('✅ CalendarPage.handleDeleteBooking - Suppression réussie');
+      await refetch();
+      console.log('✅ CalendarPage.handleDeleteBooking - Rafraîchissement terminé');
+    } catch (error) {
+      console.error('❌ CalendarPage.handleDeleteBooking - Erreur:', error);
+      throw error;
+    }
+  };
+
+  const handleDeleteUnavailability = async (unavailabilityId: string) => {
+    try {
+      await deleteUnavailability(unavailabilityId);
+      await refetchUnavailabilities();
+    } catch (error) {
+      console.error('Erreur suppression indisponibilité:', error);
+      throw error;
+    }
   };
 
   const handleBookingSuccess = async () => {
-    console.log('✅ CalendarPage - handleBookingSuccess appelé');
     handleCloseModal();
-    // Le refetch sera déclenché automatiquement par les événements
+  };
+
+  const handleSaveUnavailability = async (unavailabilityData: any) => {
+    await addUnavailability(unavailabilityData);
+    await refetchUnavailabilities();
   };
 
   const getMemberDisplayName = (member: typeof teamMembers[0]) => {
@@ -212,6 +246,15 @@ export function CalendarPage({ view = 'calendar' }: CalendarPageProps) {
                   <span className="hidden md:inline">Réinitialiser</span>
                 </button>
               )}
+
+              <button
+                onClick={() => handleAddUnavailability()}
+                className="px-3 py-2 text-sm text-white bg-red-600 hover:bg-red-700 rounded-lg transition-colors flex items-center gap-1"
+                title="Ajouter une indisponibilité"
+              >
+                <Ban className="w-4 h-4" />
+                <span className="hidden md:inline">Indisponibilité</span>
+              </button>
             </div>
           </div>
           
@@ -244,8 +287,10 @@ export function CalendarPage({ view = 'calendar' }: CalendarPageProps) {
                 onTimeSlotClick={handleTimeSlotClick}
                 onBookingClick={handleBookingClick}
                 bookings={filteredBookings}
+                unavailabilities={filteredUnavailabilities}
                 loading={loading}
                 onDeleteBooking={handleDeleteBooking}
+                onAddUnavailability={handleAddUnavailability}
               />
             </UsageLimitIndicator>
           ) : view === 'list' ? (
@@ -270,6 +315,15 @@ export function CalendarPage({ view = 'calendar' }: CalendarPageProps) {
           selectedTime={selectedTime}
           editingBooking={editingBooking}
           onSuccess={handleBookingSuccess}
+        />
+      )}
+
+      {isUnavailabilityModalOpen && (
+        <UnavailabilityModal
+          isOpen={isUnavailabilityModalOpen}
+          onClose={() => setIsUnavailabilityModalOpen(false)}
+          onSave={handleSaveUnavailability}
+          selectedDate={selectedDate}
         />
       )}
     </div>

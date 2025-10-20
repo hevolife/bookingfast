@@ -1,5 +1,5 @@
 import React, { useState } from 'react';
-import { ExternalLink, Copy, Eye, Globe, QrCode, Share2, CheckCircle, Code, Smartphone, Monitor, Package, Plus, X, Settings } from 'lucide-react';
+import { ExternalLink, Copy, Eye, Globe, QrCode, Share2, CheckCircle, Code, Smartphone, Monitor, Package, Plus, X, Settings, Users } from 'lucide-react';
 import { useAuth } from '../../contexts/AuthContext';
 import { useBusinessSettings } from '../../hooks/useBusinessSettings';
 import { useServices } from '../../hooks/useServices';
@@ -16,14 +16,18 @@ export function IframeSettings() {
   const [copiedLink, setCopiedLink] = useState(false);
   const [copiedCode, setCopiedCode] = useState(false);
   const [selectedServices, setSelectedServices] = useState<string[]>(settings?.iframe_services || []);
+  const [enableTeamSelection, setEnableTeamSelection] = useState(settings?.iframe_enable_team_selection || false);
   const [saving, setSaving] = useState(false);
 
-  // Mettre à jour selectedServices quand settings change
+  // Mettre à jour selectedServices et enableTeamSelection quand settings change
   React.useEffect(() => {
     if (settings?.iframe_services) {
       setSelectedServices(settings.iframe_services);
     }
-  }, [settings?.iframe_services]);
+    if (settings?.iframe_enable_team_selection !== undefined) {
+      setEnableTeamSelection(settings.iframe_enable_team_selection);
+    }
+  }, [settings?.iframe_services, settings?.iframe_enable_team_selection]);
 
   const getBookingUrl = () => {
     if (!user) return '';
@@ -78,6 +82,27 @@ export function IframeSettings() {
       });
       setShowServiceModal(false);
       alert('Services iframe sauvegardés avec succès !');
+    } catch (error) {
+      alert(`Erreur: ${error instanceof Error ? error.message : 'Erreur inconnue'}`);
+    } finally {
+      setSaving(false);
+    }
+  };
+
+  const handleToggleTeamSelection = async () => {
+    if (!settings) return;
+    
+    setSaving(true);
+    try {
+      const newValue = !enableTeamSelection;
+      await updateSettings({
+        iframe_enable_team_selection: newValue
+      });
+      setEnableTeamSelection(newValue);
+      alert(newValue 
+        ? 'Sélection de membre d\'équipe activée !' 
+        : 'Sélection de membre d\'équipe désactivée !'
+      );
     } catch (error) {
       alert(`Erreur: ${error instanceof Error ? error.message : 'Erreur inconnue'}`);
     } finally {
@@ -179,6 +204,80 @@ export function IframeSettings() {
               <Monitor className="w-4 h-4" />
               Aperçu iframe
             </Button>
+          </div>
+        </div>
+
+        {/* Configuration sélection membre d'équipe */}
+        <div className="bg-gradient-to-r from-purple-50 to-pink-50 rounded-2xl p-6 border border-purple-200">
+          <div className="flex items-center gap-3 mb-4">
+            <div className="w-12 h-12 bg-gradient-to-r from-purple-500 to-pink-500 rounded-xl flex items-center justify-center">
+              <Users className="w-6 h-6 text-white" />
+            </div>
+            <div className="flex-1">
+              <h3 className="text-xl font-bold text-purple-800">Sélection de Membre d'Équipe</h3>
+              <p className="text-purple-600">Permettre aux clients de choisir un membre</p>
+            </div>
+            <button
+              onClick={handleToggleTeamSelection}
+              disabled={saving}
+              className={`relative inline-flex h-8 w-14 items-center rounded-full transition-colors ${
+                enableTeamSelection ? 'bg-green-500' : 'bg-gray-300'
+              } ${saving ? 'opacity-50 cursor-not-allowed' : 'cursor-pointer'}`}
+            >
+              <span
+                className={`inline-block h-6 w-6 transform rounded-full bg-white transition-transform ${
+                  enableTeamSelection ? 'translate-x-7' : 'translate-x-1'
+                }`}
+              />
+            </button>
+          </div>
+
+          <div className="bg-white border border-purple-300 rounded-xl p-4">
+            <div className="flex items-start gap-3">
+              <div className={`w-10 h-10 rounded-xl flex items-center justify-center flex-shrink-0 ${
+                enableTeamSelection 
+                  ? 'bg-green-100' 
+                  : 'bg-gray-100'
+              }`}>
+                {enableTeamSelection ? (
+                  <CheckCircle className="w-6 h-6 text-green-600" />
+                ) : (
+                  <X className="w-6 h-6 text-gray-400" />
+                )}
+              </div>
+              <div className="flex-1">
+                <h4 className={`font-bold mb-2 ${
+                  enableTeamSelection ? 'text-green-800' : 'text-gray-700'
+                }`}>
+                  {enableTeamSelection ? '✅ Activé' : '❌ Désactivé'}
+                </h4>
+                <div className="text-sm space-y-1">
+                  {enableTeamSelection ? (
+                    <>
+                      <div className="text-green-700">• Les clients peuvent choisir leur membre d'équipe préféré</div>
+                      <div className="text-green-700">• Un menu déroulant apparaîtra dans l'iframe de réservation</div>
+                      <div className="text-green-700">• La réservation sera automatiquement assignée au membre choisi</div>
+                    </>
+                  ) : (
+                    <>
+                      <div className="text-gray-600">• Les clients ne peuvent pas choisir de membre spécifique</div>
+                      <div className="text-gray-600">• Les réservations seront non assignées par défaut</div>
+                      <div className="text-gray-600">• Vous pourrez assigner manuellement après réservation</div>
+                    </>
+                  )}
+                </div>
+              </div>
+            </div>
+          </div>
+
+          <div className="bg-blue-50 border border-blue-200 rounded-xl p-4 mt-4">
+            <h4 className="font-bold text-blue-800 mb-2">💡 Comment ça marche</h4>
+            <div className="text-blue-700 text-sm space-y-1">
+              <div>• Activez cette option pour afficher un sélecteur de membre dans l'iframe</div>
+              <div>• Les clients verront la liste de vos membres d'équipe disponibles</div>
+              <div>• Ils pourront choisir avec qui ils souhaitent réserver</div>
+              <div>• Parfait pour les salons, cabinets médicaux, centres de bien-être...</div>
+            </div>
           </div>
         </div>
 
