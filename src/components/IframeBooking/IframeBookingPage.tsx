@@ -46,6 +46,48 @@ export function IframeBookingPage() {
 
   // Récupérer les services autorisés depuis l'URL
   const allowedServices = searchParams.get('services')?.split(',').filter(Boolean) || [];
+  
+  // Vérifier si on revient d'un paiement
+  const paymentStatus = searchParams.get('payment');
+  const sessionId = searchParams.get('session_id');
+
+  // 🌐 Détecter si on est dans un iframe et récupérer l'URL parent
+  const [parentUrl, setParentUrl] = useState<string>('');
+
+  useEffect(() => {
+    // Détecter si on est dans un iframe
+    const isInIframe = window.self !== window.top;
+    
+    if (isInIframe) {
+      try {
+        // Essayer de récupérer l'URL du parent (peut échouer si cross-origin)
+        const referrer = document.referrer;
+        if (referrer) {
+          const url = new URL(referrer);
+          const parentDomain = `${url.protocol}//${url.host}`;
+          setParentUrl(parentDomain);
+          console.log('🌐 Iframe détecté - Parent URL:', parentDomain);
+        } else {
+          console.log('🌐 Iframe détecté mais referrer vide');
+        }
+      } catch (err) {
+        console.log('🌐 Impossible de récupérer l\'URL parent (cross-origin)');
+      }
+    } else {
+      console.log('🏠 Pas dans un iframe');
+    }
+  }, []);
+
+  // Gérer le retour de paiement
+  useEffect(() => {
+    if (paymentStatus === 'success' && sessionId) {
+      console.log('✅ Retour paiement réussi, session:', sessionId);
+      setCurrentStep(5);
+    } else if (paymentStatus === 'cancelled') {
+      console.log('❌ Paiement annulé');
+      // Rester sur l'étape actuelle ou revenir à l'étape 4
+    }
+  }, [paymentStatus, sessionId]);
 
   const fetchPublicData = async () => {
     if (!userId) {
@@ -374,10 +416,11 @@ export function IframeBookingPage() {
       console.log('💳 Création session Stripe:', {
         amount: depositAmount,
         service: selectedService.name,
-        client: clientData.email
+        client: clientData.email,
+        parent_url: parentUrl || 'none'
       });
 
-      // Créer la session Stripe
+      // Créer la session Stripe avec l'URL parent si disponible
       const supabaseUrl = import.meta.env.VITE_SUPABASE_URL?.replace(/\/$/, '');
       const response = await fetch(`${supabaseUrl}/functions/v1/stripe-checkout`, {
         method: 'POST',
@@ -390,8 +433,9 @@ export function IframeBookingPage() {
           currency: 'eur',
           customer_email: clientData.email,
           service_name: selectedService.name,
-          success_url: `${window.location.origin}/payment-success?session_id={CHECKOUT_SESSION_ID}`,
+          success_url: window.location.href,
           cancel_url: window.location.href,
+          parent_url: parentUrl || undefined, // 🌐 Envoyer l'URL parent si disponible
           metadata: {
             user_id: userId,
             service_id: selectedService.id,
@@ -1109,10 +1153,12 @@ export function IframeBookingPage() {
               <Check className="w-12 h-12 text-white" />
             </div>
             <h2 className="text-3xl font-bold text-gray-900 mb-4">
-              {isStripeEnabled ? 'Paiement en cours...' : 'Réservation confirmée !'}
+              {paymentStatus === 'success' ? 'Réservation confirmée !' : isStripeEnabled ? 'Paiement en cours...' : 'Réservation confirmée !'}
             </h2>
             <p className="text-gray-600 text-lg mb-8">
-              {isStripeEnabled 
+              {paymentStatus === 'success' 
+                ? `Votre réservation a été confirmée ! Vous allez recevoir un email de confirmation à ${clientData.email}`
+                : isStripeEnabled 
                 ? 'Veuillez compléter le paiement dans le nouvel onglet. Vous recevrez un email de confirmation une fois le paiement effectué.'
                 : `Vous allez recevoir un email de confirmation à ${clientData.email}`
               }
@@ -1126,6 +1172,8 @@ export function IframeBookingPage() {
                 setSelectedTeamMember('');
                 setQuantity(1);
                 setClientData({ firstname: '', lastname: '', email: '', phone: '' });
+                // Nettoyer les paramètres URL
+                window.history.replaceState({}, '', window.location.pathname);
               }}
               className="bg-gradient-to-r from-blue-500 to-purple-500 text-white py-4 px-8 rounded-2xl font-bold hover:shadow-xl transition-all"
             >

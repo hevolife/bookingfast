@@ -11,7 +11,7 @@ const corsHeaders = {
 const PLATFORM_STRIPE_SECRET_KEY = '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';
 
 Deno.serve(async (req) => {
-  console.log('🚀 === STRIPE-CHECKOUT V10 - IFRAME BOOKING DEBUG === 🚀')
+  console.log('🚀 === STRIPE-CHECKOUT V12 - CROSS-DOMAIN REDIRECT === 🚀')
   
   if (req.method === 'OPTIONS') {
     return new Response('ok', { headers: corsHeaders })
@@ -55,7 +55,7 @@ Deno.serve(async (req) => {
     const body = await req.json();
     console.log('📥 Body reçu:', JSON.stringify(body, null, 2));
 
-    const { amount, currency = 'eur', success_url, cancel_url, customer_email, metadata, service_name } = body;
+    const { amount, currency = 'eur', success_url, cancel_url, customer_email, metadata, service_name, parent_url } = body;
 
     if (!success_url || !cancel_url || !customer_email || !service_name) {
       console.error('❌ Paramètres manquants:', {
@@ -74,7 +74,8 @@ Deno.serve(async (req) => {
       customer_email,
       service_name,
       payment_type: metadata?.payment_type,
-      amount
+      amount,
+      parent_url
     })
 
     let stripeSecretKey: string | undefined;
@@ -169,6 +170,33 @@ Deno.serve(async (req) => {
         console.log('✅ Nouveau client créé:', customerId)
       }
 
+      // 🎯 CONSTRUIRE L'URL DE REDIRECTION
+      // Si parent_url est fourni (iframe sur site externe), utiliser celui-ci
+      // Sinon, utiliser l'URL de l'iframe BookingFast
+      let redirectBaseUrl: string;
+      
+      if (parent_url && parent_url !== 'https://bookingfast.pro') {
+        // Iframe sur site externe - rediriger vers le site parent
+        redirectBaseUrl = parent_url;
+        console.log('🌐 Iframe externe détecté - redirect vers:', redirectBaseUrl);
+      } else {
+        // Iframe sur BookingFast ou pas de parent_url - utiliser l'URL standard
+        redirectBaseUrl = success_url.includes('localhost') 
+          ? success_url.split('/payment-success')[0] 
+          : 'https://bookingfast.pro';
+        console.log('🏠 Iframe BookingFast - redirect vers:', redirectBaseUrl);
+      }
+      
+      // Construire les URLs avec le bon domaine
+      const iframeSuccessUrl = `${redirectBaseUrl}/booking/${userId}?payment=success&session_id={CHECKOUT_SESSION_ID}`;
+      const iframeCancelUrl = `${redirectBaseUrl}/booking/${userId}?payment=cancelled`;
+
+      console.log('🔗 URLs de redirection iframe:', {
+        success: iframeSuccessUrl,
+        cancel: iframeCancelUrl,
+        parent_url
+      });
+
       // PAIEMENT UNIQUE pour les réservations
       console.log('💳 Création session PAIEMENT UNIQUE:', {
         amount,
@@ -194,8 +222,8 @@ Deno.serve(async (req) => {
             },
           ],
           mode: 'payment',
-          success_url,
-          cancel_url,
+          success_url: iframeSuccessUrl,
+          cancel_url: iframeCancelUrl,
           metadata: metadata || {},
         };
 
