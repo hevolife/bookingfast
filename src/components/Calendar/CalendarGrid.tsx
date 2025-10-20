@@ -300,46 +300,58 @@ export function CalendarGrid({ currentDate, onTimeSlotClick, onBookingClick, boo
       setViewMonth(new Date(now.getFullYear(), now.getMonth(), 1));
     }
     setSelectedDate(now);
-    if (scrollContainerRef.current) {
-      const todayIndex = days.findIndex(day => isToday(day.date));
-      if (todayIndex !== -1) {
-        const dayWidth = 76;
-        const containerWidth = scrollContainerRef.current.clientWidth;
-        const scrollPosition = (todayIndex * dayWidth) - (containerWidth / 2) + (dayWidth / 2);
-        scrollContainerRef.current.scrollTo({
-          left: Math.max(0, scrollPosition),
-          behavior: 'smooth'
-        });
-      }
-    }
   };
 
   const scrollToSelectedDate = () => {
     if (scrollContainerRef.current) {
+      const container = scrollContainerRef.current;
       const selectedIndex = days.findIndex(day => isSelected(day.date));
+      
       if (selectedIndex !== -1) {
-        const dayWidth = 76;
-        const containerWidth = scrollContainerRef.current.clientWidth;
-        const scrollPosition = (selectedIndex * dayWidth) - (containerWidth / 2) + (dayWidth / 2);
-        scrollContainerRef.current.scrollTo({
-          left: Math.max(0, scrollPosition),
-          behavior: 'smooth'
-        });
+        // Obtenir les dimensions réelles du premier élément de date
+        const firstDateElement = container.querySelector('button');
+        if (firstDateElement) {
+          const dateRect = firstDateElement.getBoundingClientRect();
+          const dateWidth = dateRect.width;
+          
+          // Calculer le gap entre les éléments (en utilisant getComputedStyle)
+          const containerStyle = window.getComputedStyle(container.firstElementChild as Element);
+          const gap = parseFloat(containerStyle.gap) || 8; // Fallback à 8px si gap n'est pas défini
+          
+          // Largeur totale d'un élément incluant le gap
+          const totalItemWidth = dateWidth + gap;
+          
+          // Position de l'élément sélectionné
+          const itemPosition = selectedIndex * totalItemWidth;
+          
+          // Largeur visible du conteneur
+          const containerWidth = container.clientWidth;
+          
+          // Calculer la position de scroll pour centrer l'élément
+          const scrollPosition = itemPosition - (containerWidth / 2) + (dateWidth / 2);
+          
+          container.scrollTo({
+            left: Math.max(0, scrollPosition),
+            behavior: 'smooth'
+          });
+        }
       }
     }
   };
 
+  // Auto-scroll vers la date sélectionnée au changement
   useEffect(() => {
     const timer = setTimeout(() => {
       scrollToSelectedDate();
     }, 100);
     return () => clearTimeout(timer);
-  }, [selectedDate]);
+  }, [selectedDate, viewMonth]);
 
+  // Auto-scroll initial
   useEffect(() => {
     const timer = setTimeout(() => {
       scrollToSelectedDate();
-    }, 500);
+    }, 300);
     return () => clearTimeout(timer);
   }, []);
 
@@ -477,11 +489,11 @@ export function CalendarGrid({ currentDate, onTimeSlotClick, onBookingClick, boo
           touchAction: 'pan-y'
         }}
       >
-        <div className="bg-white/90 backdrop-blur-md border-b border-gray-100 shadow-lg p-4 flex-shrink-0">
-          <div className="flex items-center justify-between mb-4">
-            <div className="flex items-center gap-3">
+        <div className="bg-white/90 backdrop-blur-md border-b border-gray-100 shadow-lg p-3 sm:p-4 flex-shrink-0">
+          <div className="flex items-center justify-between mb-3 sm:mb-4">
+            <div className="flex items-center gap-2 sm:gap-3">
               <div>
-                <h1 className="text-2xl font-bold bg-gradient-to-r from-purple-600 via-pink-600 to-red-600 bg-clip-text text-transparent">
+                <h1 className="text-xl sm:text-2xl font-bold bg-gradient-to-r from-purple-600 via-pink-600 to-red-600 bg-clip-text text-transparent">
                   Planning
                 </h1>
                 <div className="text-xs text-gray-500 flex items-center gap-1">
@@ -491,15 +503,23 @@ export function CalendarGrid({ currentDate, onTimeSlotClick, onBookingClick, boo
             </div>
             
             <div className="text-right">
-              <div className="text-lg font-bold text-gray-900 flex items-center gap-2">
-                <div className="w-3 h-3 bg-gradient-to-r from-blue-500 to-purple-500 rounded-full animate-pulse"></div>
-                {selectedDate.toLocaleDateString('fr-FR', { 
-                  weekday: 'long',
-                  day: 'numeric', 
-                  month: 'short'
-                })}
+              <div className="text-base sm:text-lg font-bold text-gray-900 flex items-center gap-2">
+                <div className="w-2 h-2 sm:w-3 sm:h-3 bg-gradient-to-r from-blue-500 to-purple-500 rounded-full animate-pulse"></div>
+                <span className="hidden sm:inline">
+                  {selectedDate.toLocaleDateString('fr-FR', { 
+                    weekday: 'long',
+                    day: 'numeric', 
+                    month: 'short'
+                  })}
+                </span>
+                <span className="sm:hidden">
+                  {selectedDate.toLocaleDateString('fr-FR', { 
+                    day: 'numeric', 
+                    month: 'short'
+                  })}
+                </span>
               </div>
-              <div className={`text-xs px-3 py-1 rounded-full font-medium ${
+              <div className={`text-xs px-2 sm:px-3 py-0.5 sm:py-1 rounded-full font-medium ${
                 isDayClosed()
                   ? 'bg-gradient-to-r from-red-100 to-pink-100 text-red-700'
                   : dayBookings.length > 0 
@@ -512,10 +532,10 @@ export function CalendarGrid({ currentDate, onTimeSlotClick, onBookingClick, boo
           </div>
 
           <div className="flex items-center justify-center mb-2">
-            <div className="flex items-center gap-2">
+            <div className="flex items-center gap-1 sm:gap-2">
               <button
                 onClick={() => changeMonth('prev')}
-                className="p-2 bg-white/80 backdrop-blur-sm rounded-xl border border-gray-200 hover:border-blue-300 hover:shadow-md transition-all duration-300 transform hover:scale-110"
+                className="hidden sm:flex p-2 bg-white/80 backdrop-blur-sm rounded-xl border border-gray-200 hover:border-blue-300 hover:shadow-md transition-all duration-300 transform hover:scale-110"
               >
                 <ChevronLeft className="w-4 h-4 text-gray-600" />
               </button>
@@ -523,11 +543,11 @@ export function CalendarGrid({ currentDate, onTimeSlotClick, onBookingClick, boo
               <button
                 ref={monthButtonRef}
                 onClick={() => setShowDatePicker(true)}
-                className="group relative px-4 py-2 bg-white/80 backdrop-blur-sm rounded-xl border border-gray-200 hover:border-blue-300 hover:shadow-md transition-all duration-300"
+                className="group relative px-3 py-2 sm:px-4 sm:py-2 bg-white/80 backdrop-blur-sm rounded-lg sm:rounded-xl border border-gray-200 hover:border-blue-300 hover:shadow-md transition-all duration-300"
               >
                 <div className="flex items-center gap-2">
                   <CalendarIcon className="w-4 h-4 text-gray-600" />
-                  <span className="text-lg font-bold text-gray-900 capitalize">
+                  <span className="text-base sm:text-lg font-bold text-gray-900 capitalize">
                     {viewMonth.toLocaleDateString('fr-FR', { 
                       month: 'long', 
                       year: 'numeric' 
@@ -538,7 +558,7 @@ export function CalendarGrid({ currentDate, onTimeSlotClick, onBookingClick, boo
               
               <button
                 onClick={() => changeMonth('next')}
-                className="p-2 bg-white/80 backdrop-blur-sm rounded-xl border border-gray-200 hover:border-blue-300 hover:shadow-md transition-all duration-300 transform hover:scale-110"
+                className="hidden sm:flex p-2 bg-white/80 backdrop-blur-sm rounded-xl border border-gray-200 hover:border-blue-300 hover:shadow-md transition-all duration-300 transform hover:scale-110"
               >
                 <ChevronRight className="w-4 h-4 text-gray-600" />
               </button>
@@ -561,20 +581,20 @@ export function CalendarGrid({ currentDate, onTimeSlotClick, onBookingClick, boo
             ))}
           </div>
 
-          <div className="flex items-center gap-2">
+          <div className="flex items-center gap-1 sm:gap-2">
             <button
               onClick={() => scrollToDays('left')}
-              className="p-3 hover:bg-gradient-to-r hover:from-blue-100 hover:to-purple-100 rounded-2xl transition-all duration-300 transform hover:scale-110 shadow-md"
+              className="hidden sm:flex p-3 hover:bg-gradient-to-r hover:from-blue-100 hover:to-purple-100 rounded-2xl transition-all duration-300 transform hover:scale-110 shadow-md"
             >
               <ChevronLeft className="w-5 h-5 text-gray-600" />
             </button>
             
             <div 
               ref={scrollContainerRef}
-              className="flex-1 overflow-x-auto scrollbar-hide px-2 scroll-smooth mobile-optimized"
+              className="flex-1 overflow-x-auto scrollbar-hide px-1 sm:px-2 scroll-smooth mobile-optimized"
               style={{ touchAction: 'pan-x' }}
             >
-              <div className="flex gap-3" style={{ width: 'max-content' }}>
+              <div className="flex gap-2 sm:gap-3" style={{ width: 'max-content' }}>
                 {days.map((day, index) => {
                   const dayBookingsCount = getBookingsForDay(day.date).length;
                   
@@ -582,7 +602,7 @@ export function CalendarGrid({ currentDate, onTimeSlotClick, onBookingClick, boo
                     <button
                       key={index}
                       onClick={() => selectDay(day.date)}
-                      className={`relative flex-shrink-0 flex flex-col items-center justify-center w-16 h-16 rounded-2xl transition-all duration-300 transform hover:scale-110 shadow-lg animate-fadeIn ${
+                      className={`relative flex-shrink-0 flex flex-col items-center justify-center w-14 h-14 sm:w-16 sm:h-16 rounded-xl sm:rounded-2xl transition-all duration-300 transform hover:scale-110 shadow-lg animate-fadeIn ${
                         day.isSelected
                           ? 'bg-gradient-to-br from-purple-500 via-pink-500 to-red-500 text-white shadow-xl shadow-purple-200 animate-pulse'
                           : day.isToday
@@ -617,7 +637,7 @@ export function CalendarGrid({ currentDate, onTimeSlotClick, onBookingClick, boo
             
             <button
               onClick={() => scrollToDays('right')}
-              className="p-3 hover:bg-gradient-to-r hover:from-purple-100 hover:to-pink-100 rounded-2xl transition-all duration-300 transform hover:scale-110 shadow-md"
+              className="hidden sm:flex p-3 hover:bg-gradient-to-r hover:from-purple-100 hover:to-pink-100 rounded-2xl transition-all duration-300 transform hover:scale-110 shadow-md"
             >
               <ChevronRight className="w-5 h-5 text-gray-600" />
             </button>
