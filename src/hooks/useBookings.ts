@@ -177,17 +177,43 @@ export function useBookings() {
         console.warn('⚠️ Erreur vérification équipe:', teamError);
       }
 
-      const { data, error } = await supabase!
+      // Nettoyer les données avant l'update - retirer les champs relationnels
+      const cleanUpdates = { ...updates };
+      delete (cleanUpdates as any).service;
+      delete (cleanUpdates as any).created_at;
+      delete (cleanUpdates as any).id;
+
+      console.log('🔄 updateBooking - Données nettoyées:', cleanUpdates);
+
+      // CORRECTION: Faire l'update SANS select, puis récupérer les données séparément
+      const { error: updateError } = await supabase!
         .from('bookings')
-        .update(updates)
-        .eq('id', id)
+        .update(cleanUpdates)
+        .eq('id', id);
+
+      if (updateError) {
+        console.error('❌ updateBooking - Erreur update:', updateError);
+        throw updateError;
+      }
+
+      console.log('✅ updateBooking - Update réussi');
+
+      // Récupérer les données mises à jour dans une requête séparée
+      const { data, error: fetchError } = await supabase!
+        .from('bookings')
         .select(`
           *,
           service:services(*)
         `)
+        .eq('id', id)
         .single();
 
-      if (error) throw error;
+      if (fetchError) {
+        console.error('❌ updateBooking - Erreur fetch:', fetchError);
+        throw fetchError;
+      }
+
+      console.log('✅ updateBooking - Données récupérées:', data);
 
       if (data) {
         setBookings(prev => prev.map(b => b.id === id ? data : b));
@@ -201,7 +227,7 @@ export function useBookings() {
         return data;
       }
     } catch (err) {
-      console.error('Erreur lors de la mise à jour de la réservation:', err);
+      console.error('❌ updateBooking - Erreur globale:', err);
       throw err;
     }
   };
