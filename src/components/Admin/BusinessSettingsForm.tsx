@@ -32,10 +32,10 @@ export function BusinessSettingsForm() {
     
     try {
       await updateSettings(formData);
-      alert('Paramètres sauvegardés avec succès !');
+      alert('✅ Paramètres sauvegardés avec succès !');
     } catch (error) {
       console.error('Erreur lors de la sauvegarde:', error);
-      alert(`Erreur: ${error instanceof Error ? error.message : 'Erreur inconnue'}`);
+      alert(`❌ Erreur: ${error instanceof Error ? error.message : 'Erreur inconnue'}`);
     } finally {
       setSaving(false);
     }
@@ -465,11 +465,11 @@ export function BusinessSettingsForm() {
                 </label>
                 <select
                   value={formData.deposit_type || 'percentage'}
-                  onChange={(e) => setFormData({ ...formData, deposit_type: e.target.value as 'percentage' | 'fixed' })}
+                  onChange={(e) => setFormData({ ...formData, deposit_type: e.target.value as 'percentage' | 'fixed_amount' })}
                   className="w-full px-4 py-3 border-2 border-indigo-300 rounded-xl focus:border-indigo-500 focus:ring-2 focus:ring-indigo-200 transition-all"
                 >
                   <option value="percentage">Pourcentage</option>
-                  <option value="fixed">Montant fixe</option>
+                  <option value="fixed_amount">Montant fixe</option>
                 </select>
               </div>
 
@@ -504,6 +504,36 @@ export function BusinessSettingsForm() {
                   />
                 </div>
               )}
+
+              {/* NOUVELLE OPTION: Multiplier l'acompte par la quantité */}
+              <div className="flex items-start gap-3 p-4 bg-indigo-100 rounded-xl">
+                <input
+                  type="checkbox"
+                  checked={formData.multiply_deposit_by_services || false}
+                  onChange={(e) => setFormData({ ...formData, multiply_deposit_by_services: e.target.checked })}
+                  className="w-5 h-5 rounded border-2 border-indigo-300 mt-0.5"
+                  id="multiply-deposit"
+                />
+                <label htmlFor="multiply-deposit" className="flex-1 cursor-pointer">
+                  <div className="flex items-center gap-2 mb-1">
+                    <Calculator className="w-4 h-4 text-indigo-600" />
+                    <span className="text-sm font-medium text-gray-700">
+                      Multiplier l'acompte par la quantité
+                    </span>
+                  </div>
+                  <p className="text-xs text-gray-600">
+                    {formData.deposit_type === 'percentage' 
+                      ? "L'acompte sera calculé sur le montant total (prix × quantité)"
+                      : "Le montant fixe sera multiplié par la quantité de services"}
+                  </p>
+                  <div className="mt-2 p-2 bg-white rounded-lg text-xs text-gray-600">
+                    <strong>Exemple:</strong> {formData.deposit_type === 'percentage' 
+                      ? `Service à 100€, quantité 3, acompte ${formData.default_deposit_percentage || 30}% → ${formData.multiply_deposit_by_services ? '90€ (30% de 300€)' : '30€ (30% de 100€)'}`
+                      : `Acompte fixe ${formData.deposit_fixed_amount || 20}€, quantité 3 → ${formData.multiply_deposit_by_services ? `${(formData.deposit_fixed_amount || 20) * 3}€` : `${formData.deposit_fixed_amount || 20}€`}`
+                    }
+                  </div>
+                </label>
+              </div>
 
               <div>
                 <label className="block text-sm font-medium text-gray-700 mb-2">

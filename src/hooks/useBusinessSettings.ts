@@ -48,6 +48,7 @@ export function useBusinessSettings() {
         stripe_secret_key: '',
         stripe_webhook_secret: '',
         timezone: 'Europe/Paris',
+        multiply_deposit_by_services: false,
       };
       setSettings(defaultSettings);
       setLoading(false);
@@ -122,7 +123,8 @@ export function useBusinessSettings() {
           stripe_secret_key: '',
           stripe_webhook_secret: '',
           timezone: 'Europe/Paris',
-          enable_user_assignment: false
+          enable_user_assignment: false,
+          multiply_deposit_by_services: false,
         };
         setSettings(defaultSettings);
         return;
@@ -165,6 +167,7 @@ export function useBusinessSettings() {
         stripe_secret_key: '',
         stripe_webhook_secret: '',
         timezone: 'Europe/Paris',
+        multiply_deposit_by_services: false,
       };
       setSettings(defaultSettings);
       setError(null);
@@ -178,34 +181,96 @@ export function useBusinessSettings() {
       throw new Error('Supabase non configuré');
     }
 
+    if (!user) {
+      throw new Error('Utilisateur non connecté');
+    }
+
     try {
-      if (!settings?.id) {
-        throw new Error('Aucun paramètre à mettre à jour');
+      console.log('💾 Mise à jour des paramètres...');
+      
+      // Récupérer l'ID du propriétaire si membre d'équipe
+      let targetUserId = user.id;
+      try {
+        const { data: membershipData } = await supabase!
+          .from('team_members')
+          .select('owner_id')
+          .eq('user_id', user.id)
+          .eq('is_active', true)
+          .maybeSingle();
+
+        if (membershipData?.owner_id) {
+          targetUserId = membershipData.owner_id;
+        }
+      } catch (teamError) {
+        console.warn('⚠️ Erreur vérification équipe:', teamError);
       }
 
-      const { data, error } = await supabase!
+      // Vérifier si des paramètres existent
+      const { data: existingSettings, error: fetchError } = await supabase!
         .from('business_settings')
-        .update({
-          ...newSettings,
-          updated_at: new Date().toISOString()
-        })
-        .eq('id', settings.id)
-        .select()
-        .single();
+        .select('id')
+        .eq('user_id', targetUserId)
+        .maybeSingle();
 
-      if (error) {
-        throw error;
+      if (fetchError && fetchError.code !== 'PGRST116') {
+        console.error('❌ Erreur lors de la vérification:', fetchError);
+        throw new Error(`Erreur de vérification: ${fetchError.message}`);
       }
 
-      if (data) {
-        setSettings(data);
-        return data;
+      let result;
+
+      if (existingSettings?.id) {
+        // Mise à jour
+        console.log('📝 Mise à jour des paramètres existants:', existingSettings.id);
+        const { data, error } = await supabase!
+          .from('business_settings')
+          .update({
+            ...newSettings,
+            user_id: targetUserId,
+            updated_at: new Date().toISOString()
+          })
+          .eq('id', existingSettings.id)
+          .select()
+          .single();
+
+        if (error) {
+          console.error('❌ Erreur de mise à jour:', error);
+          throw new Error(`Erreur de mise à jour: ${error.message}`);
+        }
+
+        result = data;
       } else {
-        await fetchSettings();
-        return settings;
+        // Création
+        console.log('✨ Création de nouveaux paramètres');
+        const { data, error } = await supabase!
+          .from('business_settings')
+          .insert({
+            ...newSettings,
+            user_id: targetUserId,
+            created_at: new Date().toISOString(),
+            updated_at: new Date().toISOString()
+          })
+          .select()
+          .single();
+
+        if (error) {
+          console.error('❌ Erreur de création:', error);
+          throw new Error(`Erreur de création: ${error.message}`);
+        }
+
+        result = data;
+      }
+
+      if (result) {
+        console.log('✅ Paramètres sauvegardés avec succès');
+        setSettings(result);
+        return result;
+      } else {
+        throw new Error('Aucune donnée retournée après la sauvegarde');
       }
       
     } catch (err) {
+      console.error('❌ Erreur lors de la sauvegarde:', err);
       const errorMessage = err instanceof Error ? err.message : 'Erreur de mise à jour';
       throw new Error(errorMessage);
     }
@@ -259,6 +324,7 @@ export function useBusinessSettings() {
             stripe_secret_key: '',
             stripe_webhook_secret: '',
             timezone: 'Europe/Paris',
+            multiply_deposit_by_services: false,
           };
           setSettings(defaultSettings);
           setLoading(false);
