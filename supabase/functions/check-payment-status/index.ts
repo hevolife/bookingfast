@@ -1,5 +1,3 @@
-import { createClient } from 'npm:@supabase/supabase-js@2'
-
 const corsHeaders = {
   'Access-Control-Allow-Origin': '*',
   'Access-Control-Allow-Headers': 'authorization, x-client-info, apikey, content-type',
@@ -7,51 +5,92 @@ const corsHeaders = {
 }
 
 Deno.serve(async (req) => {
+  // CORS preflight
   if (req.method === 'OPTIONS') {
     return new Response('ok', { headers: corsHeaders })
   }
 
   try {
-    const { sessionId } = await req.json()
+    console.log('🔍 [CHECK-PAYMENT] Début requête')
+    
+    // Parse body
+    const body = await req.json()
+    console.log('📦 [CHECK-PAYMENT] Body reçu:', body)
+
+    const { sessionId } = body
 
     if (!sessionId) {
+      console.error('❌ [CHECK-PAYMENT] Session ID manquant')
       return new Response(
         JSON.stringify({ error: 'Session ID manquant' }),
         { status: 400, headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
       )
     }
 
-    console.log('🔍 Vérification statut session:', sessionId)
+    console.log('🔑 [CHECK-PAYMENT] Session ID:', sessionId)
 
-    // Récupérer la clé Stripe depuis les settings
-    const supabaseClient = createClient(
-      Deno.env.get('SUPABASE_URL') ?? '',
-      Deno.env.get('SUPABASE_SERVICE_ROLE_KEY') ?? ''
-    )
+    // Variables d'environnement
+    const supabaseUrl = Deno.env.get('SUPABASE_URL')
+    const supabaseKey = Deno.env.get('SUPABASE_SERVICE_ROLE_KEY')
+    
+    if (!supabaseUrl || !supabaseKey) {
+      console.error('❌ [CHECK-PAYMENT] Variables environnement manquantes')
+      return new Response(
+        JSON.stringify({ error: 'Configuration serveur manquante' }),
+        { status: 500, headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
+      )
+    }
 
-    // Extraire l'ID de session Stripe (format: cs_live_...)
+    // Normaliser session ID
     const stripeSessionId = sessionId.includes('cs_') ? sessionId : `cs_${sessionId}`
+    console.log('🎯 [CHECK-PAYMENT] Session ID normalisé:', stripeSessionId)
 
-    // Vérifier si une réservation existe déjà avec ce session_id
-    const { data: existingBooking } = await supabaseClient
-      .from('bookings')
-      .select('id, booking_status, payment_status')
-      .eq('stripe_session_id', stripeSessionId)
-      .maybeSingle()
+    // 🔥 APPEL REST API DIRECT (sans client Supabase)
+    console.log('🔍 [CHECK-PAYMENT] Recherche booking via REST API...')
+    
+    const apiUrl = `${supabaseUrl}/rest/v1/bookings?stripe_session_id=eq.${stripeSessionId}&select=id,booking_status,payment_status`
+    
+    const response = await fetch(apiUrl, {
+      method: 'GET',
+      headers: {
+        'apikey': supabaseKey,
+        'Authorization': `Bearer ${supabaseKey}`,
+        'Content-Type': 'application/json',
+        'Prefer': 'return=representation'
+      }
+    })
+
+    if (!response.ok) {
+      const errorText = await response.text()
+      console.error('❌ [CHECK-PAYMENT] Erreur API REST:', response.status, errorText)
+      return new Response(
+        JSON.stringify({ 
+          error: 'Erreur base de données', 
+          details: errorText 
+        }),
+        { status: 500, headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
+      )
+    }
+
+    const bookings = await response.json()
+    console.log('📊 [CHECK-PAYMENT] Résultat API:', bookings)
+
+    const existingBooking = bookings && bookings.length > 0 ? bookings[0] : null
 
     if (existingBooking) {
-      console.log('✅ Réservation trouvée:', existingBooking)
+      console.log('✅ [CHECK-PAYMENT] Réservation trouvée:', existingBooking)
       return new Response(
         JSON.stringify({
           status: 'complete',
           payment_status: 'paid',
-          booking_id: existingBooking.id
+          booking_id: existingBooking.id,
+          booking: existingBooking
         }),
         { headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
       )
     }
 
-    console.log('⏳ Réservation pas encore créée')
+    console.log('⏳ [CHECK-PAYMENT] Réservation pas encore créée')
     return new Response(
       JSON.stringify({
         status: 'pending',
@@ -61,9 +100,14 @@ Deno.serve(async (req) => {
     )
 
   } catch (error) {
-    console.error('❌ Erreur:', error)
+    console.error('❌ [CHECK-PAYMENT] Erreur globale:', error)
+    console.error('📋 [CHECK-PAYMENT] Stack:', error.stack)
     return new Response(
-      JSON.stringify({ error: error.message }),
+      JSON.stringify({ 
+        error: 'Erreur serveur', 
+        message: error.message,
+        stack: error.stack 
+      }),
       { status: 500, headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
     )
   }

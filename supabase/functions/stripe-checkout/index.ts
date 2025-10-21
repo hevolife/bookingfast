@@ -10,7 +10,7 @@ const corsHeaders = {
 const PLATFORM_STRIPE_SECRET_KEY = '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';
 
 Deno.serve(async (req) => {
-  console.log('🚀 === STRIPE-CHECKOUT V16 - SYNTAX FIXED === 🚀')
+  console.log('🚀 === STRIPE-CHECKOUT V17 - REDIRECT TO BOOKING PAGE === 🚀')
   console.log('📍 Request URL:', req.url)
   console.log('📍 Request Method:', req.method)
   
@@ -190,19 +190,21 @@ Deno.serve(async (req) => {
         console.log('✅ Nouveau client créé:', customerId)
       }
 
-      console.log('🔧 Step 7: Building redirect URLs');
+      console.log('🔧 Step 7: Building redirect URLs')
       let redirectBaseUrl: string;
       
+      // 🎯 NOUVELLE LOGIQUE : Toujours rediriger vers la page de réservation
       if (parent_url && parent_url !== 'https://bookingfast.pro') {
         redirectBaseUrl = parent_url;
         console.log('🌐 Iframe externe détecté - redirect vers:', redirectBaseUrl);
       } else {
         redirectBaseUrl = success_url.includes('localhost') 
-          ? success_url.split('/payment-success')[0] 
+          ? success_url.split('/booking/')[0] 
           : 'https://bookingfast.pro';
         console.log('🏠 Iframe BookingFast - redirect vers:', redirectBaseUrl);
       }
       
+      // ✅ REDIRECTION VERS LA PAGE DE RÉSERVATION (pas confirmation)
       const iframeSuccessUrl = `${redirectBaseUrl}/booking/${userId}?payment=success&session_id={CHECKOUT_SESSION_ID}`;
       const iframeCancelUrl = `${redirectBaseUrl}/booking/${userId}?payment=cancelled`;
 

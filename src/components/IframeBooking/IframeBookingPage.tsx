@@ -63,17 +63,6 @@ export function IframeBookingPage() {
     console.log('🌐 Dans un iframe:', inIframe);
   }, []);
 
-  // 📡 Notifier le parent quand on change d'étape (pour refresh)
-  useEffect(() => {
-    if (isInIframe && currentStep === 5) {
-      console.log('📡 Notification parent: booking_confirmed');
-      window.parent.postMessage({ 
-        type: 'booking_confirmed',
-        step: currentStep 
-      }, '*');
-    }
-  }, [currentStep, isInIframe]);
-
   // 🔄 Polling pour vérifier le statut du paiement
   useEffect(() => {
     if (!waitingForPayment || !stripeSessionId) return;
@@ -106,6 +95,9 @@ export function IframeBookingPage() {
             
             setWaitingForPayment(false);
             setCurrentStep(5);
+            
+            // 🔄 Nettoyer l'URL (enlever les paramètres payment)
+            window.history.replaceState({}, '', window.location.pathname);
           }
         }
       } catch (err) {
@@ -138,6 +130,8 @@ export function IframeBookingPage() {
     } else if (paymentStatus === 'cancelled') {
       console.log('❌ Paiement annulé');
       setCurrentStep(4);
+      // Nettoyer l'URL
+      window.history.replaceState({}, '', window.location.pathname);
     }
   }, [paymentStatus, sessionId]);
 
@@ -459,6 +453,10 @@ export function IframeBookingPage() {
         client: clientData.email
       });
 
+      // 🎯 Récupérer l'URL actuelle pour le retour
+      const currentUrl = window.location.href.split('?')[0];
+      console.log('🔗 URL de retour:', currentUrl);
+
       const supabaseUrl = import.meta.env.VITE_SUPABASE_URL?.replace(/\/$/, '');
       const response = await fetch(`${supabaseUrl}/functions/v1/stripe-checkout`, {
         method: 'POST',
@@ -471,8 +469,9 @@ export function IframeBookingPage() {
           currency: 'eur',
           customer_email: clientData.email,
           service_name: selectedService.name,
-          success_url: window.location.href.split('?')[0] + '?payment=success&session_id={CHECKOUT_SESSION_ID}',
-          cancel_url: window.location.href.split('?')[0] + '?payment=cancelled',
+          success_url: currentUrl + '?payment=success&session_id={CHECKOUT_SESSION_ID}',
+          cancel_url: currentUrl + '?payment=cancelled',
+          parent_url: window.location.origin,
           metadata: {
             user_id: userId,
             service_id: selectedService.id,
@@ -1232,7 +1231,7 @@ export function IframeBookingPage() {
           </div>
         )}
 
-        {/* Step 5: Success - NOUVELLE VERSION PROFESSIONNELLE */}
+        {/* Step 5: Success */}
         {currentStep === 5 && (
           <div className="max-w-3xl mx-auto">
             {/* Header Success */}
