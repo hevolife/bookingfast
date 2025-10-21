@@ -1,6 +1,5 @@
 import 'jsr:@supabase/functions-js/edge-runtime.d.ts';
 import Stripe from 'npm:stripe@17.7.0';
-import { createClient } from 'npm:@supabase/supabase-js@2.49.1';
 
 const corsHeaders = {
   'Access-Control-Allow-Origin': '*',
@@ -11,14 +10,17 @@ const corsHeaders = {
 const PLATFORM_STRIPE_SECRET_KEY = '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';
 
 Deno.serve(async (req) => {
-  console.log('🚀 === STRIPE-CHECKOUT V12 - CROSS-DOMAIN REDIRECT === 🚀')
+  console.log('🚀 === STRIPE-CHECKOUT V16 - SYNTAX FIXED === 🚀')
+  console.log('📍 Request URL:', req.url)
+  console.log('📍 Request Method:', req.method)
   
   if (req.method === 'OPTIONS') {
+    console.log('✅ OPTIONS request - returning CORS headers')
     return new Response('ok', { headers: corsHeaders })
   }
 
   try {
-    // IMPORTANT: Utiliser SERVICE_ROLE_KEY pour contourner RLS
+    console.log('🔧 Step 1: Reading environment variables')
     const supabaseUrl = Deno.env.get('SUPABASE_URL');
     const supabaseServiceKey = Deno.env.get('SUPABASE_SERVICE_ROLE_KEY');
     
@@ -34,29 +36,25 @@ Deno.serve(async (req) => {
           error: 'Configuration Supabase manquante',
           details: 'SUPABASE_URL ou SUPABASE_SERVICE_ROLE_KEY non défini'
         }),
-        { status: 500, headers: corsHeaders }
+        { status: 500, headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
       )
     }
-
-    const supabaseClient = createClient(supabaseUrl, supabaseServiceKey, {
-      auth: {
-        autoRefreshToken: false,
-        persistSession: false
-      }
-    })
 
     if (req.method !== 'POST') {
+      console.error('❌ Method not allowed:', req.method)
       return new Response(
         JSON.stringify({ error: 'Method not allowed' }),
-        { status: 405, headers: corsHeaders }
+        { status: 405, headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
       )
     }
 
+    console.log('🔧 Step 2: Parsing request body')
     const body = await req.json();
     console.log('📥 Body reçu:', JSON.stringify(body, null, 2));
 
     const { amount, currency = 'eur', success_url, cancel_url, customer_email, metadata, service_name, parent_url } = body;
 
+    console.log('🔧 Step 3: Validating required parameters')
     if (!success_url || !cancel_url || !customer_email || !service_name) {
       console.error('❌ Paramètres manquants:', {
         success_url: !!success_url,
@@ -66,11 +64,11 @@ Deno.serve(async (req) => {
       });
       return new Response(
         JSON.stringify({ error: 'Paramètres requis manquants' }),
-        { status: 400, headers: corsHeaders }
+        { status: 400, headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
       )
     }
 
-    console.log('📊 Données validées:', {
+    console.log('✅ Paramètres validés:', {
       customer_email,
       service_name,
       payment_type: metadata?.payment_type,
@@ -89,59 +87,81 @@ Deno.serve(async (req) => {
         console.error('❌ user_id manquant dans metadata');
         return new Response(
           JSON.stringify({ error: 'user_id requis' }),
-          { status: 400, headers: corsHeaders }
+          { status: 400, headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
         )
       }
 
-      console.log('🔍 Récupération configuration Stripe pour user_id:', userId);
+      console.log('🔧 Step 4: Fetching Stripe configuration for user:', userId);
+      console.log('🔗 API URL:', `${supabaseUrl}/rest/v1/business_settings?user_id=eq.${userId}`);
 
-      const { data: settings, error: settingsError } = await supabaseClient
-        .from('business_settings')
-        .select('stripe_enabled, stripe_secret_key')
-        .eq('user_id', userId)
-        .single()
+      const settingsResponse = await fetch(
+        `${supabaseUrl}/rest/v1/business_settings?user_id=eq.${userId}&select=stripe_enabled,stripe_secret_key`,
+        {
+          headers: {
+            'apikey': supabaseServiceKey,
+            'Authorization': `Bearer ${supabaseServiceKey}`,
+            'Content-Type': 'application/json',
+            'Prefer': 'return=representation'
+          }
+        }
+      );
 
-      console.log('📦 Résultat requête business_settings:', {
-        success: !settingsError,
-        stripe_enabled: settings?.stripe_enabled,
-        has_secret_key: !!settings?.stripe_secret_key,
-        error: settingsError ? {
-          message: settingsError.message,
-          code: settingsError.code,
-          details: settingsError.details
-        } : null
-      });
+      console.log('📡 API Response Status:', settingsResponse.status);
+      console.log('📡 API Response Headers:', Object.fromEntries(settingsResponse.headers.entries()));
 
-      if (settingsError) {
-        console.error('❌ Erreur récupération settings:', settingsError);
+      if (!settingsResponse.ok) {
+        const errorText = await settingsResponse.text();
+        console.error('❌ Erreur API Supabase:', settingsResponse.status, errorText);
         return new Response(
           JSON.stringify({ 
             error: 'Erreur récupération configuration Stripe',
-            details: settingsError.message
+            details: errorText,
+            status: settingsResponse.status
           }),
-          { status: 500, headers: corsHeaders }
+          { status: 500, headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
         )
       }
 
-      if (!settings?.stripe_enabled) {
+      const settingsData = await settingsResponse.json();
+      console.log('📦 Résultat API business_settings:', {
+        count: settingsData.length,
+        data: settingsData
+      });
+
+      if (!settingsData || settingsData.length === 0) {
+        console.error('❌ Aucune configuration trouvée pour user_id:', userId);
+        return new Response(
+          JSON.stringify({ error: 'Configuration Stripe non trouvée' }),
+          { status: 404, headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
+        )
+      }
+
+      const settings = settingsData[0];
+      console.log('🔍 Settings found:', {
+        stripe_enabled: settings.stripe_enabled,
+        has_secret_key: !!settings.stripe_secret_key
+      });
+
+      if (!settings.stripe_enabled) {
         console.error('❌ Stripe non activé pour cet utilisateur');
         return new Response(
           JSON.stringify({ error: 'Stripe non activé pour cet utilisateur' }),
-          { status: 400, headers: corsHeaders }
+          { status: 400, headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
         )
       }
 
-      if (!settings?.stripe_secret_key) {
+      if (!settings.stripe_secret_key) {
         console.error('❌ Clé secrète Stripe manquante');
         return new Response(
           JSON.stringify({ error: 'Configuration Stripe incomplète' }),
-          { status: 400, headers: corsHeaders }
+          { status: 400, headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
         )
       }
 
       stripeSecretKey = settings.stripe_secret_key
       console.log('✅ Clé Stripe utilisateur récupérée');
 
+      console.log('🔧 Step 5: Initializing Stripe client');
       const stripe = new Stripe(stripeSecretKey, {
         appInfo: {
           name: 'BookingFast',
@@ -149,7 +169,7 @@ Deno.serve(async (req) => {
         },
       })
 
-      // Créer ou récupérer le client
+      console.log('🔧 Step 6: Finding or creating Stripe customer');
       let customerId
       console.log('🔍 Recherche client Stripe avec email:', customer_email);
       
@@ -170,34 +190,28 @@ Deno.serve(async (req) => {
         console.log('✅ Nouveau client créé:', customerId)
       }
 
-      // 🎯 CONSTRUIRE L'URL DE REDIRECTION
-      // Si parent_url est fourni (iframe sur site externe), utiliser celui-ci
-      // Sinon, utiliser l'URL de l'iframe BookingFast
+      console.log('🔧 Step 7: Building redirect URLs');
       let redirectBaseUrl: string;
       
       if (parent_url && parent_url !== 'https://bookingfast.pro') {
-        // Iframe sur site externe - rediriger vers le site parent
         redirectBaseUrl = parent_url;
         console.log('🌐 Iframe externe détecté - redirect vers:', redirectBaseUrl);
       } else {
-        // Iframe sur BookingFast ou pas de parent_url - utiliser l'URL standard
         redirectBaseUrl = success_url.includes('localhost') 
           ? success_url.split('/payment-success')[0] 
           : 'https://bookingfast.pro';
         console.log('🏠 Iframe BookingFast - redirect vers:', redirectBaseUrl);
       }
       
-      // Construire les URLs avec le bon domaine
       const iframeSuccessUrl = `${redirectBaseUrl}/booking/${userId}?payment=success&session_id={CHECKOUT_SESSION_ID}`;
       const iframeCancelUrl = `${redirectBaseUrl}/booking/${userId}?payment=cancelled`;
 
-      console.log('🔗 URLs de redirection iframe:', {
+      console.log('🔗 URLs de redirection:', {
         success: iframeSuccessUrl,
-        cancel: iframeCancelUrl,
-        parent_url
+        cancel: iframeCancelUrl
       });
 
-      // PAIEMENT UNIQUE pour les réservations
+      console.log('🔧 Step 8: Creating Stripe checkout session');
       console.log('💳 Création session PAIEMENT UNIQUE:', {
         amount,
         currency,
@@ -248,8 +262,7 @@ Deno.serve(async (req) => {
           message: stripeError.message,
           type: stripeError.type,
           code: stripeError.code,
-          param: stripeError.param,
-          raw: stripeError.raw
+          param: stripeError.param
         });
         return new Response(
           JSON.stringify({ 
@@ -258,12 +271,11 @@ Deno.serve(async (req) => {
             type: stripeError.type,
             code: stripeError.code
           }),
-          { status: 500, headers: corsHeaders }
+          { status: 500, headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
         )
       }
 
     } else if (metadata?.payment_type === 'platform_subscription' || metadata?.payment_type === 'plugin_subscription') {
-      // ABONNEMENT PLATEFORME (plans ou plugins)
       console.log('💳 CRÉATION ABONNEMENT RÉCURRENT')
       
       stripeSecretKey = PLATFORM_STRIPE_SECRET_KEY;
@@ -272,7 +284,7 @@ Deno.serve(async (req) => {
         console.error('❌ PLATFORM_STRIPE_SECRET_KEY non défini');
         return new Response(
           JSON.stringify({ error: 'Configuration Stripe manquante' }),
-          { status: 500, headers: corsHeaders }
+          { status: 500, headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
         )
       }
 
@@ -285,7 +297,6 @@ Deno.serve(async (req) => {
         },
       })
 
-      // Créer ou récupérer le client
       let customerId
       console.log('🔍 Recherche client Stripe avec email:', customer_email);
       
@@ -308,71 +319,57 @@ Deno.serve(async (req) => {
 
       let priceId: string | undefined;
 
-      // PLUGIN SUBSCRIPTION
       if (metadata?.payment_type === 'plugin_subscription') {
         console.log('🔌 === ABONNEMENT PLUGIN === 🔌')
-        console.log('🔌 Plugin ID:', metadata?.plugin_id)
         
         const pluginId = metadata?.plugin_id
         if (!pluginId) {
           console.error('❌ plugin_id manquant dans metadata');
           return new Response(
             JSON.stringify({ error: 'plugin_id requis' }),
-            { status: 400, headers: corsHeaders }
+            { status: 400, headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
           )
         }
 
-        // Récupérer le Price ID du plugin depuis la base de données
-        console.log('🔍 Requête SQL: SELECT * FROM plugins WHERE id =', pluginId);
+        console.log('🔍 Requête API plugins pour ID:', pluginId);
         
-        const { data: plugin, error: pluginError } = await supabaseClient
-          .from('plugins')
-          .select('id, name, slug, stripe_price_id')
-          .eq('id', pluginId)
-          .single()
+        const pluginResponse = await fetch(
+          `${supabaseUrl}/rest/v1/plugins?id=eq.${pluginId}&select=id,name,slug,stripe_price_id`,
+          {
+            headers: {
+              'apikey': supabaseServiceKey,
+              'Authorization': `Bearer ${supabaseServiceKey}`,
+              'Content-Type': 'application/json'
+            }
+          }
+        );
 
-        console.log('📦 Résultat requête plugin:', {
-          success: !pluginError,
-          plugin: plugin ? {
-            id: plugin.id,
-            name: plugin.name,
-            slug: plugin.slug,
-            stripe_price_id: plugin.stripe_price_id
-          } : null,
-          error: pluginError ? {
-            message: pluginError.message,
-            code: pluginError.code,
-            details: pluginError.details,
-            hint: pluginError.hint
-          } : null
-        });
+        console.log('📡 Plugin API Response Status:', pluginResponse.status);
 
-        if (pluginError) {
-          console.error('❌ Erreur requête plugin:', {
-            message: pluginError.message,
-            code: pluginError.code,
-            details: pluginError.details,
-            hint: pluginError.hint
-          });
+        if (!pluginResponse.ok) {
+          const errorText = await pluginResponse.text();
+          console.error('❌ Erreur API plugins:', pluginResponse.status, errorText);
           return new Response(
             JSON.stringify({ 
               error: 'Erreur lors de la récupération du plugin',
-              details: pluginError.message,
-              code: pluginError.code,
-              hint: pluginError.hint
+              details: errorText
             }),
-            { status: 500, headers: corsHeaders }
+            { status: 500, headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
           )
         }
 
-        if (!plugin) {
+        const pluginData = await pluginResponse.json();
+        console.log('📦 Plugin data:', pluginData);
+
+        if (!pluginData || pluginData.length === 0) {
           console.error('❌ Plugin non trouvé avec ID:', pluginId);
           return new Response(
             JSON.stringify({ error: 'Plugin non trouvé' }),
-            { status: 404, headers: corsHeaders }
+            { status: 404, headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
           )
         }
 
+        const plugin = pluginData[0];
         console.log('✅ Plugin trouvé:', plugin.name);
 
         if (!plugin.stripe_price_id) {
@@ -383,7 +380,7 @@ Deno.serve(async (req) => {
               help: 'Ajoutez le stripe_price_id dans la table plugins pour ce plugin',
               plugin: plugin.slug
             }),
-            { status: 500, headers: corsHeaders }
+            { status: 500, headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
           )
         }
 
@@ -391,7 +388,6 @@ Deno.serve(async (req) => {
         console.log('✅ Price ID plugin récupéré:', priceId)
 
       } else {
-        // PLAN SUBSCRIPTION - Prix récurrents Stripe pour les plans
         const STRIPE_PRICES = {
           starter: 'price_1QpCZhKiNbWQJGP3YourStarterPriceID',
           monthly: 'price_1QpCZhKiNbWQJGP3YourMonthlyPriceID',
@@ -411,12 +407,11 @@ Deno.serve(async (req) => {
               error: 'Prix Stripe non configuré. Créez les prix récurrents dans votre dashboard Stripe.',
               help: 'Allez dans Stripe Dashboard > Produits > Créer un prix récurrent'
             }),
-            { status: 500, headers: corsHeaders }
+            { status: 500, headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
           )
         }
       }
 
-      // CRÉER UN ABONNEMENT
       console.log('💳 Création session ABONNEMENT avec Price ID:', priceId)
       
       try {
@@ -459,8 +454,7 @@ Deno.serve(async (req) => {
           message: stripeError.message,
           type: stripeError.type,
           code: stripeError.code,
-          param: stripeError.param,
-          raw: stripeError.raw
+          param: stripeError.param
         });
         return new Response(
           JSON.stringify({ 
@@ -469,7 +463,7 @@ Deno.serve(async (req) => {
             type: stripeError.type,
             code: stripeError.code
           }),
-          { status: 500, headers: corsHeaders }
+          { status: 500, headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
         )
       }
 
@@ -477,7 +471,7 @@ Deno.serve(async (req) => {
       console.error('❌ Type de paiement non reconnu:', metadata?.payment_type);
       return new Response(
         JSON.stringify({ error: 'Type de paiement non reconnu' }),
-        { status: 400, headers: corsHeaders }
+        { status: 400, headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
       )
     }
 
@@ -486,7 +480,6 @@ Deno.serve(async (req) => {
     console.error('Type:', error.constructor?.name)
     console.error('Message:', error.message)
     console.error('Stack:', error.stack)
-    console.error('Détails complets:', JSON.stringify(error, null, 2))
     
     return new Response(
       JSON.stringify({ 
@@ -495,7 +488,7 @@ Deno.serve(async (req) => {
         type: error.constructor?.name,
         stack: error.stack
       }),
-      { status: 500, headers: corsHeaders }
+      { status: 500, headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
     )
   }
-})
+});

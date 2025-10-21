@@ -453,15 +453,19 @@ export function IframeBookingPage() {
         })
       });
 
+      console.log('📡 Réponse Stripe API:', response.status);
+
       if (!response.ok) {
-        throw new Error('Erreur lors de la création de la session de paiement');
+        const errorData = await response.json();
+        console.error('❌ Erreur API:', errorData);
+        throw new Error(errorData.error || 'Erreur lors de la création de la session de paiement');
       }
 
       const { url } = await response.json();
       
       if (url) {
         console.log('🚀 Redirection vers Stripe:', url);
-        // Rediriger directement dans la même fenêtre/iframe
+        // ✅ CORRECTION : Redirection directe dans la même fenêtre/iframe
         window.location.href = url;
       } else {
         throw new Error('URL de paiement manquante');
