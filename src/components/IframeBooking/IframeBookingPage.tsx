@@ -47,12 +47,16 @@ export function IframeBookingPage() {
   const [stripeSessionId, setStripeSessionId] = useState<string | null>(null);
   const [confirmedBooking, setConfirmedBooking] = useState<any>(null);
 
+  // 🌐 Capturer l'origine du parent (site externe)
+  const [parentOrigin, setParentOrigin] = useState<string | null>(null);
+
   // Récupérer les services autorisés depuis l'URL
   const allowedServices = searchParams.get('services')?.split(',').filter(Boolean) || [];
   
   // Vérifier si on revient d'un paiement
   const paymentStatus = searchParams.get('payment');
   const sessionId = searchParams.get('session_id');
+  const returnOrigin = searchParams.get('origin'); // 🎯 Origine de retour
 
   // 🌐 Détecter si on est dans un iframe
   const [isInIframe, setIsInIframe] = useState(false);
@@ -61,6 +65,29 @@ export function IframeBookingPage() {
     const inIframe = window.self !== window.top;
     setIsInIframe(inIframe);
     console.log('🌐 Dans un iframe:', inIframe);
+
+    // 🎯 Capturer l'origine du parent
+    if (inIframe) {
+      try {
+        const origin = document.referrer ? new URL(document.referrer).origin : null;
+        if (origin && origin !== window.location.origin) {
+          setParentOrigin(origin);
+          console.log('🌐 Origine parent détectée:', origin);
+          
+          // Stocker dans sessionStorage pour persistance
+          sessionStorage.setItem('parentOrigin', origin);
+        }
+      } catch (err) {
+        console.error('❌ Erreur détection origine:', err);
+      }
+    }
+
+    // 🔄 Récupérer depuis sessionStorage si disponible
+    const storedOrigin = sessionStorage.getItem('parentOrigin');
+    if (storedOrigin && !parentOrigin) {
+      setParentOrigin(storedOrigin);
+      console.log('🔄 Origine récupérée depuis sessionStorage:', storedOrigin);
+    }
   }, []);
 
   // 🔄 Polling pour vérifier le statut du paiement
@@ -125,6 +152,14 @@ export function IframeBookingPage() {
   useEffect(() => {
     if (paymentStatus === 'success' && sessionId) {
       console.log('✅ Retour paiement réussi, session:', sessionId);
+      
+      // 🔄 Restaurer l'origine si présente dans l'URL
+      if (returnOrigin) {
+        setParentOrigin(returnOrigin);
+        sessionStorage.setItem('parentOrigin', returnOrigin);
+        console.log('🔄 Origine restaurée depuis URL:', returnOrigin);
+      }
+      
       setStripeSessionId(sessionId);
       setWaitingForPayment(true);
     } else if (paymentStatus === 'cancelled') {
@@ -133,7 +168,7 @@ export function IframeBookingPage() {
       // Nettoyer l'URL
       window.history.replaceState({}, '', window.location.pathname);
     }
-  }, [paymentStatus, sessionId]);
+  }, [paymentStatus, sessionId, returnOrigin]);
 
   const fetchPublicData = async () => {
     if (!userId) {
@@ -450,12 +485,24 @@ export function IframeBookingPage() {
       console.log('💳 Création session Stripe:', {
         amount: depositAmount,
         service: selectedService.name,
-        client: clientData.email
+        client: clientData.email,
+        parentOrigin
       });
 
-      // 🎯 Récupérer l'URL actuelle pour le retour
-      const currentUrl = window.location.href.split('?')[0];
-      console.log('🔗 URL de retour:', currentUrl);
+      // 🎯 Construire l'URL de retour
+      const baseUrl = parentOrigin || window.location.origin;
+      const iframeUrl = `${window.location.origin}/booking/${userId}`;
+      
+      // 🔗 URL de retour : site externe avec iframe mis à jour
+      const successUrl = `${baseUrl}${window.location.pathname}?payment=success&session_id={CHECKOUT_SESSION_ID}&origin=${encodeURIComponent(baseUrl)}`;
+      const cancelUrl = `${baseUrl}${window.location.pathname}?payment=cancelled&origin=${encodeURIComponent(baseUrl)}`;
+
+      console.log('🔗 URLs de redirection:', {
+        success: successUrl,
+        cancel: cancelUrl,
+        baseUrl,
+        iframeUrl
+      });
 
       const supabaseUrl = import.meta.env.VITE_SUPABASE_URL?.replace(/\/$/, '');
       const response = await fetch(`${supabaseUrl}/functions/v1/stripe-checkout`, {
@@ -469,9 +516,9 @@ export function IframeBookingPage() {
           currency: 'eur',
           customer_email: clientData.email,
           service_name: selectedService.name,
-          success_url: currentUrl + '?payment=success&session_id={CHECKOUT_SESSION_ID}',
-          cancel_url: currentUrl + '?payment=cancelled',
-          parent_url: window.location.origin,
+          success_url: successUrl,
+          cancel_url: cancelUrl,
+          parent_url: baseUrl,
           metadata: {
             user_id: userId,
             service_id: selectedService.id,
@@ -482,7 +529,8 @@ export function IframeBookingPage() {
             client_lastname: clientData.lastname,
             client_phone: clientData.phone,
             assigned_user_id: selectedTeamMember || undefined,
-            payment_type: 'booking_deposit'
+            payment_type: 'booking_deposit',
+            return_origin: baseUrl
           }
         })
       });
@@ -498,13 +546,13 @@ export function IframeBookingPage() {
       const { url, sessionId } = await response.json();
       
       if (url && sessionId) {
-        console.log('🚀 Ouverture Stripe dans nouvel onglet:', url);
+        console.log('🚀 Redirection vers Stripe:', url);
         console.log('🔑 Session ID:', sessionId);
         
         setStripeSessionId(sessionId);
-        window.open(url, '_blank');
-        setProcessingPayment(false);
-        setWaitingForPayment(true);
+        
+        // 🎯 Redirection directe (pas de nouvel onglet)
+        window.location.href = url;
       } else {
         throw new Error('URL ou Session ID manquant');
       }
@@ -699,48 +747,16 @@ export function IframeBookingPage() {
           </div>
           
           <h2 className="text-2xl font-bold text-gray-900 mb-4">
-            Paiement en cours...
+            Vérification du paiement...
           </h2>
           
           <p className="text-gray-600 mb-6">
-            Veuillez compléter votre paiement dans l'onglet Stripe qui vient de s'ouvrir.
+            Nous vérifions votre paiement. Veuillez patienter quelques instants.
           </p>
-          
-          <div className="bg-blue-50 rounded-2xl p-6 mb-6 border border-blue-200">
-            <div className="flex items-start gap-3">
-              <ExternalLink className="w-5 h-5 text-blue-600 flex-shrink-0 mt-0.5" />
-              <div className="text-left">
-                <p className="text-sm text-blue-900 font-medium mb-2">
-                  L'onglet Stripe ne s'est pas ouvert ?
-                </p>
-                <button
-                  onClick={() => {
-                    if (stripeSessionId) {
-                      const supabaseUrl = import.meta.env.VITE_SUPABASE_URL?.replace(/\/$/, '');
-                      window.open(`https://checkout.stripe.com/c/pay/${stripeSessionId}`, '_blank');
-                    }
-                  }}
-                  className="text-sm text-blue-600 hover:text-blue-700 underline"
-                >
-                  Cliquez ici pour ouvrir la page de paiement
-                </button>
-              </div>
-            </div>
-          </div>
           
           <p className="text-sm text-gray-500">
-            Votre réservation sera automatiquement confirmée après le paiement.
+            Votre réservation sera automatiquement confirmée.
           </p>
-          
-          <button
-            onClick={() => {
-              setWaitingForPayment(false);
-              setStripeSessionId(null);
-            }}
-            className="mt-6 text-sm text-gray-600 hover:text-gray-800 underline"
-          >
-            Annuler et revenir
-          </button>
         </div>
       </div>
     );
@@ -1181,9 +1197,6 @@ export function IframeBookingPage() {
                     Un acompte de {depositAmount.toFixed(2)}€ sera demandé pour confirmer votre réservation. 
                     Le solde de {((selectedService.price_ttc * quantity) - depositAmount).toFixed(2)}€ sera à régler sur place.
                   </p>
-                  <p className="text-sm text-blue-600 mt-2 font-medium">
-                    ℹ️ La page de paiement s'ouvrira dans un nouvel onglet
-                  </p>
                 </div>
               )}
             </div>
@@ -1204,7 +1217,7 @@ export function IframeBookingPage() {
                 {processingPayment ? (
                   <>
                     <Loader2 className="w-5 h-5 animate-spin" />
-                    Ouverture paiement...
+                    Redirection...
                   </>
                 ) : submitting ? (
                   <>
@@ -1215,7 +1228,7 @@ export function IframeBookingPage() {
                   <>
                     {isStripeEnabled ? (
                       <>
-                        <ExternalLink className="w-5 h-5" />
+                        <CreditCard className="w-5 h-5" />
                         Payer l'acompte
                       </>
                     ) : (
