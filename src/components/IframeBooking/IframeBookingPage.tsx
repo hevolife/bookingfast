@@ -546,13 +546,25 @@ export function IframeBookingPage() {
       const { url, sessionId } = await response.json();
       
       if (url && sessionId) {
-        console.log('🚀 Redirection vers Stripe:', url);
+        console.log('🚀 Ouverture Stripe dans nouvel onglet:', url);
         console.log('🔑 Session ID:', sessionId);
         
         setStripeSessionId(sessionId);
         
-        // 🎯 Redirection directe (pas de nouvel onglet)
-        window.location.href = url;
+        // 🎯 OUVRIR DANS UN NOUVEL ONGLET
+        const paymentWindow = window.open(url, '_blank');
+        
+        if (!paymentWindow) {
+          alert('⚠️ Veuillez autoriser les popups pour effectuer le paiement');
+          setProcessingPayment(false);
+          return;
+        }
+        
+        // 🔄 Démarrer le polling immédiatement
+        setWaitingForPayment(true);
+        setProcessingPayment(false);
+        
+        console.log('✅ Nouvel onglet ouvert, polling démarré');
       } else {
         throw new Error('URL ou Session ID manquant');
       }
@@ -747,15 +759,21 @@ export function IframeBookingPage() {
           </div>
           
           <h2 className="text-2xl font-bold text-gray-900 mb-4">
-            Vérification du paiement...
+            Paiement en cours...
           </h2>
           
           <p className="text-gray-600 mb-6">
-            Nous vérifions votre paiement. Veuillez patienter quelques instants.
+            Veuillez compléter le paiement dans l'onglet Stripe qui vient de s'ouvrir.
           </p>
           
+          <div className="bg-blue-50 rounded-2xl p-4 border border-blue-200 mb-6">
+            <p className="text-sm text-blue-700">
+              💡 <strong>Astuce :</strong> Une fois le paiement effectué, cette page se mettra à jour automatiquement.
+            </p>
+          </div>
+          
           <p className="text-sm text-gray-500">
-            Votre réservation sera automatiquement confirmée.
+            Vérification automatique en cours...
           </p>
         </div>
       </div>
@@ -1217,7 +1235,7 @@ export function IframeBookingPage() {
                 {processingPayment ? (
                   <>
                     <Loader2 className="w-5 h-5 animate-spin" />
-                    Redirection...
+                    Ouverture paiement...
                   </>
                 ) : submitting ? (
                   <>
@@ -1228,7 +1246,7 @@ export function IframeBookingPage() {
                   <>
                     {isStripeEnabled ? (
                       <>
-                        <CreditCard className="w-5 h-5" />
+                        <ExternalLink className="w-5 h-5" />
                         Payer l'acompte
                       </>
                     ) : (
