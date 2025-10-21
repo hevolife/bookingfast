@@ -7,15 +7,14 @@ export default defineConfig({
     exclude: ['lucide-react'],
     include: ['react', 'react-dom', 'react-router-dom', '@supabase/supabase-js']
   },
+  esbuild: {
+    drop: ['console', 'debugger'],
+    pure: ['console.log', 'console.info', 'console.debug', 'console.warn']
+  },
   build: {
     target: 'esnext',
-    minify: 'terser',
-    terserOptions: {
-      compress: {
-        drop_console: false,
-        drop_debugger: false
-      }
-    },
+    minify: 'esbuild',
+    sourcemap: false,
     rollupOptions: {
       output: {
         manualChunks: {
@@ -30,29 +29,23 @@ export default defineConfig({
       }
     },
     chunkSizeWarningLimit: 1000,
-    sourcemap: true
+    cssCodeSplit: true,
+    assetsInlineLimit: 4096
   },
   server: {
     port: 5173,
     strictPort: false,
-    host: true,
-    hmr: {
-      overlay: true
-    },
-    headers: {
-      'Cache-Control': 'no-store, no-cache, must-revalidate, proxy-revalidate, max-age=0',
-      'Pragma': 'no-cache',
-      'Expires': '0'
-    }
+    host: true
   },
   preview: {
-    port: 4173,
+    port: 5173,
     strictPort: false,
     host: true,
     headers: {
-      'Cache-Control': 'no-store, no-cache, must-revalidate, proxy-revalidate, max-age=0',
-      'Pragma': 'no-cache',
-      'Expires': '0'
+      'Cache-Control': 'public, max-age=31536000, immutable',
+      'X-Content-Type-Options': 'nosniff',
+      'X-Frame-Options': 'SAMEORIGIN',
+      'X-XSS-Protection': '1; mode=block'
     }
   }
 });

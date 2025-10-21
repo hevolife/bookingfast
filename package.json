@@ -1,15 +1,16 @@
 {
-  "name": "vite-react-typescript-starter",
+  "name": "bookingfast",
   "private": true,
-  "version": "0.0.0",
+  "version": "1.0.0",
   "type": "module",
   "scripts": {
     "dev": "vite",
-    "build": "vite build",
+    "build": "tsc && vite build",
     "build:prod": "chmod +x build.sh && ./build.sh",
     "lint": "eslint .",
     "preview": "vite preview",
-    "type-check": "tsc --noEmit"
+    "type-check": "tsc --noEmit",
+    "start": "vite preview --port 5173 --host"
   },
   "dependencies": {
     "@supabase/supabase-js": "^2.57.4",
