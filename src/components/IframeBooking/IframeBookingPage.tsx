@@ -56,7 +56,7 @@ export function IframeBookingPage() {
   // Vérifier si on revient d'un paiement
   const paymentStatus = searchParams.get('payment');
   const sessionId = searchParams.get('session_id');
-  const returnOrigin = searchParams.get('origin'); // 🎯 Origine de retour
+  const returnOrigin = searchParams.get('origin');
 
   // 🌐 Détecter si on est dans un iframe
   const [isInIframe, setIsInIframe] = useState(false);
@@ -66,15 +66,12 @@ export function IframeBookingPage() {
     setIsInIframe(inIframe);
     console.log('🌐 Dans un iframe:', inIframe);
 
-    // 🎯 Capturer l'origine du parent
     if (inIframe) {
       try {
         const origin = document.referrer ? new URL(document.referrer).origin : null;
         if (origin && origin !== window.location.origin) {
           setParentOrigin(origin);
           console.log('🌐 Origine parent détectée:', origin);
-          
-          // Stocker dans sessionStorage pour persistance
           sessionStorage.setItem('parentOrigin', origin);
         }
       } catch (err) {
@@ -82,7 +79,6 @@ export function IframeBookingPage() {
       }
     }
 
-    // 🔄 Récupérer depuis sessionStorage si disponible
     const storedOrigin = sessionStorage.getItem('parentOrigin');
     if (storedOrigin && !parentOrigin) {
       setParentOrigin(storedOrigin);
@@ -115,15 +111,13 @@ export function IframeBookingPage() {
           if (result.status === 'complete' && result.payment_status === 'paid') {
             console.log('✅ Paiement confirmé !');
             
-            // Récupérer les détails de la réservation
-            if (result.booking) {
-              setConfirmedBooking(result.booking);
+            // 🎯 Charger les détails complets de la réservation
+            if (result.booking_id) {
+              await loadBookingDetails(result.booking_id);
             }
             
             setWaitingForPayment(false);
             setCurrentStep(5);
-            
-            // 🔄 Nettoyer l'URL (enlever les paramètres payment)
             window.history.replaceState({}, '', window.location.pathname);
           }
         }
@@ -132,10 +126,7 @@ export function IframeBookingPage() {
       }
     };
 
-    // Vérifier toutes les 3 secondes
     const interval = setInterval(checkPaymentStatus, 3000);
-
-    // Timeout après 10 minutes
     const timeout = setTimeout(() => {
       console.log('⏱️ Timeout polling paiement');
       setWaitingForPayment(false);
@@ -148,12 +139,59 @@ export function IframeBookingPage() {
     };
   }, [waitingForPayment, stripeSessionId]);
 
+  // 🎯 Charger les détails de la réservation
+  const loadBookingDetails = async (bookingId: string) => {
+    try {
+      console.log('📥 Chargement détails réservation:', bookingId);
+      
+      if (!isSupabaseConfigured) {
+        console.log('🎭 Mode démo - pas de chargement');
+        return;
+      }
+
+      const { data: booking, error } = await supabase
+        .from('bookings')
+        .select(`
+          *,
+          services (*)
+        `)
+        .eq('id', bookingId)
+        .single();
+
+      if (error) {
+        console.error('❌ Erreur chargement réservation:', error);
+        return;
+      }
+
+      console.log('✅ Réservation chargée:', booking);
+
+      // 🎯 Remplir tous les états avec les données de la réservation
+      setConfirmedBooking(booking);
+      setSelectedService(booking.services);
+      setSelectedDate(booking.date);
+      setSelectedTime(booking.time);
+      setQuantity(booking.quantity || 1);
+      setClientData({
+        firstname: booking.client_firstname || '',
+        lastname: booking.client_name || '',
+        email: booking.client_email || '',
+        phone: booking.client_phone || ''
+      });
+      
+      if (booking.assigned_user_id) {
+        setSelectedTeamMember(booking.assigned_user_id);
+      }
+
+    } catch (err) {
+      console.error('❌ Erreur chargement détails:', err);
+    }
+  };
+
   // Gérer le retour de paiement
   useEffect(() => {
     if (paymentStatus === 'success' && sessionId) {
       console.log('✅ Retour paiement réussi, session:', sessionId);
       
-      // 🔄 Restaurer l'origine si présente dans l'URL
       if (returnOrigin) {
         setParentOrigin(returnOrigin);
         sessionStorage.setItem('parentOrigin', returnOrigin);
@@ -165,7 +203,6 @@ export function IframeBookingPage() {
     } else if (paymentStatus === 'cancelled') {
       console.log('❌ Paiement annulé');
       setCurrentStep(4);
-      // Nettoyer l'URL
       window.history.replaceState({}, '', window.location.pathname);
     }
   }, [paymentStatus, sessionId, returnOrigin]);
@@ -489,20 +526,11 @@ export function IframeBookingPage() {
         parentOrigin
       });
 
-      // 🎯 Construire l'URL de retour
       const baseUrl = parentOrigin || window.location.origin;
-      const iframeUrl = `${window.location.origin}/booking/${userId}`;
-      
-      // 🔗 URL de retour : site externe avec iframe mis à jour
       const successUrl = `${baseUrl}${window.location.pathname}?payment=success&session_id={CHECKOUT_SESSION_ID}&origin=${encodeURIComponent(baseUrl)}`;
       const cancelUrl = `${baseUrl}${window.location.pathname}?payment=cancelled&origin=${encodeURIComponent(baseUrl)}`;
 
-      console.log('🔗 URLs de redirection:', {
-        success: successUrl,
-        cancel: cancelUrl,
-        baseUrl,
-        iframeUrl
-      });
+      console.log('🔗 URLs de redirection:', { success: successUrl, cancel: cancelUrl });
 
       const supabaseUrl = import.meta.env.VITE_SUPABASE_URL?.replace(/\/$/, '');
       const response = await fetch(`${supabaseUrl}/functions/v1/stripe-checkout`, {
@@ -535,8 +563,6 @@ export function IframeBookingPage() {
         })
       });
 
-      console.log('📡 Réponse Stripe API:', response.status);
-
       if (!response.ok) {
         const errorData = await response.json();
         console.error('❌ Erreur API:', errorData);
@@ -547,11 +573,8 @@ export function IframeBookingPage() {
       
       if (url && sessionId) {
         console.log('🚀 Ouverture Stripe dans nouvel onglet:', url);
-        console.log('🔑 Session ID:', sessionId);
-        
         setStripeSessionId(sessionId);
         
-        // 🎯 OUVRIR DANS UN NOUVEL ONGLET
         const paymentWindow = window.open(url, '_blank');
         
         if (!paymentWindow) {
@@ -560,11 +583,8 @@ export function IframeBookingPage() {
           return;
         }
         
-        // 🔄 Démarrer le polling immédiatement
         setWaitingForPayment(true);
         setProcessingPayment(false);
-        
-        console.log('✅ Nouvel onglet ouvert, polling démarré');
       } else {
         throw new Error('URL ou Session ID manquant');
       }
@@ -747,7 +767,6 @@ export function IframeBookingPage() {
     { id: 4, title: 'Confirmation', icon: Check, description: 'Récapitulatif' }
   ];
 
-  // 🔄 Écran d'attente de paiement
   if (waitingForPayment) {
     return (
       <div className="min-h-screen bg-white flex items-center justify-center p-4">
@@ -783,7 +802,6 @@ export function IframeBookingPage() {
   return (
     <div className="min-h-screen bg-white">
       <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-4 sm:py-6">
-        {/* Progress Indicator */}
         <div className="mb-6 sm:mb-8">
           <div className="flex items-center justify-center gap-2 mb-4">
             {steps.map((step) => (
@@ -800,7 +818,6 @@ export function IframeBookingPage() {
           </div>
         </div>
 
-        {/* Step 1: Service Selection */}
         {currentStep === 1 && (
           <div className="space-y-6 sm:space-y-8">
             <div className="text-center">
@@ -889,7 +906,6 @@ export function IframeBookingPage() {
           </div>
         )}
 
-        {/* Step 2: Date & Time Selection */}
         {currentStep === 2 && selectedService && (
           <div className="space-y-6 sm:space-y-8">
             <div className="text-center">
@@ -1020,7 +1036,6 @@ export function IframeBookingPage() {
           </div>
         )}
 
-        {/* Step 3: Client Information */}
         {currentStep === 3 && (
           <div className="space-y-6 sm:space-y-8">
             <div className="text-center">
@@ -1125,7 +1140,6 @@ export function IframeBookingPage() {
           </div>
         )}
 
-        {/* Step 4: Confirmation */}
         {currentStep === 4 && selectedService && (
           <div className="space-y-6 sm:space-y-8">
             <div className="text-center">
@@ -1262,10 +1276,8 @@ export function IframeBookingPage() {
           </div>
         )}
 
-        {/* Step 5: Success */}
         {currentStep === 5 && (
           <div className="max-w-3xl mx-auto">
-            {/* Header Success */}
             <div className="text-center mb-8">
               <div className="w-24 h-24 bg-gradient-to-r from-green-500 to-emerald-500 rounded-full flex items-center justify-center mx-auto mb-6 animate-bounce">
                 <CheckCircle className="w-12 h-12 text-white" />
@@ -1278,9 +1290,7 @@ export function IframeBookingPage() {
               </p>
             </div>
 
-            {/* Booking Details Card */}
             <div className="bg-white rounded-3xl shadow-2xl overflow-hidden mb-6">
-              {/* Service Header */}
               <div className="bg-gradient-to-r from-blue-500 to-purple-500 p-6 text-white">
                 <div className="flex items-center gap-4">
                   <div className="w-16 h-16 bg-white/20 rounded-2xl flex items-center justify-center backdrop-blur-sm">
@@ -1297,9 +1307,7 @@ export function IframeBookingPage() {
                 </div>
               </div>
 
-              {/* Details Grid */}
               <div className="p-6 space-y-4">
-                {/* Date & Time */}
                 <div className="flex items-start gap-4 p-4 bg-gradient-to-r from-purple-50 to-pink-50 rounded-2xl border border-purple-200">
                   <div className="w-12 h-12 bg-gradient-to-r from-purple-500 to-pink-500 rounded-xl flex items-center justify-center flex-shrink-0">
                     <Calendar className="w-6 h-6 text-white" />
@@ -1321,7 +1329,6 @@ export function IframeBookingPage() {
                   </div>
                 </div>
 
-                {/* Client Info */}
                 <div className="flex items-start gap-4 p-4 bg-gradient-to-r from-blue-50 to-cyan-50 rounded-2xl border border-blue-200">
                   <div className="w-12 h-12 bg-gradient-to-r from-blue-500 to-cyan-500 rounded-xl flex items-center justify-center flex-shrink-0">
                     <User className="w-6 h-6 text-white" />
@@ -1346,7 +1353,6 @@ export function IframeBookingPage() {
                   </div>
                 </div>
 
-                {/* Team Member (if selected) */}
                 {selectedTeamMember && data?.teamMembers && (
                   <div className="flex items-start gap-4 p-4 bg-gradient-to-r from-green-50 to-emerald-50 rounded-2xl border border-green-200">
                     <div className="w-12 h-12 bg-gradient-to-r from-green-500 to-emerald-500 rounded-xl flex items-center justify-center flex-shrink-0">
@@ -1361,7 +1367,6 @@ export function IframeBookingPage() {
                   </div>
                 )}
 
-                {/* Payment Info */}
                 {isStripeEnabled && (
                   <div className="flex items-start gap-4 p-4 bg-gradient-to-r from-green-50 to-emerald-50 rounded-2xl border border-green-200">
                     <div className="w-12 h-12 bg-gradient-to-r from-green-500 to-emerald-500 rounded-xl flex items-center justify-center flex-shrink-0">
@@ -1395,7 +1400,6 @@ export function IframeBookingPage() {
               </div>
             </div>
 
-            {/* Email Confirmation Notice */}
             <div className="bg-gradient-to-r from-blue-50 to-purple-50 rounded-2xl p-6 mb-6 border border-blue-200">
               <div className="flex items-start gap-3">
                 <Mail className="w-6 h-6 text-blue-600 flex-shrink-0 mt-1" />
@@ -1408,7 +1412,6 @@ export function IframeBookingPage() {
               </div>
             </div>
 
-            {/* Action Buttons */}
             <div className="flex flex-col sm:flex-row gap-4">
               <button
                 onClick={() => {
