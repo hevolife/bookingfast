@@ -132,8 +132,7 @@ serve(async (req) => {
 
     console.log('[BLOCKED_DATES] DEBUT récupération plages bloquées pour userId:', userId)
     
-    // CRITICAL: Utiliser .rpc() au lieu de .from() pour bypasser RLS
-    // La fonction get_blocked_date_ranges est SECURITY DEFINER donc elle s'exécute avec les permissions du propriétaire
+    // CRITICAL: Utiliser .rpc() pour bypasser RLS avec SERVICE_ROLE
     const { data: blockedDateRangesData, error: blockedDateRangesError } = await supabaseClient
       .rpc('get_blocked_date_ranges', { p_user_id: userId })
 
