@@ -22,6 +22,7 @@ export function BookingHistoryModal({ isOpen, onClose, bookingId, clientName }: 
   const [history, setHistory] = useState<HistoryEvent[]>([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
+  const [serviceNames, setServiceNames] = useState<Record<string, string>>({});
 
   useEffect(() => {
     if (isOpen && bookingId) {
@@ -34,15 +35,64 @@ export function BookingHistoryModal({ isOpen, onClose, bookingId, clientName }: 
     setError(null);
 
     try {
-      const { data, error: rpcError } = await supabase!
-        .rpc('get_booking_history', { booking_id_param: bookingId });
+      console.log('🔍 Chargement historique pour booking_id:', bookingId);
 
-      if (rpcError) throw rpcError;
+      // 1. Charger l'historique
+      const { data: historyData, error: historyError } = await supabase!
+        .from('booking_history')
+        .select('*')
+        .eq('booking_id', bookingId)
+        .order('created_at', { ascending: false });
 
-      setHistory(data || []);
+      if (historyError) {
+        console.error('❌ Erreur requête historique:', historyError);
+        throw historyError;
+      }
+
+      console.log('✅ Historique chargé:', historyData?.length || 0, 'événements');
+
+      // 2. Extraire tous les service_id uniques de l'historique
+      const serviceIds = new Set<string>();
+      historyData?.forEach(event => {
+        if (event.event_data?.service_id) {
+          const serviceId = typeof event.event_data.service_id === 'object' 
+            ? event.event_data.service_id.new || event.event_data.service_id.old
+            : event.event_data.service_id;
+          if (serviceId) serviceIds.add(serviceId);
+        }
+      });
+
+      console.log('🔍 Service IDs trouvés:', Array.from(serviceIds));
+
+      // 3. Charger les noms des services
+      if (serviceIds.size > 0) {
+        const { data: servicesData, error: servicesError } = await supabase!
+          .from('services')
+          .select('id, name')
+          .in('id', Array.from(serviceIds));
+
+        if (servicesError) {
+          console.warn('⚠️ Erreur chargement services:', servicesError);
+        } else {
+          const namesMap: Record<string, string> = {};
+          servicesData?.forEach(service => {
+            namesMap[service.id] = service.name;
+          });
+          console.log('✅ Noms des services chargés:', namesMap);
+          setServiceNames(namesMap);
+        }
+      }
+
+      const mappedHistory = (historyData || []).map(event => ({
+        ...event,
+        user_email: null
+      }));
+
+      setHistory(mappedHistory);
     } catch (err) {
-      console.error('Erreur chargement historique:', err);
-      setError('Impossible de charger l\'historique');
+      console.error('❌ Erreur chargement historique:', err);
+      const errorMessage = err instanceof Error ? err.message : 'Impossible de charger l\'historique';
+      setError(errorMessage);
     } finally {
       setLoading(false);
     }
@@ -64,6 +114,32 @@ export function BookingHistoryModal({ isOpen, onClose, bookingId, clientName }: 
     });
   };
 
+  // 🎯 FONCTION HELPER : Convertir une valeur en string affichable
+  const formatValue = (value: any): string => {
+    if (value === null || value === undefined) return '-';
+    if (typeof value === 'string') return value;
+    if (typeof value === 'number') return value.toString();
+    if (typeof value === 'boolean') return value ? 'Oui' : 'Non';
+    if (typeof value === 'object') return JSON.stringify(value);
+    return String(value);
+  };
+
+  // 🎯 FONCTION HELPER : Extraire old/new d'un objet ou retourner la valeur directe
+  const extractOldNew = (value: any): { old: string | null; new: string | null } => {
+    if (value && typeof value === 'object' && ('old' in value || 'new' in value)) {
+      return {
+        old: value.old ? formatValue(value.old) : null,
+        new: value.new ? formatValue(value.new) : null
+      };
+    }
+    return { old: null, new: formatValue(value) };
+  };
+
+  // 🎯 NOUVELLE FONCTION : Obtenir le nom du service à partir de l'ID
+  const getServiceName = (serviceId: string): string => {
+    return serviceNames[serviceId] || `Service inconnu (${serviceId.substring(0, 8)}...)`;
+  };
+
   const formatEventDetails = (eventType: string, eventData: any) => {
     if (!eventData || Object.keys(eventData).length === 0) return null;
 
@@ -71,13 +147,14 @@ export function BookingHistoryModal({ isOpen, onClose, bookingId, clientName }: 
 
     // Date
     if (eventData.date) {
+      const { old, new: newVal } = extractOldNew(eventData.date);
       details.push(
         <div key="date" className="flex items-center justify-between py-2 border-b border-gray-100">
           <span className="text-gray-600 font-medium">📅 Date</span>
           <div className="flex items-center gap-2">
-            <span className="text-red-600 line-through">{eventData.date.old}</span>
-            <ArrowRight className="w-4 h-4 text-gray-400" />
-            <span className="text-green-600 font-semibold">{eventData.date.new}</span>
+            {old && <span className="text-red-600 line-through">{old}</span>}
+            {old && <ArrowRight className="w-4 h-4 text-gray-400" />}
+            <span className="text-green-600 font-semibold">{newVal}</span>
           </div>
         </div>
       );
@@ -85,27 +162,37 @@ export function BookingHistoryModal({ isOpen, onClose, bookingId, clientName }: 
 
     // Heure
     if (eventData.time) {
+      const { old, new: newVal } = extractOldNew(eventData.time);
+      const oldTime = old ? old.substring(0, 5) : null;
+      const newTime = newVal ? newVal.substring(0, 5) : null;
+      
       details.push(
         <div key="time" className="flex items-center justify-between py-2 border-b border-gray-100">
           <span className="text-gray-600 font-medium">🕐 Heure</span>
           <div className="flex items-center gap-2">
-            <span className="text-red-600 line-through">{eventData.time.old?.substring(0, 5)}</span>
-            <ArrowRight className="w-4 h-4 text-gray-400" />
-            <span className="text-green-600 font-semibold">{eventData.time.new?.substring(0, 5)}</span>
+            {oldTime && <span className="text-red-600 line-through">{oldTime}</span>}
+            {oldTime && <ArrowRight className="w-4 h-4 text-gray-400" />}
+            <span className="text-green-600 font-semibold">{newTime}</span>
           </div>
         </div>
       );
     }
 
-    // Service
-    if (eventData.service) {
+    // Service - MODIFIÉ POUR AFFICHER LE NOM
+    if (eventData.service_id) {
+      const { old, new: newVal } = extractOldNew(eventData.service_id);
+      
       details.push(
         <div key="service" className="flex items-center justify-between py-2 border-b border-gray-100">
           <span className="text-gray-600 font-medium">🎯 Service</span>
           <div className="flex items-center gap-2">
-            <span className="text-red-600 line-through">{eventData.service.old_name}</span>
-            <ArrowRight className="w-4 h-4 text-gray-400" />
-            <span className="text-green-600 font-semibold">{eventData.service.new_name}</span>
+            {old && (
+              <>
+                <span className="text-red-600 line-through">{getServiceName(old)}</span>
+                <ArrowRight className="w-4 h-4 text-gray-400" />
+              </>
+            )}
+            <span className="text-green-600 font-semibold">{getServiceName(newVal!)}</span>
           </div>
         </div>
       );
@@ -113,27 +200,14 @@ export function BookingHistoryModal({ isOpen, onClose, bookingId, clientName }: 
 
     // Quantité
     if (eventData.quantity) {
+      const { old, new: newVal } = extractOldNew(eventData.quantity);
       details.push(
         <div key="quantity" className="flex items-center justify-between py-2 border-b border-gray-100">
           <span className="text-gray-600 font-medium">👥 Quantité</span>
           <div className="flex items-center gap-2">
-            <span className="text-red-600 line-through">{eventData.quantity.old}</span>
-            <ArrowRight className="w-4 h-4 text-gray-400" />
-            <span className="text-green-600 font-semibold">{eventData.quantity.new}</span>
-          </div>
-        </div>
-      );
-    }
-
-    // Durée
-    if (eventData.duration) {
-      details.push(
-        <div key="duration" className="flex items-center justify-between py-2 border-b border-gray-100">
-          <span className="text-gray-600 font-medium">⏱️ Durée</span>
-          <div className="flex items-center gap-2">
-            <span className="text-red-600 line-through">{eventData.duration.old} min</span>
-            <ArrowRight className="w-4 h-4 text-gray-400" />
-            <span className="text-green-600 font-semibold">{eventData.duration.new} min</span>
+            {old && <span className="text-red-600 line-through">{old}</span>}
+            {old && <ArrowRight className="w-4 h-4 text-gray-400" />}
+            <span className="text-green-600 font-semibold">{newVal}</span>
           </div>
         </div>
       );
@@ -141,160 +215,39 @@ export function BookingHistoryModal({ isOpen, onClose, bookingId, clientName }: 
 
     // Montant total
     if (eventData.total_amount) {
+      const { new: newVal } = extractOldNew(eventData.total_amount);
       details.push(
         <div key="total_amount" className="flex items-center justify-between py-2 border-b border-gray-100">
           <span className="text-gray-600 font-medium">💰 Montant total</span>
-          <div className="flex items-center gap-2">
-            <span className="text-red-600 line-through">{eventData.total_amount.old}€</span>
-            <ArrowRight className="w-4 h-4 text-gray-400" />
-            <span className="text-green-600 font-semibold">{eventData.total_amount.new}€</span>
-          </div>
+          <span className="text-green-600 font-semibold">{newVal}€</span>
         </div>
       );
     }
 
     // Nom du client
     if (eventData.client_name) {
+      const { new: newVal } = extractOldNew(eventData.client_name);
       details.push(
         <div key="client_name" className="flex items-center justify-between py-2 border-b border-gray-100">
-          <span className="text-gray-600 font-medium">👤 Nom du client</span>
-          <div className="flex items-center gap-2">
-            <span className="text-red-600 line-through">{eventData.client_name.old}</span>
-            <ArrowRight className="w-4 h-4 text-gray-400" />
-            <span className="text-green-600 font-semibold">{eventData.client_name.new}</span>
-          </div>
+          <span className="text-gray-600 font-medium">👤 Client</span>
+          <span className="text-gray-900 font-semibold">{newVal}</span>
         </div>
       );
     }
 
-    // Email du client
-    if (eventData.client_email) {
-      details.push(
-        <div key="client_email" className="flex items-center justify-between py-2 border-b border-gray-100">
-          <span className="text-gray-600 font-medium">📧 Email</span>
-          <div className="flex items-center gap-2">
-            <span className="text-red-600 line-through text-sm">{eventData.client_email.old}</span>
-            <ArrowRight className="w-4 h-4 text-gray-400" />
-            <span className="text-green-600 font-semibold text-sm">{eventData.client_email.new}</span>
-          </div>
-        </div>
-      );
-    }
-
-    // Téléphone du client
-    if (eventData.client_phone) {
-      details.push(
-        <div key="client_phone" className="flex items-center justify-between py-2 border-b border-gray-100">
-          <span className="text-gray-600 font-medium">📱 Téléphone</span>
-          <div className="flex items-center gap-2">
-            <span className="text-red-600 line-through">{eventData.client_phone.old}</span>
-            <ArrowRight className="w-4 h-4 text-gray-400" />
-            <span className="text-green-600 font-semibold">{eventData.client_phone.new}</span>
-          </div>
-        </div>
-      );
-    }
-
-    // Transactions
-    if (eventData.transactions) {
-      const oldTransactions = Array.isArray(eventData.transactions.old) ? eventData.transactions.old : [];
-      const newTransactions = Array.isArray(eventData.transactions.new) ? eventData.transactions.new : [];
-      
-      details.push(
-        <div key="transactions" className="py-2">
-          <span className="text-gray-600 font-medium block mb-2">💳 Transactions</span>
-          <div className="space-y-2 pl-4">
-            {oldTransactions.length > 0 && (
-              <div className="text-sm">
-                <span className="text-red-600 font-medium">Avant:</span>
-                <div className="mt-1 space-y-1">
-                  {oldTransactions.map((t: any, i: number) => (
-                    <div key={i} className="text-gray-600 line-through">
-                      • {t.amount}€ - {t.method} ({t.status})
-                    </div>
-                  ))}
-                </div>
-              </div>
-            )}
-            {newTransactions.length > 0 && (
-              <div className="text-sm">
-                <span className="text-green-600 font-medium">Après:</span>
-                <div className="mt-1 space-y-1">
-                  {newTransactions.map((t: any, i: number) => (
-                    <div key={i} className="text-gray-600 font-semibold">
-                      • {t.amount}€ - {t.method} ({t.status})
-                    </div>
-                  ))}
-                </div>
-              </div>
-            )}
-          </div>
-        </div>
-      );
-    }
-
-    // Service personnalisé
-    if (eventData.custom_service) {
-      details.push(
-        <div key="custom_service" className="py-2">
-          <span className="text-gray-600 font-medium block mb-2">🎨 Service personnalisé</span>
-          <div className="space-y-2 pl-4 text-sm">
-            {eventData.custom_service.old && (
-              <div className="text-red-600 line-through">
-                Avant: {eventData.custom_service.old.name} - {eventData.custom_service.old.price}€ - {eventData.custom_service.old.duration}min
-              </div>
-            )}
-            {eventData.custom_service.new && (
-              <div className="text-green-600 font-semibold">
-                Après: {eventData.custom_service.new.name} - {eventData.custom_service.new.price}€ - {eventData.custom_service.new.duration}min
-              </div>
-            )}
-          </div>
-        </div>
-      );
-    }
-
-    // Statut (pour les changements de statut)
+    // Statut
     if (eventData.old_status && eventData.new_status) {
+      const oldStatus = formatValue(eventData.old_status);
+      const newStatus = formatValue(eventData.new_status);
+      
       details.push(
         <div key="status" className="flex items-center justify-between py-2 border-b border-gray-100">
           <span className="text-gray-600 font-medium">📊 Statut</span>
           <div className="flex items-center gap-2">
-            <span className="text-red-600 line-through capitalize">{eventData.old_status}</span>
+            <span className="text-red-600 line-through capitalize">{oldStatus}</span>
             <ArrowRight className="w-4 h-4 text-gray-400" />
-            <span className="text-green-600 font-semibold capitalize">{eventData.new_status}</span>
+            <span className="text-green-600 font-semibold capitalize">{newStatus}</span>
           </div>
-        </div>
-      );
-    }
-
-    // Notes
-    if (eventData.note) {
-      details.push(
-        <div key="note" className="py-2">
-          <span className="text-gray-600 font-medium block mb-2">📝 Note</span>
-          <div className="bg-amber-50 rounded-lg p-3 text-sm text-gray-700">
-            {eventData.note}
-          </div>
-        </div>
-      );
-    }
-
-    // Utilisateur assigné
-    if (eventData.assigned_user_email) {
-      details.push(
-        <div key="assigned_user" className="flex items-center justify-between py-2 border-b border-gray-100">
-          <span className="text-gray-600 font-medium">👤 Assigné à</span>
-          <span className="text-indigo-600 font-semibold">{eventData.assigned_user_email}</span>
-        </div>
-      );
-    }
-
-    if (eventData.unassigned_user_email) {
-      details.push(
-        <div key="unassigned_user" className="flex items-center justify-between py-2 border-b border-gray-100">
-          <span className="text-gray-600 font-medium">👤 Désassigné de</span>
-          <span className="text-red-600 font-semibold">{eventData.unassigned_user_email}</span>
         </div>
       );
     }
@@ -303,7 +256,7 @@ export function BookingHistoryModal({ isOpen, onClose, bookingId, clientName }: 
       <div className="mt-3 pt-3 border-t border-gray-200">
         <details className="text-sm">
           <summary className="cursor-pointer hover:text-gray-900 font-medium text-gray-700 flex items-center gap-2">
-            <span>📋 Voir les détails des modifications</span>
+            <span>📋 Voir les détails</span>
           </summary>
           <div className="mt-3 bg-white rounded-lg p-4 space-y-2 border border-gray-200">
             {details}
@@ -412,12 +365,26 @@ export function BookingHistoryModal({ isOpen, onClose, bookingId, clientName }: 
           ) : error ? (
             <div className="text-center py-12">
               <XCircle className="w-16 h-16 text-red-500 mx-auto mb-4" />
-              <p className="text-red-600 font-medium">{error}</p>
+              <p className="text-red-600 font-medium mb-2">{error}</p>
+              <p className="text-sm text-gray-500 mb-4">Vérifiez la console pour plus de détails</p>
+              <button
+                onClick={loadHistory}
+                className="mt-4 px-6 py-2 bg-indigo-600 text-white rounded-lg hover:bg-indigo-700 transition-colors"
+              >
+                Réessayer
+              </button>
             </div>
           ) : history.length === 0 ? (
             <div className="text-center py-12">
               <History className="w-16 h-16 text-gray-400 mx-auto mb-4" />
-              <p className="text-gray-600">Aucun historique disponible</p>
+              <p className="text-gray-600 font-medium mb-2">Aucun historique disponible</p>
+              <p className="text-sm text-gray-500">Les événements de cette réservation apparaîtront ici</p>
+              <button
+                onClick={loadHistory}
+                className="mt-4 px-6 py-2 bg-indigo-600 text-white rounded-lg hover:bg-indigo-700 transition-colors"
+              >
+                Actualiser
+              </button>
             </div>
           ) : (
             <div className="space-y-4">
