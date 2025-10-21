@@ -28,6 +28,5 @@
       "@contexts/*": ["src/contexts/*"]
     }
   },
-  "include": ["src"],
-  "references": [{ "path": "./tsconfig.node.json" }]
+  "include": ["src"]
 }
