@@ -16,6 +16,11 @@ interface PaymentSectionProps {
   serviceName: string;
   bookingDate: string;
   bookingTime: string;
+  selectedClient?: {
+    firstname?: string;
+    lastname?: string;
+    phone?: string;
+  };
 }
 
 // Composant Timer pour les liens de paiement
@@ -77,7 +82,8 @@ export function PaymentSection({
   clientEmail,
   serviceName,
   bookingDate,
-  bookingTime
+  bookingTime,
+  selectedClient
 }: PaymentSectionProps) {
   const { settings } = useBusinessSettings();
   const { user } = useAuth();

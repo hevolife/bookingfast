@@ -1,7 +1,6 @@
 import { EmailWorkflow, EmailTemplate } from '../types/email';
 import { Booking } from '../types';
-import { supabase, isSupabaseConfigured } from './supabase';
-import { useAuth } from '../contexts/AuthContext';
+import { supabase } from './supabase';
 
 interface WorkflowLog {
   id: string;
@@ -14,6 +13,16 @@ interface WorkflowLog {
   message: string;
   timestamp: string;
 }
+
+// Vérifier si Supabase est configuré
+const isSupabaseConfigured = (): boolean => {
+  const configured = !!supabase && !!import.meta.env.VITE_SUPABASE_URL && !!import.meta.env.VITE_SUPABASE_ANON_KEY;
+  console.log('🔍 isSupabaseConfigured:', configured);
+  console.log('  - supabase:', !!supabase);
+  console.log('  - VITE_SUPABASE_URL:', !!import.meta.env.VITE_SUPABASE_URL);
+  console.log('  - VITE_SUPABASE_ANON_KEY:', !!import.meta.env.VITE_SUPABASE_ANON_KEY);
+  return configured;
+};
 
 // Remplacer les variables dans le contenu
 const replaceVariables = (content: string, booking: Booking): string => {
@@ -101,7 +110,7 @@ const checkWorkflowConditions = (workflow: EmailWorkflow, booking: Booking): boo
 };
 
 // Envoyer un email via Brevo
-const sendEmail = async (
+const sendEmailViaBrevo = async (
   to: string, 
   subject: string, 
   htmlContent: string, 
@@ -109,17 +118,15 @@ const sendEmail = async (
   userId: string,
   templateVariables: Record<string, string> = {}
 ): Promise<boolean> => {
-  console.log('📧 DÉBUT ENVOI EMAIL');
+  console.log('📧 DÉBUT ENVOI EMAIL VIA BREVO');
   console.log('📧 À:', to);
   console.log('📧 Sujet:', subject);
   console.log('📧 User ID:', userId);
+  console.log('📧 Variables:', Object.keys(templateVariables).length);
   
   if (!isSupabaseConfigured()) {
-    console.log('📧 SIMULATION ENVOI EMAIL - Mode démo');
-    console.log('📧 Contenu HTML:', htmlContent.length, 'caractères');
-    console.log('📧 Contenu texte:', textContent.length, 'caractères');
-    console.log('✅ EMAIL SIMULÉ AVEC SUCCÈS');
-    return true; // Simuler le succès en mode démo
+    console.log('⚠️ SUPABASE NON CONFIGURÉ - Email non envoyé');
+    return false;
   }
 
   try {
@@ -166,16 +173,29 @@ const sendEmail = async (
 
 // Fonction principale pour déclencher un workflow
 export const triggerWorkflow = async (trigger: string, booking: Booking, userId?: string): Promise<void> => {
-  if (!userId) {
-    console.log('⚠️ Pas d\'utilisateur connecté, workflow ignoré');
-    return;
-  }
+  console.log('🚀 ========================================');
   console.log('🚀 DÉBUT DÉCLENCHEMENT WORKFLOW');
+  console.log('🚀 ========================================');
   console.log('📋 Trigger:', trigger);
   console.log('📋 Réservation ID:', booking.id);
   console.log('📋 Client:', booking.client_email);
   console.log('📋 Service:', booking.service?.name || 'Service inconnu');
   console.log('📋 User ID:', userId);
+  console.log('📋 Payment Link:', booking.payment_link);
+  
+  if (!userId) {
+    console.log('⚠️ PAS D\'UTILISATEUR CONNECTÉ - Workflow ignoré');
+    return;
+  }
+  
+  // Debug spécial pour payment_link_created
+  if (trigger === 'payment_link_created') {
+    console.log('💳 DEBUG PAYMENT_LINK_CREATED:');
+    console.log('💳 Payment link:', booking.payment_link);
+    console.log('💳 Payment status:', booking.payment_status);
+    console.log('💳 Total amount:', booking.total_amount);
+    console.log('💳 Payment amount:', booking.payment_amount);
+  }
   
   // Debug spécial pour payment_link_paid
   if (trigger === 'payment_link_paid') {
@@ -205,16 +225,18 @@ export const triggerWorkflow = async (trigger: string, booking: Booking, userId?
     }
   }
   
-  if (!isSupabaseConfigured()) {
-    console.log('📧 MODE DÉMO - SIMULATION WORKFLOW');
-    console.log('✅ Workflow simulé avec succès pour:', trigger);
+  const configured = isSupabaseConfigured();
+  console.log('🔍 Supabase configuré:', configured);
+  
+  if (!configured) {
+    console.log('⚠️ SUPABASE NON CONFIGURÉ - Workflow ignoré');
     return;
   }
 
   try {
     // Charger les workflows actifs pour ce déclencheur
     console.log('🔍 Recherche workflows pour trigger:', trigger, 'user_id:', userId);
-    const { data: workflows, error: workflowsError } = await supabase
+    const { data: workflows, error: workflowsError } = await supabase!
       .from('email_workflows')
       .select('*')
       .eq('user_id', userId)
@@ -228,7 +250,13 @@ export const triggerWorkflow = async (trigger: string, booking: Booking, userId?
 
     console.log('📊 Workflows trouvés:', workflows?.length || 0);
     if (workflows && workflows.length > 0) {
-      console.log('📋 Liste workflows:', workflows.map(w => ({ id: w.id, name: w.name, template_id: w.template_id })));
+      console.log('📋 Liste workflows:', workflows.map(w => ({ 
+        id: w.id, 
+        name: w.name, 
+        template_id: w.template_id,
+        active: w.active,
+        trigger: w.trigger
+      })));
     }
 
     if (!workflows || workflows.length === 0) {
@@ -239,7 +267,7 @@ export const triggerWorkflow = async (trigger: string, booking: Booking, userId?
     // Charger les templates
     const templateIds = workflows.map(w => w.template_id);
     console.log('🔍 Chargement templates:', templateIds);
-    const { data: templates, error: templatesError } = await supabase
+    const { data: templates, error: templatesError } = await supabase!
       .from('email_templates')
       .select('*')
       .in('id', templateIds);
@@ -255,15 +283,19 @@ export const triggerWorkflow = async (trigger: string, booking: Booking, userId?
     }
   
     // Filtrer les workflows qui correspondent aux conditions
-    const matchingWorkflows = workflows.filter(workflow => 
-      checkWorkflowConditions(workflow, booking)
-    );
+    const matchingWorkflows = workflows.filter(workflow => {
+      const matches = checkWorkflowConditions(workflow, booking);
+      console.log(`🔍 Workflow "${workflow.name}" conditions:`, matches);
+      return matches;
+    });
   
     console.log('🔍 Workflows correspondants aux conditions:', matchingWorkflows.length);
   
     for (const workflow of matchingWorkflows) {
       try {
+        console.log('⚡ ========================================');
         console.log('⚡ EXÉCUTION WORKFLOW:', workflow.name);
+        console.log('⚡ ========================================');
         console.log('📧 Template ID:', workflow.template_id);
       
         // Trouver le template
@@ -271,7 +303,7 @@ export const triggerWorkflow = async (trigger: string, booking: Booking, userId?
         if (!template) {
           console.error(`❌ Template non trouvé: ${workflow.template_id}`);
           console.log('📋 Templates disponibles:', templates?.map(t => t.id) || []);
-          continue; // Passer au workflow suivant au lieu d'échouer
+          continue;
         }
         
         console.log('✅ Template trouvé:', template.name);
@@ -279,9 +311,7 @@ export const triggerWorkflow = async (trigger: string, booking: Booking, userId?
         // Attendre le délai si spécifié
         if (workflow.delay && workflow.delay > 0) {
           console.log('⏳ Attente de', workflow.delay, 'secondes...');
-          // En production, vous utiliseriez un système de queue
-          // Ici on simule juste le délai
-          await new Promise(resolve => setTimeout(resolve, workflow.delay * 1000)); // Secondes pour la démo
+          await new Promise(resolve => setTimeout(resolve, workflow.delay * 1000));
         }
       
         // Préparer les variables pour le template
@@ -310,10 +340,11 @@ export const triggerWorkflow = async (trigger: string, booking: Booking, userId?
         };
         
         console.log('📧 Variables template préparées:', Object.keys(templateVariables).length, 'variables');
+        console.log('📧 Variables détails:', templateVariables);
       
         // Envoyer l'email
-        console.log('📤 Envoi email à:', booking.client_email);
-        const success = await sendEmail(
+        console.log('📤 Tentative envoi email à:', booking.client_email);
+        const success = await sendEmailViaBrevo(
           booking.client_email, 
           template.subject, 
           template.html_content, 
@@ -322,30 +353,33 @@ export const triggerWorkflow = async (trigger: string, booking: Booking, userId?
           templateVariables
         );
         
+        console.log('📧 Résultat envoi email:', success ? '✅ SUCCÈS' : '❌ ÉCHEC');
+        
         // Mettre à jour les statistiques du workflow
         if (success) {
           console.log('📊 Mise à jour statistiques workflow...');
-          await supabase
+          await supabase!
             .from('email_workflows')
             .update({
               sent_count: workflow.sent_count + 1
             })
             .eq('id', workflow.id);
+          console.log('✅ Statistiques mises à jour');
         }
         
         console.log(success ? '✅' : '❌', 'Workflow', workflow.name, success ? 'réussi' : 'échoué');
         
       } catch (error) {
         console.error('❌ Erreur workflow', workflow.name, ':', error);
-          // Ne pas faire échouer la génération du lien pour une erreur de workflow
-        // Continuer avec les autres workflows même si un échoue
       }
     }
   } catch (error) {
     console.error('❌ Erreur générale workflow:', error);
   }
   
+  console.log('🏁 ========================================');
   console.log('🏁 FIN EXÉCUTION WORKFLOWS POUR:', trigger);
+  console.log('🏁 ========================================');
 };
 
 // Fonction pour envoyer un email manuel
@@ -358,9 +392,14 @@ export const sendManualEmail = async (
   textContent: string,
   templateVariables: Record<string, string> = {}
 ): Promise<boolean> => {
+  console.log('📧 ENVOI EMAIL MANUEL');
+  console.log('📧 User ID:', userId);
+  console.log('📧 À:', toEmail);
+  console.log('📧 Sujet:', subject);
+  
   if (!isSupabaseConfigured()) {
-    console.log('📧 SIMULATION ENVOI EMAIL MANUEL');
-    return true;
+    console.log('⚠️ SUPABASE NON CONFIGURÉ - Email manuel non envoyé');
+    throw new Error('Supabase non configuré');
   }
 
   try {
@@ -403,6 +442,14 @@ export const sendPaymentLinkEmail = async (
   booking: Booking,
   paymentLink: string
 ): Promise<boolean> => {
+  console.log('📧 ========================================');
+  console.log('📧 ENVOI EMAIL LIEN DE PAIEMENT');
+  console.log('📧 ========================================');
+  console.log('📧 User ID:', userId);
+  console.log('📧 Booking ID:', booking.id);
+  console.log('📧 Client:', booking.client_email);
+  console.log('📧 Payment Link:', paymentLink);
+  
   const templateVariables = {
     '{{client_firstname}}': booking.client_firstname || '',
     '{{client_lastname}}': booking.client_name || '',
@@ -475,7 +522,7 @@ Important : Ce lien expire dans 30 minutes.
 
 {{business_name}}`;
 
-  return await sendEmail(
+  const result = await sendEmailViaBrevo(
     booking.client_email,
     subject,
     htmlContent,
@@ -483,6 +530,11 @@ Important : Ce lien expire dans 30 minutes.
     userId,
     templateVariables
   );
+  
+  console.log('📧 Résultat envoi email lien de paiement:', result ? '✅ SUCCÈS' : '❌ ÉCHEC');
+  console.log('📧 ========================================');
+  
+  return result;
 };
 
 // Fonction pour envoyer un email de confirmation
@@ -558,7 +610,7 @@ Nous avons hâte de vous accueillir !
 
 {{business_name}}`;
 
-  return await sendEmail(
+  return await sendEmailViaBrevo(
     booking.client_email,
     subject,
     htmlContent,

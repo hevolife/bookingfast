@@ -3,6 +3,7 @@ import { supabase, isSupabaseConfigured } from '../lib/supabase';
 import { Booking } from '../types';
 import { useAuth } from '../contexts/AuthContext';
 import { GoogleCalendarService } from '../lib/googleCalendar';
+import { triggerWorkflow } from '../lib/workflowEngine';
 
 export function useBookings() {
   const { user } = useAuth();
@@ -109,6 +110,11 @@ export function useBookings() {
   }, [user?.id]);
 
   const addBooking = async (bookingData: Omit<Booking, 'id' | 'created_at' | 'user_id'>) => {
+    console.log('🎯 ========================================');
+    console.log('🎯 DÉBUT addBooking');
+    console.log('🎯 ========================================');
+    console.log('📋 Données réservation:', bookingData);
+    
     if (!isSupabaseConfigured || !user) {
       throw new Error('Supabase non configuré ou utilisateur non connecté');
     }
@@ -130,6 +136,8 @@ export function useBookings() {
       } catch (teamError) {
         console.warn('⚠️ Erreur vérification équipe:', teamError);
       }
+
+      console.log('🔍 addBooking - targetUserId:', targetUserId);
 
       // Vérifier la limite de réservations
       const { data: limitCheck, error: limitError } = await supabase!
@@ -143,6 +151,7 @@ export function useBookings() {
         );
       }
 
+      console.log('💾 Insertion réservation dans la base de données...');
       const { data, error } = await supabase!
         .from('bookings')
         .insert([{ ...bookingData, user_id: targetUserId }])
@@ -152,11 +161,47 @@ export function useBookings() {
         `)
         .single();
 
-      if (error) throw error;
+      if (error) {
+        console.error('❌ Erreur insertion:', error);
+        throw error;
+      }
+
+      console.log('✅ Réservation créée:', data);
 
       if (data) {
         setBookings(prev => [...prev, data]);
         
+        // 🔥 DÉCLENCHEMENT DES WORKFLOWS
+        console.log('🔥 ========================================');
+        console.log('🔥 DÉCLENCHEMENT DES WORKFLOWS');
+        console.log('🔥 ========================================');
+        
+        // Workflow: Réservation créée
+        console.log('🔥 Trigger: booking_created');
+        try {
+          await triggerWorkflow('booking_created', data, targetUserId);
+          console.log('✅ Workflow booking_created déclenché');
+        } catch (workflowError) {
+          console.error('❌ Erreur workflow booking_created:', workflowError);
+        }
+        
+        // Workflow: Lien de paiement créé (si payment_link existe)
+        if (data.payment_link) {
+          console.log('🔥 Trigger: payment_link_created');
+          console.log('🔥 Payment link:', data.payment_link);
+          try {
+            await triggerWorkflow('payment_link_created', data, targetUserId);
+            console.log('✅ Workflow payment_link_created déclenché');
+          } catch (workflowError) {
+            console.error('❌ Erreur workflow payment_link_created:', workflowError);
+          }
+        } else {
+          console.log('ℹ️ Pas de payment_link, workflow payment_link_created non déclenché');
+        }
+        
+        console.log('🔥 ========================================');
+        
+        // Google Calendar
         try {
           await GoogleCalendarService.createEvent(data, targetUserId);
         } catch (calendarError) {
@@ -166,12 +211,22 @@ export function useBookings() {
         return data;
       }
     } catch (err) {
-      console.error('Erreur lors de l\'ajout de la réservation:', err);
+      console.error('❌ Erreur lors de l\'ajout de la réservation:', err);
       throw err;
+    } finally {
+      console.log('🏁 ========================================');
+      console.log('🏁 FIN addBooking');
+      console.log('🏁 ========================================');
     }
   };
 
   const updateBooking = async (id: string, updates: Partial<Booking>) => {
+    console.log('🎯 ========================================');
+    console.log('🎯 DÉBUT updateBooking');
+    console.log('🎯 ========================================');
+    console.log('📋 Booking ID:', id);
+    console.log('📋 Updates:', updates);
+    
     if (!isSupabaseConfigured || !user) {
       throw new Error('Supabase non configuré ou utilisateur non connecté');
     }
@@ -193,6 +248,19 @@ export function useBookings() {
       } catch (teamError) {
         console.warn('⚠️ Erreur vérification équipe:', teamError);
       }
+
+      // Récupérer l'ancienne réservation pour comparer
+      console.log('🔍 Récupération ancienne réservation...');
+      const { data: oldBooking } = await supabase!
+        .from('bookings')
+        .select(`
+          *,
+          service:services(*)
+        `)
+        .eq('id', id)
+        .single();
+
+      console.log('📋 Ancienne réservation:', oldBooking);
 
       // Nettoyer les données avant l'update - retirer les champs relationnels
       const cleanUpdates = { ...updates };
@@ -235,6 +303,47 @@ export function useBookings() {
       if (data) {
         setBookings(prev => prev.map(b => b.id === id ? data : b));
         
+        // 🔥 DÉCLENCHEMENT DES WORKFLOWS
+        console.log('🔥 ========================================');
+        console.log('🔥 DÉCLENCHEMENT DES WORKFLOWS (UPDATE)');
+        console.log('🔥 ========================================');
+        
+        // Workflow: Réservation mise à jour
+        console.log('🔥 Trigger: booking_updated');
+        try {
+          await triggerWorkflow('booking_updated', data, targetUserId);
+          console.log('✅ Workflow booking_updated déclenché');
+        } catch (workflowError) {
+          console.error('❌ Erreur workflow booking_updated:', workflowError);
+        }
+        
+        // Workflow: Lien de paiement créé (si nouveau payment_link)
+        if (data.payment_link && (!oldBooking || oldBooking.payment_link !== data.payment_link)) {
+          console.log('🔥 Trigger: payment_link_created (nouveau lien)');
+          console.log('🔥 Payment link:', data.payment_link);
+          try {
+            await triggerWorkflow('payment_link_created', data, targetUserId);
+            console.log('✅ Workflow payment_link_created déclenché');
+          } catch (workflowError) {
+            console.error('❌ Erreur workflow payment_link_created:', workflowError);
+          }
+        }
+        
+        // Workflow: Statut de réservation changé
+        if (oldBooking && oldBooking.booking_status !== data.booking_status) {
+          console.log('🔥 Trigger: booking_status_changed');
+          console.log('🔥 Ancien statut:', oldBooking.booking_status, '→ Nouveau:', data.booking_status);
+          try {
+            await triggerWorkflow('booking_status_changed', data, targetUserId);
+            console.log('✅ Workflow booking_status_changed déclenché');
+          } catch (workflowError) {
+            console.error('❌ Erreur workflow booking_status_changed:', workflowError);
+          }
+        }
+        
+        console.log('🔥 ========================================');
+        
+        // Google Calendar
         try {
           await GoogleCalendarService.updateEvent(data, targetUserId);
         } catch (calendarError) {
@@ -246,6 +355,10 @@ export function useBookings() {
     } catch (err) {
       console.error('❌ updateBooking - Erreur globale:', err);
       throw err;
+    } finally {
+      console.log('🏁 ========================================');
+      console.log('🏁 FIN updateBooking');
+      console.log('🏁 ========================================');
     }
   };
 
