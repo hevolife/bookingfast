@@ -6,7 +6,7 @@ export interface MultiUserSetting {
   id: string;
   user_id: string;
   team_member_id: string;
-  can_view_only_assigned: boolean;
+  restricted_visibility: boolean;
   created_at: string;
   updated_at: string;
 }
@@ -26,10 +26,11 @@ export function useMultiUserSettings() {
     try {
       console.log('🔍 Chargement paramètres pour user:', user.id);
       
+      // ✅ CORRECTION : Lire depuis team_members
       const { data, error } = await supabase
-        .from('multi_user_settings')
-        .select('*')
-        .eq('user_id', user.id)
+        .from('team_members')
+        .select('id, user_id, restricted_visibility, created_at, updated_at')
+        .eq('owner_id', user.id)
         .order('created_at', { ascending: false });
 
       if (error) {
@@ -38,7 +39,18 @@ export function useMultiUserSettings() {
       }
       
       console.log('✅ Paramètres chargés:', data);
-      setSettings(data || []);
+      
+      // Mapper vers le format attendu
+      const mappedData = (data || []).map(member => ({
+        id: member.id,
+        user_id: member.user_id,
+        team_member_id: member.id,
+        restricted_visibility: member.restricted_visibility || false,
+        created_at: member.created_at,
+        updated_at: member.updated_at
+      }));
+      
+      setSettings(mappedData);
     } catch (error) {
       console.error('❌ Erreur chargement paramètres multi-user:', error);
     } finally {
@@ -46,61 +58,32 @@ export function useMultiUserSettings() {
     }
   };
 
-  const updateSetting = async (teamMemberId: string, canViewOnlyAssigned: boolean) => {
+  const updateSetting = async (teamMemberId: string, restrictedVisibility: boolean) => {
     if (!user || !supabase) {
       throw new Error('Utilisateur non connecté ou Supabase non configuré');
     }
 
     try {
-      console.log('🔄 Tentative mise à jour:', { 
-        user_id: user.id, 
+      console.log('🔄 Mise à jour team_members:', { 
         team_member_id: teamMemberId, 
-        can_view_only_assigned: canViewOnlyAssigned 
+        restricted_visibility: restrictedVisibility 
       });
 
-      const { data: existing, error: checkError } = await supabase
-        .from('multi_user_settings')
-        .select('id')
-        .eq('user_id', user.id)
-        .eq('team_member_id', teamMemberId)
-        .maybeSingle();
+      // ✅ CORRECTION : Mettre à jour team_members.restricted_visibility
+      const { error: updateError } = await supabase
+        .from('team_members')
+        .update({
+          restricted_visibility: restrictedVisibility,
+          updated_at: new Date().toISOString()
+        })
+        .eq('id', teamMemberId);
 
-      if (checkError) {
-        console.error('❌ Erreur vérification:', checkError);
-        throw checkError;
+      if (updateError) {
+        console.error('❌ Erreur UPDATE team_members:', updateError);
+        throw updateError;
       }
-
-      if (existing) {
-        console.log('📝 UPDATE existant:', existing.id);
-        const { error: updateError } = await supabase
-          .from('multi_user_settings')
-          .update({
-            can_view_only_assigned: canViewOnlyAssigned,
-            updated_at: new Date().toISOString()
-          })
-          .eq('id', existing.id);
-
-        if (updateError) {
-          console.error('❌ Erreur UPDATE:', updateError);
-          throw updateError;
-        }
-        console.log('✅ UPDATE réussi');
-      } else {
-        console.log('➕ INSERT nouveau');
-        const { error: insertError } = await supabase
-          .from('multi_user_settings')
-          .insert({
-            user_id: user.id,
-            team_member_id: teamMemberId,
-            can_view_only_assigned: canViewOnlyAssigned
-          });
-
-        if (insertError) {
-          console.error('❌ Erreur INSERT:', insertError);
-          throw insertError;
-        }
-        console.log('✅ INSERT réussi');
-      }
+      
+      console.log('✅ UPDATE team_members réussi');
 
       await fetchSettings();
     } catch (error) {
@@ -111,7 +94,7 @@ export function useMultiUserSettings() {
 
   const getSettingForMember = (teamMemberId: string): boolean => {
     const setting = settings.find(s => s.team_member_id === teamMemberId);
-    return setting?.can_view_only_assigned || false;
+    return setting?.restricted_visibility || false;
   };
 
   useEffect(() => {

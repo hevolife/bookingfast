@@ -41,35 +41,49 @@ export function useBookings() {
 
     try {
       let targetUserId = user.id;
+      let isRestrictedMember = false;
+      
       console.log('🔍 fetchBookings - targetUserId initial:', targetUserId);
       
       try {
         console.log('🔍 fetchBookings - Vérification team_members...');
         const { data: membershipData, error: membershipError } = await supabase!
           .from('team_members')
-          .select('owner_id')
+          .select('owner_id, role_name, restricted_visibility')
           .eq('user_id', user.id)
           .eq('is_active', true)
           .maybeSingle();
 
         console.log('🔍 fetchBookings - membershipData:', membershipData);
         
-        if (!membershipError && membershipData?.owner_id) {
+        if (!membershipError && membershipData) {
           targetUserId = membershipData.owner_id;
+          isRestrictedMember = membershipData.restricted_visibility === true;
           console.log('🔍 fetchBookings - targetUserId mis à jour:', targetUserId);
+          console.log('🔍 fetchBookings - restricted_visibility:', isRestrictedMember);
         }
       } catch (teamError) {
         console.warn('⚠️ Erreur vérification équipe:', teamError);
       }
 
       console.log('🔍 fetchBookings - Requête bookings pour user_id:', targetUserId);
-      const { data, error } = await supabase!
+      
+      // Construire la requête de base
+      let query = supabase!
         .from('bookings')
         .select(`
           *,
           service:services(*)
         `)
-        .eq('user_id', targetUserId)
+        .eq('user_id', targetUserId);
+
+      // Si l'utilisateur a la visibilité restreinte, filtrer par assigned_user_id
+      if (isRestrictedMember) {
+        console.log('🔒 fetchBookings - Application du filtre de visibilité restreinte pour:', user.id);
+        query = query.eq('assigned_user_id', user.id);
+      }
+
+      const { data, error } = await query
         .order('date', { ascending: true })
         .order('time', { ascending: true });
 
@@ -79,6 +93,9 @@ export function useBookings() {
       }
 
       console.log('✅ Bookings chargés:', data?.length || 0, 'réservations');
+      if (isRestrictedMember) {
+        console.log('🔒 Réservations filtrées pour membre restreint');
+      }
       setBookings(data || []);
     } catch (err) {
       console.error('❌ Erreur lors du chargement des réservations:', err);

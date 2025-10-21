@@ -1,8 +1,7 @@
 import React, { useState } from 'react';
-import { Users, Shield, Eye, EyeOff, Save } from 'lucide-react';
+import { Users, Shield, Eye, EyeOff } from 'lucide-react';
 import { useTeam } from '../../hooks/useTeam';
 import { useMultiUserSettings } from '../../hooks/useMultiUserSettings';
-import { Button } from '../UI/Button';
 import { LoadingSpinner } from '../UI/LoadingSpinner';
 
 export function MultiUserSettingsPage() {
@@ -14,7 +13,7 @@ export function MultiUserSettingsPage() {
   React.useEffect(() => {
     const initial: Record<string, boolean> = {};
     teamMembers.forEach(member => {
-      initial[member.user_id] = getSettingForMember(member.user_id);
+      initial[member.id] = getSettingForMember(member.id);
     });
     setLocalSettings(initial);
   }, [teamMembers, settings]);
@@ -26,8 +25,9 @@ export function MultiUserSettingsPage() {
 
     try {
       await updateSetting(teamMemberId, newValue);
+      console.log('✅ Paramètre mis à jour:', { teamMemberId, restricted_visibility: newValue });
     } catch (error) {
-      console.error('Erreur sauvegarde:', error);
+      console.error('❌ Erreur sauvegarde:', error);
       setLocalSettings(prev => ({ ...prev, [teamMemberId]: !newValue }));
     } finally {
       setSaving(null);
@@ -76,8 +76,8 @@ export function MultiUserSettingsPage() {
               </thead>
               <tbody className="divide-y divide-gray-200">
                 {teamMembers.map((member) => {
-                  const isRestricted = localSettings[member.user_id] || false;
-                  const isSaving = saving === member.user_id;
+                  const isRestricted = localSettings[member.id] || false;
+                  const isSaving = saving === member.id;
 
                   return (
                     <tr key={member.id} className="hover:bg-gray-50 transition-colors">
@@ -98,7 +98,7 @@ export function MultiUserSettingsPage() {
                       <td className="px-6 py-4">
                         <div className="flex items-center justify-center">
                           <button
-                            onClick={() => handleToggle(member.user_id)}
+                            onClick={() => handleToggle(member.id)}
                             disabled={isSaving}
                             className={`relative inline-flex h-8 w-14 items-center rounded-full transition-colors ${
                               isRestricted ? 'bg-green-500' : 'bg-gray-300'
