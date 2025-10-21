@@ -13,15 +13,8 @@ export default defineConfig({
   },
   build: {
     target: 'esnext',
-    minify: 'terser',
+    minify: 'esbuild',
     sourcemap: false,
-    terserOptions: {
-      compress: {
-        drop_console: true,
-        drop_debugger: true,
-        pure_funcs: ['console.log', 'console.info', 'console.debug', 'console.warn']
-      }
-    },
     rollupOptions: {
       output: {
         manualChunks: {

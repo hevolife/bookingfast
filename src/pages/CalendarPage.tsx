@@ -1,7 +1,7 @@
-import { useState, useEffect } from 'react';
+import React, { useState, useEffect } from 'react';
 import { Plus } from 'lucide-react';
 import { CalendarGrid } from '../components/Calendar/CalendarGrid';
-import { BookingModal } from '../components/BookingModal/BookingModal';
+import { BookingModal } from '../components/Calendar/BookingModal';
 import { UnavailabilityModal } from '../components/Calendar/UnavailabilityModal';
 import { useBookings } from '../hooks/useBookings';
 import { useUnavailabilities } from '../hooks/useUnavailabilities';
@@ -147,8 +147,12 @@ export function CalendarPage() {
         selectedDate={selectedDate}
         selectedTime={selectedTime}
         editingBooking={editingBooking}
-        onSuccess={async () => {
-          await refetchBookings();
+        onSave={async (bookingData) => {
+          if (editingBooking) {
+            await updateBooking(editingBooking.id, bookingData);
+          } else {
+            await addBooking(bookingData);
+          }
           setBookingModalOpen(false);
           setEditingBooking(null);
         }}

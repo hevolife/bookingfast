@@ -19,20 +19,10 @@ export interface Service {
   unit_name?: string;
 }
 
-export interface Transaction {
-  id: string;
-  amount: number;
-  method: 'cash' | 'card' | 'check' | 'transfer' | 'stripe';
-  note?: string;
-  status: 'pending' | 'completed' | 'cancelled';
-  created_at: string;
-}
-
 export interface Booking {
   id: string;
   user_id: string;
   service_id: string;
-  service?: Service;
   date: string;
   time: string;
   duration_minutes: number;
@@ -46,15 +36,8 @@ export interface Booking {
   booking_status: 'pending' | 'confirmed' | 'cancelled' | 'completed';
   notes?: string;
   created_at: string;
-  quantity: number;
+  quantity?: number;
   assigned_user_id?: string;
-  payment_link?: string;
-  transactions?: Transaction[];
-  custom_service_data?: {
-    name: string;
-    price: number;
-    duration: number;
-  };
 }
 
 export interface Client {
