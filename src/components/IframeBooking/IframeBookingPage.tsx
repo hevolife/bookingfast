@@ -1,6 +1,6 @@
 import React, { useState, useEffect } from 'react';
 import { useParams, useSearchParams } from 'react-router-dom';
-import { Calendar, Clock, User, Mail, Phone, CreditCard, Package, MapPin, Star, ArrowRight, ArrowLeft, Check, Building2, Euro, Users, Timer, ChevronRight, Sparkles, UserCheck, CheckCircle, ExternalLink } from 'lucide-react';
+import { Calendar, Clock, User, Mail, Phone, CreditCard, Package, MapPin, Star, ArrowRight, ArrowLeft, Check, Building2, Euro, Users, Timer, ChevronRight, Sparkles, UserCheck, CheckCircle, ExternalLink, Loader2 } from 'lucide-react';
 import { Service, BusinessSettings, Booking, Unavailability, TeamMember } from '../../types';
 import { supabase, isSupabaseConfigured } from '../../lib/supabase';
 import { getBusinessTimezone, getCurrentDateInTimezone, formatInBusinessTimezone } from '../../lib/timezone';
@@ -43,6 +43,8 @@ export function IframeBookingPage() {
   });
   const [submitting, setSubmitting] = useState(false);
   const [processingPayment, setProcessingPayment] = useState(false);
+  const [waitingForPayment, setWaitingForPayment] = useState(false);
+  const [stripeSessionId, setStripeSessionId] = useState<string | null>(null);
 
   // Récupérer les services autorisés depuis l'URL
   const allowedServices = searchParams.get('services')?.split(',').filter(Boolean) || [];
@@ -78,15 +80,62 @@ export function IframeBookingPage() {
     }
   }, []);
 
-  // Gérer le retour de paiement
+  // 🔄 Polling pour vérifier le statut du paiement
+  useEffect(() => {
+    if (!waitingForPayment || !stripeSessionId) return;
+
+    console.log('🔄 Démarrage polling paiement pour session:', stripeSessionId);
+
+    const checkPaymentStatus = async () => {
+      try {
+        const supabaseUrl = import.meta.env.VITE_SUPABASE_URL?.replace(/\/$/, '');
+        const response = await fetch(`${supabaseUrl}/functions/v1/check-payment-status`, {
+          method: 'POST',
+          headers: {
+            'Content-Type': 'application/json',
+            'Authorization': `Bearer ${import.meta.env.VITE_SUPABASE_ANON_KEY}`,
+          },
+          body: JSON.stringify({ sessionId: stripeSessionId })
+        });
+
+        if (response.ok) {
+          const result = await response.json();
+          console.log('📊 Statut paiement:', result);
+
+          if (result.status === 'complete' && result.payment_status === 'paid') {
+            console.log('✅ Paiement confirmé !');
+            setWaitingForPayment(false);
+            setCurrentStep(5);
+          }
+        }
+      } catch (err) {
+        console.error('❌ Erreur vérification paiement:', err);
+      }
+    };
+
+    // Vérifier toutes les 3 secondes
+    const interval = setInterval(checkPaymentStatus, 3000);
+
+    // Timeout après 10 minutes
+    const timeout = setTimeout(() => {
+      console.log('⏱️ Timeout polling paiement');
+      setWaitingForPayment(false);
+      setError('Le paiement prend trop de temps. Veuillez vérifier votre email de confirmation.');
+    }, 10 * 60 * 1000);
+
+    return () => {
+      clearInterval(interval);
+      clearTimeout(timeout);
+    };
+  }, [waitingForPayment, stripeSessionId]);
+
+  // Gérer le retour de paiement (si l'utilisateur revient sur l'iframe)
   useEffect(() => {
     if (paymentStatus === 'success' && sessionId) {
       console.log('✅ Retour paiement réussi, session:', sessionId);
-      // Afficher la confirmation
       setCurrentStep(5);
     } else if (paymentStatus === 'cancelled') {
       console.log('❌ Paiement annulé');
-      // Rester sur l'étape 4 pour permettre de réessayer
       setCurrentStep(4);
     }
   }, [paymentStatus, sessionId]);
@@ -194,10 +243,6 @@ export function IframeBookingPage() {
 
       const result = await response.json();
       console.log('✅ Données reçues:', result);
-      console.log('🔍 Indisponibilités reçues:', result.unavailabilities?.length || 0, result.unavailabilities);
-      console.log('👥 Membres d\'équipe reçus:', result.teamMembers?.length || 0, result.teamMembers);
-      console.log('⚙️ Paramètre iframe_enable_team_selection:', result.settings?.iframe_enable_team_selection);
-      console.log('💳 Stripe configuré:', result.settings?.stripe_enabled);
       
       if (!result.success) {
         throw new Error(result.error || 'Erreur lors de la récupération des données');
@@ -208,18 +253,15 @@ export function IframeBookingPage() {
       filteredServices = filteredServices.filter(service => 
         service.description !== 'Service personnalisé'
       );
-      console.log('🚫 Services personnalisés filtrés');
       
       if (allowedServices.length > 0) {
         filteredServices = filteredServices.filter(service => 
           allowedServices.includes(service.id)
         );
-        console.log('🎯 Services filtrés par URL:', filteredServices.length, 'sur', result.services?.length || 0);
       } else if (result.settings?.iframe_services && result.settings.iframe_services.length > 0) {
         filteredServices = filteredServices.filter(service => 
           result.settings.iframe_services.includes(service.id)
         );
-        console.log('⚙️ Services filtrés par paramètres:', filteredServices.length, 'sur', result.services?.length || 0);
       }
       
       setData({
@@ -240,7 +282,6 @@ export function IframeBookingPage() {
     fetchPublicData();
   }, [userId]);
 
-  // Initialize date when data is loaded
   useEffect(() => {
     if (data?.settings && !selectedDate) {
       const { date } = getNextAvailableDateTime(data.settings);
@@ -257,7 +298,6 @@ export function IframeBookingPage() {
     const slotStartMinutes = startHour * 60 + startMinute;
     const slotEndMinutes = slotStartMinutes + durationMinutes;
 
-    // Filtrer par membre d'équipe si sélectionné
     const relevantUnavailabilities = selectedTeamMember
       ? data.unavailabilities.filter(u => 
           u.date === date && 
@@ -327,13 +367,11 @@ export function IframeBookingPage() {
   const isTimeSlotAvailable = (time: string, service: Service | null): boolean => {
     if (!service || !selectedDate) return false;
     
-    // Vérifier la validation de base (délai minimum, etc.)
     const validation = validateBookingDateTime(selectedDate, time, data?.settings, true);
     if (!validation.isValid) {
       return false;
     }
     
-    // Vérifier si le créneau est bloqué par une indisponibilité
     if (isTimeBlockedByUnavailability(selectedDate, time, service.duration_minutes)) {
       return false;
     }
@@ -342,7 +380,6 @@ export function IframeBookingPage() {
     const startTime = startHour * 60 + startMinute;
     const endTime = startTime + service.duration_minutes;
     
-    // Filtrer les réservations par membre d'équipe si sélectionné
     let dayBookings = data?.bookings?.filter(booking => booking.date === selectedDate) || [];
     if (selectedTeamMember) {
       dayBookings = dayBookings.filter(booking => 
@@ -418,11 +455,9 @@ export function IframeBookingPage() {
       console.log('💳 Création session Stripe:', {
         amount: depositAmount,
         service: selectedService.name,
-        client: clientData.email,
-        parent_url: parentUrl || 'none'
+        client: clientData.email
       });
 
-      // Créer la session Stripe avec l'URL parent si disponible
       const supabaseUrl = import.meta.env.VITE_SUPABASE_URL?.replace(/\/$/, '');
       const response = await fetch(`${supabaseUrl}/functions/v1/stripe-checkout`, {
         method: 'POST',
@@ -435,9 +470,8 @@ export function IframeBookingPage() {
           currency: 'eur',
           customer_email: clientData.email,
           service_name: selectedService.name,
-          success_url: window.location.href,
-          cancel_url: window.location.href,
-          parent_url: parentUrl || undefined,
+          success_url: window.location.href.split('?')[0] + '?payment=success&session_id={CHECKOUT_SESSION_ID}',
+          cancel_url: window.location.href.split('?')[0] + '?payment=cancelled',
           metadata: {
             user_id: userId,
             service_id: selectedService.id,
@@ -461,14 +495,23 @@ export function IframeBookingPage() {
         throw new Error(errorData.error || 'Erreur lors de la création de la session de paiement');
       }
 
-      const { url } = await response.json();
+      const { url, sessionId } = await response.json();
       
-      if (url) {
-        console.log('🚀 Redirection vers Stripe:', url);
-        // ✅ CORRECTION : Redirection directe dans la même fenêtre/iframe
-        window.location.href = url;
+      if (url && sessionId) {
+        console.log('🚀 Ouverture Stripe dans nouvel onglet:', url);
+        console.log('🔑 Session ID:', sessionId);
+        
+        // Sauvegarder le session ID pour le polling
+        setStripeSessionId(sessionId);
+        
+        // Ouvrir Stripe dans un nouvel onglet
+        window.open(url, '_blank');
+        
+        // Passer en mode "attente de paiement"
+        setProcessingPayment(false);
+        setWaitingForPayment(true);
       } else {
-        throw new Error('URL de paiement manquante');
+        throw new Error('URL ou Session ID manquant');
       }
     } catch (err) {
       console.error('❌ Erreur paiement:', err);
@@ -483,13 +526,11 @@ export function IframeBookingPage() {
       return;
     }
 
-    // Si Stripe est activé, rediriger vers le paiement
     if (data?.settings?.stripe_enabled) {
       await handlePayment();
       return;
     }
 
-    // Sinon, créer la réservation directement
     setSubmitting(true);
     
     try {
@@ -594,7 +635,6 @@ export function IframeBookingPage() {
   const availableDates = getAvailableDates();
   const showTeamSelection = data?.settings?.iframe_enable_team_selection && data?.teamMembers && data.teamMembers.length > 0;
 
-  // Calculer le montant de l'acompte
   const calculateDepositAmount = () => {
     if (!selectedService || !data?.settings) return 0;
     
@@ -650,6 +690,65 @@ export function IframeBookingPage() {
     { id: 3, title: 'Informations', icon: User, description: 'Vos coordonnées' },
     { id: 4, title: 'Confirmation', icon: Check, description: 'Récapitulatif' }
   ];
+
+  // 🔄 Écran d'attente de paiement
+  if (waitingForPayment) {
+    return (
+      <div className="min-h-screen bg-white flex items-center justify-center p-4">
+        <div className="text-center max-w-md">
+          <div className="relative w-24 h-24 mx-auto mb-6">
+            <div className="w-24 h-24 border-4 border-blue-200 rounded-full animate-spin"></div>
+            <div className="absolute top-0 left-0 w-24 h-24 border-4 border-blue-600 rounded-full animate-spin border-t-transparent"></div>
+            <CreditCard className="absolute top-1/2 left-1/2 transform -translate-x-1/2 -translate-y-1/2 w-10 h-10 text-blue-600" />
+          </div>
+          
+          <h2 className="text-2xl font-bold text-gray-900 mb-4">
+            Paiement en cours...
+          </h2>
+          
+          <p className="text-gray-600 mb-6">
+            Veuillez compléter votre paiement dans l'onglet Stripe qui vient de s'ouvrir.
+          </p>
+          
+          <div className="bg-blue-50 rounded-2xl p-6 mb-6 border border-blue-200">
+            <div className="flex items-start gap-3">
+              <ExternalLink className="w-5 h-5 text-blue-600 flex-shrink-0 mt-0.5" />
+              <div className="text-left">
+                <p className="text-sm text-blue-900 font-medium mb-2">
+                  L'onglet Stripe ne s'est pas ouvert ?
+                </p>
+                <button
+                  onClick={() => {
+                    if (stripeSessionId) {
+                      const supabaseUrl = import.meta.env.VITE_SUPABASE_URL?.replace(/\/$/, '');
+                      window.open(`https://checkout.stripe.com/c/pay/${stripeSessionId}`, '_blank');
+                    }
+                  }}
+                  className="text-sm text-blue-600 hover:text-blue-700 underline"
+                >
+                  Cliquez ici pour ouvrir la page de paiement
+                </button>
+              </div>
+            </div>
+          </div>
+          
+          <p className="text-sm text-gray-500">
+            Votre réservation sera automatiquement confirmée après le paiement.
+          </p>
+          
+          <button
+            onClick={() => {
+              setWaitingForPayment(false);
+              setStripeSessionId(null);
+            }}
+            className="mt-6 text-sm text-gray-600 hover:text-gray-800 underline"
+          >
+            Annuler et revenir
+          </button>
+        </div>
+      </div>
+    );
+  }
 
   return (
     <div className="min-h-screen bg-white">
@@ -772,7 +871,6 @@ export function IframeBookingPage() {
               </p>
             </div>
 
-            {/* Service récapitulatif */}
             <div className="bg-gradient-to-r from-blue-50 to-purple-50 rounded-3xl p-4 sm:p-6 border-2 border-blue-200">
               <div className="flex items-center gap-4">
                 <div className="w-16 h-16 bg-gradient-to-r from-blue-500 to-purple-500 rounded-2xl flex items-center justify-center">
@@ -800,7 +898,6 @@ export function IframeBookingPage() {
               </div>
             </div>
 
-            {/* Sélection membre d'équipe - AVANT la sélection de date/heure */}
             {showTeamSelection && (
               <div className="bg-gradient-to-r from-purple-50 to-pink-50 rounded-2xl p-6 border border-purple-200">
                 <div className="flex items-center gap-3 mb-4">
@@ -817,7 +914,6 @@ export function IframeBookingPage() {
                   value={selectedTeamMember}
                   onChange={(e) => {
                     setSelectedTeamMember(e.target.value);
-                    // Réinitialiser la date et l'heure pour forcer un nouveau calcul des disponibilités
                     setSelectedTime('');
                   }}
                   className="w-full px-4 py-3 border-2 border-purple-300 rounded-xl focus:border-purple-500 focus:ring-2 focus:ring-purple-200 transition-all bg-white"
@@ -841,7 +937,6 @@ export function IframeBookingPage() {
               </div>
             )}
 
-            {/* Date Picker */}
             <DatePicker
               selectedDate={selectedDate}
               onDateSelect={setSelectedDate}
@@ -849,7 +944,6 @@ export function IframeBookingPage() {
               settings={data.settings}
             />
 
-            {/* Time Slots */}
             {selectedDate && (
               <div className="space-y-4">
                 <h3 className="text-xl font-bold text-gray-900">Horaires disponibles</h3>
@@ -884,7 +978,6 @@ export function IframeBookingPage() {
               </div>
             )}
 
-            {/* Navigation */}
             <div className="flex gap-4">
               <button
                 onClick={() => setCurrentStep(1)}
@@ -1092,6 +1185,9 @@ export function IframeBookingPage() {
                     Un acompte de {depositAmount.toFixed(2)}€ sera demandé pour confirmer votre réservation. 
                     Le solde de {((selectedService.price_ttc * quantity) - depositAmount).toFixed(2)}€ sera à régler sur place.
                   </p>
+                  <p className="text-sm text-blue-600 mt-2 font-medium">
+                    ℹ️ La page de paiement s'ouvrira dans un nouvel onglet
+                  </p>
                 </div>
               )}
             </div>
@@ -1111,22 +1207,27 @@ export function IframeBookingPage() {
               >
                 {processingPayment ? (
                   <>
-                    <div className="w-5 h-5 border-2 border-white border-t-transparent rounded-full animate-spin" />
-                    Redirection...
+                    <Loader2 className="w-5 h-5 animate-spin" />
+                    Ouverture paiement...
                   </>
                 ) : submitting ? (
                   <>
-                    <div className="w-5 h-5 border-2 border-white border-t-transparent rounded-full animate-spin" />
+                    <Loader2 className="w-5 h-5 animate-spin" />
                     Confirmation...
                   </>
                 ) : (
                   <>
                     {isStripeEnabled ? (
-                      <CreditCard className="w-5 h-5" />
+                      <>
+                        <ExternalLink className="w-5 h-5" />
+                        Payer l'acompte
+                      </>
                     ) : (
-                      <Check className="w-5 h-5" />
+                      <>
+                        <Check className="w-5 h-5" />
+                        Confirmer la réservation
+                      </>
                     )}
-                    {isStripeEnabled ? 'Payer l\'acompte' : 'Confirmer la réservation'}
                   </>
                 )}
               </button>
@@ -1155,7 +1256,6 @@ export function IframeBookingPage() {
                 setSelectedTeamMember('');
                 setQuantity(1);
                 setClientData({ firstname: '', lastname: '', email: '', phone: '' });
-                // Nettoyer les paramètres URL
                 window.history.replaceState({}, '', window.location.pathname);
               }}
               className="bg-gradient-to-r from-blue-500 to-purple-500 text-white py-4 px-8 rounded-2xl font-bold hover:shadow-xl transition-all"
