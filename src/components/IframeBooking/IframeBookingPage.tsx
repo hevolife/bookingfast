@@ -14,6 +14,12 @@ interface PublicBookingData {
   bookings: Booking[];
   unavailabilities: Unavailability[];
   teamMembers: TeamMember[];
+  blockedDateRanges: Array<{
+    id: string;
+    start_date: string;
+    end_date: string;
+    reason?: string;
+  }>;
 }
 
 interface TimeSlot {
@@ -281,7 +287,8 @@ export function IframeBookingPage() {
           },
           bookings: [],
           unavailabilities: [],
-          teamMembers: []
+          teamMembers: [],
+          blockedDateRanges: []
         };
         setData(demoData);
         setLoading(false);
@@ -310,6 +317,7 @@ export function IframeBookingPage() {
 
       const result = await response.json();
       console.log('✅ Données reçues:', result);
+      console.log('🚫 Plages bloquées reçues:', result.blockedDateRanges);
       
       if (!result.success) {
         throw new Error(result.error || 'Erreur lors de la récupération des données');
@@ -335,7 +343,8 @@ export function IframeBookingPage() {
         ...result,
         services: filteredServices,
         unavailabilities: result.unavailabilities || [],
-        teamMembers: result.teamMembers || []
+        teamMembers: result.teamMembers || [],
+        blockedDateRanges: result.blockedDateRanges || []
       });
     } catch (err) {
       console.error('❌ Erreur chargement données publiques:', err);
@@ -355,6 +364,39 @@ export function IframeBookingPage() {
       setSelectedDate(date);
     }
   }, [data?.settings, selectedDate]);
+
+  // 🚫 Vérifier si une date est bloquée - CORRECTION FORMAT
+  const isDateBlocked = (date: string): boolean => {
+    if (!data?.blockedDateRanges || data.blockedDateRanges.length === 0) {
+      console.log('🚫 Aucune plage bloquée définie');
+      return false;
+    }
+
+    // Normaliser la date au format YYYY-MM-DD
+    const checkDate = new Date(date + 'T00:00:00');
+    const checkDateStr = checkDate.toISOString().split('T')[0];
+    
+    console.log('🔍 Vérification date:', checkDateStr);
+    
+    const isBlocked = data.blockedDateRanges.some(range => {
+      const startDate = new Date(range.start_date + 'T00:00:00');
+      const endDate = new Date(range.end_date + 'T00:00:00');
+      
+      const startDateStr = startDate.toISOString().split('T')[0];
+      const endDateStr = endDate.toISOString().split('T')[0];
+      
+      const blocked = checkDateStr >= startDateStr && checkDateStr <= endDateStr;
+      
+      if (blocked) {
+        console.log('🚫 Date BLOQUÉE:', checkDateStr, 'dans plage:', startDateStr, '-', endDateStr);
+      }
+      
+      return blocked;
+    });
+    
+    console.log('🚫 Résultat isDateBlocked:', isBlocked);
+    return isBlocked;
+  };
 
   const isTimeBlockedByUnavailability = (date: string, time: string, durationMinutes: number): boolean => {
     if (!data?.unavailabilities || data.unavailabilities.length === 0) {
@@ -391,6 +433,12 @@ export function IframeBookingPage() {
 
   const generateTimeSlots = (date: string): TimeSlot[] => {
     if (!data?.settings || !date) {
+      return [];
+    }
+
+    // 🚫 VÉRIFICATION CRITIQUE - Si la date est bloquée, retourner aucun créneau
+    if (isDateBlocked(date)) {
+      console.log('🚫 Date bloquée - Aucun créneau généré pour:', date);
       return [];
     }
     
@@ -433,6 +481,12 @@ export function IframeBookingPage() {
 
   const isTimeSlotAvailable = (time: string, service: Service | null): boolean => {
     if (!service || !selectedDate) return false;
+
+    // 🚫 VÉRIFICATION CRITIQUE - Vérifier si la date est bloquée
+    if (isDateBlocked(selectedDate)) {
+      console.log('🚫 Créneau refusé - Date bloquée:', selectedDate);
+      return false;
+    }
     
     const validation = validateBookingDateTime(selectedDate, time, data?.settings, true);
     if (!validation.isValid) {
@@ -672,6 +726,13 @@ export function IframeBookingPage() {
       date.setDate(today.getDate() + i);
       
       const dateString = date.toISOString().split('T')[0];
+
+      // 🚫 VÉRIFICATION CRITIQUE - Exclure les dates bloquées
+      if (isDateBlocked(dateString)) {
+        console.log('🚫 Date bloquée exclue du calendrier:', dateString);
+        continue;
+      }
+
       const dayName = date.toLocaleDateString('en-US', { weekday: 'long' }).toLowerCase();
       const daySettings = data.settings.opening_hours[dayName];
       
@@ -998,7 +1059,11 @@ export function IframeBookingPage() {
                   <div className="text-center py-12 bg-gray-50 rounded-3xl">
                     <Clock className="w-16 h-16 text-gray-300 mx-auto mb-4" />
                     <h3 className="text-xl font-medium text-gray-900 mb-2">Aucun créneau disponible</h3>
-                    <p className="text-gray-500">Veuillez sélectionner une autre date</p>
+                    <p className="text-gray-500">
+                      {isDateBlocked(selectedDate) 
+                        ? 'Cette date est bloquée. Veuillez sélectionner une autre date.'
+                        : 'Veuillez sélectionner une autre date'}
+                    </p>
                   </div>
                 ) : (
                   <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 lg:grid-cols-5 gap-3">

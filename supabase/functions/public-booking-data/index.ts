@@ -13,42 +13,47 @@ serve(async (req) => {
   }
 
   try {
-    console.log('🔔 Demande de données publiques de réservation reçue')
+    console.log('[INFO] Demande de données publiques de réservation reçue')
     
-    // Créer le client Supabase avec la clé service role pour contourner RLS
     const supabaseClient = createClient(
       Deno.env.get('SUPABASE_URL') ?? '',
-      Deno.env.get('SUPABASE_SERVICE_ROLE_KEY') ?? ''
+      Deno.env.get('SUPABASE_SERVICE_ROLE_KEY') ?? '',
+      {
+        auth: {
+          autoRefreshToken: false,
+          persistSession: false
+        },
+        db: {
+          schema: 'public'
+        }
+      }
     )
 
-    // Récupérer l'userId depuis l'URL
     const url = new URL(req.url)
     const userId = url.searchParams.get('user_id')
 
     if (!userId) {
-      console.error('❌ user_id manquant')
+      console.error('[ERROR] user_id manquant')
       return new Response(
         JSON.stringify({ error: 'user_id parameter required' }),
         { status: 400, headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
       )
     }
 
-    console.log('🔍 Récupération données pour userId:', userId)
+    console.log('[DEBUG] Récupération données pour userId:', userId)
 
-    // Vérifier d'abord que l'utilisateur existe dans auth.users
     const { data: userData, error: userError } = await supabaseClient.auth.admin.getUserById(userId)
 
     if (userError || !userData.user) {
-      console.error('❌ Utilisateur non trouvé:', userId, userError)
+      console.error('[ERROR] Utilisateur non trouvé:', userId, userError)
       return new Response(
         JSON.stringify({ error: 'User not found' }),
         { status: 404, headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
       )
     }
 
-    console.log('✅ Utilisateur trouvé:', userData.user.email)
+    console.log('[SUCCESS] Utilisateur trouvé:', userData.user.email)
 
-    // Récupérer les services avec les privilèges service role (contourne RLS)
     const { data: servicesData, error: servicesError } = await supabaseClient
       .from('services')
       .select('*')
@@ -56,16 +61,15 @@ serve(async (req) => {
       .order('created_at', { ascending: true })
 
     if (servicesError) {
-      console.error('❌ Erreur chargement services:', servicesError)
+      console.error('[ERROR] Erreur chargement services:', servicesError)
       return new Response(
         JSON.stringify({ error: 'Failed to load services', details: servicesError.message }),
         { status: 500, headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
       )
     }
 
-    console.log('✅ Services récupérés:', servicesData?.length || 0)
+    console.log('[SUCCESS] Services récupérés:', servicesData?.length || 0)
 
-    // Récupérer les paramètres business
     const { data: settingsData, error: settingsError } = await supabaseClient
       .from('business_settings')
       .select('*')
@@ -73,12 +77,11 @@ serve(async (req) => {
       .maybeSingle()
 
     if (settingsError) {
-      console.warn('⚠️ Erreur chargement paramètres:', settingsError)
+      console.warn('[WARN] Erreur chargement paramètres:', settingsError)
     }
 
-    console.log('✅ Paramètres récupérés:', !!settingsData)
+    console.log('[SUCCESS] Paramètres récupérés:', !!settingsData)
 
-    // Récupérer les réservations existantes
     const { data: bookingsData, error: bookingsError } = await supabaseClient
       .from('bookings')
       .select('date, time, duration_minutes, service_id, booking_status, quantity, assigned_user_id')
@@ -86,13 +89,12 @@ serve(async (req) => {
       .in('booking_status', ['pending', 'confirmed'])
 
     if (bookingsError) {
-      console.warn('⚠️ Erreur chargement réservations:', bookingsError)
+      console.warn('[WARN] Erreur chargement réservations:', bookingsError)
     }
 
-    console.log('✅ Réservations récupérées:', bookingsData?.length || 0)
+    console.log('[SUCCESS] Réservations récupérées:', bookingsData?.length || 0)
 
-    // Récupération des indisponibilités
-    console.log('🔍 Tentative de récupération des indisponibilités pour userId:', userId)
+    console.log('[DEBUG] Tentative de récupération des indisponibilités pour userId:', userId)
     
     const { data: unavailabilitiesData, error: unavailabilitiesError } = await supabaseClient
       .from('unavailabilities')
@@ -102,13 +104,12 @@ serve(async (req) => {
       .order('start_time', { ascending: true })
 
     if (unavailabilitiesError) {
-      console.error('❌ ERREUR chargement indisponibilités:', unavailabilitiesError)
+      console.error('[ERROR] ERREUR chargement indisponibilités:', unavailabilitiesError)
     } else {
-      console.log('✅ Indisponibilités récupérées:', unavailabilitiesData?.length || 0)
+      console.log('[SUCCESS] Indisponibilités récupérées:', unavailabilitiesData?.length || 0)
     }
 
-    // Récupération des membres d'équipe ACTIFS
-    console.log('🔍 Tentative de récupération des membres d\'équipe pour userId:', userId)
+    console.log('[DEBUG] Tentative de récupération des membres d\'équipe pour userId:', userId)
     
     const { data: teamMembersData, error: teamMembersError } = await supabaseClient
       .from('team_members')
@@ -118,14 +119,38 @@ serve(async (req) => {
       .order('created_at', { ascending: true })
 
     if (teamMembersError) {
-      console.error('❌ ERREUR chargement membres d\'équipe:', teamMembersError)
+      console.error('[ERROR] ERREUR chargement membres d\'équipe:', teamMembersError)
     } else {
-      console.log('✅ Membres d\'équipe récupérés:', teamMembersData?.length || 0)
+      console.log('[SUCCESS] Membres d\'équipe récupérés:', teamMembersData?.length || 0)
       if (teamMembersData && teamMembersData.length > 0) {
-        console.log('📋 Liste des membres:', teamMembersData.map(m => ({
+        console.log('[DEBUG] Liste des membres:', teamMembersData.map(m => ({
           id: m.user_id,
           name: m.full_name || `${m.firstname} ${m.lastname}` || m.email
         })))
+      }
+    }
+
+    console.log('[BLOCKED_DATES] DEBUT récupération plages bloquées pour userId:', userId)
+    
+    // CRITICAL: Utiliser .rpc() au lieu de .from() pour bypasser RLS
+    // La fonction get_blocked_date_ranges est SECURITY DEFINER donc elle s'exécute avec les permissions du propriétaire
+    const { data: blockedDateRangesData, error: blockedDateRangesError } = await supabaseClient
+      .rpc('get_blocked_date_ranges', { p_user_id: userId })
+
+    if (blockedDateRangesError) {
+      console.error('[BLOCKED_DATES] ERREUR chargement plages bloquées:', blockedDateRangesError)
+      console.error('[BLOCKED_DATES] Détails erreur:', JSON.stringify(blockedDateRangesError, null, 2))
+    } else {
+      console.log('[BLOCKED_DATES] Plages bloquées récupérées:', blockedDateRangesData?.length || 0)
+      if (blockedDateRangesData && blockedDateRangesData.length > 0) {
+        console.log('[BLOCKED_DATES] Liste des plages bloquées:', blockedDateRangesData.map(r => ({
+          id: r.id,
+          start: r.start_date,
+          end: r.end_date,
+          reason: r.reason
+        })))
+      } else {
+        console.warn('[BLOCKED_DATES] Aucune plage bloquée trouvée pour userId:', userId)
       }
     }
 
@@ -140,11 +165,14 @@ serve(async (req) => {
       settings: settingsData,
       bookings: bookingsData || [],
       unavailabilities: unavailabilitiesData || [],
-      teamMembers: teamMembersData || []
+      teamMembers: teamMembersData || [],
+      blockedDateRanges: blockedDateRangesData || []
     }
 
-    console.log('📤 Réponse finale - unavailabilities:', responseData.unavailabilities?.length || 0)
-    console.log('📤 Réponse finale - teamMembers:', responseData.teamMembers?.length || 0)
+    console.log('[BLOCKED_DATES] Réponse finale - blockedDateRanges:', responseData.blockedDateRanges?.length || 0)
+    if (responseData.blockedDateRanges && responseData.blockedDateRanges.length > 0) {
+      console.log('[BLOCKED_DATES] Contenu blockedDateRanges:', JSON.stringify(responseData.blockedDateRanges, null, 2))
+    }
 
     return new Response(
       JSON.stringify(responseData),
@@ -152,7 +180,7 @@ serve(async (req) => {
     )
 
   } catch (error) {
-    console.error('❌ Erreur fonction publique données réservation:', error)
+    console.error('[ERROR] Erreur fonction publique données réservation:', error)
     return new Response(
       JSON.stringify({ 
         error: error.message,
