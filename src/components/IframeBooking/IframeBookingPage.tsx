@@ -1,6 +1,6 @@
 import React, { useState, useEffect } from 'react';
 import { useParams, useSearchParams } from 'react-router-dom';
-import { Calendar, Clock, User, Mail, Phone, CreditCard, Package, MapPin, Star, ArrowRight, ArrowLeft, Check, Building2, Euro, Users, Timer, ChevronRight, Sparkles, UserCheck, CheckCircle, ExternalLink, Loader2 } from 'lucide-react';
+import { Calendar, Clock, User, Mail, Phone, CreditCard, Package, MapPin, Star, ArrowRight, ArrowLeft, Check, Building2, Euro, Users, Timer, ChevronRight, Sparkles, UserCheck, CheckCircle, ExternalLink, Loader2, Download, Share2 } from 'lucide-react';
 import { Service, BusinessSettings, Booking, Unavailability, TeamMember } from '../../types';
 import { supabase, isSupabaseConfigured } from '../../lib/supabase';
 import { getBusinessTimezone, getCurrentDateInTimezone, formatInBusinessTimezone } from '../../lib/timezone';
@@ -45,6 +45,7 @@ export function IframeBookingPage() {
   const [processingPayment, setProcessingPayment] = useState(false);
   const [waitingForPayment, setWaitingForPayment] = useState(false);
   const [stripeSessionId, setStripeSessionId] = useState<string | null>(null);
+  const [confirmedBooking, setConfirmedBooking] = useState<any>(null);
 
   // Récupérer les services autorisés depuis l'URL
   const allowedServices = searchParams.get('services')?.split(',').filter(Boolean) || [];
@@ -53,32 +54,25 @@ export function IframeBookingPage() {
   const paymentStatus = searchParams.get('payment');
   const sessionId = searchParams.get('session_id');
 
-  // 🌐 Détecter si on est dans un iframe et récupérer l'URL parent
-  const [parentUrl, setParentUrl] = useState<string>('');
+  // 🌐 Détecter si on est dans un iframe
+  const [isInIframe, setIsInIframe] = useState(false);
 
   useEffect(() => {
-    // Détecter si on est dans un iframe
-    const isInIframe = window.self !== window.top;
-    
-    if (isInIframe) {
-      try {
-        // Essayer de récupérer l'URL du parent (peut échouer si cross-origin)
-        const referrer = document.referrer;
-        if (referrer) {
-          const url = new URL(referrer);
-          const parentDomain = `${url.protocol}//${url.host}`;
-          setParentUrl(parentDomain);
-          console.log('🌐 Iframe détecté - Parent URL:', parentDomain);
-        } else {
-          console.log('🌐 Iframe détecté mais referrer vide');
-        }
-      } catch (err) {
-        console.log('🌐 Impossible de récupérer l\'URL parent (cross-origin)');
-      }
-    } else {
-      console.log('🏠 Pas dans un iframe');
-    }
+    const inIframe = window.self !== window.top;
+    setIsInIframe(inIframe);
+    console.log('🌐 Dans un iframe:', inIframe);
   }, []);
+
+  // 📡 Notifier le parent quand on change d'étape (pour refresh)
+  useEffect(() => {
+    if (isInIframe && currentStep === 5) {
+      console.log('📡 Notification parent: booking_confirmed');
+      window.parent.postMessage({ 
+        type: 'booking_confirmed',
+        step: currentStep 
+      }, '*');
+    }
+  }, [currentStep, isInIframe]);
 
   // 🔄 Polling pour vérifier le statut du paiement
   useEffect(() => {
@@ -104,6 +98,12 @@ export function IframeBookingPage() {
 
           if (result.status === 'complete' && result.payment_status === 'paid') {
             console.log('✅ Paiement confirmé !');
+            
+            // Récupérer les détails de la réservation
+            if (result.booking) {
+              setConfirmedBooking(result.booking);
+            }
+            
             setWaitingForPayment(false);
             setCurrentStep(5);
           }
@@ -129,11 +129,12 @@ export function IframeBookingPage() {
     };
   }, [waitingForPayment, stripeSessionId]);
 
-  // Gérer le retour de paiement (si l'utilisateur revient sur l'iframe)
+  // Gérer le retour de paiement
   useEffect(() => {
     if (paymentStatus === 'success' && sessionId) {
       console.log('✅ Retour paiement réussi, session:', sessionId);
-      setCurrentStep(5);
+      setStripeSessionId(sessionId);
+      setWaitingForPayment(true);
     } else if (paymentStatus === 'cancelled') {
       console.log('❌ Paiement annulé');
       setCurrentStep(4);
@@ -501,13 +502,8 @@ export function IframeBookingPage() {
         console.log('🚀 Ouverture Stripe dans nouvel onglet:', url);
         console.log('🔑 Session ID:', sessionId);
         
-        // Sauvegarder le session ID pour le polling
         setStripeSessionId(sessionId);
-        
-        // Ouvrir Stripe dans un nouvel onglet
         window.open(url, '_blank');
-        
-        // Passer en mode "attente de paiement"
         setProcessingPayment(false);
         setWaitingForPayment(true);
       } else {
@@ -569,6 +565,7 @@ export function IframeBookingPage() {
         }
 
         console.log('✅ Réservation créée:', booking.id);
+        setConfirmedBooking(booking);
         setCurrentStep(5);
       } else {
         console.log('🎭 Mode démo - simulation réservation');
@@ -1235,33 +1232,172 @@ export function IframeBookingPage() {
           </div>
         )}
 
-        {/* Step 5: Success */}
+        {/* Step 5: Success - NOUVELLE VERSION PROFESSIONNELLE */}
         {currentStep === 5 && (
-          <div className="text-center py-12">
-            <div className="w-24 h-24 bg-gradient-to-r from-green-500 to-emerald-500 rounded-full flex items-center justify-center mx-auto mb-6">
-              <Check className="w-12 h-12 text-white" />
+          <div className="max-w-3xl mx-auto">
+            {/* Header Success */}
+            <div className="text-center mb-8">
+              <div className="w-24 h-24 bg-gradient-to-r from-green-500 to-emerald-500 rounded-full flex items-center justify-center mx-auto mb-6 animate-bounce">
+                <CheckCircle className="w-12 h-12 text-white" />
+              </div>
+              <h2 className="text-3xl sm:text-4xl font-bold text-gray-900 mb-3">
+                Réservation confirmée !
+              </h2>
+              <p className="text-gray-600 text-lg">
+                Votre rendez-vous a été enregistré avec succès
+              </p>
             </div>
-            <h2 className="text-3xl font-bold text-gray-900 mb-4">
-              Réservation confirmée !
-            </h2>
-            <p className="text-gray-600 text-lg mb-8">
-              Votre réservation a été confirmée ! Vous allez recevoir un email de confirmation à {clientData.email}
-            </p>
-            <button
-              onClick={() => {
-                setCurrentStep(1);
-                setSelectedService(null);
-                setSelectedDate('');
-                setSelectedTime('');
-                setSelectedTeamMember('');
-                setQuantity(1);
-                setClientData({ firstname: '', lastname: '', email: '', phone: '' });
-                window.history.replaceState({}, '', window.location.pathname);
-              }}
-              className="bg-gradient-to-r from-blue-500 to-purple-500 text-white py-4 px-8 rounded-2xl font-bold hover:shadow-xl transition-all"
-            >
-              Nouvelle réservation
-            </button>
+
+            {/* Booking Details Card */}
+            <div className="bg-white rounded-3xl shadow-2xl overflow-hidden mb-6">
+              {/* Service Header */}
+              <div className="bg-gradient-to-r from-blue-500 to-purple-500 p-6 text-white">
+                <div className="flex items-center gap-4">
+                  <div className="w-16 h-16 bg-white/20 rounded-2xl flex items-center justify-center backdrop-blur-sm">
+                    <Package className="w-8 h-8" />
+                  </div>
+                  <div className="flex-1">
+                    <h3 className="text-2xl font-bold mb-1">{selectedService?.name}</h3>
+                    <p className="text-white/90">{selectedService?.duration_minutes} minutes</p>
+                  </div>
+                  <div className="text-right">
+                    <div className="text-3xl font-bold">{selectedService?.price_ttc.toFixed(2)}€</div>
+                    {quantity > 1 && <div className="text-white/90">x {quantity}</div>}
+                  </div>
+                </div>
+              </div>
+
+              {/* Details Grid */}
+              <div className="p-6 space-y-4">
+                {/* Date & Time */}
+                <div className="flex items-start gap-4 p-4 bg-gradient-to-r from-purple-50 to-pink-50 rounded-2xl border border-purple-200">
+                  <div className="w-12 h-12 bg-gradient-to-r from-purple-500 to-pink-500 rounded-xl flex items-center justify-center flex-shrink-0">
+                    <Calendar className="w-6 h-6 text-white" />
+                  </div>
+                  <div className="flex-1">
+                    <h4 className="font-bold text-gray-900 mb-1">Date et heure</h4>
+                    <p className="text-gray-700 font-medium">
+                      {new Date(selectedDate).toLocaleDateString('fr-FR', {
+                        weekday: 'long',
+                        day: 'numeric',
+                        month: 'long',
+                        year: 'numeric'
+                      })}
+                    </p>
+                    <div className="flex items-center gap-2 mt-2">
+                      <Clock className="w-4 h-4 text-purple-600" />
+                      <span className="text-purple-700 font-bold">{selectedTime}</span>
+                    </div>
+                  </div>
+                </div>
+
+                {/* Client Info */}
+                <div className="flex items-start gap-4 p-4 bg-gradient-to-r from-blue-50 to-cyan-50 rounded-2xl border border-blue-200">
+                  <div className="w-12 h-12 bg-gradient-to-r from-blue-500 to-cyan-500 rounded-xl flex items-center justify-center flex-shrink-0">
+                    <User className="w-6 h-6 text-white" />
+                  </div>
+                  <div className="flex-1">
+                    <h4 className="font-bold text-gray-900 mb-2">Vos coordonnées</h4>
+                    <div className="space-y-1">
+                      <p className="text-gray-700 font-medium">
+                        {clientData.firstname} {clientData.lastname}
+                      </p>
+                      <div className="flex items-center gap-2 text-gray-600">
+                        <Mail className="w-4 h-4" />
+                        <span>{clientData.email}</span>
+                      </div>
+                      {clientData.phone && (
+                        <div className="flex items-center gap-2 text-gray-600">
+                          <Phone className="w-4 h-4" />
+                          <span>{clientData.phone}</span>
+                        </div>
+                      )}
+                    </div>
+                  </div>
+                </div>
+
+                {/* Team Member (if selected) */}
+                {selectedTeamMember && data?.teamMembers && (
+                  <div className="flex items-start gap-4 p-4 bg-gradient-to-r from-green-50 to-emerald-50 rounded-2xl border border-green-200">
+                    <div className="w-12 h-12 bg-gradient-to-r from-green-500 to-emerald-500 rounded-xl flex items-center justify-center flex-shrink-0">
+                      <UserCheck className="w-6 h-6 text-white" />
+                    </div>
+                    <div className="flex-1">
+                      <h4 className="font-bold text-gray-900 mb-1">Praticien</h4>
+                      <p className="text-gray-700 font-medium">
+                        {getMemberDisplayName(data.teamMembers.find(m => m.user_id === selectedTeamMember)!)}
+                      </p>
+                    </div>
+                  </div>
+                )}
+
+                {/* Payment Info */}
+                {isStripeEnabled && (
+                  <div className="flex items-start gap-4 p-4 bg-gradient-to-r from-green-50 to-emerald-50 rounded-2xl border border-green-200">
+                    <div className="w-12 h-12 bg-gradient-to-r from-green-500 to-emerald-500 rounded-xl flex items-center justify-center flex-shrink-0">
+                      <CreditCard className="w-6 h-6 text-white" />
+                    </div>
+                    <div className="flex-1">
+                      <h4 className="font-bold text-gray-900 mb-2">Paiement</h4>
+                      <div className="space-y-1">
+                        <div className="flex justify-between items-center">
+                          <span className="text-gray-600">Acompte payé</span>
+                          <span className="font-bold text-green-600">{depositAmount.toFixed(2)}€</span>
+                        </div>
+                        <div className="flex justify-between items-center">
+                          <span className="text-gray-600">Solde à régler sur place</span>
+                          <span className="font-bold text-gray-900">
+                            {((selectedService?.price_ttc || 0) * quantity - depositAmount).toFixed(2)}€
+                          </span>
+                        </div>
+                        <div className="pt-2 mt-2 border-t border-green-200">
+                          <div className="flex justify-between items-center">
+                            <span className="font-bold text-gray-900">Total</span>
+                            <span className="font-bold text-gray-900 text-lg">
+                              {((selectedService?.price_ttc || 0) * quantity).toFixed(2)}€
+                            </span>
+                          </div>
+                        </div>
+                      </div>
+                    </div>
+                  </div>
+                )}
+              </div>
+            </div>
+
+            {/* Email Confirmation Notice */}
+            <div className="bg-gradient-to-r from-blue-50 to-purple-50 rounded-2xl p-6 mb-6 border border-blue-200">
+              <div className="flex items-start gap-3">
+                <Mail className="w-6 h-6 text-blue-600 flex-shrink-0 mt-1" />
+                <div>
+                  <h4 className="font-bold text-blue-900 mb-2">Email de confirmation envoyé</h4>
+                  <p className="text-blue-700 text-sm">
+                    Un email de confirmation a été envoyé à <strong>{clientData.email}</strong> avec tous les détails de votre réservation.
+                  </p>
+                </div>
+              </div>
+            </div>
+
+            {/* Action Buttons */}
+            <div className="flex flex-col sm:flex-row gap-4">
+              <button
+                onClick={() => {
+                  setCurrentStep(1);
+                  setSelectedService(null);
+                  setSelectedDate('');
+                  setSelectedTime('');
+                  setSelectedTeamMember('');
+                  setQuantity(1);
+                  setClientData({ firstname: '', lastname: '', email: '', phone: '' });
+                  setConfirmedBooking(null);
+                  window.history.replaceState({}, '', window.location.pathname);
+                }}
+                className="flex-1 bg-gradient-to-r from-blue-500 to-purple-500 text-white py-4 px-6 rounded-2xl font-bold hover:shadow-xl transition-all flex items-center justify-center gap-2"
+              >
+                <Calendar className="w-5 h-5" />
+                Nouvelle réservation
+              </button>
+            </div>
           </div>
         )}
       </div>

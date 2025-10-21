@@ -1,13 +1,13 @@
-import { createClient } from 'npm:@supabase/supabase-js@2'
-
 const corsHeaders = {
   'Access-Control-Allow-Origin': '*',
   'Access-Control-Allow-Headers': 'authorization, x-client-info, apikey, content-type, stripe-signature',
   'Access-Control-Allow-Methods': 'POST, OPTIONS',
 }
 
+// Cache pour éviter les doublons
 const processedSessions = new Map<string, { timestamp: number; result: any }>()
 
+// Nettoyer le cache toutes les 10 minutes
 setInterval(() => {
   const now = Date.now()
   const tenMinutes = 10 * 60 * 1000
@@ -19,6 +19,44 @@ setInterval(() => {
   }
 }, 10 * 60 * 1000)
 
+// Helper pour appeler l'API REST Supabase
+async function supabaseRequest(
+  endpoint: string,
+  method: string = 'GET',
+  body?: any
+) {
+  const supabaseUrl = Deno.env.get('SUPABASE_URL')
+  const serviceRoleKey = Deno.env.get('SUPABASE_SERVICE_ROLE_KEY')
+  
+  const url = `${supabaseUrl}/rest/v1/${endpoint}`
+  
+  const headers: Record<string, string> = {
+    'apikey': serviceRoleKey!,
+    'Authorization': `Bearer ${serviceRoleKey}`,
+    'Content-Type': 'application/json',
+    'Prefer': 'return=representation'
+  }
+  
+  const options: RequestInit = {
+    method,
+    headers
+  }
+  
+  if (body) {
+    options.body = JSON.stringify(body)
+  }
+  
+  const response = await fetch(url, options)
+  
+  if (!response.ok) {
+    const error = await response.text()
+    throw new Error(`Supabase API error: ${response.status} - ${error}`)
+  }
+  
+  const text = await response.text()
+  return text ? JSON.parse(text) : null
+}
+
 Deno.serve(async (req) => {
   if (req.method === 'OPTIONS') {
     return new Response('ok', { headers: corsHeaders })
@@ -26,11 +64,6 @@ Deno.serve(async (req) => {
 
   try {
     console.log('🔔 Webhook Stripe reçu')
-    
-    const supabaseClient = createClient(
-      Deno.env.get('SUPABASE_URL') ?? '',
-      Deno.env.get('SUPABASE_SERVICE_ROLE_KEY') ?? ''
-    )
 
     const body = await req.text()
     const signature = req.headers.get('stripe-signature')
@@ -54,21 +87,18 @@ Deno.serve(async (req) => {
       const subscription = event.data.object
       console.log('📊 Mise à jour abonnement:', subscription.id)
 
-      const { error: updateError } = await supabaseClient
-        .from('users')
-        .update({
+      await supabaseRequest(
+        `users?stripe_subscription_id=eq.${subscription.id}`,
+        'PATCH',
+        {
           subscription_status: subscription.status === 'active' ? 'active' : 'cancelled',
           cancel_at_period_end: subscription.cancel_at_period_end || false,
           current_period_end: new Date(subscription.current_period_end * 1000).toISOString(),
           updated_at: new Date().toISOString()
-        })
-        .eq('stripe_subscription_id', subscription.id)
+        }
+      )
 
-      if (updateError) {
-        console.error('❌ Erreur mise à jour abonnement:', updateError)
-      } else {
-        console.log('✅ Abonnement mis à jour')
-      }
+      console.log('✅ Abonnement mis à jour')
 
       return new Response(JSON.stringify({ success: true }), {
         headers: { ...corsHeaders, 'Content-Type': 'application/json' }
@@ -83,6 +113,7 @@ Deno.serve(async (req) => {
       console.log('💳 Session de paiement complétée:', sessionId)
       console.log('📋 Metadata:', JSON.stringify(session.metadata, null, 2))
       
+      // ⚠️ VÉRIFICATION CRITIQUE : Paiement complet ?
       if (session.status !== 'complete' || session.payment_status !== 'paid') {
         console.log('⚠️ PAIEMENT NON COMPLET - Session ignorée')
         return new Response(JSON.stringify({ 
@@ -93,6 +124,7 @@ Deno.serve(async (req) => {
         })
       }
       
+      // 🔒 Vérifier si déjà traité (éviter doublons)
       if (processedSessions.has(sessionId)) {
         const cached = processedSessions.get(sessionId)!
         console.log('🔒 SESSION DÉJÀ TRAITÉE')
@@ -105,6 +137,7 @@ Deno.serve(async (req) => {
         })
       }
 
+      // Marquer comme en cours de traitement
       processedSessions.set(sessionId, { 
         timestamp: Date.now(), 
         result: { processing: true } 
@@ -120,7 +153,7 @@ Deno.serve(async (req) => {
         return new Response('Email client manquant', { status: 400, headers: corsHeaders })
       }
 
-      // RÉSERVATION IFRAME (booking_deposit)
+      // 📅 RÉSERVATION IFRAME (booking_deposit)
       if (metadata.payment_type === 'booking_deposit') {
         console.log('📅 === CRÉATION RÉSERVATION APRÈS PAIEMENT === 📅')
         
@@ -141,20 +174,34 @@ Deno.serve(async (req) => {
         }
 
         // Récupérer les infos du service
-        const { data: service, error: serviceError } = await supabaseClient
-          .from('services')
-          .select('*')
-          .eq('id', serviceId)
-          .single()
+        const services = await supabaseRequest(`services?id=eq.${serviceId}`)
+        const service = services?.[0]
 
-        if (serviceError || !service) {
-          console.error('❌ Service non trouvé:', serviceError)
+        if (!service) {
+          console.error('❌ Service non trouvé')
           processedSessions.delete(sessionId)
           return new Response('Service non trouvé', { status: 404, headers: corsHeaders })
         }
 
         const totalAmount = service.price_ttc * quantity
         const depositAmount = session.amount_total / 100 // Stripe envoie en centimes
+
+        // 🔍 Vérifier si la réservation existe déjà
+        const existingBookings = await supabaseRequest(`bookings?stripe_session_id=eq.${sessionId}`)
+        const existingBooking = existingBookings?.[0]
+
+        if (existingBooking) {
+          console.log('⚠️ Réservation déjà créée:', existingBooking.id)
+          const result = { 
+            success: true, 
+            type: 'booking_already_exists',
+            bookingId: existingBooking.id
+          }
+          processedSessions.set(sessionId, { timestamp: Date.now(), result })
+          return new Response(JSON.stringify(result), {
+            headers: { ...corsHeaders, 'Content-Type': 'application/json' }
+          })
+        }
 
         // Créer la réservation
         const bookingData: any = {
@@ -181,14 +228,11 @@ Deno.serve(async (req) => {
 
         console.log('📝 Création réservation:', bookingData)
 
-        const { data: booking, error: bookingError } = await supabaseClient
-          .from('bookings')
-          .insert(bookingData)
-          .select()
-          .single()
+        const bookings = await supabaseRequest('bookings', 'POST', bookingData)
+        const booking = bookings?.[0]
 
-        if (bookingError) {
-          console.error('❌ Erreur création réservation:', bookingError)
+        if (!booking) {
+          console.error('❌ Erreur création réservation')
           processedSessions.delete(sessionId)
           return new Response('Erreur création réservation', { status: 500, headers: corsHeaders })
         }
@@ -208,7 +252,7 @@ Deno.serve(async (req) => {
         })
       }
 
-      // ABONNEMENT PLUGIN
+      // 🔌 ABONNEMENT PLUGIN
       if (clientReferenceId && clientReferenceId.includes('|')) {
         console.log('🔌 ABONNEMENT PLUGIN détecté via client_reference_id')
         
@@ -225,25 +269,18 @@ Deno.serve(async (req) => {
         
         const stripeSubscriptionId = session.subscription
 
-        const { data: existingSub, error: checkError } = await supabaseClient
-          .from('plugin_subscriptions')
-          .select('*')
-          .eq('user_id', userId)
-          .eq('plugin_id', pluginId)
-          .maybeSingle()
-
-        if (checkError) {
-          console.error('❌ Erreur vérification souscription:', checkError)
-          processedSessions.delete(sessionId)
-          return new Response('Erreur vérification souscription', { status: 500, headers: corsHeaders })
-        }
+        const existingSubs = await supabaseRequest(
+          `plugin_subscriptions?user_id=eq.${userId}&plugin_id=eq.${pluginId}`
+        )
+        const existingSub = existingSubs?.[0]
 
         if (existingSub) {
           console.log('📋 Souscription existante trouvée, mise à jour...')
           
-          const { error: updateError } = await supabaseClient
-            .from('plugin_subscriptions')
-            .update({
+          await supabaseRequest(
+            `plugin_subscriptions?id=eq.${existingSub.id}`,
+            'PATCH',
+            {
               status: 'active',
               is_trial: false,
               trial_ends_at: null,
@@ -252,37 +289,23 @@ Deno.serve(async (req) => {
               current_period_start: new Date().toISOString(),
               current_period_end: session.expires_at ? new Date(session.expires_at * 1000).toISOString() : null,
               updated_at: new Date().toISOString()
-            })
-            .eq('id', existingSub.id)
-          
-          if (updateError) {
-            console.error('❌ Erreur mise à jour plugin:', updateError)
-            processedSessions.delete(sessionId)
-            return new Response('Erreur mise à jour plugin', { status: 500, headers: corsHeaders })
-          }
+            }
+          )
           
           console.log('✅ PLUGIN ACTIVÉ (mise à jour)')
         } else {
           console.log('➕ Création nouvelle souscription plugin...')
           
-          const { error: insertError } = await supabaseClient
-            .from('plugin_subscriptions')
-            .insert({
-              user_id: userId,
-              plugin_id: pluginId,
-              status: 'active',
-              is_trial: false,
-              stripe_subscription_id: stripeSubscriptionId,
-              stripe_customer_id: session.customer,
-              current_period_start: new Date().toISOString(),
-              current_period_end: session.expires_at ? new Date(session.expires_at * 1000).toISOString() : null
-            })
-          
-          if (insertError) {
-            console.error('❌ Erreur création plugin:', insertError)
-            processedSessions.delete(sessionId)
-            return new Response('Erreur création plugin', { status: 500, headers: corsHeaders })
-          }
+          await supabaseRequest('plugin_subscriptions', 'POST', {
+            user_id: userId,
+            plugin_id: pluginId,
+            status: 'active',
+            is_trial: false,
+            stripe_subscription_id: stripeSubscriptionId,
+            stripe_customer_id: session.customer,
+            current_period_start: new Date().toISOString(),
+            current_period_end: session.expires_at ? new Date(session.expires_at * 1000).toISOString() : null
+          })
           
           console.log('✅ PLUGIN ACTIVÉ (création)')
         }
@@ -302,7 +325,7 @@ Deno.serve(async (req) => {
         })
       }
 
-      // Abonnement plateforme
+      // 💳 Abonnement plateforme
       if (metadata.payment_type === 'platform_subscription') {
         console.log('💳 ABONNEMENT PLATEFORME')
         
@@ -322,9 +345,10 @@ Deno.serve(async (req) => {
         
         const stripeSubscriptionId = session.subscription
 
-        const { error: updateError } = await supabaseClient
-          .from('users')
-          .update({
+        await supabaseRequest(
+          `users?id=eq.${userId}`,
+          'PATCH',
+          {
             subscription_tier: subscriptionTier,
             subscription_status: 'active',
             trial_ends_at: null,
@@ -333,14 +357,8 @@ Deno.serve(async (req) => {
             current_period_end: session.expires_at ? new Date(session.expires_at * 1000).toISOString() : null,
             cancel_at_period_end: false,
             updated_at: new Date().toISOString()
-          })
-          .eq('id', userId)
-        
-        if (updateError) {
-          console.error('❌ Erreur mise à jour abonnement:', updateError)
-          processedSessions.delete(sessionId)
-          return new Response('Erreur mise à jour abonnement', { status: 500, headers: corsHeaders })
-        }
+          }
+        )
         
         console.log('✅ ABONNEMENT ACTIVÉ')
         
