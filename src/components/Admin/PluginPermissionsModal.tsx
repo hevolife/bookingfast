@@ -34,7 +34,12 @@ export function PluginPermissionsModal({ isOpen, onClose, member }: PluginPermis
 
     setLoading(true);
     try {
+      console.log('🔍 Chargement permissions pour:', { owner: user.id, member: member.id });
+      
+      // ✅ CORRECTION : Utiliser user.id comme owner_id (propriétaire connecté)
       const data = await getTeamMemberPluginPermissions(user.id, member.id);
+      
+      console.log('✅ Permissions reçues:', data);
       setPermissions(data);
     } catch (error) {
       console.error('❌ Erreur chargement permissions:', error);
