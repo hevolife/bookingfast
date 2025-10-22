@@ -1,10 +1,11 @@
 import React, { useState, useEffect } from 'react';
-import { useSearchParams } from 'react-router-dom';
 import { CreditCard, Clock, User, Mail, Calendar, AlertTriangle, XCircle, Timer, CheckCircle } from 'lucide-react';
 import { supabase, isSupabaseConfigured } from '../../lib/supabase';
 
 export function PaymentPage() {
-  const [searchParams] = useSearchParams();
+  // 🎯 PARSER L'URL MANUELLEMENT (pas de useSearchParams)
+  const searchParams = new URLSearchParams(window.location.search);
+  
   const [timeLeft, setTimeLeft] = useState<number>(0);
   const [isExpired, setIsExpired] = useState(false);
   const [processing, setProcessing] = useState(false);
@@ -47,32 +48,29 @@ export function PaymentPage() {
 
         if (error || !booking) {
           console.warn('⚠️ Réservation non trouvée, mais autorisation du lien pour les clients externes');
-          // Ne pas bloquer pour les clients externes - ils peuvent avoir un lien valide
           setCheckingStatus(false);
           return;
         }
 
-        // Si la réservation est déjà entièrement payée, marquer comme supprimé
+        // Si la réservation est déjà entièrement payée
         if (booking.payment_status === 'completed' && 
             (booking.payment_amount || 0) >= booking.total_amount) {
-          console.log('💰 Réservation déjà entièrement payée');
-          setIsDeleted(true); // Cela déclenchera l'affichage "Paiement validé"
+          setIsDeleted(true);
           setCheckingStatus(false);
           return;
         }
         
-        // Vérifier aussi si le montant demandé a déjà été payé
+        // Vérifier si le montant demandé a déjà été payé
         const requestedAmount = parseFloat(amount || '0');
         const alreadyPaid = (booking.payment_amount || 0);
         
         if (requestedAmount > 0 && alreadyPaid >= requestedAmount) {
-          console.log('💰 Montant demandé déjà payé:', { requestedAmount, alreadyPaid });
-          setIsDeleted(true); // Afficher "Paiement validé"
+          setIsDeleted(true);
           setCheckingStatus(false);
           return;
         }
         
-        // Vérifier si il y a des transactions Stripe complétées pour ce montant
+        // Vérifier les transactions Stripe
         const stripeTransactions = booking.transactions?.filter(t => 
           t.method === 'stripe' && 
           t.status === 'completed' &&
@@ -80,17 +78,13 @@ export function PaymentPage() {
         ) || [];
         
         if (stripeTransactions.length > 0) {
-          console.log('💰 Transaction Stripe déjà complétée pour ce montant');
-          setIsDeleted(true); // Afficher "Paiement validé"
+          setIsDeleted(true);
           setCheckingStatus(false);
           return;
         }
         
-        // Sinon, autoriser l'accès au lien de paiement
-        console.log('✅ Lien de paiement autorisé');
       } catch (error) {
-        console.warn('⚠️ Erreur vérification lien, mais autorisation pour les clients externes:', error);
-        // En cas d'erreur, autoriser quand même l'accès pour les clients externes
+        console.warn('⚠️ Erreur vérification lien:', error);
       } finally {
         setCheckingStatus(false);
       }
@@ -123,20 +117,6 @@ export function PaymentPage() {
     const minutes = Math.floor(ms / 60000);
     const seconds = Math.floor((ms % 60000) / 1000);
     return `${minutes.toString().padStart(2, '0')}:${seconds.toString().padStart(2, '0')}`;
-  };
-
-  const formatTimeLeftReadable = (ms: number) => {
-    const hours = Math.floor(ms / 3600000);
-    const minutes = Math.floor((ms % 3600000) / 60000);
-    const seconds = Math.floor((ms % 60000) / 1000);
-    
-    if (hours > 0) {
-      return `${hours}h ${minutes}min ${seconds}s`;
-    } else if (minutes > 0) {
-      return `${minutes}min ${seconds}s`;
-    } else {
-      return `${seconds}s`;
-    }
   };
 
   // Affichage pendant la vérification
@@ -245,21 +225,7 @@ export function PaymentPage() {
 
     setProcessing(true);
     try {
-      console.log('🔄 Début du processus de paiement');
-      console.log('📊 Données de paiement:', {
-        amount: parseFloat(amount),
-        service_name: service,
-        customer_email: email,
-        metadata: {
-          client: client,
-          email: email,
-          date: date,
-          time: time,
-        }
-      });
-
       if (isSupabaseConfigured()) {
-        // Appel à la fonction Supabase Edge Function
         const supabaseUrl = import.meta.env.VITE_SUPABASE_URL;
         const response = await fetch(`${supabaseUrl}/functions/v1/stripe-checkout`, {
           method: 'POST',
@@ -296,11 +262,8 @@ export function PaymentPage() {
           throw new Error(errorData.error || 'Erreur lors de la création de la session de paiement');
         }
       } else {
-        // Mode démo - simuler le paiement
-        console.log('🎭 Mode démo - simulation du paiement');
+        // Mode démo
         await new Promise(resolve => setTimeout(resolve, 2000));
-        
-        // Rediriger vers la page de succès
         window.location.href = '/payment-success';
         return;
       }
@@ -312,7 +275,7 @@ export function PaymentPage() {
     }
   };
 
-  const isWarning = timeLeft > 0 && timeLeft < 5 * 60 * 1000; // Moins de 5 minutes
+  const isWarning = timeLeft > 0 && timeLeft < 5 * 60 * 1000;
 
   return (
     <div className="min-h-screen bg-gradient-to-br from-blue-50 via-purple-50 to-pink-50 flex items-center justify-center p-4">
