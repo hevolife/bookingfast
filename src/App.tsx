@@ -1,11 +1,11 @@
-import React, { useState, useEffect, lazy, Suspense } from 'react';
+import React, { lazy, Suspense, useEffect } from 'react';
+import { Routes, Route, Navigate, useNavigate, useLocation } from 'react-router-dom';
 import { TeamProvider } from './contexts/TeamContext';
 import { Navbar } from './components/Layout/Navbar';
 import { LoadingSpinner } from './components/UI/LoadingSpinner';
 import { GoogleCalendarCallback } from './components/Admin/GoogleCalendarCallback';
 import { PluginGuard } from './components/Plugins/PluginGuard';
 
-// Lazy load pages for better code splitting
 const DashboardPage = lazy(() => import('./components/Dashboard/DashboardPage').then(m => ({ default: m.DashboardPage })));
 const CalendarPage = lazy(() => import('./components/Calendar/CalendarPage').then(m => ({ default: m.CalendarPage })));
 const ClientsPage = lazy(() => import('./components/Clients/ClientsPage').then(m => ({ default: m.ClientsPage })));
@@ -17,11 +17,9 @@ const MultiUserSettingsPage = lazy(() => import('./components/MultiUser/MultiUse
 const POSPage = lazy(() => import('./components/POS/POSPage').then(m => ({ default: m.POSPage })));
 const PluginsPage = lazy(() => import('./components/Plugins/PluginsPage').then(m => ({ default: m.PluginsPage })));
 
-type PageType = 'dashboard' | 'calendar' | 'bookings-list' | 'clients' | 'services' | 'emails' | 'admin' | 'reports' | 'multi-user' | 'pos' | 'plugins';
-
 function App() {
-  const [currentPage, setCurrentPage] = useState<PageType>('dashboard');
-  const [isOAuthCallback, setIsOAuthCallback] = useState(false);
+  const location = useLocation();
+  const navigate = useNavigate();
 
   // Détecter le callback OAuth Google Calendar
   useEffect(() => {
@@ -30,45 +28,21 @@ function App() {
     const state = urlParams.get('state');
     const path = window.location.pathname;
 
-    // Si on est sur /auth/google/callback avec un code, c'est le callback OAuth
     if ((path === '/auth/google/callback' || path.includes('/auth/google/callback')) && code && state) {
-      console.log('🔍 Callback OAuth détecté:', { code: code.substring(0, 20) + '...', state });
-      setIsOAuthCallback(true);
+      // Laisser le composant GoogleCalendarCallback gérer le callback
+      return;
     }
   }, []);
 
-  const renderPage = () => {
-    const pageComponents: Record<PageType, React.ReactNode> = {
-      dashboard: <DashboardPage />,
-      calendar: <CalendarPage />,
-      'bookings-list': <CalendarPage view="list" />,
-      clients: <ClientsPage />,
-      services: <ServicesPage />,
-      emails: <EmailWorkflowPage />,
-      admin: <AdminPage />,
-      reports: (
-        <PluginGuard pluginSlug="reports">
-          <ReportsPage />
-        </PluginGuard>
-      ),
-      'multi-user': (
-        <PluginGuard pluginSlug="multi-user">
-          <MultiUserSettingsPage />
-        </PluginGuard>
-      ),
-      pos: (
-        <PluginGuard pluginSlug="pos">
-          <POSPage />
-        </PluginGuard>
-      ),
-      plugins: <PluginsPage />
-    };
-
-    return pageComponents[currentPage] || <DashboardPage />;
-  };
+  // Rediriger vers /dashboard si on est sur la racine
+  useEffect(() => {
+    if (location.pathname === '/') {
+      navigate('/dashboard', { replace: true });
+    }
+  }, [location.pathname, navigate]);
 
   // Si c'est un callback OAuth, afficher le composant de callback
-  if (isOAuthCallback) {
+  if (location.pathname.includes('/auth/google/callback')) {
     return (
       <TeamProvider>
         <div className="flex items-center justify-center min-h-screen bg-gradient-to-br from-blue-50 via-purple-50 to-pink-50">
@@ -83,7 +57,7 @@ function App() {
   return (
     <TeamProvider>
       <div className="app-container flex flex-col h-screen overflow-hidden bg-gradient-to-br from-blue-50 via-purple-50 to-pink-50">
-        <Navbar currentPage={currentPage} onPageChange={setCurrentPage} />
+        <Navbar />
         <main 
           className="flex-1 overflow-y-auto scrollable-area"
           style={{ 
@@ -93,7 +67,32 @@ function App() {
           }}
         >
           <Suspense fallback={<LoadingSpinner />}>
-            {renderPage()}
+            <Routes>
+              <Route path="/dashboard" element={<DashboardPage />} />
+              <Route path="/calendar" element={<CalendarPage />} />
+              <Route path="/bookings-list" element={<CalendarPage view="list" />} />
+              <Route path="/clients" element={<ClientsPage />} />
+              <Route path="/services" element={<ServicesPage />} />
+              <Route path="/emails" element={<EmailWorkflowPage />} />
+              <Route path="/admin" element={<AdminPage />} />
+              <Route path="/reports" element={
+                <PluginGuard pluginSlug="reports">
+                  <ReportsPage />
+                </PluginGuard>
+              } />
+              <Route path="/multi-user" element={
+                <PluginGuard pluginSlug="multi-user">
+                  <MultiUserSettingsPage />
+                </PluginGuard>
+              } />
+              <Route path="/pos" element={
+                <PluginGuard pluginSlug="pos">
+                  <POSPage />
+                </PluginGuard>
+              } />
+              <Route path="/plugins" element={<PluginsPage />} />
+              <Route path="*" element={<Navigate to="/dashboard" replace />} />
+            </Routes>
           </Suspense>
         </main>
       </div>

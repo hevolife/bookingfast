@@ -1,24 +1,19 @@
 import React, { useState, useEffect } from 'react';
+import { useNavigate, useLocation } from 'react-router-dom';
 import { Calendar, Settings, LayoutDashboard, Package, Mail, BarChart3, Users, ShoppingCart, LogOut, Menu, X, ChevronDown, ChevronRight, Puzzle, List, UserCircle } from 'lucide-react';
 import { useAuth } from '../../contexts/AuthContext';
 import { usePlugins } from '../../hooks/usePlugins';
 
-interface NavbarProps {
-  currentPage: string;
-  onPageChange: (page: any) => void;
-}
-
-export function Navbar({ currentPage, onPageChange }: NavbarProps) {
+export function Navbar() {
+  const navigate = useNavigate();
+  const location = useLocation();
   const { signOut } = useAuth();
   const { userPlugins, loading } = usePlugins();
   const [mobileMenuOpen, setMobileMenuOpen] = useState(false);
   const [pluginsMenuOpen, setPluginsMenuOpen] = useState(false);
   const [calendarMenuOpen, setCalendarMenuOpen] = useState(false);
 
-  useEffect(() => {
-    console.log('🔍 Navbar - Plugins utilisateur:', userPlugins);
-    console.log('🔍 Navbar - Loading:', loading);
-  }, [userPlugins, loading]);
+  const currentPage = location.pathname.replace('/', '') || 'dashboard';
 
   const hasReportsAccess = userPlugins.some(p => p.plugin_slug === 'reports');
   const hasMultiUserAccess = userPlugins.some(p => p.plugin_slug === 'multi-user');
@@ -53,25 +48,10 @@ export function Navbar({ currentPage, onPageChange }: NavbarProps) {
   };
 
   const handleNavigation = (pageId: string) => {
-    onPageChange(pageId);
+    navigate(`/${pageId}`);
     setMobileMenuOpen(false);
     setPluginsMenuOpen(false);
     setCalendarMenuOpen(false);
-  };
-
-  const getActiveViewLabel = () => {
-    const calendarItem = calendarSubItems.find(item => item.id === currentPage);
-    if (calendarItem) return calendarItem.label;
-    
-    const pluginItem = pluginNavItems.find(item => item.id === currentPage);
-    if (pluginItem) return pluginItem.label;
-    
-    if (currentPage === 'dashboard') return 'Dashboard';
-    if (currentPage === 'services') return 'Services';
-    if (currentPage === 'emails') return 'Emails';
-    if (currentPage === 'admin') return 'Paramètres';
-    
-    return 'Dashboard';
   };
 
   return (
@@ -97,9 +77,8 @@ export function Navbar({ currentPage, onPageChange }: NavbarProps) {
             </div>
 
             <div className="hidden lg:flex items-center gap-2">
-              {/* Dashboard */}
               <button
-                onClick={() => onPageChange('dashboard')}
+                onClick={() => handleNavigation('dashboard')}
                 className={`flex items-center gap-2 px-4 py-2 rounded-xl font-medium transition-all ${
                   currentPage === 'dashboard'
                     ? 'bg-gradient-to-r from-purple-600 to-pink-600 text-white shadow-lg'
@@ -110,7 +89,6 @@ export function Navbar({ currentPage, onPageChange }: NavbarProps) {
                 <span>Dashboard</span>
               </button>
 
-              {/* Menu Calendrier avec sous-menu */}
               <div className="relative">
                 <button
                   onClick={handleCalendarToggle}
@@ -137,10 +115,7 @@ export function Navbar({ currentPage, onPageChange }: NavbarProps) {
                       return (
                         <button
                           key={item.id}
-                          onClick={() => {
-                            onPageChange(item.id);
-                            setCalendarMenuOpen(false);
-                          }}
+                          onClick={() => handleNavigation(item.id)}
                           className={`w-full flex items-center gap-3 px-4 py-3 font-medium transition-all ${
                             isActive
                               ? 'bg-gradient-to-r from-blue-50 to-cyan-50 text-blue-600'
@@ -156,9 +131,8 @@ export function Navbar({ currentPage, onPageChange }: NavbarProps) {
                 )}
               </div>
 
-              {/* Services */}
               <button
-                onClick={() => onPageChange('services')}
+                onClick={() => handleNavigation('services')}
                 className={`flex items-center gap-2 px-4 py-2 rounded-xl font-medium transition-all ${
                   currentPage === 'services'
                     ? 'bg-gradient-to-r from-green-600 to-emerald-600 text-white shadow-lg'
@@ -169,9 +143,8 @@ export function Navbar({ currentPage, onPageChange }: NavbarProps) {
                 <span>Services</span>
               </button>
 
-              {/* Emails */}
               <button
-                onClick={() => onPageChange('emails')}
+                onClick={() => handleNavigation('emails')}
                 className={`flex items-center gap-2 px-4 py-2 rounded-xl font-medium transition-all ${
                   currentPage === 'emails'
                     ? 'bg-gradient-to-r from-orange-600 to-red-600 text-white shadow-lg'
@@ -209,10 +182,7 @@ export function Navbar({ currentPage, onPageChange }: NavbarProps) {
                         return (
                           <button
                             key={item.id}
-                            onClick={() => {
-                              onPageChange(item.id);
-                              setPluginsMenuOpen(false);
-                            }}
+                            onClick={() => handleNavigation(item.id)}
                             className={`w-full flex items-center gap-3 px-4 py-3 font-medium transition-all ${
                               isActive
                                 ? 'bg-gradient-to-r from-blue-50 to-cyan-50 text-blue-600'
@@ -230,7 +200,7 @@ export function Navbar({ currentPage, onPageChange }: NavbarProps) {
               )}
 
               <button
-                onClick={() => onPageChange('admin')}
+                onClick={() => handleNavigation('admin')}
                 className={`flex items-center gap-2 px-4 py-2 rounded-xl font-medium transition-all ${
                   currentPage === 'admin'
                     ? 'bg-gradient-to-r from-purple-600 to-pink-600 text-white shadow-lg'
@@ -297,7 +267,6 @@ export function Navbar({ currentPage, onPageChange }: NavbarProps) {
                   Menu Principal
                 </div>
                 
-                {/* Dashboard */}
                 <button
                   onClick={() => handleNavigation('dashboard')}
                   className={`w-full flex items-center gap-4 p-4 rounded-2xl font-medium transition-all transform hover:scale-105 animate-slideUp ${
@@ -325,7 +294,6 @@ export function Navbar({ currentPage, onPageChange }: NavbarProps) {
                 </button>
               </div>
 
-              {/* Menu Calendrier avec sous-menu mobile */}
               <div className="space-y-2 mt-6">
                 <div className="text-xs font-bold text-purple-200 uppercase tracking-wider px-4 mb-3 flex items-center gap-2">
                   <Calendar className="w-4 h-4" />
@@ -398,7 +366,6 @@ export function Navbar({ currentPage, onPageChange }: NavbarProps) {
                   Autres
                 </div>
                 
-                {/* Services */}
                 <button
                   onClick={() => handleNavigation('services')}
                   className={`w-full flex items-center gap-4 p-4 rounded-2xl font-medium transition-all transform hover:scale-105 ${
@@ -425,7 +392,6 @@ export function Navbar({ currentPage, onPageChange }: NavbarProps) {
                   )}
                 </button>
 
-                {/* Emails */}
                 <button
                   onClick={() => handleNavigation('emails')}
                   className={`w-full flex items-center gap-4 p-4 rounded-2xl font-medium transition-all transform hover:scale-105 ${
