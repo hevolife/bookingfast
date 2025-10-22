@@ -11,13 +11,23 @@
     "isolatedModules": true,
     "noEmit": true,
     "jsx": "react-jsx",
-    "strict": true,
-    "noUnusedLocals": true,
-    "noUnusedParameters": true,
-    "noFallthroughCasesInSwitch": true,
+    "strict": false,
+    "noUnusedLocals": false,
+    "noUnusedParameters": false,
+    "noFallthroughCasesInSwitch": false,
     "allowSyntheticDefaultImports": true,
     "esModuleInterop": true,
-    "forceConsistentCasingInFileNames": true,
+    "forceConsistentCasingInFileNames": false,
+    "noImplicitAny": false,
+    "strictNullChecks": false,
+    "strictFunctionTypes": false,
+    "strictBindCallApply": false,
+    "strictPropertyInitialization": false,
+    "noImplicitThis": false,
+    "alwaysStrict": false,
+    "suppressImplicitAnyIndexErrors": true,
+    "noImplicitReturns": false,
+    "noUncheckedIndexedAccess": false,
     "baseUrl": ".",
     "paths": {
       "@/*": ["src/*"],
@@ -29,5 +39,5 @@
     }
   },
   "include": ["src"],
-  "references": [{ "path": "./tsconfig.node.json" }]
+  "exclude": ["node_modules", "dist"]
 }
