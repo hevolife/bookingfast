@@ -1,6 +1,6 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState } from 'react';
 import { useSearchParams, useNavigate } from 'react-router-dom';
-import { Mail, Lock, Eye, EyeOff, LogIn, UserPlus, Building2, Sparkles, Key, Gift, RotateCcw } from 'lucide-react';
+import { Mail, Lock, Eye, EyeOff, LogIn, UserPlus, Building2, Sparkles, Gift, RotateCcw } from 'lucide-react';
 import { useAuth } from '../../contexts/AuthContext';
 import { AccessCodeRedemption } from './AccessCodeRedemption';
 import { useAppVersion } from '../../hooks/useAppVersion';
@@ -20,42 +20,17 @@ export function LoginPage() {
   const [showSecretCode, setShowSecretCode] = useState(false);
   const [showForgotPassword, setShowForgotPassword] = useState(false);
   
-  const { signIn, signUp, isAuthenticated } = useAuth();
+  const { signIn, signUp } = useAuth();
   const { currentVersion } = useAppVersion();
 
-  // Récupérer le code d'affiliation depuis l'URL
   const affiliateCode = searchParams.get('ref');
-
-  // Afficher un message si c'est un lien d'affiliation
   const isAffiliateSignup = affiliateCode && !isLogin;
-
-  // 🔥 CORRECTION : Rediriger si déjà authentifié
-  useEffect(() => {
-    if (isAuthenticated) {
-      console.log('✅ LoginPage - Utilisateur déjà authentifié, redirection vers /dashboard');
-      navigate('/dashboard', { replace: true });
-    }
-  }, [isAuthenticated, navigate]);
-
-  // Gérer le retour de confirmation d'email
-  useEffect(() => {
-    const type = searchParams.get('type');
-    const accessToken = searchParams.get('access_token');
-    
-    if (type === 'signup' && accessToken) {
-      console.log('✅ Email confirmé - redirection vers dashboard');
-      navigate('/dashboard', { replace: true });
-    }
-  }, [searchParams, navigate]);
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
     setLoading(true);
     setError(null);
 
-    console.log('🔐 LoginPage - Tentative de connexion...', { email, isLogin });
-
-    // Validation du mot de passe pour l'inscription
     if (!isLogin) {
       if (password !== confirmPassword) {
         setError('Les mots de passe ne correspondent pas');
@@ -71,31 +46,27 @@ export function LoginPage() {
 
     try {
       if (isLogin) {
-        console.log('🔑 LoginPage - Appel signIn...');
+        console.log('🔑 Tentative de connexion...');
         await signIn(email, password);
-        console.log('✅ LoginPage - SignIn réussi, redirection vers /dashboard');
-        // La redirection sera gérée par le useEffect qui surveille isAuthenticated
+        console.log('✅ Connexion réussie - REDIRECTION IMMÉDIATE');
+        
+        // ✅ REDIRECTION IMMÉDIATE APRÈS CONNEXION
+        window.location.href = '/dashboard';
       } else {
-        console.log('📝 LoginPage - Appel signUp...');
+        console.log('📝 Tentative d\'inscription...');
         await signUp(email, password);
         
-        // Si c'est un lien d'affiliation, traiter le parrainage
         if (affiliateCode) {
-          try {
-            console.log('🎯 Traitement code d\'affiliation:', affiliateCode);
-          } catch (affiliateError) {
-            console.warn('⚠️ Erreur traitement affiliation:', affiliateError);
-          }
+          console.log('🎯 Code affiliation:', affiliateCode);
         }
         
         setError('Compte créé avec succès ! Vérifiez votre email pour confirmer votre compte.');
         setIsLogin(true);
         setPassword('');
         setConfirmPassword('');
-        return;
       }
     } catch (err) {
-      console.error('❌ LoginPage - Erreur authentification:', err);
+      console.error('❌ Erreur authentification:', err);
       let errorMessage = 'Une erreur est survenue';
       
       if (err instanceof Error) {
@@ -126,7 +97,6 @@ export function LoginPage() {
 
   return (
     <div className="min-h-screen bg-gradient-to-br from-blue-50 via-purple-50 to-pink-50 flex items-center justify-center p-4">
-      {/* Background decorations */}
       <div className="absolute inset-0 overflow-hidden pointer-events-none">
         <div className="absolute -top-40 -right-40 w-80 h-80 bg-gradient-to-r from-purple-400 to-pink-400 rounded-full opacity-20 animate-float"></div>
         <div className="absolute -bottom-40 -left-40 w-80 h-80 bg-gradient-to-r from-blue-400 to-cyan-400 rounded-full opacity-20 animate-float" style={{ animationDelay: '2s' }}></div>
@@ -134,7 +104,6 @@ export function LoginPage() {
       </div>
 
       <div className="relative z-10 w-full max-w-md">
-        {/* Logo et titre */}
         <div className="text-center mb-6">
           <div className="w-20 h-20 bg-gradient-to-r from-blue-600 to-purple-600 rounded-3xl flex items-center justify-center mx-auto mb-4 shadow-2xl animate-glow">
             <Building2 className="w-10 h-10 text-white" />
@@ -147,9 +116,7 @@ export function LoginPage() {
           </p>
         </div>
 
-        {/* Formulaire */}
         <div className="bg-white/90 backdrop-blur-md rounded-3xl shadow-2xl p-8 border border-white/20">
-          {/* Message d'affiliation */}
           {isAffiliateSignup && (
             <div className="mb-6 bg-gradient-to-r from-purple-50 to-pink-50 border-2 border-purple-200 rounded-2xl p-4 animate-fadeIn">
               <div className="flex items-center gap-3 mb-2">
@@ -188,7 +155,6 @@ export function LoginPage() {
           )}
 
           <form onSubmit={handleSubmit} className="space-y-6">
-            {/* Email */}
             <div>
               <label className="block text-sm font-medium text-gray-700 mb-2">
                 Adresse email
@@ -206,7 +172,6 @@ export function LoginPage() {
               </div>
             </div>
 
-            {/* Mot de passe */}
             <div>
               <label className="block text-sm font-medium text-gray-700 mb-2">
                 Mot de passe
@@ -237,7 +202,6 @@ export function LoginPage() {
               )}
             </div>
 
-            {/* Confirmation mot de passe (uniquement en mode inscription) */}
             {!isLogin && (
               <div>
                 <label className="block text-sm font-medium text-gray-700 mb-2">
@@ -281,7 +245,6 @@ export function LoginPage() {
               </div>
             )}
 
-            {/* Bouton de soumission */}
             <button
               type="submit"
               disabled={loading || (!isLogin && password !== confirmPassword)}
@@ -301,7 +264,6 @@ export function LoginPage() {
             </button>
           </form>
 
-          {/* Mot de passe oublié */}
           {isLogin && (
             <div className="mt-4 text-center">
               <button
@@ -315,7 +277,6 @@ export function LoginPage() {
             </div>
           )}
 
-          {/* Toggle entre login/register */}
           <div className="mt-6 text-center">
             <div className="text-gray-600 mb-3">
               {isLogin ? "Vous n'avez pas de compte ?" : "Vous avez déjà un compte ?"}
@@ -329,7 +290,6 @@ export function LoginPage() {
             </button>
           </div>
 
-          {/* Code secret */}
           <div className="mt-4 text-center">
             <button
               type="button"
@@ -341,22 +301,18 @@ export function LoginPage() {
             </button>
           </div>
 
-          {/* Formulaire code secret */}
           {showSecretCode && (
             <div className="mt-4">
               <AccessCodeRedemption 
                 onSuccess={() => {
                   setShowSecretCode(false);
-                  setTimeout(() => {
-                    navigate('/dashboard', { replace: true });
-                  }, 1500);
+                  window.location.href = '/dashboard';
                 }}
               />
             </div>
           )}
         </div>
 
-        {/* Modal mot de passe oublié */}
         {showForgotPassword && (
           <ForgotPasswordModal
             isOpen={showForgotPassword}
@@ -364,7 +320,6 @@ export function LoginPage() {
           />
         )}
 
-        {/* Footer */}
         <div className="text-center mt-6 text-gray-500 text-sm">
           <p>© 2025 BookingFast - Système de réservation professionnel</p>
           {currentVersion && (

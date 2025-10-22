@@ -12,18 +12,15 @@ export function PublicRoute({ children }: PublicRouteProps) {
   const navigate = useNavigate();
 
   useEffect(() => {
-    console.log('🌐 PublicRoute - État:', { isAuthenticated, loading });
-
-    // Si l'utilisateur est connecté, rediriger vers /dashboard
+    // ⚠️ SEULEMENT rediriger si authentifié ET pas en train de charger
     if (!loading && isAuthenticated) {
-      console.log('✅ Utilisateur connecté détecté - redirection vers /dashboard');
+      console.log('✅ PublicRoute - Utilisateur authentifié détecté, redirection vers /dashboard');
       navigate('/dashboard', { replace: true });
     }
   }, [isAuthenticated, loading, navigate]);
 
-  // Afficher le loader pendant la vérification
+  // Afficher le loader pendant la vérification initiale
   if (loading) {
-    console.log('⏳ PublicRoute - Vérification en cours...');
     return (
       <div className="min-h-screen bg-gradient-to-br from-blue-50 via-purple-50 to-pink-50 flex items-center justify-center">
         <div className="text-center">
@@ -34,13 +31,6 @@ export function PublicRoute({ children }: PublicRouteProps) {
     );
   }
 
-  // Si connecté, ne rien afficher (redirection en cours)
-  if (isAuthenticated) {
-    console.log('🚫 PublicRoute - Utilisateur connecté, redirection en cours...');
-    return null;
-  }
-
-  // ✅ Afficher le contenu si NON connecté
-  console.log('✅ PublicRoute - Utilisateur non connecté, affichage de la page publique');
+  // ✅ Toujours afficher le contenu si pas authentifié
   return <>{children}</>;
 }

@@ -20,7 +20,8 @@ export default defineConfig({
   },
   esbuild: {
     logOverride: { 'this-is-undefined-in-esm': 'silent' },
-    drop: ['console', 'debugger'],
+    // ✅ ON GARDE LES CONSOLE.LOG EN DEV
+    drop: process.env.NODE_ENV === 'production' ? ['console', 'debugger'] : [],
     tsconfigRaw: {
       compilerOptions: {
         skipLibCheck: true,
