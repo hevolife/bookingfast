@@ -36,9 +36,10 @@ function App() {
     }
   }, []);
 
-  // Rediriger vers /dashboard si on est sur la racine (mais pas pour les pages publiques)
+  // Rediriger vers /dashboard UNIQUEMENT si on est exactement sur '/'
   useEffect(() => {
-    if (location.pathname === '/' && !location.pathname.includes('/booking/')) {
+    // Ne rediriger QUE si on est exactement sur la racine '/'
+    if (location.pathname === '/') {
       navigate('/dashboard', { replace: true });
     }
   }, [location.pathname, navigate]);
@@ -59,7 +60,8 @@ function App() {
   }
 
   // Si c'est une page de booking publique, afficher sans navbar et sans auth
-  if (location.pathname.includes('/booking/')) {
+  if (location.pathname.startsWith('/booking/')) {
+    console.log('🎯 Page de booking publique détectée:', location.pathname);
     return (
       <TeamProvider>
         <Suspense fallback={<LoadingSpinner />}>
