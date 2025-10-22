@@ -20,6 +20,7 @@ export default defineConfig({
   },
   esbuild: {
     logOverride: { 'this-is-undefined-in-esm': 'silent' },
+    drop: ['console', 'debugger'],
     tsconfigRaw: {
       compilerOptions: {
         skipLibCheck: true,
