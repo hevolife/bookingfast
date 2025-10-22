@@ -30,10 +30,10 @@ export function LandingPage() {
   const [currentFeature, setCurrentFeature] = useState(0);
   const [isVisible, setIsVisible] = useState(false);
 
-  // Rediriger les utilisateurs authentifiés vers le dashboard
+  // 🔥 CORRECTION : Rediriger si déjà authentifié
   useEffect(() => {
     if (isAuthenticated) {
-      console.log('✅ Utilisateur authentifié détecté - redirection vers dashboard');
+      console.log('✅ LandingPage - Utilisateur authentifié détecté, redirection vers /dashboard');
       navigate('/dashboard', { replace: true });
     }
   }, [isAuthenticated, navigate]);

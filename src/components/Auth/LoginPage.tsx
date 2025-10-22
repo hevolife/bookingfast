@@ -29,23 +29,21 @@ export function LoginPage() {
   // Afficher un message si c'est un lien d'affiliation
   const isAffiliateSignup = affiliateCode && !isLogin;
 
-  // CORRECTION : Rediriger vers le dashboard si déjà authentifié
+  // 🔥 CORRECTION : Rediriger si déjà authentifié
   useEffect(() => {
     if (isAuthenticated) {
-      console.log('✅ Utilisateur déjà authentifié - redirection vers dashboard');
+      console.log('✅ LoginPage - Utilisateur déjà authentifié, redirection vers /dashboard');
       navigate('/dashboard', { replace: true });
     }
   }, [isAuthenticated, navigate]);
 
-  // CORRECTION : Gérer le retour de confirmation d'email
+  // Gérer le retour de confirmation d'email
   useEffect(() => {
     const type = searchParams.get('type');
     const accessToken = searchParams.get('access_token');
     
     if (type === 'signup' && accessToken) {
       console.log('✅ Email confirmé - redirection vers dashboard');
-      // L'utilisateur est maintenant authentifié via le token dans l'URL
-      // Le AuthContext va gérer la session automatiquement
       navigate('/dashboard', { replace: true });
     }
   }, [searchParams, navigate]);
@@ -54,6 +52,8 @@ export function LoginPage() {
     e.preventDefault();
     setLoading(true);
     setError(null);
+
+    console.log('🔐 LoginPage - Tentative de connexion...', { email, isLogin });
 
     // Validation du mot de passe pour l'inscription
     if (!isLogin) {
@@ -71,32 +71,31 @@ export function LoginPage() {
 
     try {
       if (isLogin) {
+        console.log('🔑 LoginPage - Appel signIn...');
         await signIn(email, password);
-        // Redirection explicite après connexion réussie
-        navigate('/dashboard', { replace: true });
+        console.log('✅ LoginPage - SignIn réussi, redirection vers /dashboard');
+        // La redirection sera gérée par le useEffect qui surveille isAuthenticated
       } else {
-        // Inscription avec gestion du code d'affiliation
+        console.log('📝 LoginPage - Appel signUp...');
         await signUp(email, password);
         
         // Si c'est un lien d'affiliation, traiter le parrainage
         if (affiliateCode) {
           try {
             console.log('🎯 Traitement code d\'affiliation:', affiliateCode);
-            // Le traitement du code d'affiliation sera fait côté serveur
-            // lors de la création du profil utilisateur
           } catch (affiliateError) {
             console.warn('⚠️ Erreur traitement affiliation:', affiliateError);
-            // Ne pas bloquer l'inscription pour une erreur d'affiliation
           }
         }
         
         setError('Compte créé avec succès ! Vérifiez votre email pour confirmer votre compte.');
-        setIsLogin(true); // Basculer vers le mode connexion
-        setPassword(''); // Vider le mot de passe
-        setConfirmPassword(''); // Vider la confirmation
+        setIsLogin(true);
+        setPassword('');
+        setConfirmPassword('');
         return;
       }
     } catch (err) {
+      console.error('❌ LoginPage - Erreur authentification:', err);
       let errorMessage = 'Une erreur est survenue';
       
       if (err instanceof Error) {
@@ -348,7 +347,6 @@ export function LoginPage() {
               <AccessCodeRedemption 
                 onSuccess={() => {
                   setShowSecretCode(false);
-                  // Rediriger vers le dashboard après succès
                   setTimeout(() => {
                     navigate('/dashboard', { replace: true });
                   }, 1500);

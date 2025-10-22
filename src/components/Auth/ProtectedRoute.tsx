@@ -13,30 +13,24 @@ export function ProtectedRoute({ children }: ProtectedRouteProps) {
   const location = useLocation();
 
   useEffect(() => {
-    // 🎯 Pages publiques qui ne nécessitent PAS d'authentification
-    const isPublicPage = 
-      location.pathname === '/' ||
-      location.pathname === '/login' ||           // ← AJOUT CRITIQUE
-      location.pathname === '/signup' ||          // ← AJOUT CRITIQUE
-      location.pathname.includes('/booking/') ||
-      location.pathname === '/payment' ||
-      location.pathname === '/privacy-policy' ||
-      location.pathname === '/terms-of-service';
+    console.log('🔒 ProtectedRoute - État:', { 
+      isAuthenticated, 
+      loading, 
+      pathname: location.pathname 
+    });
 
-    // Ne pas rediriger si on est sur une page publique
-    if (isPublicPage) {
-      return;
-    }
-
-    // Rediriger vers /login si non authentifié ET pas sur une page publique
+    // Si non authentifié, rediriger vers /login
     if (!loading && !isAuthenticated) {
-      console.log('🔒 Utilisateur non authentifié - redirection vers /login');
+      console.log('❌ Non authentifié - redirection vers /login');
       navigate('/login', { replace: true, state: { from: location } });
+    } else if (!loading && isAuthenticated) {
+      console.log('✅ Authentifié - accès autorisé à:', location.pathname);
     }
   }, [isAuthenticated, loading, navigate, location]);
 
   // Afficher le loader pendant la vérification
   if (loading) {
+    console.log('⏳ ProtectedRoute - Vérification en cours...');
     return (
       <div className="min-h-screen bg-gradient-to-br from-blue-50 via-purple-50 to-pink-50 flex items-center justify-center">
         <div className="text-center">
@@ -47,21 +41,13 @@ export function ProtectedRoute({ children }: ProtectedRouteProps) {
     );
   }
 
-  // 🎯 Vérifier si on est sur une page publique
-  const isPublicPage = 
-    location.pathname === '/' ||
-    location.pathname === '/login' ||
-    location.pathname === '/signup' ||
-    location.pathname.includes('/booking/') ||
-    location.pathname === '/payment' ||
-    location.pathname === '/privacy-policy' ||
-    location.pathname === '/terms-of-service';
-
-  // Si non authentifié ET pas sur une page publique, ne rien afficher (redirection en cours)
-  if (!isAuthenticated && !isPublicPage) {
+  // Si non authentifié, ne rien afficher (redirection en cours)
+  if (!isAuthenticated) {
+    console.log('🚫 ProtectedRoute - Accès refusé, redirection en cours...');
     return null;
   }
 
-  // Afficher le contenu
+  // ✅ Afficher le contenu si authentifié
+  console.log('✅ ProtectedRoute - Rendu du contenu autorisé');
   return <>{children}</>;
 }

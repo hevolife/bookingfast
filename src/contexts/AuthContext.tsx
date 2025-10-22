@@ -38,14 +38,17 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
     }
 
     if (!supabase) {
+      console.error('❌ Supabase non configuré');
       setLoading(false);
       return;
     }
 
     let mounted = true;
 
+    console.log('🔍 Vérification de la session...');
     supabase.auth.getSession().then(({ data: { session } }) => {
       if (mounted) {
+        console.log('📋 Session récupérée:', session ? '✅ Connecté' : '❌ Non connecté');
         setSession(session);
         setUser(session?.user ?? null);
         setLoading(false);
@@ -56,9 +59,13 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
       data: { subscription },
     } = supabase.auth.onAuthStateChange(async (_event, session) => {
       if (mounted) {
-        console.log('🔐 Auth state changed:', _event);
+        console.log('🔐 Auth state changed:', _event, session ? '✅ Session active' : '❌ Pas de session');
         setSession(session);
         setUser(session?.user ?? null);
+        
+        if (_event === 'SIGNED_IN') {
+          console.log('✅ SIGNED_IN détecté - utilisateur connecté');
+        }
         
         if (_event === 'SIGNED_UP' && session?.user) {
           console.log('🆕 Nouveau compte détecté, initialisation...');
@@ -134,7 +141,7 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
     
     console.log('🔑 Tentative de connexion pour:', email);
     
-    const { error } = await supabase.auth.signInWithPassword({
+    const { data, error } = await supabase.auth.signInWithPassword({
       email,
       password,
     });
@@ -144,7 +151,8 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
       throw error;
     }
     
-    console.log('✅ Connexion réussie');
+    console.log('✅ Connexion réussie - Session:', data.session ? '✅ Active' : '❌ Manquante');
+    console.log('✅ User:', data.user ? '✅ Présent' : '❌ Manquant');
   };
 
   const signUp = async (email: string, password: string) => {
@@ -200,8 +208,6 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
       console.log('✅ Déconnexion réussie - redirection vers /login');
       setSession(null);
       setUser(null);
-      
-      // 🎯 CORRECTION CRITIQUE : Rediriger vers /login au lieu de /
       window.location.href = '/login';
       
     } catch (error) {
@@ -222,6 +228,13 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
     signUp,
     signOut,
   };
+
+  console.log('🔐 AuthContext - État actuel:', { 
+    isAuthenticated: !!user, 
+    loading,
+    hasUser: !!user,
+    hasSession: !!session
+  });
 
   return <AuthContext.Provider value={value}>{children}</AuthContext.Provider>;
 }

@@ -10,6 +10,7 @@ import { IframeBookingPage } from './components/IframeBooking/IframeBookingPage'
 import { PaymentPage } from './components/PaymentPage/PaymentPage';
 import { LandingPage } from './components/Landing/LandingPage';
 import { ProtectedRoute } from './components/Auth/ProtectedRoute';
+import { PublicRoute } from './components/Auth/PublicRoute';
 
 const DashboardPage = lazy(() => import('./components/Dashboard/DashboardPage').then(m => ({ default: m.DashboardPage })));
 const CalendarPage = lazy(() => import('./components/Calendar/CalendarPage').then(m => ({ default: m.CalendarPage })));
@@ -37,16 +38,14 @@ function AppRoutes() {
   const location = useLocation();
   const pathname = location.pathname;
 
-  // 🎯 Pages publiques sans Navbar
-  const isPublicPage = 
-    pathname === '/' ||
-    pathname === '/login' ||
-    pathname === '/signup' ||
+  // 🎯 Pages TOUJOURS publiques (pas de vérification auth)
+  const isAlwaysPublicPage = 
     pathname.startsWith('/booking/') ||
     pathname === '/payment' ||
     pathname.startsWith('/payment?') ||
     pathname === '/privacy-policy' ||
-    pathname === '/terms-of-service';
+    pathname === '/terms-of-service' ||
+    pathname.includes('/auth/google/callback');
 
   // Callback OAuth
   if (pathname.includes('/auth/google/callback')) {
@@ -59,13 +58,11 @@ function AppRoutes() {
     );
   }
 
-  // 🎯 Pages publiques (sans Navbar, sans ProtectedRoute)
-  if (isPublicPage) {
+  // 🎯 Pages TOUJOURS publiques (booking, payment, etc.)
+  if (isAlwaysPublicPage) {
     return (
       <Suspense fallback={<LoadingSpinner />}>
         <Routes>
-          <Route path="/" element={<LandingPage />} />
-          <Route path="/login" element={<LoginPage />} />
           <Route path="/booking/:userId" element={<IframeBookingPage />} />
           <Route path="/payment" element={<PaymentPage />} />
         </Routes>
@@ -73,7 +70,21 @@ function AppRoutes() {
     );
   }
 
-  // 🎯 Pages authentifiées (avec Navbar + ProtectedRoute)
+  // 🎯 Pages publiques MAIS avec redirection si connecté (login, landing)
+  if (pathname === '/' || pathname === '/login' || pathname === '/signup') {
+    return (
+      <PublicRoute>
+        <Suspense fallback={<LoadingSpinner />}>
+          <Routes>
+            <Route path="/" element={<LandingPage />} />
+            <Route path="/login" element={<LoginPage />} />
+          </Routes>
+        </Suspense>
+      </PublicRoute>
+    );
+  }
+
+  // 🎯 Pages protégées (dashboard, services, etc.)
   return (
     <ProtectedRoute>
       <div className="app-container flex flex-col h-screen overflow-hidden bg-gradient-to-br from-blue-50 via-purple-50 to-pink-50">
