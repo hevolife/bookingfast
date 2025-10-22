@@ -1,6 +1,7 @@
 import React, { lazy, Suspense, useEffect } from 'react';
 import { Routes, Route, Navigate, useNavigate, useLocation } from 'react-router-dom';
 import { TeamProvider } from './contexts/TeamContext';
+import { AuthProvider } from './contexts/AuthContext';
 import { Navbar } from './components/Layout/Navbar';
 import { LoadingSpinner } from './components/UI/LoadingSpinner';
 import { GoogleCalendarCallback } from './components/Admin/GoogleCalendarCallback';
@@ -45,17 +46,19 @@ function App() {
   // Si c'est un callback OAuth, afficher le composant de callback
   if (location.pathname.includes('/auth/google/callback')) {
     return (
-      <TeamProvider>
-        <div className="flex items-center justify-center min-h-screen bg-gradient-to-br from-blue-50 via-purple-50 to-pink-50">
-          <Suspense fallback={<LoadingSpinner />}>
-            <GoogleCalendarCallback />
-          </Suspense>
-        </div>
-      </TeamProvider>
+      <AuthProvider>
+        <TeamProvider>
+          <div className="flex items-center justify-center min-h-screen bg-gradient-to-br from-blue-50 via-purple-50 to-pink-50">
+            <Suspense fallback={<LoadingSpinner />}>
+              <GoogleCalendarCallback />
+            </Suspense>
+          </div>
+        </TeamProvider>
+      </AuthProvider>
     );
   }
 
-  // Si c'est une page de booking publique, afficher sans navbar
+  // Si c'est une page de booking publique, afficher sans navbar et sans auth
   if (location.pathname.includes('/booking/')) {
     return (
       <TeamProvider>
@@ -69,48 +72,50 @@ function App() {
   }
 
   return (
-    <TeamProvider>
-      <div className="app-container flex flex-col h-screen overflow-hidden bg-gradient-to-br from-blue-50 via-purple-50 to-pink-50">
-        <Navbar />
-        <main 
-          className="flex-1 overflow-y-auto scrollable-area"
-          style={{ 
-            paddingTop: 0,
-            WebkitOverflowScrolling: 'touch',
-            touchAction: 'pan-y'
-          }}
-        >
-          <Suspense fallback={<LoadingSpinner />}>
-            <Routes>
-              <Route path="/dashboard" element={<DashboardPage />} />
-              <Route path="/calendar" element={<CalendarPage />} />
-              <Route path="/bookings-list" element={<CalendarPage view="list" />} />
-              <Route path="/clients" element={<ClientsPage />} />
-              <Route path="/services" element={<ServicesPage />} />
-              <Route path="/emails" element={<EmailWorkflowPage />} />
-              <Route path="/admin" element={<AdminPage />} />
-              <Route path="/reports" element={
-                <PluginGuard pluginSlug="reports">
-                  <ReportsPage />
-                </PluginGuard>
-              } />
-              <Route path="/multi-user" element={
-                <PluginGuard pluginSlug="multi-user">
-                  <MultiUserSettingsPage />
-                </PluginGuard>
-              } />
-              <Route path="/pos" element={
-                <PluginGuard pluginSlug="pos">
-                  <POSPage />
-                </PluginGuard>
-              } />
-              <Route path="/plugins" element={<PluginsPage />} />
-              <Route path="*" element={<Navigate to="/dashboard" replace />} />
-            </Routes>
-          </Suspense>
-        </main>
-      </div>
-    </TeamProvider>
+    <AuthProvider>
+      <TeamProvider>
+        <div className="app-container flex flex-col h-screen overflow-hidden bg-gradient-to-br from-blue-50 via-purple-50 to-pink-50">
+          <Navbar />
+          <main 
+            className="flex-1 overflow-y-auto scrollable-area"
+            style={{ 
+              paddingTop: 0,
+              WebkitOverflowScrolling: 'touch',
+              touchAction: 'pan-y'
+            }}
+          >
+            <Suspense fallback={<LoadingSpinner />}>
+              <Routes>
+                <Route path="/dashboard" element={<DashboardPage />} />
+                <Route path="/calendar" element={<CalendarPage />} />
+                <Route path="/bookings-list" element={<CalendarPage view="list" />} />
+                <Route path="/clients" element={<ClientsPage />} />
+                <Route path="/services" element={<ServicesPage />} />
+                <Route path="/emails" element={<EmailWorkflowPage />} />
+                <Route path="/admin" element={<AdminPage />} />
+                <Route path="/reports" element={
+                  <PluginGuard pluginSlug="reports">
+                    <ReportsPage />
+                  </PluginGuard>
+                } />
+                <Route path="/multi-user" element={
+                  <PluginGuard pluginSlug="multi-user">
+                    <MultiUserSettingsPage />
+                  </PluginGuard>
+                } />
+                <Route path="/pos" element={
+                  <PluginGuard pluginSlug="pos">
+                    <POSPage />
+                  </PluginGuard>
+                } />
+                <Route path="/plugins" element={<PluginsPage />} />
+                <Route path="*" element={<Navigate to="/dashboard" replace />} />
+              </Routes>
+            </Suspense>
+          </main>
+        </div>
+      </TeamProvider>
+    </AuthProvider>
   );
 }
 

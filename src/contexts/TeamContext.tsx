@@ -24,7 +24,16 @@ interface TeamContextType {
 const TeamContext = createContext<TeamContextType | undefined>(undefined);
 
 export function TeamProvider({ children }: { children: React.ReactNode }) {
-  const { user } = useAuth();
+  // Vérifier si on est dans un contexte d'authentification
+  let user = null;
+  try {
+    const auth = useAuth();
+    user = auth.user;
+  } catch (error) {
+    // Pas d'AuthProvider disponible (page publique)
+    console.log('ℹ️ TeamProvider sans AuthProvider (page publique)');
+  }
+
   const [teamMembers, setTeamMembers] = useState<TeamMember[]>([]);
   const [currentUserRole, setCurrentUserRole] = useState<'owner' | 'admin' | 'member' | null>(null);
   const [loading, setLoading] = useState(true);
