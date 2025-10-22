@@ -13,6 +13,11 @@ export function ProtectedRoute({ children }: ProtectedRouteProps) {
   const location = useLocation();
 
   useEffect(() => {
+    // Ne pas rediriger si on est sur une page publique de booking
+    if (location.pathname.includes('/booking/')) {
+      return;
+    }
+
     if (!loading && !isAuthenticated) {
       console.log('🔒 Utilisateur non authentifié - redirection vers login');
       navigate('/login', { replace: true, state: { from: location } });
@@ -30,7 +35,7 @@ export function ProtectedRoute({ children }: ProtectedRouteProps) {
     );
   }
 
-  if (!isAuthenticated) {
+  if (!isAuthenticated && !location.pathname.includes('/booking/')) {
     return null;
   }
 

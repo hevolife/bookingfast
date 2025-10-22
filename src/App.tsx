@@ -5,6 +5,7 @@ import { Navbar } from './components/Layout/Navbar';
 import { LoadingSpinner } from './components/UI/LoadingSpinner';
 import { GoogleCalendarCallback } from './components/Admin/GoogleCalendarCallback';
 import { PluginGuard } from './components/Plugins/PluginGuard';
+import { IframeBookingPage } from './components/IframeBooking/IframeBookingPage';
 
 const DashboardPage = lazy(() => import('./components/Dashboard/DashboardPage').then(m => ({ default: m.DashboardPage })));
 const CalendarPage = lazy(() => import('./components/Calendar/CalendarPage').then(m => ({ default: m.CalendarPage })));
@@ -34,9 +35,9 @@ function App() {
     }
   }, []);
 
-  // Rediriger vers /dashboard si on est sur la racine
+  // Rediriger vers /dashboard si on est sur la racine (mais pas pour les pages publiques)
   useEffect(() => {
-    if (location.pathname === '/') {
+    if (location.pathname === '/' && !location.pathname.includes('/booking/')) {
       navigate('/dashboard', { replace: true });
     }
   }, [location.pathname, navigate]);
@@ -50,6 +51,19 @@ function App() {
             <GoogleCalendarCallback />
           </Suspense>
         </div>
+      </TeamProvider>
+    );
+  }
+
+  // Si c'est une page de booking publique, afficher sans navbar
+  if (location.pathname.includes('/booking/')) {
+    return (
+      <TeamProvider>
+        <Suspense fallback={<LoadingSpinner />}>
+          <Routes>
+            <Route path="/booking/:userId" element={<IframeBookingPage />} />
+          </Routes>
+        </Suspense>
       </TeamProvider>
     );
   }
