@@ -7,6 +7,7 @@ import { LoadingSpinner } from './components/UI/LoadingSpinner';
 import { GoogleCalendarCallback } from './components/Admin/GoogleCalendarCallback';
 import { PluginGuard } from './components/Plugins/PluginGuard';
 import { IframeBookingPage } from './components/IframeBooking/IframeBookingPage';
+import { PaymentPage } from './components/PaymentPage/PaymentPage';
 
 const DashboardPage = lazy(() => import('./components/Dashboard/DashboardPage').then(m => ({ default: m.DashboardPage })));
 const CalendarPage = lazy(() => import('./components/Calendar/CalendarPage').then(m => ({ default: m.CalendarPage })));
@@ -22,15 +23,18 @@ const PluginsPage = lazy(() => import('./components/Plugins/PluginsPage').then(m
 function App() {
   const location = useLocation();
 
-  // Page de booking publique - PAS de AuthProvider
-  const isBookingPage = location.pathname.startsWith('/booking/');
+  // Pages publiques - PAS de AuthProvider
+  const isPublicPage = 
+    location.pathname.startsWith('/booking/') ||
+    location.pathname.startsWith('/payment');
   
-  if (isBookingPage) {
+  if (isPublicPage) {
     return (
       <TeamProvider>
         <Suspense fallback={<LoadingSpinner />}>
           <Routes>
             <Route path="/booking/:userId" element={<IframeBookingPage />} />
+            <Route path="/payment" element={<PaymentPage />} />
           </Routes>
         </Suspense>
       </TeamProvider>

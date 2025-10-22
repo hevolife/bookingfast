@@ -15,13 +15,19 @@ interface AuthContextType {
 const AuthContext = createContext<AuthContextType | undefined>(undefined);
 
 export function AuthProvider({ children }: { children: React.ReactNode }) {
+  // 🎯 VÉRIFICATION CRITIQUE : Détecter les pages publiques AVANT tout
+  const isPublicPage = 
+    window.location.pathname.startsWith('/booking/') ||
+    window.location.pathname.startsWith('/payment');
+  
   const [user, setUser] = useState<User | null>(null);
   const [session, setSession] = useState<Session | null>(null);
-  const [loading, setLoading] = useState(true);
+  const [loading, setLoading] = useState(!isPublicPage); // ✅ Si page publique, pas de loading
 
   useEffect(() => {
-    // Ne pas vérifier l'auth sur les pages publiques de booking
-    if (window.location.pathname.includes('/booking/')) {
+    // 🚫 SKIP complet pour les pages publiques
+    if (isPublicPage) {
+      console.log('🌐 Page publique détectée - skip auth');
       setLoading(false);
       return;
     }
@@ -63,7 +69,7 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
       mounted = false;
       subscription.unsubscribe();
     };
-  }, []);
+  }, [isPublicPage]);
 
   const initializeNewAccount = async (userId: string) => {
     if (!supabase) return;
