@@ -1,11 +1,10 @@
 import React, { useState, useEffect } from 'react';
-import { useSearchParams, useNavigate } from 'react-router-dom';
+import { useSearchParams } from 'react-router-dom';
 import { CreditCard, Clock, User, Mail, Calendar, AlertTriangle, XCircle, Timer, CheckCircle } from 'lucide-react';
 import { supabase, isSupabaseConfigured } from '../../lib/supabase';
 
 export function PaymentPage() {
   const [searchParams] = useSearchParams();
-  const navigate = useNavigate();
   const [timeLeft, setTimeLeft] = useState<number>(0);
   const [isExpired, setIsExpired] = useState(false);
   const [processing, setProcessing] = useState(false);
@@ -99,6 +98,7 @@ export function PaymentPage() {
 
     checkPaymentLinkStatus();
   }, [email, date, time, amount]);
+
   // Calculer le temps restant
   useEffect(() => {
     if (!expiresAt) return;
@@ -193,6 +193,7 @@ export function PaymentPage() {
       </div>
     );
   }
+
   // Vérifier si le lien est valide
   if (!amount || !service || !client || !email || !date || !time) {
     return (
@@ -206,7 +207,7 @@ export function PaymentPage() {
             Ce lien de paiement n'est pas valide ou a été corrompu.
           </p>
           <button
-            onClick={() => navigate('/')}
+            onClick={() => window.location.href = '/'}
             className="w-full bg-gradient-to-r from-blue-600 to-purple-600 text-white py-3 px-6 rounded-2xl font-medium hover:from-blue-700 hover:to-purple-700 transition-all duration-300"
           >
             Retour à la réservation
@@ -229,7 +230,7 @@ export function PaymentPage() {
             Ce lien de paiement a expiré. Veuillez contacter l'établissement pour obtenir un nouveau lien.
           </p>
           <button
-            onClick={() => navigate('/')}
+            onClick={() => window.location.href = '/'}
             className="w-full bg-gradient-to-r from-blue-600 to-purple-600 text-white py-3 px-6 rounded-2xl font-medium hover:from-blue-700 hover:to-purple-700 transition-all duration-300"
           >
             Retour à l'accueil
