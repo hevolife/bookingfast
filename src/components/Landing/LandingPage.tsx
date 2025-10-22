@@ -26,17 +26,19 @@ import { useAuth } from '../../contexts/AuthContext';
 
 export function LandingPage() {
   const navigate = useNavigate();
-  const { isAuthenticated } = useAuth();
+  const { isAuthenticated, loading } = useAuth();
   const [currentFeature, setCurrentFeature] = useState(0);
   const [isVisible, setIsVisible] = useState(false);
 
-  // 🔥 CORRECTION : Rediriger si déjà authentifié
+  // 🔥 REDIRECTION IMMÉDIATE si authentifié
   useEffect(() => {
-    if (isAuthenticated) {
-      console.log('✅ LandingPage - Utilisateur authentifié détecté, redirection vers /dashboard');
-      navigate('/dashboard', { replace: true });
+    console.log('🔍 LandingPage - État auth:', { isAuthenticated, loading });
+    
+    if (!loading && isAuthenticated) {
+      console.log('🚀 LandingPage - Utilisateur authentifié, redirection immédiate vers /dashboard');
+      window.location.href = '/dashboard';
     }
-  }, [isAuthenticated, navigate]);
+  }, [isAuthenticated, loading]);
 
   const features = [
     {
@@ -107,6 +109,30 @@ export function LandingPage() {
   const scrollToSection = (sectionId: string) => {
     document.getElementById(sectionId)?.scrollIntoView({ behavior: 'smooth' });
   };
+
+  // ✅ Afficher un loader si en cours de vérification
+  if (loading) {
+    return (
+      <div className="min-h-screen bg-gradient-to-br from-blue-50 via-purple-50 to-pink-50 flex items-center justify-center">
+        <div className="text-center">
+          <div className="w-16 h-16 border-4 border-purple-200 border-t-purple-600 rounded-full animate-spin mx-auto mb-4"></div>
+          <p className="text-gray-600 text-lg">Chargement...</p>
+        </div>
+      </div>
+    );
+  }
+
+  // ✅ Si authentifié, afficher un message de redirection
+  if (isAuthenticated) {
+    return (
+      <div className="min-h-screen bg-gradient-to-br from-blue-50 via-purple-50 to-pink-50 flex items-center justify-center">
+        <div className="text-center">
+          <div className="w-16 h-16 border-4 border-purple-200 border-t-purple-600 rounded-full animate-spin mx-auto mb-4"></div>
+          <p className="text-gray-600 text-lg">Redirection vers le dashboard...</p>
+        </div>
+      </div>
+    );
+  }
 
   return (
     <div className="landing-page min-h-screen bg-gradient-to-br from-blue-50 via-purple-50 to-pink-50">
