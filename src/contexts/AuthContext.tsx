@@ -16,9 +16,12 @@ const AuthContext = createContext<AuthContextType | undefined>(undefined);
 
 export function AuthProvider({ children }: { children: React.ReactNode }) {
   // 🎯 VÉRIFICATION CRITIQUE : Détecter les pages publiques AVANT tout
+  const pathname = window.location.pathname;
   const isPublicPage = 
-    window.location.pathname.startsWith('/booking/') ||
-    window.location.pathname.startsWith('/payment');
+    pathname.startsWith('/booking/') ||
+    pathname === '/payment' ||
+    pathname.startsWith('/payment?') ||
+    pathname.includes('/payment');
   
   const [user, setUser] = useState<User | null>(null);
   const [session, setSession] = useState<Session | null>(null);

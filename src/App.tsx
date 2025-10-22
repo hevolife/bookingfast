@@ -23,10 +23,12 @@ const PluginsPage = lazy(() => import('./components/Plugins/PluginsPage').then(m
 function App() {
   const location = useLocation();
 
-  // Pages publiques - PAS de AuthProvider
+  // 🎯 PAGES PUBLIQUES - PAS de AuthProvider
+  const pathname = location.pathname;
   const isPublicPage = 
-    location.pathname.startsWith('/booking/') ||
-    location.pathname.startsWith('/payment');
+    pathname.startsWith('/booking/') ||
+    pathname === '/payment' ||
+    pathname.startsWith('/payment?');
   
   if (isPublicPage) {
     return (
@@ -42,7 +44,7 @@ function App() {
   }
 
   // Callback OAuth
-  if (location.pathname.includes('/auth/google/callback')) {
+  if (pathname.includes('/auth/google/callback')) {
     return (
       <AuthProvider>
         <TeamProvider>
