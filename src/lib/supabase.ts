@@ -38,8 +38,10 @@ function createSupabaseClient() {
 // Export singleton instance
 export const supabase = supabaseInstance || (supabaseInstance = createSupabaseClient());
 
-// Check if Supabase is properly configured
-export const isSupabaseConfigured = !!(supabaseUrl && supabaseAnonKey);
+// 🔥 FIX: Export as FUNCTION, not constant
+export function isSupabaseConfigured(): boolean {
+  return !!(supabaseUrl && supabaseAnonKey);
+}
 
 // Network error detection utility
 export function isNetworkError(error: any): boolean {

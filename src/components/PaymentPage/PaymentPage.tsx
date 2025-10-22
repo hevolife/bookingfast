@@ -3,14 +3,34 @@ import { CreditCard, Clock, User, Mail, Calendar, AlertTriangle, XCircle, Timer,
 import { supabase, isSupabaseConfigured } from '../../lib/supabase';
 
 export function PaymentPage() {
-  // 🎯 PARSER L'URL MANUELLEMENT (pas de useSearchParams)
+  console.log('🎯 PaymentPage - COMPONENT MOUNTED');
+  console.log('🌐 URL:', window.location.href);
+  console.log('📍 Pathname:', window.location.pathname);
+  console.log('🔍 Search:', window.location.search);
+
+  // 🎯 PARSER L'URL MANUELLEMENT
   const searchParams = new URLSearchParams(window.location.search);
   
+  console.log('📦 URL Parameters:');
+  console.log('  - amount:', searchParams.get('amount'));
+  console.log('  - service:', searchParams.get('service'));
+  console.log('  - client:', searchParams.get('client'));
+  console.log('  - email:', searchParams.get('email'));
+  console.log('  - date:', searchParams.get('date'));
+  console.log('  - time:', searchParams.get('time'));
+  console.log('  - expires:', searchParams.get('expires'));
+  console.log('  - user_id:', searchParams.get('user_id'));
+
   const [timeLeft, setTimeLeft] = useState<number>(0);
   const [isExpired, setIsExpired] = useState(false);
   const [processing, setProcessing] = useState(false);
   const [isDeleted, setIsDeleted] = useState(false);
   const [checkingStatus, setCheckingStatus] = useState(true);
+
+  console.log('🔄 Initial State:');
+  console.log('  - checkingStatus:', checkingStatus);
+  console.log('  - isDeleted:', isDeleted);
+  console.log('  - isExpired:', isExpired);
 
   // Récupérer les paramètres de l'URL
   const amount = searchParams.get('amount');
@@ -24,20 +44,35 @@ export function PaymentPage() {
 
   // Vérifier si le lien de paiement existe encore
   useEffect(() => {
+    console.log('🔍 useEffect - checkPaymentLinkStatus STARTED');
+    
     const checkPaymentLinkStatus = async () => {
+      console.log('⏳ checkPaymentLinkStatus - FUNCTION CALLED');
+      
       if (!email || !date || !time) {
+        console.log('⚠️ Missing required params - SKIPPING CHECK');
+        console.log('  - email:', email);
+        console.log('  - date:', date);
+        console.log('  - time:', time);
         setCheckingStatus(false);
         return;
       }
 
-      if (!isSupabaseConfigured()) {
-        // En mode démo, toujours autoriser l'accès
+      const supabaseConfigured = isSupabaseConfigured();
+      console.log('🔧 Supabase configured:', supabaseConfigured);
+
+      if (!supabaseConfigured) {
+        console.log('🎭 DEMO MODE - Skipping Supabase check');
         setCheckingStatus(false);
         return;
       }
 
       try {
-        // Rechercher la réservation correspondante
+        console.log('🔍 Querying Supabase for booking...');
+        console.log('  - email:', email);
+        console.log('  - date:', date);
+        console.log('  - time:', time);
+
         const { data: booking, error } = await supabase
           .from('bookings')
           .select('transactions, payment_status, total_amount, payment_amount')
@@ -46,15 +81,22 @@ export function PaymentPage() {
           .eq('time', time)
           .single();
 
+        console.log('📊 Supabase Response:');
+        console.log('  - error:', error);
+        console.log('  - booking:', booking);
+
         if (error || !booking) {
-          console.warn('⚠️ Réservation non trouvée, mais autorisation du lien pour les clients externes');
+          console.warn('⚠️ Booking not found - Allowing external client access');
           setCheckingStatus(false);
           return;
         }
 
+        console.log('✅ Booking found:', booking);
+
         // Si la réservation est déjà entièrement payée
         if (booking.payment_status === 'completed' && 
             (booking.payment_amount || 0) >= booking.total_amount) {
+          console.log('💰 Booking fully paid - Setting isDeleted=true');
           setIsDeleted(true);
           setCheckingStatus(false);
           return;
@@ -64,7 +106,12 @@ export function PaymentPage() {
         const requestedAmount = parseFloat(amount || '0');
         const alreadyPaid = (booking.payment_amount || 0);
         
+        console.log('💵 Payment check:');
+        console.log('  - requestedAmount:', requestedAmount);
+        console.log('  - alreadyPaid:', alreadyPaid);
+        
         if (requestedAmount > 0 && alreadyPaid >= requestedAmount) {
+          console.log('✅ Amount already paid - Setting isDeleted=true');
           setIsDeleted(true);
           setCheckingStatus(false);
           return;
@@ -77,15 +124,21 @@ export function PaymentPage() {
           Math.abs(t.amount - requestedAmount) < 0.01
         ) || [];
         
+        console.log('💳 Stripe transactions:', stripeTransactions);
+        
         if (stripeTransactions.length > 0) {
+          console.log('✅ Stripe transaction found - Setting isDeleted=true');
           setIsDeleted(true);
           setCheckingStatus(false);
           return;
         }
+
+        console.log('✅ All checks passed - Payment link valid');
         
       } catch (error) {
-        console.warn('⚠️ Erreur vérification lien:', error);
+        console.error('❌ Error checking payment link:', error);
       } finally {
+        console.log('🏁 checkPaymentLinkStatus - FINALLY BLOCK');
         setCheckingStatus(false);
       }
     };
@@ -95,12 +148,23 @@ export function PaymentPage() {
 
   // Calculer le temps restant
   useEffect(() => {
-    if (!expiresAt) return;
+    console.log('⏰ useEffect - Timer STARTED');
+    console.log('  - expiresAt:', expiresAt);
+    
+    if (!expiresAt) {
+      console.log('⚠️ No expiration time - SKIPPING TIMER');
+      return;
+    }
 
     const updateTimer = () => {
       const now = new Date().getTime();
       const expiry = parseInt(expiresAt);
       const remaining = Math.max(0, expiry - now);
+      
+      console.log('⏱️ Timer update:');
+      console.log('  - now:', now);
+      console.log('  - expiry:', expiry);
+      console.log('  - remaining:', remaining);
       
       setTimeLeft(remaining);
       setIsExpired(remaining === 0);
@@ -109,7 +173,10 @@ export function PaymentPage() {
     updateTimer();
     const interval = setInterval(updateTimer, 1000);
 
-    return () => clearInterval(interval);
+    return () => {
+      console.log('🛑 Timer cleanup');
+      clearInterval(interval);
+    };
   }, [expiresAt]);
 
   // Formater le temps restant
@@ -119,8 +186,15 @@ export function PaymentPage() {
     return `${minutes.toString().padStart(2, '0')}:${seconds.toString().padStart(2, '0')}`;
   };
 
+  console.log('🎨 RENDER - Current State:');
+  console.log('  - checkingStatus:', checkingStatus);
+  console.log('  - isDeleted:', isDeleted);
+  console.log('  - isExpired:', isExpired);
+  console.log('  - processing:', processing);
+
   // Affichage pendant la vérification
   if (checkingStatus) {
+    console.log('⏳ RENDERING: Checking status screen');
     return (
       <div className="min-h-screen bg-gradient-to-br from-blue-50 via-purple-50 to-pink-50 flex items-center justify-center p-4">
         <div className="bg-white rounded-3xl shadow-2xl p-8 max-w-md w-full text-center">
@@ -129,6 +203,9 @@ export function PaymentPage() {
           </div>
           <h1 className="text-2xl font-bold text-gray-900 mb-4">Vérification...</h1>
           <p className="text-gray-600">Vérification du statut du lien de paiement</p>
+          <div className="mt-4 text-xs text-gray-400">
+            Debug: checkingStatus = {checkingStatus.toString()}
+          </div>
         </div>
       </div>
     );
@@ -136,6 +213,7 @@ export function PaymentPage() {
 
   // Vérifier si le lien a été supprimé
   if (isDeleted) {
+    console.log('✅ RENDERING: Payment already completed screen');
     return (
       <div className="min-h-screen bg-gradient-to-br from-green-50 to-emerald-50 flex items-center justify-center p-4">
         <div className="bg-white rounded-3xl shadow-2xl p-8 max-w-md w-full text-center">
@@ -176,6 +254,8 @@ export function PaymentPage() {
 
   // Vérifier si le lien est valide
   if (!amount || !service || !client || !email || !date || !time) {
+    console.log('❌ RENDERING: Invalid link screen');
+    console.log('Missing params:', { amount, service, client, email, date, time });
     return (
       <div className="min-h-screen bg-gradient-to-br from-red-50 to-pink-50 flex items-center justify-center p-4">
         <div className="bg-white rounded-3xl shadow-2xl p-8 max-w-md w-full text-center">
@@ -199,6 +279,7 @@ export function PaymentPage() {
 
   // Vérifier si le lien a expiré
   if (isExpired) {
+    console.log('⏰ RENDERING: Expired link screen');
     return (
       <div className="min-h-screen bg-gradient-to-br from-orange-50 to-red-50 flex items-center justify-center p-4">
         <div className="bg-white rounded-3xl shadow-2xl p-8 max-w-md w-full text-center">
@@ -221,12 +302,22 @@ export function PaymentPage() {
   }
 
   const handlePayment = async () => {
-    if (isExpired || processing) return;
+    console.log('💳 handlePayment - CALLED');
+    
+    if (isExpired || processing) {
+      console.log('⚠️ Payment blocked:', { isExpired, processing });
+      return;
+    }
 
     setProcessing(true);
+    console.log('⏳ Processing payment...');
+    
     try {
       if (isSupabaseConfigured()) {
+        console.log('🔧 Supabase configured - Creating Stripe session');
         const supabaseUrl = import.meta.env.VITE_SUPABASE_URL;
+        console.log('🌐 Supabase URL:', supabaseUrl);
+        
         const response = await fetch(`${supabaseUrl}/functions/v1/stripe-checkout`, {
           method: 'POST',
           headers: {
@@ -249,9 +340,13 @@ export function PaymentPage() {
           }),
         });
 
+        console.log('📡 Stripe response status:', response.status);
+
         if (response.ok) {
           const { url } = await response.json();
+          console.log('✅ Stripe URL received:', url);
           if (url) {
+            console.log('🔄 Redirecting to Stripe...');
             window.location.href = url;
             return;
           } else {
@@ -259,23 +354,28 @@ export function PaymentPage() {
           }
         } else {
           const errorData = await response.json();
+          console.error('❌ Stripe error:', errorData);
           throw new Error(errorData.error || 'Erreur lors de la création de la session de paiement');
         }
       } else {
-        // Mode démo
+        console.log('🎭 DEMO MODE - Simulating payment');
         await new Promise(resolve => setTimeout(resolve, 2000));
+        console.log('✅ Demo payment complete - Redirecting');
         window.location.href = '/payment-success';
         return;
       }
     } catch (error) {
-      console.error('Erreur de paiement:', error);
+      console.error('❌ Payment error:', error);
       alert(`Une erreur est survenue lors du paiement: ${error instanceof Error ? error.message : 'Erreur inconnue'}. Veuillez réessayer.`);
     } finally {
+      console.log('🏁 handlePayment - FINALLY');
       setProcessing(false);
     }
   };
 
   const isWarning = timeLeft > 0 && timeLeft < 5 * 60 * 1000;
+
+  console.log('💳 RENDERING: Payment form');
 
   return (
     <div className="min-h-screen bg-gradient-to-br from-blue-50 via-purple-50 to-pink-50 flex items-center justify-center p-4">
