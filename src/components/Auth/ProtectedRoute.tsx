@@ -13,17 +13,29 @@ export function ProtectedRoute({ children }: ProtectedRouteProps) {
   const location = useLocation();
 
   useEffect(() => {
-    // Ne pas rediriger si on est sur une page publique de booking
-    if (location.pathname.includes('/booking/')) {
+    // 🎯 Pages publiques qui ne nécessitent PAS d'authentification
+    const isPublicPage = 
+      location.pathname === '/' ||
+      location.pathname === '/login' ||           // ← AJOUT CRITIQUE
+      location.pathname === '/signup' ||          // ← AJOUT CRITIQUE
+      location.pathname.includes('/booking/') ||
+      location.pathname === '/payment' ||
+      location.pathname === '/privacy-policy' ||
+      location.pathname === '/terms-of-service';
+
+    // Ne pas rediriger si on est sur une page publique
+    if (isPublicPage) {
       return;
     }
 
+    // Rediriger vers /login si non authentifié ET pas sur une page publique
     if (!loading && !isAuthenticated) {
-      console.log('🔒 Utilisateur non authentifié - redirection vers login');
+      console.log('🔒 Utilisateur non authentifié - redirection vers /login');
       navigate('/login', { replace: true, state: { from: location } });
     }
   }, [isAuthenticated, loading, navigate, location]);
 
+  // Afficher le loader pendant la vérification
   if (loading) {
     return (
       <div className="min-h-screen bg-gradient-to-br from-blue-50 via-purple-50 to-pink-50 flex items-center justify-center">
@@ -35,9 +47,21 @@ export function ProtectedRoute({ children }: ProtectedRouteProps) {
     );
   }
 
-  if (!isAuthenticated && !location.pathname.includes('/booking/')) {
+  // 🎯 Vérifier si on est sur une page publique
+  const isPublicPage = 
+    location.pathname === '/' ||
+    location.pathname === '/login' ||
+    location.pathname === '/signup' ||
+    location.pathname.includes('/booking/') ||
+    location.pathname === '/payment' ||
+    location.pathname === '/privacy-policy' ||
+    location.pathname === '/terms-of-service';
+
+  // Si non authentifié ET pas sur une page publique, ne rien afficher (redirection en cours)
+  if (!isAuthenticated && !isPublicPage) {
     return null;
   }
 
+  // Afficher le contenu
   return <>{children}</>;
 }

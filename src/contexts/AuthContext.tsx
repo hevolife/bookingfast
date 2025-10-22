@@ -15,20 +15,22 @@ interface AuthContextType {
 const AuthContext = createContext<AuthContextType | undefined>(undefined);
 
 export function AuthProvider({ children }: { children: React.ReactNode }) {
-  // 🎯 VÉRIFICATION CRITIQUE : Détecter les pages publiques AVANT tout
   const pathname = window.location.pathname;
   const isPublicPage = 
+    pathname === '/' ||
     pathname.startsWith('/booking/') ||
     pathname === '/payment' ||
     pathname.startsWith('/payment?') ||
-    pathname.includes('/payment');
+    pathname.includes('/payment') ||
+    pathname === '/login' ||
+    pathname === '/privacy-policy' ||
+    pathname === '/terms-of-service';
   
   const [user, setUser] = useState<User | null>(null);
   const [session, setSession] = useState<Session | null>(null);
-  const [loading, setLoading] = useState(!isPublicPage); // ✅ Si page publique, pas de loading
+  const [loading, setLoading] = useState(!isPublicPage);
 
   useEffect(() => {
-    // 🚫 SKIP complet pour les pages publiques
     if (isPublicPage) {
       console.log('🌐 Page publique détectée - skip auth');
       setLoading(false);
@@ -42,7 +44,6 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
 
     let mounted = true;
 
-    // Récupérer la session initiale
     supabase.auth.getSession().then(({ data: { session } }) => {
       if (mounted) {
         setSession(session);
@@ -51,7 +52,6 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
       }
     });
 
-    // Écouter les changements d'authentification
     const {
       data: { subscription },
     } = supabase.auth.onAuthStateChange(async (_event, session) => {
@@ -60,7 +60,6 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
         setSession(session);
         setUser(session?.user ?? null);
         
-        // Si c'est un nouveau compte (SIGNED_UP), initialiser les données
         if (_event === 'SIGNED_UP' && session?.user) {
           console.log('🆕 Nouveau compte détecté, initialisation...');
           await initializeNewAccount(session.user.id);
@@ -80,7 +79,6 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
     try {
       console.log('🔧 Initialisation du compte:', userId);
       
-      // 1. Créer le profil utilisateur
       const { error: profileError } = await supabase
         .from('profiles')
         .upsert({
@@ -96,7 +94,6 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
         console.log('✅ Profil créé');
       }
       
-      // 2. Créer les paramètres business par défaut
       const { error: settingsError } = await supabase
         .from('business_settings')
         .upsert({
@@ -167,7 +164,6 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
     
     console.log('✅ Inscription réussie');
     
-    // Initialiser le compte immédiatement après l'inscription
     if (data.user) {
       await initializeNewAccount(data.user.id);
     }
@@ -194,24 +190,26 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
           localStorage.removeItem('bookingfast-auth');
           setSession(null);
           setUser(null);
-          window.location.href = '/';
+          window.location.href = '/login';
           return;
         }
         
         throw error;
       }
 
-      console.log('✅ Déconnexion réussie');
+      console.log('✅ Déconnexion réussie - redirection vers /login');
       setSession(null);
       setUser(null);
-      window.location.href = '/';
+      
+      // 🎯 CORRECTION CRITIQUE : Rediriger vers /login au lieu de /
+      window.location.href = '/login';
       
     } catch (error) {
       console.error('❌ Erreur critique lors de la déconnexion:', error);
       localStorage.removeItem('bookingfast-auth');
       setSession(null);
       setUser(null);
-      window.location.href = '/';
+      window.location.href = '/login';
     }
   };
 

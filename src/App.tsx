@@ -8,6 +8,8 @@ import { GoogleCalendarCallback } from './components/Admin/GoogleCalendarCallbac
 import { PluginGuard } from './components/Plugins/PluginGuard';
 import { IframeBookingPage } from './components/IframeBooking/IframeBookingPage';
 import { PaymentPage } from './components/PaymentPage/PaymentPage';
+import { LandingPage } from './components/Landing/LandingPage';
+import { ProtectedRoute } from './components/Auth/ProtectedRoute';
 
 const DashboardPage = lazy(() => import('./components/Dashboard/DashboardPage').then(m => ({ default: m.DashboardPage })));
 const CalendarPage = lazy(() => import('./components/Calendar/CalendarPage').then(m => ({ default: m.CalendarPage })));
@@ -19,92 +21,102 @@ const ReportsPage = lazy(() => import('./components/Reports/ReportsPage').then(m
 const MultiUserSettingsPage = lazy(() => import('./components/MultiUser/MultiUserSettingsPage').then(m => ({ default: m.MultiUserSettingsPage })));
 const POSPage = lazy(() => import('./components/POS/POSPage').then(m => ({ default: m.POSPage })));
 const PluginsPage = lazy(() => import('./components/Plugins/PluginsPage').then(m => ({ default: m.PluginsPage })));
+const LoginPage = lazy(() => import('./components/Auth/LoginPage').then(m => ({ default: m.LoginPage })));
 
 function App() {
-  const location = useLocation();
+  return (
+    <AuthProvider>
+      <TeamProvider>
+        <AppRoutes />
+      </TeamProvider>
+    </AuthProvider>
+  );
+}
 
-  // 🎯 PAGES PUBLIQUES - PAS de AuthProvider
+function AppRoutes() {
+  const location = useLocation();
   const pathname = location.pathname;
+
+  // 🎯 Pages publiques sans Navbar
   const isPublicPage = 
+    pathname === '/' ||
+    pathname === '/login' ||
+    pathname === '/signup' ||
     pathname.startsWith('/booking/') ||
     pathname === '/payment' ||
-    pathname.startsWith('/payment?');
-  
-  if (isPublicPage) {
-    return (
-      <TeamProvider>
-        <Suspense fallback={<LoadingSpinner />}>
-          <Routes>
-            <Route path="/booking/:userId" element={<IframeBookingPage />} />
-            <Route path="/payment" element={<PaymentPage />} />
-          </Routes>
-        </Suspense>
-      </TeamProvider>
-    );
-  }
+    pathname.startsWith('/payment?') ||
+    pathname === '/privacy-policy' ||
+    pathname === '/terms-of-service';
 
   // Callback OAuth
   if (pathname.includes('/auth/google/callback')) {
     return (
-      <AuthProvider>
-        <TeamProvider>
-          <div className="flex items-center justify-center min-h-screen bg-gradient-to-br from-blue-50 via-purple-50 to-pink-50">
-            <Suspense fallback={<LoadingSpinner />}>
-              <GoogleCalendarCallback />
-            </Suspense>
-          </div>
-        </TeamProvider>
-      </AuthProvider>
+      <div className="flex items-center justify-center min-h-screen bg-gradient-to-br from-blue-50 via-purple-50 to-pink-50">
+        <Suspense fallback={<LoadingSpinner />}>
+          <GoogleCalendarCallback />
+        </Suspense>
+      </div>
     );
   }
 
-  // Pages authentifiées
+  // 🎯 Pages publiques (sans Navbar, sans ProtectedRoute)
+  if (isPublicPage) {
+    return (
+      <Suspense fallback={<LoadingSpinner />}>
+        <Routes>
+          <Route path="/" element={<LandingPage />} />
+          <Route path="/login" element={<LoginPage />} />
+          <Route path="/booking/:userId" element={<IframeBookingPage />} />
+          <Route path="/payment" element={<PaymentPage />} />
+        </Routes>
+      </Suspense>
+    );
+  }
+
+  // 🎯 Pages authentifiées (avec Navbar + ProtectedRoute)
   return (
-    <AuthProvider>
-      <TeamProvider>
-        <div className="app-container flex flex-col h-screen overflow-hidden bg-gradient-to-br from-blue-50 via-purple-50 to-pink-50">
-          <Navbar />
-          <main 
-            className="flex-1 overflow-y-auto scrollable-area"
-            style={{ 
-              paddingTop: 0,
-              WebkitOverflowScrolling: 'touch',
-              touchAction: 'pan-y'
-            }}
-          >
-            <Suspense fallback={<LoadingSpinner />}>
-              <Routes>
-                <Route path="/" element={<Navigate to="/dashboard" replace />} />
-                <Route path="/dashboard" element={<DashboardPage />} />
-                <Route path="/calendar" element={<CalendarPage />} />
-                <Route path="/bookings-list" element={<CalendarPage view="list" />} />
-                <Route path="/clients" element={<ClientsPage />} />
-                <Route path="/services" element={<ServicesPage />} />
-                <Route path="/emails" element={<EmailWorkflowPage />} />
-                <Route path="/admin" element={<AdminPage />} />
-                <Route path="/reports" element={
-                  <PluginGuard pluginSlug="reports">
-                    <ReportsPage />
-                  </PluginGuard>
-                } />
-                <Route path="/multi-user" element={
-                  <PluginGuard pluginSlug="multi-user">
-                    <MultiUserSettingsPage />
-                  </PluginGuard>
-                } />
-                <Route path="/pos" element={
-                  <PluginGuard pluginSlug="pos">
-                    <POSPage />
-                  </PluginGuard>
-                } />
-                <Route path="/plugins" element={<PluginsPage />} />
-                <Route path="*" element={<Navigate to="/dashboard" replace />} />
-              </Routes>
-            </Suspense>
-          </main>
-        </div>
-      </TeamProvider>
-    </AuthProvider>
+    <ProtectedRoute>
+      <div className="app-container flex flex-col h-screen overflow-hidden bg-gradient-to-br from-blue-50 via-purple-50 to-pink-50">
+        <Navbar />
+        <main 
+          className="flex-1 overflow-y-auto scrollable-area"
+          style={{ 
+            paddingTop: 0,
+            WebkitOverflowScrolling: 'touch',
+            touchAction: 'pan-y'
+          }}
+        >
+          <Suspense fallback={<LoadingSpinner />}>
+            <Routes>
+              <Route path="/dashboard" element={<DashboardPage />} />
+              <Route path="/calendar" element={<CalendarPage />} />
+              <Route path="/bookings-list" element={<CalendarPage view="list" />} />
+              <Route path="/clients" element={<ClientsPage />} />
+              <Route path="/services" element={<ServicesPage />} />
+              <Route path="/emails" element={<EmailWorkflowPage />} />
+              <Route path="/admin" element={<AdminPage />} />
+              <Route path="/reports" element={
+                <PluginGuard pluginSlug="reports">
+                  <ReportsPage />
+                </PluginGuard>
+              } />
+              <Route path="/multi-user" element={
+                <PluginGuard pluginSlug="multi-user">
+                  <MultiUserSettingsPage />
+                </PluginGuard>
+              } />
+              <Route path="/pos" element={
+                <PluginGuard pluginSlug="pos">
+                  <POSPage />
+                </PluginGuard>
+              } />
+              <Route path="/plugins" element={<PluginsPage />} />
+              <Route path="*" element={<Navigate to="/dashboard" replace />} />
+            </Routes>
+          </Suspense>
+        </main>
+      </div>
+    </ProtectedRoute>
   );
 }
 

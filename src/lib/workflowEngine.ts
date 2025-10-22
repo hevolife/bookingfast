@@ -14,14 +14,13 @@ interface WorkflowLog {
   timestamp: string;
 }
 
-// 🔥 CACHE POUR ÉVITER LES DOUBLONS
-const processedWorkflows = new Map<string, number>();
-const DEBOUNCE_TIME = 5000; // 5 secondes
-
 // Vérifier si Supabase est configuré
 const isSupabaseConfigured = (): boolean => {
   const configured = !!supabase && !!import.meta.env.VITE_SUPABASE_URL && !!import.meta.env.VITE_SUPABASE_ANON_KEY;
   console.log('🔍 isSupabaseConfigured:', configured);
+  console.log('  - supabase:', !!supabase);
+  console.log('  - VITE_SUPABASE_URL:', !!import.meta.env.VITE_SUPABASE_URL);
+  console.log('  - VITE_SUPABASE_ANON_KEY:', !!import.meta.env.VITE_SUPABASE_ANON_KEY);
   return configured;
 };
 
@@ -64,7 +63,7 @@ const replaceVariables = (content: string, booking: Booking): string => {
 // Vérifier si les conditions d'un workflow sont remplies
 const checkWorkflowConditions = (workflow: EmailWorkflow, booking: Booking): boolean => {
   if (!workflow.conditions || workflow.conditions.length === 0) {
-    return true;
+    return true; // Pas de conditions = toujours vrai
   }
 
   return workflow.conditions.every(condition => {
@@ -123,6 +122,7 @@ const sendEmailViaBrevo = async (
   console.log('📧 À:', to);
   console.log('📧 Sujet:', subject);
   console.log('📧 User ID:', userId);
+  console.log('📧 Variables:', Object.keys(templateVariables).length);
   
   if (!isSupabaseConfigured()) {
     console.log('⚠️ SUPABASE NON CONFIGURÉ - Email non envoyé');
@@ -133,6 +133,7 @@ const sendEmailViaBrevo = async (
     console.log('📧 ENVOI EMAIL RÉEL VIA BREVO...');
     
     const supabaseUrl = import.meta.env.VITE_SUPABASE_URL;
+    console.log('🔗 URL Supabase:', supabaseUrl);
     
     const response = await fetch(`${supabaseUrl}/functions/v1/send-brevo-email`, {
       method: 'POST',
@@ -160,35 +161,14 @@ const sendEmailViaBrevo = async (
     } else {
       const errorData = await response.json();
       console.error('❌ Erreur envoi email Brevo:', errorData);
+      console.error('❌ Statut:', response.status);
+      console.error('❌ Détails:', errorData);
       return false;
     }
   } catch (error) {
     console.error('❌ ERREUR RÉSEAU ENVOI EMAIL:', error);
     return false;
   }
-};
-
-// 🔥 FONCTION POUR VÉRIFIER SI LE WORKFLOW A DÉJÀ ÉTÉ TRAITÉ
-const isWorkflowProcessed = (workflowId: string, bookingId: string, trigger: string): boolean => {
-  const key = `${workflowId}-${bookingId}-${trigger}`;
-  const lastProcessed = processedWorkflows.get(key);
-  const now = Date.now();
-  
-  if (lastProcessed && (now - lastProcessed) < DEBOUNCE_TIME) {
-    console.log(`⏭️ WORKFLOW DÉJÀ TRAITÉ: ${key} (il y a ${now - lastProcessed}ms)`);
-    return true;
-  }
-  
-  processedWorkflows.set(key, now);
-  
-  // Nettoyer les anciennes entrées (> 1 minute)
-  for (const [k, v] of processedWorkflows.entries()) {
-    if (now - v > 60000) {
-      processedWorkflows.delete(k);
-    }
-  }
-  
-  return false;
 };
 
 // Fonction principale pour déclencher un workflow
@@ -208,24 +188,30 @@ export const triggerWorkflow = async (trigger: string, booking: Booking, userId?
     return;
   }
   
-  // 🔥 FILTRAGE SPÉCIAL POUR payment_link_created
+  // Debug spécial pour payment_link_created
   if (trigger === 'payment_link_created') {
     console.log('💳 DEBUG PAYMENT_LINK_CREATED:');
     console.log('💳 Payment link:', booking.payment_link);
     console.log('💳 Payment status:', booking.payment_status);
-    
-    // Ne déclencher que si le lien existe vraiment
-    if (!booking.payment_link || booking.payment_link.trim() === '') {
-      console.log('⚠️ PAS DE LIEN DE PAIEMENT - Workflow payment_link_created ignoré');
-      return;
-    }
+    console.log('💳 Total amount:', booking.total_amount);
+    console.log('💳 Payment amount:', booking.payment_amount);
   }
   
-  // 🔥 FILTRAGE SPÉCIAL POUR payment_link_paid
+  // Debug spécial pour payment_link_paid
   if (trigger === 'payment_link_paid') {
     console.log('💳 DEBUG PAYMENT_LINK_PAID:');
     console.log('💳 Transactions:', booking.transactions?.length || 0);
+    console.log('💳 Détails transactions:', booking.transactions?.map(t => ({
+      method: t.method,
+      status: t.status,
+      amount: t.amount,
+      created_at: t.created_at,
+      age_minutes: t.created_at ? Math.round((Date.now() - new Date(t.created_at).getTime()) / 60000) : 'N/A'
+    })));
+    console.log('💳 Payment status:', booking.payment_status);
+    console.log('💳 Payment amount:', booking.payment_amount);
     
+    // Vérifier si on a bien une transaction Stripe complétée
     const hasStripePayment = booking.transactions?.some(t => 
       t.method === 'stripe' && 
       t.status === 'completed'
@@ -263,6 +249,15 @@ export const triggerWorkflow = async (trigger: string, booking: Booking, userId?
     }
 
     console.log('📊 Workflows trouvés:', workflows?.length || 0);
+    if (workflows && workflows.length > 0) {
+      console.log('📋 Liste workflows:', workflows.map(w => ({ 
+        id: w.id, 
+        name: w.name, 
+        template_id: w.template_id,
+        active: w.active,
+        trigger: w.trigger
+      })));
+    }
 
     if (!workflows || workflows.length === 0) {
       console.log('ℹ️ Aucun workflow actif pour le déclencheur:', trigger);
@@ -283,6 +278,9 @@ export const triggerWorkflow = async (trigger: string, booking: Booking, userId?
     }
     
     console.log('📊 Templates trouvés:', templates?.length || 0);
+    if (templates && templates.length > 0) {
+      console.log('📋 Liste templates:', templates.map(t => ({ id: t.id, name: t.name })));
+    }
   
     // Filtrer les workflows qui correspondent aux conditions
     const matchingWorkflows = workflows.filter(workflow => {
@@ -295,12 +293,6 @@ export const triggerWorkflow = async (trigger: string, booking: Booking, userId?
   
     for (const workflow of matchingWorkflows) {
       try {
-        // 🔥 VÉRIFIER SI LE WORKFLOW A DÉJÀ ÉTÉ TRAITÉ
-        if (isWorkflowProcessed(workflow.id, booking.id, trigger)) {
-          console.log(`⏭️ WORKFLOW IGNORÉ (déjà traité): ${workflow.name}`);
-          continue;
-        }
-        
         console.log('⚡ ========================================');
         console.log('⚡ EXÉCUTION WORKFLOW:', workflow.name);
         console.log('⚡ ========================================');
@@ -310,6 +302,7 @@ export const triggerWorkflow = async (trigger: string, booking: Booking, userId?
         const template = templates?.find(t => t.id === workflow.template_id);
         if (!template) {
           console.error(`❌ Template non trouvé: ${workflow.template_id}`);
+          console.log('📋 Templates disponibles:', templates?.map(t => t.id) || []);
           continue;
         }
         
@@ -347,6 +340,7 @@ export const triggerWorkflow = async (trigger: string, booking: Booking, userId?
         };
         
         console.log('📧 Variables template préparées:', Object.keys(templateVariables).length, 'variables');
+        console.log('📧 Variables détails:', templateVariables);
       
         // Envoyer l'email
         console.log('📤 Tentative envoi email à:', booking.client_email);

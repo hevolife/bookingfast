@@ -21,34 +21,22 @@ import {
   Sparkles,
   Settings
 } from 'lucide-react';
-import { useNavigate, useLocation } from 'react-router-dom';
-import { isPWA } from '../../utils/pwaDetection';
+import { useNavigate } from 'react-router-dom';
 import { useAuth } from '../../contexts/AuthContext';
 
 export function LandingPage() {
   const navigate = useNavigate();
-  const location = useLocation();
   const { isAuthenticated } = useAuth();
   const [currentFeature, setCurrentFeature] = useState(0);
   const [isVisible, setIsVisible] = useState(false);
 
-  // CORRECTION : Rediriger les utilisateurs authentifiés vers le dashboard
+  // Rediriger les utilisateurs authentifiés vers le dashboard
   useEffect(() => {
-    const isBookingRoute = location.pathname.startsWith('/booking/');
-    
-    // Si l'utilisateur est authentifié et pas sur une route de réservation publique
-    if (isAuthenticated && !isBookingRoute) {
-      console.log('✅ Utilisateur authentifié détecté sur landing page - redirection vers dashboard');
+    if (isAuthenticated) {
+      console.log('✅ Utilisateur authentifié détecté - redirection vers dashboard');
       navigate('/dashboard', { replace: true });
-      return;
     }
-
-    // Rediriger vers login si en mode PWA - MAIS PAS si on vient d'une route de réservation
-    if (isPWA() && !isBookingRoute) {
-      console.log('🚫 Landing page - PWA détecté, redirection vers /login');
-      navigate('/login', { replace: true });
-    }
-  }, [navigate, location.pathname, isAuthenticated]);
+  }, [isAuthenticated, navigate]);
 
   const features = [
     {
