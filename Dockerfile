@@ -2,28 +2,22 @@ FROM node:20-alpine AS builder
 
 WORKDIR /app
 
-# Copier les fichiers de dépendances
 COPY package*.json ./
-
-# Installer les dépendances
 RUN npm ci --only=production
 
-# Copier le code source
 COPY . .
-
-# Build l'application
 RUN npm run build
 
-# Stage de production
 FROM nginx:alpine
 
-# Copier la configuration nginx AVANT les fichiers
+# COPIER nginx.conf DANS LE BON DOSSIER
 COPY nginx.conf /etc/nginx/conf.d/default.conf
 
-# Copier les fichiers buildés
+# Supprimer la config par défaut de nginx
+RUN rm -f /etc/nginx/conf.d/default.conf.dpkg-dist
+
 COPY --from=builder /app/dist /usr/share/nginx/html
 
-# Exposer le port
 EXPOSE 80
 
 CMD ["nginx", "-g", "daemon off;"]

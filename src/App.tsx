@@ -1,5 +1,5 @@
-import React, { lazy, Suspense, useEffect } from 'react';
-import { Routes, Route, Navigate, useNavigate, useLocation } from 'react-router-dom';
+import React, { lazy, Suspense } from 'react';
+import { Routes, Route, Navigate, useLocation } from 'react-router-dom';
 import { TeamProvider } from './contexts/TeamContext';
 import { AuthProvider } from './contexts/AuthContext';
 import { Navbar } from './components/Layout/Navbar';
@@ -21,16 +21,11 @@ const PluginsPage = lazy(() => import('./components/Plugins/PluginsPage').then(m
 
 function App() {
   const location = useLocation();
-  const navigate = useNavigate();
 
-  // 🚫 VÉRIFICATION CRITIQUE EN PREMIER - Si c'est une page de booking, ne RIEN faire d'autre
+  // Page de booking publique - PAS de AuthProvider
   const isBookingPage = location.pathname.startsWith('/booking/');
   
-  console.log('🎯 Route actuelle:', location.pathname);
-  console.log('🎯 Est une page de booking?', isBookingPage);
-
   if (isBookingPage) {
-    console.log('✅ Page de booking publique détectée - Pas de redirect');
     return (
       <TeamProvider>
         <Suspense fallback={<LoadingSpinner />}>
@@ -42,7 +37,7 @@ function App() {
     );
   }
 
-  // Si c'est un callback OAuth, afficher le composant de callback
+  // Callback OAuth
   if (location.pathname.includes('/auth/google/callback')) {
     return (
       <AuthProvider>
@@ -57,14 +52,7 @@ function App() {
     );
   }
 
-  // Rediriger vers /dashboard UNIQUEMENT si on est exactement sur '/'
-  useEffect(() => {
-    if (location.pathname === '/') {
-      console.log('🔄 Redirect vers /dashboard');
-      navigate('/dashboard', { replace: true });
-    }
-  }, [location.pathname, navigate]);
-
+  // Pages authentifiées
   return (
     <AuthProvider>
       <TeamProvider>
@@ -80,6 +68,7 @@ function App() {
           >
             <Suspense fallback={<LoadingSpinner />}>
               <Routes>
+                <Route path="/" element={<Navigate to="/dashboard" replace />} />
                 <Route path="/dashboard" element={<DashboardPage />} />
                 <Route path="/calendar" element={<CalendarPage />} />
                 <Route path="/bookings-list" element={<CalendarPage view="list" />} />
