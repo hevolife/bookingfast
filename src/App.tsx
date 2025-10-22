@@ -24,8 +24,13 @@ function App() {
   const navigate = useNavigate();
 
   // 🚫 VÉRIFICATION CRITIQUE EN PREMIER - Si c'est une page de booking, ne RIEN faire d'autre
-  if (location.pathname.startsWith('/booking/')) {
-    console.log('🎯 Page de booking publique détectée:', location.pathname);
+  const isBookingPage = location.pathname.startsWith('/booking/');
+  
+  console.log('🎯 Route actuelle:', location.pathname);
+  console.log('🎯 Est une page de booking?', isBookingPage);
+
+  if (isBookingPage) {
+    console.log('✅ Page de booking publique détectée - Pas de redirect');
     return (
       <TeamProvider>
         <Suspense fallback={<LoadingSpinner />}>
@@ -55,6 +60,7 @@ function App() {
   // Rediriger vers /dashboard UNIQUEMENT si on est exactement sur '/'
   useEffect(() => {
     if (location.pathname === '/') {
+      console.log('🔄 Redirect vers /dashboard');
       navigate('/dashboard', { replace: true });
     }
   }, [location.pathname, navigate]);
