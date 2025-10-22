@@ -11,7 +11,6 @@ import { PaymentPage } from './components/PaymentPage/PaymentPage';
 import { LandingPage } from './components/Landing/LandingPage';
 import { ProtectedRoute } from './components/Auth/ProtectedRoute';
 import { PublicRoute } from './components/Auth/PublicRoute';
-import { isPWA } from './utils/pwaDetection';
 
 const DashboardPage = lazy(() => import('./components/Dashboard/DashboardPage').then(m => ({ default: m.DashboardPage })));
 const CalendarPage = lazy(() => import('./components/Calendar/CalendarPage').then(m => ({ default: m.CalendarPage })));
@@ -38,9 +37,6 @@ function App() {
 function AppRoutes() {
   const location = useLocation();
   const pathname = location.pathname;
-  const isPWAMode = isPWA();
-
-  console.log('🔍 AppRoutes - État:', { pathname, isPWAMode });
 
   // 🎯 Pages TOUJOURS publiques (pas de vérification auth)
   const isAlwaysPublicPage = 
@@ -71,20 +67,6 @@ function AppRoutes() {
           <Route path="/payment" element={<PaymentPage />} />
         </Routes>
       </Suspense>
-    );
-  }
-
-  // 🎯 NOUVEAU: Bloquer l'accès à la landing page en mode PWA
-  if (isPWAMode && pathname === '/') {
-    console.log('🚫 PWA Mode - Redirection de / vers /login');
-    window.location.href = '/login';
-    return (
-      <div className="flex items-center justify-center min-h-screen bg-gradient-to-br from-blue-50 via-purple-50 to-pink-50">
-        <div className="text-center">
-          <LoadingSpinner size="lg" className="mx-auto mb-4" />
-          <p className="text-gray-600 text-lg">Redirection...</p>
-        </div>
-      </div>
     );
   }
 

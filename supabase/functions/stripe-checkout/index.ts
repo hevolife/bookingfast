@@ -10,7 +10,7 @@ const corsHeaders = {
 const PLATFORM_STRIPE_SECRET_KEY = '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';
 
 Deno.serve(async (req) => {
-  console.log('🚀 === STRIPE-CHECKOUT V17 - REDIRECT TO BOOKING PAGE === 🚀')
+  console.log('🚀 === STRIPE-CHECKOUT V18 - METADATA FIX === 🚀')
   console.log('📍 Request URL:', req.url)
   console.log('📍 Request Method:', req.method)
   
@@ -83,10 +83,26 @@ Deno.serve(async (req) => {
       console.log('💳 === PAIEMENT RÉSERVATION IFRAME === 💳')
       
       const userId = metadata?.user_id
+      const serviceId = metadata?.service_id // 🔥 CRITIQUE
+      
+      console.log('🔍 Métadonnées critiques:', {
+        user_id: userId,
+        service_id: serviceId
+      });
+      
       if (!userId) {
         console.error('❌ user_id manquant dans metadata');
         return new Response(
           JSON.stringify({ error: 'user_id requis' }),
+          { status: 400, headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
+        )
+      }
+
+      // 🔥 VALIDATION CRITIQUE - service_id OBLIGATOIRE
+      if (!serviceId) {
+        console.error('❌ service_id manquant dans metadata');
+        return new Response(
+          JSON.stringify({ error: 'service_id requis pour créer la réservation' }),
           { status: 400, headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
         )
       }
@@ -193,7 +209,6 @@ Deno.serve(async (req) => {
       console.log('🔧 Step 7: Building redirect URLs')
       let redirectBaseUrl: string;
       
-      // 🎯 NOUVELLE LOGIQUE : Toujours rediriger vers la page de réservation
       if (parent_url && parent_url !== 'https://bookingfast.pro') {
         redirectBaseUrl = parent_url;
         console.log('🌐 Iframe externe détecté - redirect vers:', redirectBaseUrl);
@@ -204,7 +219,6 @@ Deno.serve(async (req) => {
         console.log('🏠 Iframe BookingFast - redirect vers:', redirectBaseUrl);
       }
       
-      // ✅ REDIRECTION VERS LA PAGE DE RÉSERVATION (pas confirmation)
       const iframeSuccessUrl = `${redirectBaseUrl}/booking/${userId}?payment=success&session_id={CHECKOUT_SESSION_ID}`;
       const iframeCancelUrl = `${redirectBaseUrl}/booking/${userId}?payment=cancelled`;
 
@@ -219,6 +233,16 @@ Deno.serve(async (req) => {
         currency,
         service_name
       });
+
+      // 🔥 MÉTADONNÉES COMPLÈTES AVEC service_id
+      const completeMetadata = {
+        ...metadata,
+        user_id: userId,
+        service_id: serviceId, // 🔥 AJOUT CRITIQUE
+        payment_type: 'booking_deposit'
+      };
+
+      console.log('📦 Métadonnées complètes pour Stripe:', JSON.stringify(completeMetadata, null, 2));
 
       try {
         const sessionData = {
@@ -240,7 +264,7 @@ Deno.serve(async (req) => {
           mode: 'payment',
           success_url: iframeSuccessUrl,
           cancel_url: iframeCancelUrl,
-          metadata: metadata || {},
+          metadata: completeMetadata, // 🔥 MÉTADONNÉES COMPLÈTES
         };
 
         console.log('📋 Données session Stripe:', JSON.stringify(sessionData, null, 2));

@@ -2,7 +2,7 @@
   "name": "BookingFast - Système de Réservation",
   "short_name": "BookingFast",
   "description": "Application de gestion de réservations professionnelle",
-  "start_url": "/login",
+  "start_url": "/",
   "display": "standalone",
   "background_color": "#3B82F6",
   "theme_color": "#3B82F6",
@@ -33,10 +33,10 @@
   ],
   "shortcuts": [
     {
-      "name": "Connexion",
-      "short_name": "Login",
-      "description": "Se connecter à BookingFast",
-      "url": "/login",
+      "name": "Nouveau rendez-vous",
+      "short_name": "Nouveau RDV",
+      "description": "Créer une nouvelle réservation",
+      "url": "/calendar",
       "icons": [
         {
           "src": "/pwa-192x192.png",
@@ -55,18 +55,6 @@
           "sizes": "192x192"
         }
       ]
-    },
-    {
-      "name": "Calendrier",
-      "short_name": "Calendrier",
-      "description": "Gérer les réservations",
-      "url": "/calendar",
-      "icons": [
-        {
-          "src": "/pwa-192x192.png",
-          "sizes": "192x192"
-        }
-      ]
     }
   ],
   "screenshots": [
@@ -75,7 +63,7 @@
       "sizes": "512x512",
       "type": "image/png",
       "form_factor": "wide",
-      "label": "Interface principale BookingFast"
+      "label": "Interface principale BookingPro"
     }
   ],
   "edge_side_panel": {
