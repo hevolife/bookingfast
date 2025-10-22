@@ -23,26 +23,19 @@ function App() {
   const location = useLocation();
   const navigate = useNavigate();
 
-  // Détecter le callback OAuth Google Calendar
-  useEffect(() => {
-    const urlParams = new URLSearchParams(window.location.search);
-    const code = urlParams.get('code');
-    const state = urlParams.get('state');
-    const path = window.location.pathname;
-
-    if ((path === '/auth/google/callback' || path.includes('/auth/google/callback')) && code && state) {
-      // Laisser le composant GoogleCalendarCallback gérer le callback
-      return;
-    }
-  }, []);
-
-  // Rediriger vers /dashboard UNIQUEMENT si on est exactement sur '/'
-  useEffect(() => {
-    // Ne rediriger QUE si on est exactement sur la racine '/'
-    if (location.pathname === '/') {
-      navigate('/dashboard', { replace: true });
-    }
-  }, [location.pathname, navigate]);
+  // 🚫 VÉRIFICATION CRITIQUE EN PREMIER - Si c'est une page de booking, ne RIEN faire d'autre
+  if (location.pathname.startsWith('/booking/')) {
+    console.log('🎯 Page de booking publique détectée:', location.pathname);
+    return (
+      <TeamProvider>
+        <Suspense fallback={<LoadingSpinner />}>
+          <Routes>
+            <Route path="/booking/:userId" element={<IframeBookingPage />} />
+          </Routes>
+        </Suspense>
+      </TeamProvider>
+    );
+  }
 
   // Si c'est un callback OAuth, afficher le composant de callback
   if (location.pathname.includes('/auth/google/callback')) {
@@ -59,19 +52,12 @@ function App() {
     );
   }
 
-  // Si c'est une page de booking publique, afficher sans navbar et sans auth
-  if (location.pathname.startsWith('/booking/')) {
-    console.log('🎯 Page de booking publique détectée:', location.pathname);
-    return (
-      <TeamProvider>
-        <Suspense fallback={<LoadingSpinner />}>
-          <Routes>
-            <Route path="/booking/:userId" element={<IframeBookingPage />} />
-          </Routes>
-        </Suspense>
-      </TeamProvider>
-    );
-  }
+  // Rediriger vers /dashboard UNIQUEMENT si on est exactement sur '/'
+  useEffect(() => {
+    if (location.pathname === '/') {
+      navigate('/dashboard', { replace: true });
+    }
+  }, [location.pathname, navigate]);
 
   return (
     <AuthProvider>
