@@ -73,7 +73,7 @@ export function PaymentPage() {
         console.log('  - date:', date);
         console.log('  - time:', time);
 
-        const { data: booking, error } = await supabase
+        const { data: booking, error } = await supabase!
           .from('bookings')
           .select('transactions, payment_status, total_amount, payment_amount')
           .eq('client_email', email)
@@ -203,9 +203,6 @@ export function PaymentPage() {
           </div>
           <h1 className="text-2xl font-bold text-gray-900 mb-4">Vérification...</h1>
           <p className="text-gray-600">Vérification du statut du lien de paiement</p>
-          <div className="mt-4 text-xs text-gray-400">
-            Debug: checkingStatus = {checkingStatus.toString()}
-          </div>
         </div>
       </div>
     );
@@ -315,29 +312,40 @@ export function PaymentPage() {
     try {
       if (isSupabaseConfigured()) {
         console.log('🔧 Supabase configured - Creating Stripe session');
+        
+        // 🔥 FIX: Récupérer l'URL Supabase correctement
         const supabaseUrl = import.meta.env.VITE_SUPABASE_URL;
         console.log('🌐 Supabase URL:', supabaseUrl);
         
-        const response = await fetch(`${supabaseUrl}/functions/v1/stripe-checkout`, {
+        // 🔥 FIX: Construire l'URL correctement (sans double slash)
+        const functionUrl = `${supabaseUrl}/functions/v1/stripe-checkout`;
+        console.log('🔗 Function URL:', functionUrl);
+        
+        const payload = {
+          amount: parseFloat(amount),
+          service_name: service,
+          customer_email: email,
+          success_url: `${window.location.origin}/payment-success`,
+          cancel_url: `${window.location.origin}/payment-cancel`,
+          metadata: {
+            payment_type: 'booking_deposit',
+            client: client,
+            email: email,
+            date: date,
+            time: time,
+            user_id: userId,
+          },
+        };
+        
+        console.log('📦 Payload:', JSON.stringify(payload, null, 2));
+        
+        const response = await fetch(functionUrl, {
           method: 'POST',
           headers: {
             'Content-Type': 'application/json',
             'Authorization': `Bearer ${import.meta.env.VITE_SUPABASE_ANON_KEY}`,
           },
-          body: JSON.stringify({
-            amount: parseFloat(amount),
-            service_name: service,
-            customer_email: email,
-            success_url: `${window.location.origin}/payment-success`,
-            cancel_url: `${window.location.origin}/payment-cancel`,
-            metadata: {
-              client: client,
-              email: email,
-              date: date,
-              time: time,
-              user_id: userId,
-            },
-          }),
+          body: JSON.stringify(payload),
         });
 
         console.log('📡 Stripe response status:', response.status);
