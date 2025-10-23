@@ -586,16 +586,17 @@ export function IframeBookingPage() {
 
       console.log('🔗 URLs de redirection:', { success: successUrl, cancel: cancelUrl });
 
-      // 🔥 CORRECTION CRITIQUE - AJOUT DE TOUTES LES MÉTADONNÉES MANQUANTES
+      // 🔥 MÉTADONNÉES COMPLÈTES AVEC CHAMPS SÉPARÉS
       const metadata = {
         user_id: userId,
-        service_id: selectedService.id, // ✅ AJOUT CRITIQUE
+        service_id: selectedService.id,
         date: selectedDate,
         time: selectedTime,
         quantity: quantity.toString(),
-        client_firstname: clientData.firstname,
-        client_lastname: clientData.lastname,
-        client_phone: clientData.phone,
+        client_firstname: clientData.firstname, // ✅ SÉPARÉ
+        client_lastname: clientData.lastname,   // ✅ SÉPARÉ
+        client_email: clientData.email,
+        client_phone: clientData.phone || '',
         payment_type: 'booking_deposit',
         return_origin: baseUrl
       };
@@ -622,7 +623,7 @@ export function IframeBookingPage() {
           success_url: successUrl,
           cancel_url: cancelUrl,
           parent_url: baseUrl,
-          metadata: metadata // ✅ MÉTADONNÉES COMPLÈTES
+          metadata: metadata
         })
       });
 

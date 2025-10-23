@@ -20,6 +20,7 @@ export function PaymentPage() {
   console.log('  - time:', searchParams.get('time'));
   console.log('  - expires:', searchParams.get('expires'));
   console.log('  - user_id:', searchParams.get('user_id'));
+  console.log('  - booking_id:', searchParams.get('booking_id')); // 🔥 NOUVEAU
 
   const [timeLeft, setTimeLeft] = useState<number>(0);
   const [isExpired, setIsExpired] = useState(false);
@@ -42,6 +43,7 @@ export function PaymentPage() {
   const time = searchParams.get('time');
   const expiresAt = searchParams.get('expires');
   const userId = searchParams.get('user_id');
+  const bookingId = searchParams.get('booking_id'); // 🔥 NOUVEAU
 
   // 🔍 Récupérer le service_id depuis le nom du service
   useEffect(() => {
@@ -242,6 +244,7 @@ export function PaymentPage() {
   console.log('  - isExpired:', isExpired);
   console.log('  - processing:', processing);
   console.log('  - serviceId:', serviceId);
+  console.log('  - bookingId:', bookingId); // 🔥 NOUVEAU
 
   // Affichage pendant la vérification
   if (checkingStatus) {
@@ -379,11 +382,12 @@ export function PaymentPage() {
         const functionUrl = `${supabaseUrl}/functions/v1/stripe-checkout`;
         console.log('🔗 Function URL:', functionUrl);
         
-        // 🔥 CORRECTION CRITIQUE - MÉTADONNÉES COMPLÈTES AVEC service_id
+        // 🔥 MÉTADONNÉES COMPLÈTES AVEC booking_id
         const metadata = {
           payment_type: 'booking_deposit',
           user_id: userId,
-          service_id: serviceId, // ✅ AJOUT CRITIQUE
+          service_id: serviceId,
+          booking_id: bookingId, // 🔥 AJOUT CRITIQUE
           client: client,
           email: email,
           date: date,
@@ -396,7 +400,7 @@ export function PaymentPage() {
           customer_email: email,
           success_url: `${window.location.origin}/payment-success`,
           cancel_url: `${window.location.origin}/payment-cancel`,
-          metadata: metadata, // ✅ MÉTADONNÉES COMPLÈTES
+          metadata: metadata,
         };
         
         console.log('📦 Payload:', JSON.stringify(payload, null, 2));
