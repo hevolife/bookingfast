@@ -171,18 +171,14 @@ Deno.serve(async (req) => {
           return new Response('Données manquantes', { status: 400, headers: corsHeaders })
         }
 
-        // Mettre à jour le lien de paiement
-        await supabaseRequest(
-          `payment_links?id=eq.${paymentLinkId}`,
-          'PATCH',
-          {
-            status: 'completed',
-            stripe_session_id: sessionId,
-            paid_at: new Date().toISOString()
-          }
-        )
+        console.log('🔍 Traitement paiement lien:', {
+          paymentLinkId,
+          bookingId,
+          amount
+        })
 
-        // Récupérer la réservation
+        // 1️⃣ Récupérer la réservation
+        console.log('🔍 Récupération réservation...')
         const bookings = await supabaseRequest(`bookings?id=eq.${bookingId}`)
         const booking = bookings?.[0]
 
@@ -192,9 +188,16 @@ Deno.serve(async (req) => {
           return new Response('Réservation non trouvée', { status: 404, headers: corsHeaders })
         }
 
-        // Ajouter la transaction
+        console.log('📋 Réservation trouvée:', {
+          id: booking.id,
+          total_amount: booking.total_amount,
+          payment_amount: booking.payment_amount,
+          payment_status: booking.payment_status
+        })
+
+        // 2️⃣ Ajouter la transaction
         const transactions = booking.transactions || []
-        transactions.push({
+        const newTransaction = {
           id: crypto.randomUUID(),
           amount: amount,
           method: 'stripe',
@@ -202,39 +205,71 @@ Deno.serve(async (req) => {
           date: new Date().toISOString(),
           stripe_session_id: sessionId,
           payment_link_id: paymentLinkId
-        })
+        }
+        transactions.push(newTransaction)
 
-        // Calculer le nouveau montant payé
+        console.log('💰 Nouvelle transaction:', newTransaction)
+
+        // 3️⃣ Calculer le nouveau montant payé
         const newPaymentAmount = (booking.payment_amount || 0) + amount
 
-        // Déterminer le statut de paiement
+        console.log('💵 Calcul paiement:', {
+          ancien: booking.payment_amount || 0,
+          ajout: amount,
+          nouveau: newPaymentAmount,
+          total: booking.total_amount
+        })
+
+        // 4️⃣ Déterminer le statut de paiement
         let paymentStatus = 'partial'
         if (newPaymentAmount >= booking.total_amount) {
           paymentStatus = 'completed'
+          console.log('✅ Paiement COMPLET')
         } else if (newPaymentAmount > 0) {
           paymentStatus = 'partial'
+          console.log('⚠️ Paiement PARTIEL')
         }
 
-        // Mettre à jour la réservation
+        // 5️⃣ Mettre à jour la réservation
+        console.log('🔄 Mise à jour réservation...')
+        const updateData = {
+          transactions: transactions,
+          payment_amount: newPaymentAmount,
+          payment_status: paymentStatus,
+          deposit_amount: amount,
+          updated_at: new Date().toISOString()
+        }
+
+        console.log('📦 Données de mise à jour:', updateData)
+
         await supabaseRequest(
           `bookings?id=eq.${bookingId}`,
           'PATCH',
+          updateData
+        )
+
+        // 6️⃣ 🔥 MARQUER LE LIEN COMME REMPLACÉ
+        console.log('🔄 Marquage lien comme remplacé...')
+        await supabaseRequest(
+          `payment_links?id=eq.${paymentLinkId}`,
+          'PATCH',
           {
-            transactions: transactions,
-            payment_amount: newPaymentAmount,
-            payment_status: paymentStatus,
-            deposit_amount: amount,
-            updated_at: new Date().toISOString()
+            status: 'completed',
+            stripe_session_id: sessionId,
+            paid_at: new Date().toISOString(),
+            replaced_by_transaction_id: newTransaction.id // 🔥 NOUVEAU
           }
         )
 
-        console.log('✅ PAIEMENT VIA LIEN TRAITÉ')
+        console.log('✅ PAIEMENT VIA LIEN TRAITÉ AVEC SUCCÈS')
 
         const result = { 
           success: true, 
           type: 'payment_link',
           bookingId: bookingId,
-          amount: amount
+          amount: amount,
+          newPaymentAmount: newPaymentAmount,
+          paymentStatus: paymentStatus
         }
         
         processedSessions.set(sessionId, { timestamp: Date.now(), result })
