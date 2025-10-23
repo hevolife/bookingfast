@@ -18,6 +18,7 @@
   2. Security
     - Enable RLS on `payment_links` table
     - Add policies for authenticated users
+    - Add PUBLIC policy for reading payment links (for payment page)
 
   3. Indexes
     - Index sur booking_id pour recherche rapide
@@ -43,12 +44,12 @@ CREATE TABLE IF NOT EXISTS payment_links (
 -- Activer RLS
 ALTER TABLE payment_links ENABLE ROW LEVEL SECURITY;
 
--- Politique : Les utilisateurs peuvent voir leurs propres liens
-CREATE POLICY "Users can view own payment links"
+-- 🔥 POLITIQUE CRITIQUE : Lecture publique pour la page de paiement
+CREATE POLICY "Public can view payment links for payment page"
   ON payment_links
   FOR SELECT
-  TO authenticated
-  USING (auth.uid() = user_id);
+  TO anon, authenticated
+  USING (true);
 
 -- Politique : Les utilisateurs peuvent créer leurs propres liens
 CREATE POLICY "Users can create own payment links"

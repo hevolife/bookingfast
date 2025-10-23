@@ -65,14 +65,40 @@ export function usePaymentLinks(bookingId?: string) {
     amount: number,
     expiryMinutes?: number
   ): Promise<PaymentLink | null> => {
+    console.log('🔵 [CREATE] Début création lien de paiement');
+    console.log('🔵 [CREATE] Params:', { bookingId, amount, expiryMinutes });
+
     if (!user || !isSupabaseConfigured) {
+      console.error('❌ [CREATE] Supabase non configuré ou utilisateur non connecté');
       throw new Error('Supabase non configuré ou utilisateur non connecté');
     }
 
+    console.log('✅ [CREATE] User ID:', user.id);
+
     try {
+      // 🔥 VÉRIFICATION AUTH CRITIQUE
+      const { data: { user: supabaseUser }, error: userError } = await supabase!.auth.getUser();
+      const { data: { session }, error: sessionError } = await supabase!.auth.getSession();
+
+      console.log('🔥 [AUTH CHECK] Supabase User:', supabaseUser?.id);
+      console.log('🔥 [AUTH CHECK] Session exists:', !!session);
+      console.log('🔥 [AUTH CHECK] Access token exists:', !!session?.access_token);
+      console.log('🔥 [AUTH CHECK] User error:', userError);
+      console.log('🔥 [AUTH CHECK] Session error:', sessionError);
+
+      if (!supabaseUser) {
+        throw new Error('Utilisateur non authentifié dans Supabase');
+      }
+
+      if (!session?.access_token) {
+        throw new Error('Session invalide ou expirée');
+      }
+
       let targetUserId = user.id;
 
+      // Vérifier équipe
       try {
+        console.log('🔍 [CREATE] Vérification équipe...');
         const { data: membershipData } = await supabase!
           .from('team_members')
           .select('owner_id')
@@ -82,40 +108,73 @@ export function usePaymentLinks(bookingId?: string) {
 
         if (membershipData?.owner_id) {
           targetUserId = membershipData.owner_id;
+          console.log('✅ [CREATE] Membre d\'équipe, owner_id:', targetUserId);
+        } else {
+          console.log('✅ [CREATE] Utilisateur propriétaire');
         }
       } catch (teamError) {
-        console.warn('⚠️ Erreur vérification équipe:', teamError);
+        console.warn('⚠️ [CREATE] Erreur vérification équipe:', teamError);
       }
 
       // Récupérer les paramètres de délai d'expiration
-      const { data: settings } = await supabase!
+      console.log('🔍 [CREATE] Récupération paramètres expiration...');
+      const { data: settings, error: settingsError } = await supabase!
         .from('business_settings')
         .select('payment_link_expiry_minutes')
         .eq('user_id', targetUserId)
-        .single();
+        .maybeSingle();
+
+      if (settingsError) {
+        console.warn('⚠️ [CREATE] Erreur récupération settings:', settingsError);
+      } else {
+        console.log('✅ [CREATE] Settings:', settings);
+      }
 
       const expiryMins = expiryMinutes || settings?.payment_link_expiry_minutes || 30;
       const expiresAt = new Date(Date.now() + expiryMins * 60 * 1000).toISOString();
 
-      // Créer le lien de paiement
-      const { data: paymentLink, error } = await supabase!
+      console.log('✅ [CREATE] Expiration calculée:', { expiryMins, expiresAt });
+
+      // 🔥 CRITIQUE : Passer explicitement user_id
+      const insertData = {
+        booking_id: bookingId,
+        user_id: targetUserId, // ✅ EXPLICITE
+        amount,
+        expires_at: expiresAt,
+        status: 'pending' as const
+      };
+
+      console.log('🔵 [CREATE] Données à insérer:', insertData);
+
+      // 🔥 CRÉER LE LIEN DE PAIEMENT
+      console.log('🔵 [CREATE] Exécution INSERT...');
+      const { data: paymentLink, error: insertError } = await supabase!
         .from('payment_links')
-        .insert({
-          booking_id: bookingId,
-          user_id: targetUserId,
-          amount,
-          expires_at: expiresAt,
-          status: 'pending'
-        })
+        .insert(insertData)
         .select()
         .single();
 
-      if (error) throw error;
+      if (insertError) {
+        console.error('❌ [CREATE] Erreur INSERT:', insertError);
+        console.error('❌ [CREATE] Code erreur:', insertError.code);
+        console.error('❌ [CREATE] Message:', insertError.message);
+        console.error('❌ [CREATE] Details:', insertError.details);
+        throw insertError;
+      }
+
+      if (!paymentLink) {
+        console.error('❌ [CREATE] Aucune donnée retournée après INSERT');
+        throw new Error('Aucune donnée retournée après création');
+      }
+
+      console.log('✅ [CREATE] Lien créé avec succès:', paymentLink);
 
       // Générer l'URL du lien de paiement
       const paymentUrl = `${window.location.origin}/payment?link_id=${paymentLink.id}`;
+      console.log('✅ [CREATE] URL générée:', paymentUrl);
 
       // Mettre à jour avec l'URL
+      console.log('🔵 [CREATE] Mise à jour URL...');
       const { data: updatedLink, error: updateError } = await supabase!
         .from('payment_links')
         .update({ payment_url: paymentUrl })
@@ -123,12 +182,20 @@ export function usePaymentLinks(bookingId?: string) {
         .select()
         .single();
 
-      if (updateError) throw updateError;
+      if (updateError) {
+        console.error('❌ [CREATE] Erreur UPDATE URL:', updateError);
+        throw updateError;
+      }
+
+      console.log('✅ [CREATE] URL mise à jour:', updatedLink);
 
       setPaymentLinks(prev => [updatedLink, ...prev]);
+      
+      console.log('✅ [CREATE] Création terminée avec succès');
       return updatedLink;
     } catch (err) {
-      console.error('❌ Erreur création lien de paiement:', err);
+      console.error('❌ [CREATE] Erreur globale:', err);
+      console.error('❌ [CREATE] Stack:', err instanceof Error ? err.stack : 'N/A');
       throw err;
     }
   };

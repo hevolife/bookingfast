@@ -1,5 +1,5 @@
 import React, { useState, useEffect } from 'react';
-import { CreditCard, Clock, User, Mail, Calendar, AlertTriangle, XCircle, Timer, CheckCircle, Package } from 'lucide-react';
+import { CreditCard, Clock, User, Calendar, AlertTriangle, XCircle, Timer, CheckCircle, Package } from 'lucide-react';
 import { supabase, isSupabaseConfigured } from '../../lib/supabase';
 import { useSearchParams } from 'react-router-dom';
 
@@ -14,11 +14,21 @@ export function PaymentPage() {
   const [checkingStatus, setCheckingStatus] = useState(true);
   const [paymentLinkData, setPaymentLinkData] = useState<any>(null);
   const [bookingData, setBookingData] = useState<any>(null);
+  const [error, setError] = useState<string | null>(null);
 
   // Charger les données du lien de paiement
   useEffect(() => {
     const loadPaymentLink = async () => {
-      if (!linkId || !isSupabaseConfigured) {
+      if (!linkId) {
+        console.error('❌ Aucun link_id fourni');
+        setError('Aucun identifiant de lien fourni');
+        setCheckingStatus(false);
+        return;
+      }
+
+      if (!isSupabaseConfigured) {
+        console.error('❌ Supabase non configuré');
+        setError('Configuration manquante');
         setCheckingStatus(false);
         return;
       }
@@ -26,6 +36,7 @@ export function PaymentPage() {
       try {
         console.log('🔍 Chargement lien de paiement:', linkId);
 
+        // 🔥 REQUÊTE SANS AUTHENTIFICATION (politique publique)
         const { data: link, error: linkError } = await supabase!
           .from('payment_links')
           .select(`
@@ -36,10 +47,17 @@ export function PaymentPage() {
             )
           `)
           .eq('id', linkId)
-          .single();
+          .maybeSingle();
 
-        if (linkError || !link) {
-          console.error('❌ Lien non trouvé:', linkError);
+        if (linkError) {
+          console.error('❌ Erreur Supabase:', linkError);
+          setError(`Erreur base de données: ${linkError.message}`);
+          setCheckingStatus(false);
+          return;
+        }
+
+        if (!link) {
+          console.error('❌ Lien non trouvé');
           setIsDeleted(true);
           setCheckingStatus(false);
           return;
@@ -71,10 +89,14 @@ export function PaymentPage() {
           setIsExpired(true);
           
           // Marquer comme expiré dans la base
-          await supabase!
-            .from('payment_links')
-            .update({ status: 'expired' })
-            .eq('id', linkId);
+          try {
+            await supabase!
+              .from('payment_links')
+              .update({ status: 'expired' })
+              .eq('id', linkId);
+          } catch (updateError) {
+            console.warn('⚠️ Impossible de marquer comme expiré:', updateError);
+          }
           
           setCheckingStatus(false);
           return;
@@ -85,6 +107,7 @@ export function PaymentPage() {
         setCheckingStatus(false);
       } catch (err) {
         console.error('❌ Erreur chargement:', err);
+        setError(err instanceof Error ? err.message : 'Erreur inconnue');
         setCheckingStatus(false);
       }
     };
@@ -191,6 +214,31 @@ export function PaymentPage() {
           </div>
           <h1 className="text-2xl font-bold text-gray-900 mb-4">Vérification...</h1>
           <p className="text-gray-600">Vérification du lien de paiement</p>
+        </div>
+      </div>
+    );
+  }
+
+  // Erreur de chargement
+  if (error) {
+    return (
+      <div className="min-h-screen bg-gradient-to-br from-red-50 to-pink-50 flex items-center justify-center p-4">
+        <div className="bg-white rounded-3xl shadow-2xl p-8 max-w-md w-full text-center">
+          <div className="w-20 h-20 bg-gradient-to-r from-red-500 to-pink-500 rounded-full flex items-center justify-center mx-auto mb-6">
+            <XCircle className="w-12 h-12 text-white" />
+          </div>
+          <h1 className="text-3xl font-bold text-gray-900 mb-4">Erreur</h1>
+          <p className="text-gray-600 text-lg mb-6">{error}</p>
+          <div className="bg-red-50 rounded-xl p-4 border border-red-200 text-left">
+            <p className="text-sm text-red-800">
+              <strong>Causes possibles :</strong>
+            </p>
+            <ul className="text-sm text-red-700 mt-2 space-y-1 list-disc list-inside">
+              <li>La table payment_links n'existe pas encore</li>
+              <li>Les politiques RLS ne sont pas configurées</li>
+              <li>Le lien n'a pas été créé correctement</li>
+            </ul>
+          </div>
         </div>
       </div>
     );

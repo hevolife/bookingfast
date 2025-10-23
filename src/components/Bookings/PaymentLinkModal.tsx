@@ -15,10 +15,13 @@ export function PaymentLinkModal({ booking, onClose }: PaymentLinkModalProps) {
   const [creating, setCreating] = useState(false);
   const [generatedLink, setGeneratedLink] = useState<string | null>(null);
   const [copied, setCopied] = useState(false);
+  const [error, setError] = useState<string | null>(null);
 
   const remainingBalance = booking.total_amount - (booking.payment_amount || 0);
 
   const handleCreate = async () => {
+    console.log('🔵 [MODAL] Début création lien');
+    
     const amountValue = parseFloat(amount);
     
     if (!amountValue || amountValue <= 0) {
@@ -32,16 +35,26 @@ export function PaymentLinkModal({ booking, onClose }: PaymentLinkModalProps) {
     }
 
     setCreating(true);
+    setError(null);
 
     try {
+      console.log('🔵 [MODAL] Appel createPaymentLink...');
       const link = await createPaymentLink(booking.id, amountValue, expiryMinutes);
       
+      console.log('✅ [MODAL] Lien reçu:', link);
+      
       if (link?.payment_url) {
+        console.log('✅ [MODAL] URL du lien:', link.payment_url);
         setGeneratedLink(link.payment_url);
+      } else {
+        console.error('❌ [MODAL] Pas d\'URL dans le lien retourné');
+        throw new Error('URL de paiement manquante');
       }
     } catch (err) {
-      console.error('❌ Erreur création lien:', err);
-      alert('Erreur lors de la création du lien de paiement');
+      console.error('❌ [MODAL] Erreur création lien:', err);
+      const errorMessage = err instanceof Error ? err.message : 'Erreur inconnue';
+      setError(errorMessage);
+      alert(`Erreur lors de la création du lien de paiement:\n${errorMessage}`);
     } finally {
       setCreating(false);
     }
@@ -139,6 +152,14 @@ export function PaymentLinkModal({ booking, onClose }: PaymentLinkModalProps) {
                   ⚠️ <strong>Important :</strong> Le lien expirera automatiquement après {expiryMinutes} minutes.
                 </p>
               </div>
+
+              {error && (
+                <div className="bg-red-50 rounded-xl p-4 border border-red-200">
+                  <p className="text-sm text-red-800">
+                    ❌ <strong>Erreur :</strong> {error}
+                  </p>
+                </div>
+              )}
 
               <button
                 onClick={handleCreate}
