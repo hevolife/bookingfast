@@ -586,6 +586,27 @@ export function IframeBookingPage() {
 
       console.log('🔗 URLs de redirection:', { success: successUrl, cancel: cancelUrl });
 
+      // 🔥 CORRECTION CRITIQUE - AJOUT DE TOUTES LES MÉTADONNÉES MANQUANTES
+      const metadata = {
+        user_id: userId,
+        service_id: selectedService.id, // ✅ AJOUT CRITIQUE
+        date: selectedDate,
+        time: selectedTime,
+        quantity: quantity.toString(),
+        client_firstname: clientData.firstname,
+        client_lastname: clientData.lastname,
+        client_phone: clientData.phone,
+        payment_type: 'booking_deposit',
+        return_origin: baseUrl
+      };
+
+      // Ajouter assigned_user_id seulement s'il existe
+      if (selectedTeamMember) {
+        metadata['assigned_user_id'] = selectedTeamMember;
+      }
+
+      console.log('📦 Métadonnées complètes:', metadata);
+
       const supabaseUrl = import.meta.env.VITE_SUPABASE_URL?.replace(/\/$/, '');
       const response = await fetch(`${supabaseUrl}/functions/v1/stripe-checkout`, {
         method: 'POST',
@@ -601,19 +622,7 @@ export function IframeBookingPage() {
           success_url: successUrl,
           cancel_url: cancelUrl,
           parent_url: baseUrl,
-          metadata: {
-            user_id: userId,
-            service_id: selectedService.id,
-            date: selectedDate,
-            time: selectedTime,
-            quantity: quantity.toString(),
-            client_firstname: clientData.firstname,
-            client_lastname: clientData.lastname,
-            client_phone: clientData.phone,
-            assigned_user_id: selectedTeamMember || undefined,
-            payment_type: 'booking_deposit',
-            return_origin: baseUrl
-          }
+          metadata: metadata // ✅ MÉTADONNÉES COMPLÈTES
         })
       });
 
