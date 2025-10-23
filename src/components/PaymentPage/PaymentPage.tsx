@@ -26,6 +26,7 @@ export function PaymentPage() {
   const [processing, setProcessing] = useState(false);
   const [isDeleted, setIsDeleted] = useState(false);
   const [checkingStatus, setCheckingStatus] = useState(true);
+  const [serviceId, setServiceId] = useState<string | null>(null);
 
   console.log('🔄 Initial State:');
   console.log('  - checkingStatus:', checkingStatus);
@@ -34,13 +35,62 @@ export function PaymentPage() {
 
   // Récupérer les paramètres de l'URL
   const amount = searchParams.get('amount');
-  const service = searchParams.get('service');
+  const serviceName = searchParams.get('service');
   const client = searchParams.get('client');
   const email = searchParams.get('email');
   const date = searchParams.get('date');
   const time = searchParams.get('time');
   const expiresAt = searchParams.get('expires');
   const userId = searchParams.get('user_id');
+
+  // 🔍 Récupérer le service_id depuis le nom du service
+  useEffect(() => {
+    const fetchServiceId = async () => {
+      if (!serviceName || !userId) {
+        console.log('⚠️ serviceName ou userId manquant');
+        return;
+      }
+
+      const supabaseConfigured = isSupabaseConfigured();
+      console.log('🔧 Supabase configured:', supabaseConfigured);
+
+      if (!supabaseConfigured) {
+        console.log('🎭 DEMO MODE - Skipping service lookup');
+        setServiceId('demo-service-id');
+        return;
+      }
+
+      try {
+        console.log('🔍 Recherche service par nom:', serviceName);
+        
+        const { data: services, error } = await supabase!
+          .from('services')
+          .select('id, name')
+          .eq('user_id', userId)
+          .eq('name', serviceName)
+          .limit(1);
+
+        console.log('📊 Services trouvés:', services);
+
+        if (error) {
+          console.error('❌ Erreur recherche service:', error);
+          return;
+        }
+
+        if (services && services.length > 0) {
+          const foundServiceId = services[0].id;
+          console.log('✅ Service ID trouvé:', foundServiceId);
+          setServiceId(foundServiceId);
+        } else {
+          console.warn('⚠️ Aucun service trouvé avec le nom:', serviceName);
+        }
+      } catch (err) {
+        console.error('❌ Erreur lors de la recherche du service:', err);
+      }
+    };
+
+    fetchServiceId();
+  }, [serviceName, userId]);
 
   // Vérifier si le lien de paiement existe encore
   useEffect(() => {
@@ -191,6 +241,7 @@ export function PaymentPage() {
   console.log('  - isDeleted:', isDeleted);
   console.log('  - isExpired:', isExpired);
   console.log('  - processing:', processing);
+  console.log('  - serviceId:', serviceId);
 
   // Affichage pendant la vérification
   if (checkingStatus) {
@@ -226,7 +277,7 @@ export function PaymentPage() {
           <div className="bg-green-50 border border-green-200 rounded-2xl p-4 mb-6">
             <h4 className="font-bold text-green-800 mb-2">✅ Réservation confirmée</h4>
             <div className="text-green-700 text-sm space-y-1 text-left">
-              <div>• <strong>Service :</strong> {service || 'Service réservé'}</div>
+              <div>• <strong>Service :</strong> {serviceName || 'Service réservé'}</div>
               <div>• <strong>Client :</strong> {client || 'Client'}</div>
               <div>• <strong>Date :</strong> {date ? new Date(date).toLocaleDateString('fr-FR', {
                 weekday: 'long',
@@ -250,9 +301,9 @@ export function PaymentPage() {
   }
 
   // Vérifier si le lien est valide
-  if (!amount || !service || !client || !email || !date || !time) {
+  if (!amount || !serviceName || !client || !email || !date || !time) {
     console.log('❌ RENDERING: Invalid link screen');
-    console.log('Missing params:', { amount, service, client, email, date, time });
+    console.log('Missing params:', { amount, serviceName, client, email, date, time });
     return (
       <div className="min-h-screen bg-gradient-to-br from-red-50 to-pink-50 flex items-center justify-center p-4">
         <div className="bg-white rounded-3xl shadow-2xl p-8 max-w-md w-full text-center">
@@ -306,6 +357,13 @@ export function PaymentPage() {
       return;
     }
 
+    // 🔥 VÉRIFICATION CRITIQUE - service_id OBLIGATOIRE
+    if (!serviceId) {
+      console.error('❌ service_id manquant - impossible de continuer');
+      alert('Erreur : Service non trouvé. Veuillez contacter l\'établissement.');
+      return;
+    }
+
     setProcessing(true);
     console.log('⏳ Processing payment...');
     
@@ -321,20 +379,24 @@ export function PaymentPage() {
         const functionUrl = `${supabaseUrl}/functions/v1/stripe-checkout`;
         console.log('🔗 Function URL:', functionUrl);
         
+        // 🔥 CORRECTION CRITIQUE - MÉTADONNÉES COMPLÈTES AVEC service_id
+        const metadata = {
+          payment_type: 'booking_deposit',
+          user_id: userId,
+          service_id: serviceId, // ✅ AJOUT CRITIQUE
+          client: client,
+          email: email,
+          date: date,
+          time: time,
+        };
+        
         const payload = {
           amount: parseFloat(amount),
-          service_name: service,
+          service_name: serviceName,
           customer_email: email,
           success_url: `${window.location.origin}/payment-success`,
           cancel_url: `${window.location.origin}/payment-cancel`,
-          metadata: {
-            payment_type: 'booking_deposit',
-            client: client,
-            email: email,
-            date: date,
-            time: time,
-            user_id: userId,
-          },
+          metadata: metadata, // ✅ MÉTADONNÉES COMPLÈTES
         };
         
         console.log('📦 Payload:', JSON.stringify(payload, null, 2));
@@ -444,7 +506,7 @@ export function PaymentPage() {
             <div className="flex items-center gap-3 p-4 bg-gradient-to-r from-purple-50 to-pink-50 rounded-xl">
               <Calendar className="w-5 h-5 text-purple-600" />
               <div>
-                <div className="font-medium text-gray-900">{service}</div>
+                <div className="font-medium text-gray-900">{serviceName}</div>
                 <div className="text-sm text-gray-600">
                   {new Date(date).toLocaleDateString('fr-FR', {
                     weekday: 'long',
@@ -474,12 +536,23 @@ export function PaymentPage() {
             </div>
           )}
 
+          {/* Avertissement si service_id manquant */}
+          {!serviceId && (
+            <div className="mb-6 bg-red-50 border border-red-200 rounded-xl p-4 flex items-center gap-3">
+              <XCircle className="w-5 h-5 text-red-600 flex-shrink-0" />
+              <div className="text-red-800 text-sm">
+                <div className="font-medium">Service non trouvé</div>
+                <div>Impossible de traiter le paiement. Veuillez contacter l'établissement.</div>
+              </div>
+            </div>
+          )}
+
           {/* Bouton de paiement */}
           <button
             onClick={handlePayment}
-            disabled={isExpired || processing}
+            disabled={isExpired || processing || !serviceId}
             className={`w-full py-4 px-6 rounded-2xl font-bold text-white transition-all duration-300 transform hover:scale-105 shadow-lg flex items-center justify-center gap-2 ${
-              isExpired
+              isExpired || !serviceId
                 ? 'bg-gray-400 cursor-not-allowed'
                 : processing
                 ? 'bg-blue-400 cursor-wait'
@@ -495,6 +568,11 @@ export function PaymentPage() {
               <>
                 <XCircle className="w-5 h-5" />
                 Lien expiré
+              </>
+            ) : !serviceId ? (
+              <>
+                <XCircle className="w-5 h-5" />
+                Service non trouvé
               </>
             ) : (
               <>
