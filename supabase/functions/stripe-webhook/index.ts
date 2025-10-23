@@ -82,6 +82,18 @@ Deno.serve(async (req) => {
       return new Response('JSON invalide', { status: 400, headers: corsHeaders })
     }
 
+    // 🔥 IGNORER payment_intent.succeeded - ON ATTEND checkout.session.completed
+    if (event.type === 'payment_intent.succeeded') {
+      console.log('⏭️ IGNORÉ: payment_intent.succeeded - On attend checkout.session.completed')
+      return new Response(JSON.stringify({ 
+        received: true, 
+        ignored: true,
+        reason: 'Waiting for checkout.session.completed event'
+      }), {
+        headers: { ...corsHeaders, 'Content-Type': 'application/json' }
+      })
+    }
+
     // Gérer les événements d'abonnement
     if (event.type === 'customer.subscription.updated' || event.type === 'customer.subscription.deleted') {
       const subscription = event.data.object
@@ -143,37 +155,197 @@ Deno.serve(async (req) => {
         result: { processing: true } 
       })
 
-      const customerEmail = session.customer_details?.email
-      const clientReferenceId = session.client_reference_id
       const metadata = session.metadata || {}
 
-      if (!customerEmail) {
-        console.error('❌ Email client manquant')
-        processedSessions.delete(sessionId)
-        return new Response('Email client manquant', { status: 400, headers: corsHeaders })
+      // 💳 PAIEMENT VIA LIEN DE PAIEMENT
+      if (metadata.payment_type === 'payment_link') {
+        console.log('💳 === PAIEMENT VIA LIEN === 💳')
+        
+        const paymentLinkId = metadata.payment_link_id
+        const bookingId = metadata.booking_id
+        const amount = session.amount_total / 100
+
+        if (!paymentLinkId || !bookingId) {
+          console.error('❌ payment_link_id ou booking_id manquant')
+          processedSessions.delete(sessionId)
+          return new Response('Données manquantes', { status: 400, headers: corsHeaders })
+        }
+
+        console.log('🔍 Traitement paiement lien:', {
+          paymentLinkId,
+          bookingId,
+          amount
+        })
+
+        // 1️⃣ Récupérer la réservation
+        console.log('🔍 Récupération réservation...')
+        const bookings = await supabaseRequest(`bookings?id=eq.${bookingId}`)
+        const booking = bookings?.[0]
+
+        if (!booking) {
+          console.error('❌ Réservation non trouvée')
+          processedSessions.delete(sessionId)
+          return new Response('Réservation non trouvée', { status: 404, headers: corsHeaders })
+        }
+
+        console.log('📋 Réservation trouvée:', {
+          id: booking.id,
+          total_amount: booking.total_amount,
+          payment_amount: booking.payment_amount,
+          payment_status: booking.payment_status
+        })
+
+        // 2️⃣ Ajouter la transaction
+        const transactions = booking.transactions || []
+        const newTransaction = {
+          id: crypto.randomUUID(),
+          amount: amount,
+          method: 'stripe',
+          status: 'completed',
+          date: new Date().toISOString(),
+          stripe_session_id: sessionId,
+          payment_link_id: paymentLinkId
+        }
+        transactions.push(newTransaction)
+
+        console.log('💰 Nouvelle transaction:', newTransaction)
+
+        // 3️⃣ Calculer le nouveau montant payé
+        const newPaymentAmount = (booking.payment_amount || 0) + amount
+
+        console.log('💵 Calcul paiement:', {
+          ancien: booking.payment_amount || 0,
+          ajout: amount,
+          nouveau: newPaymentAmount,
+          total: booking.total_amount
+        })
+
+        // 4️⃣ Déterminer le statut de paiement
+        let paymentStatus = 'partial'
+        if (newPaymentAmount >= booking.total_amount) {
+          paymentStatus = 'completed'
+          console.log('✅ Paiement COMPLET')
+        } else if (newPaymentAmount > 0) {
+          paymentStatus = 'partial'
+          console.log('⚠️ Paiement PARTIEL')
+        }
+
+        // 5️⃣ Mettre à jour la réservation
+        console.log('🔄 Mise à jour réservation...')
+        const updateData = {
+          transactions: transactions,
+          payment_amount: newPaymentAmount,
+          payment_status: paymentStatus,
+          deposit_amount: amount,
+          updated_at: new Date().toISOString()
+        }
+
+        console.log('📦 Données de mise à jour:', updateData)
+
+        await supabaseRequest(
+          `bookings?id=eq.${bookingId}`,
+          'PATCH',
+          updateData
+        )
+
+        // 6️⃣ 🔥 MARQUER LE LIEN COMME REMPLACÉ (CORRECTION)
+        console.log('🔄 Marquage lien comme remplacé...')
+        console.log('🔍 Payment Link ID:', paymentLinkId)
+        console.log('🔍 Transaction ID:', newTransaction.id)
+        
+        try {
+          const updateResult = await supabaseRequest(
+            `payment_links?id=eq.${paymentLinkId}`,
+            'PATCH',
+            {
+              status: 'completed',
+              stripe_session_id: sessionId,
+              paid_at: new Date().toISOString(),
+              replaced_by_transaction_id: newTransaction.id // 🔥 CRITIQUE
+            }
+          )
+          console.log('✅ Lien marqué comme remplacé:', updateResult)
+        } catch (updateError) {
+          console.error('❌ ERREUR mise à jour payment_link:', updateError)
+          // Ne pas bloquer le processus si cette mise à jour échoue
+        }
+
+        console.log('✅ PAIEMENT VIA LIEN TRAITÉ AVEC SUCCÈS')
+
+        const result = { 
+          success: true, 
+          type: 'payment_link',
+          bookingId: bookingId,
+          amount: amount,
+          newPaymentAmount: newPaymentAmount,
+          paymentStatus: paymentStatus,
+          transactionId: newTransaction.id,
+          paymentLinkId: paymentLinkId
+        }
+        
+        processedSessions.set(sessionId, { timestamp: Date.now(), result })
+        
+        return new Response(JSON.stringify(result), {
+          headers: { ...corsHeaders, 'Content-Type': 'application/json' }
+        })
       }
 
       // 📅 RÉSERVATION IFRAME (booking_deposit)
       if (metadata.payment_type === 'booking_deposit') {
-        console.log('📅 === CRÉATION RÉSERVATION APRÈS PAIEMENT === 📅')
+        console.log('📅 === PAIEMENT RÉSERVATION === 📅')
         
         const userId = metadata.user_id
         const serviceId = metadata.service_id
+        const bookingId = metadata.booking_id
         const date = metadata.date
         const time = metadata.time
         const quantity = parseInt(metadata.quantity || '1')
-        const clientFirstname = metadata.client_firstname
-        const clientLastname = metadata.client_lastname
-        const clientPhone = metadata.client_phone
+        
+        let clientFirstname = ''
+        let clientLastname = ''
+        let clientPhone = metadata.phone || metadata.client_phone || ''
+        
+        if (metadata.client) {
+          const nameParts = metadata.client.trim().split(/\s+/)
+          if (nameParts.length === 1) {
+            clientFirstname = nameParts[0]
+            clientLastname = nameParts[0]
+          } else {
+            clientFirstname = nameParts[0]
+            clientLastname = nameParts.slice(1).join(' ')
+          }
+        }
+        
+        if (!clientFirstname && metadata.client_firstname) {
+          clientFirstname = metadata.client_firstname
+          clientLastname = metadata.client_lastname || metadata.client_firstname
+        }
+        
+        if (!clientFirstname && session.customer_details?.name) {
+          const nameParts = session.customer_details.name.trim().split(/\s+/)
+          if (nameParts.length === 1) {
+            clientFirstname = nameParts[0]
+            clientLastname = nameParts[0]
+          } else {
+            clientFirstname = nameParts[0]
+            clientLastname = nameParts.slice(1).join(' ')
+          }
+        }
+        
+        if (!clientFirstname) {
+          const emailPart = session.customer_details.email.split('@')[0]
+          clientFirstname = emailPart
+          clientLastname = emailPart
+        }
+        
         const assignedUserId = metadata.assigned_user_id
 
         if (!userId || !serviceId || !date || !time) {
-          console.error('❌ Données réservation manquantes:', { userId, serviceId, date, time })
+          console.error('❌ Données réservation manquantes')
           processedSessions.delete(sessionId)
           return new Response('Données réservation manquantes', { status: 400, headers: corsHeaders })
         }
 
-        // Récupérer les infos du service
         const services = await supabaseRequest(`services?id=eq.${serviceId}`)
         const service = services?.[0]
 
@@ -184,89 +356,121 @@ Deno.serve(async (req) => {
         }
 
         const totalAmount = service.price_ttc * quantity
-        const depositAmount = session.amount_total / 100 // Stripe envoie en centimes
+        const depositAmount = session.amount_total / 100
 
-        // 🔍 Vérifier si la réservation existe déjà
-        const existingBookings = await supabaseRequest(`bookings?stripe_session_id=eq.${sessionId}`)
-        const existingBooking = existingBookings?.[0]
+        if (bookingId) {
+          console.log('🔄 === MISE À JOUR RÉSERVATION EXISTANTE === 🔄')
 
-        if (existingBooking) {
-          console.log('⚠️ Réservation déjà créée:', existingBooking.id)
+          const existingBookings = await supabaseRequest(`bookings?id=eq.${bookingId}`)
+          const existingBooking = existingBookings?.[0]
+
+          if (!existingBooking) {
+            console.error('❌ Réservation non trouvée:', bookingId)
+            processedSessions.delete(sessionId)
+            return new Response('Réservation non trouvée', { status: 404, headers: corsHeaders })
+          }
+
+          const updateData: any = {
+            payment_status: 'paid',
+            payment_amount: depositAmount,
+            booking_status: 'confirmed',
+            stripe_session_id: sessionId,
+            deposit_amount: depositAmount,
+            updated_at: new Date().toISOString()
+          }
+
+          await supabaseRequest(
+            `bookings?id=eq.${bookingId}`,
+            'PATCH',
+            updateData
+          )
+
+          console.log('✅ RÉSERVATION MISE À JOUR:', bookingId)
+
           const result = { 
             success: true, 
-            type: 'booking_already_exists',
-            bookingId: existingBooking.id
+            type: 'booking_updated',
+            bookingId: bookingId
           }
+          
           processedSessions.set(sessionId, { timestamp: Date.now(), result })
+          
+          return new Response(JSON.stringify(result), {
+            headers: { ...corsHeaders, 'Content-Type': 'application/json' }
+          })
+
+        } else {
+          console.log('➕ === CRÉATION NOUVELLE RÉSERVATION === ➕')
+
+          const existingBookings = await supabaseRequest(`bookings?stripe_session_id=eq.${sessionId}`)
+          const existingBooking = existingBookings?.[0]
+
+          if (existingBooking) {
+            console.log('⚠️ Réservation déjà créée:', existingBooking.id)
+            const result = { 
+              success: true, 
+              type: 'booking_already_exists',
+              bookingId: existingBooking.id
+            }
+            processedSessions.set(sessionId, { timestamp: Date.now(), result })
+            return new Response(JSON.stringify(result), {
+              headers: { ...corsHeaders, 'Content-Type': 'application/json' }
+            })
+          }
+
+          const bookingData: any = {
+            user_id: userId,
+            service_id: serviceId,
+            date: date,
+            time: time,
+            duration_minutes: service.duration_minutes,
+            quantity: quantity,
+            client_name: clientLastname,
+            client_firstname: clientFirstname,
+            client_email: session.customer_details.email,
+            client_phone: clientPhone,
+            total_amount: totalAmount,
+            payment_status: 'paid',
+            payment_amount: depositAmount,
+            deposit_amount: depositAmount,
+            booking_status: 'confirmed',
+            stripe_session_id: sessionId
+          }
+
+          if (assignedUserId) {
+            bookingData.assigned_user_id = assignedUserId
+          }
+
+          const bookings = await supabaseRequest('bookings', 'POST', bookingData)
+          const booking = bookings?.[0]
+
+          if (!booking) {
+            console.error('❌ Erreur création réservation')
+            processedSessions.delete(sessionId)
+            return new Response('Erreur création réservation', { status: 500, headers: corsHeaders })
+          }
+
+          console.log('✅ RÉSERVATION CRÉÉE:', booking.id)
+
+          const result = { 
+            success: true, 
+            type: 'booking_created',
+            bookingId: booking.id
+          }
+          
+          processedSessions.set(sessionId, { timestamp: Date.now(), result })
+          
           return new Response(JSON.stringify(result), {
             headers: { ...corsHeaders, 'Content-Type': 'application/json' }
           })
         }
-
-        // Créer la réservation
-        const bookingData: any = {
-          user_id: userId,
-          service_id: serviceId,
-          date: date,
-          time: time,
-          duration_minutes: service.duration_minutes,
-          quantity: quantity,
-          client_name: clientLastname,
-          client_firstname: clientFirstname,
-          client_email: customerEmail,
-          client_phone: clientPhone,
-          total_amount: totalAmount,
-          payment_status: 'paid',
-          payment_amount: depositAmount,
-          booking_status: 'confirmed',
-          stripe_session_id: sessionId
-        }
-
-        if (assignedUserId) {
-          bookingData.assigned_user_id = assignedUserId
-        }
-
-        console.log('📝 Création réservation:', bookingData)
-
-        const bookings = await supabaseRequest('bookings', 'POST', bookingData)
-        const booking = bookings?.[0]
-
-        if (!booking) {
-          console.error('❌ Erreur création réservation')
-          processedSessions.delete(sessionId)
-          return new Response('Erreur création réservation', { status: 500, headers: corsHeaders })
-        }
-
-        console.log('✅ RÉSERVATION CRÉÉE:', booking.id)
-
-        const result = { 
-          success: true, 
-          type: 'booking_created',
-          bookingId: booking.id
-        }
-        
-        processedSessions.set(sessionId, { timestamp: Date.now(), result })
-        
-        return new Response(JSON.stringify(result), {
-          headers: { ...corsHeaders, 'Content-Type': 'application/json' }
-        })
       }
 
       // 🔌 ABONNEMENT PLUGIN
-      if (clientReferenceId && clientReferenceId.includes('|')) {
-        console.log('🔌 ABONNEMENT PLUGIN détecté via client_reference_id')
+      if (session.client_reference_id && session.client_reference_id.includes('|')) {
+        console.log('🔌 ABONNEMENT PLUGIN détecté')
         
-        const [userId, pluginId] = clientReferenceId.split('|')
-        
-        console.log('👤 User ID extrait:', userId)
-        console.log('🔌 Plugin ID extrait:', pluginId)
-        
-        if (!userId || !pluginId) {
-          console.error('❌ Format client_reference_id invalide:', clientReferenceId)
-          processedSessions.delete(sessionId)
-          return new Response('Format client_reference_id invalide', { status: 400, headers: corsHeaders })
-        }
-        
+        const [userId, pluginId] = session.client_reference_id.split('|')
         const stripeSubscriptionId = session.subscription
 
         const existingSubs = await supabaseRequest(
@@ -275,8 +479,6 @@ Deno.serve(async (req) => {
         const existingSub = existingSubs?.[0]
 
         if (existingSub) {
-          console.log('📋 Souscription existante trouvée, mise à jour...')
-          
           await supabaseRequest(
             `plugin_subscriptions?id=eq.${existingSub.id}`,
             'PATCH',
@@ -291,11 +493,7 @@ Deno.serve(async (req) => {
               updated_at: new Date().toISOString()
             }
           )
-          
-          console.log('✅ PLUGIN ACTIVÉ (mise à jour)')
         } else {
-          console.log('➕ Création nouvelle souscription plugin...')
-          
           await supabaseRequest('plugin_subscriptions', 'POST', {
             user_id: userId,
             plugin_id: pluginId,
@@ -306,8 +504,6 @@ Deno.serve(async (req) => {
             current_period_start: new Date().toISOString(),
             current_period_end: session.expires_at ? new Date(session.expires_at * 1000).toISOString() : null
           })
-          
-          console.log('✅ PLUGIN ACTIVÉ (création)')
         }
         
         const result = { 

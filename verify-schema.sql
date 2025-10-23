@@ -1,17 +1,26 @@
--- 🔍 LISTER TOUTES LES TABLES DE LA BASE
-SELECT table_name 
-FROM information_schema.tables 
-WHERE table_schema = 'public'
-ORDER BY table_name;
-
--- 🔍 VÉRIFIER LA STRUCTURE DE LA TABLE BOOKINGS
-SELECT column_name, data_type, is_nullable
-FROM information_schema.columns
-WHERE table_name = 'bookings'
+-- 🔍 VOIR LES COLONNES QUI EXISTENT VRAIMENT
+SELECT column_name, data_type 
+FROM information_schema.columns 
+WHERE table_name = 'bookings' 
 ORDER BY ordinal_position;
 
--- 🔍 CHERCHER DES TABLES CONTENANT "transaction"
-SELECT table_name 
-FROM information_schema.tables 
-WHERE table_schema = 'public' 
-AND table_name LIKE '%transaction%';
+-- 🔍 VOIR LES DONNÉES DE LA RÉSERVATION (sans deposit_amount)
+SELECT 
+  id,
+  created_at,
+  service_id,
+  date,
+  time,
+  client_name,
+  client_firstname,
+  client_email,
+  total_amount,
+  payment_amount,
+  payment_status,
+  booking_status,
+  quantity,
+  stripe_session_id,
+  stripe_payment_intent_id,
+  transactions
+FROM bookings
+WHERE id = '9222ceae-5bf3-4b00-ae12-ac7f83e2483a';

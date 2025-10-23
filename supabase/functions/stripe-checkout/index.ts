@@ -10,7 +10,7 @@ const corsHeaders = {
 const PLATFORM_STRIPE_SECRET_KEY = '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';
 
 Deno.serve(async (req) => {
-  console.log('🚀 === STRIPE-CHECKOUT V17 - REDIRECT TO BOOKING PAGE === 🚀')
+  console.log('🚀 === STRIPE-CHECKOUT V20 - PAYMENT LINK SUPPORT === 🚀')
   console.log('📍 Request URL:', req.url)
   console.log('📍 Request Method:', req.method)
   
@@ -78,15 +78,31 @@ Deno.serve(async (req) => {
 
     let stripeSecretKey: string | undefined;
     
-    // PAIEMENT RÉSERVATION IFRAME (booking_deposit)
-    if (metadata?.payment_type === 'booking_deposit') {
-      console.log('💳 === PAIEMENT RÉSERVATION IFRAME === 💳')
+    // 🔥 NOUVEAU : PAIEMENT VIA LIEN DE PAIEMENT
+    if (metadata?.payment_type === 'payment_link') {
+      console.log('💳 === PAIEMENT VIA LIEN DE PAIEMENT === 💳')
       
       const userId = metadata?.user_id
+      const paymentLinkId = metadata?.payment_link_id
+      
+      console.log('🔍 Métadonnées critiques:', {
+        user_id: userId,
+        payment_link_id: paymentLinkId,
+        booking_id: metadata?.booking_id
+      });
+      
       if (!userId) {
         console.error('❌ user_id manquant dans metadata');
         return new Response(
           JSON.stringify({ error: 'user_id requis' }),
+          { status: 400, headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
+        )
+      }
+
+      if (!paymentLinkId) {
+        console.error('❌ payment_link_id manquant dans metadata');
+        return new Response(
+          JSON.stringify({ error: 'payment_link_id requis' }),
           { status: 400, headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
         )
       }
@@ -107,7 +123,196 @@ Deno.serve(async (req) => {
       );
 
       console.log('📡 API Response Status:', settingsResponse.status);
-      console.log('📡 API Response Headers:', Object.fromEntries(settingsResponse.headers.entries()));
+
+      if (!settingsResponse.ok) {
+        const errorText = await settingsResponse.text();
+        console.error('❌ Erreur API Supabase:', settingsResponse.status, errorText);
+        return new Response(
+          JSON.stringify({ 
+            error: 'Erreur récupération configuration Stripe',
+            details: errorText,
+            status: settingsResponse.status
+          }),
+          { status: 500, headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
+        )
+      }
+
+      const settingsData = await settingsResponse.json();
+      console.log('📦 Résultat API business_settings:', {
+        count: settingsData.length,
+        data: settingsData
+      });
+
+      if (!settingsData || settingsData.length === 0) {
+        console.error('❌ Aucune configuration trouvée pour user_id:', userId);
+        return new Response(
+          JSON.stringify({ error: 'Configuration Stripe non trouvée' }),
+          { status: 404, headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
+        )
+      }
+
+      const settings = settingsData[0];
+      console.log('🔍 Settings found:', {
+        stripe_enabled: settings.stripe_enabled,
+        has_secret_key: !!settings.stripe_secret_key
+      });
+
+      if (!settings.stripe_enabled) {
+        console.error('❌ Stripe non activé pour cet utilisateur');
+        return new Response(
+          JSON.stringify({ error: 'Stripe non activé pour cet utilisateur' }),
+          { status: 400, headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
+        )
+      }
+
+      if (!settings.stripe_secret_key) {
+        console.error('❌ Clé secrète Stripe manquante');
+        return new Response(
+          JSON.stringify({ error: 'Configuration Stripe incomplète' }),
+          { status: 400, headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
+        )
+      }
+
+      stripeSecretKey = settings.stripe_secret_key
+      console.log('✅ Clé Stripe utilisateur récupérée');
+
+      console.log('🔧 Step 5: Initializing Stripe client');
+      const stripe = new Stripe(stripeSecretKey, {
+        appInfo: {
+          name: 'BookingFast',
+          version: '1.0.0',
+        },
+      })
+
+      console.log('🔧 Step 6: Finding or creating Stripe customer');
+      let customerId
+      console.log('🔍 Recherche client Stripe avec email:', customer_email);
+      
+      const existingCustomers = await stripe.customers.list({
+        email: customer_email,
+        limit: 1,
+      })
+      
+      if (existingCustomers.data.length > 0) {
+        customerId = existingCustomers.data[0].id
+        console.log('✅ Client existant:', customerId)
+      } else {
+        const newCustomer = await stripe.customers.create({
+          email: customer_email,
+          metadata: metadata || {},
+        })
+        customerId = newCustomer.id
+        console.log('✅ Nouveau client créé:', customerId)
+      }
+
+      console.log('🔧 Step 7: Creating Stripe checkout session for payment link');
+      console.log('💳 Création session PAIEMENT UNIQUE (lien de paiement):', {
+        amount,
+        currency,
+        service_name,
+        payment_link_id: paymentLinkId
+      });
+
+      try {
+        const sessionData = {
+          customer: customerId,
+          payment_method_types: ['card'],
+          line_items: [
+            {
+              price_data: {
+                currency: currency,
+                product_data: {
+                  name: service_name,
+                  description: `Paiement via lien - ${service_name}`,
+                },
+                unit_amount: Math.round(amount * 100),
+              },
+              quantity: 1,
+            },
+          ],
+          mode: 'payment',
+          success_url,
+          cancel_url,
+          metadata: metadata || {},
+        };
+
+        console.log('📋 Données session Stripe:', JSON.stringify(sessionData, null, 2));
+
+        const session = await stripe.checkout.sessions.create(sessionData);
+
+        console.log('✅ Session PAIEMENT créée:', session.id)
+        console.log('🔗 URL:', session.url)
+
+        return new Response(
+          JSON.stringify({ 
+            sessionId: session.id, 
+            url: session.url,
+            success: true,
+            type: 'payment'
+          }),
+          { headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
+        )
+      } catch (stripeError: any) {
+        console.error('❌ Erreur Stripe:', {
+          message: stripeError.message,
+          type: stripeError.type,
+          code: stripeError.code,
+          param: stripeError.param
+        });
+        return new Response(
+          JSON.stringify({ 
+            error: 'Erreur Stripe',
+            details: stripeError.message,
+            type: stripeError.type,
+            code: stripeError.code
+          }),
+          { status: 500, headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
+        )
+      }
+
+    } else if (metadata?.payment_type === 'booking_deposit') {
+      console.log('💳 === PAIEMENT RÉSERVATION IFRAME === 💳')
+      
+      const userId = metadata?.user_id
+      const serviceId = metadata?.service_id
+      
+      console.log('🔍 Métadonnées critiques:', {
+        user_id: userId,
+        service_id: serviceId
+      });
+      
+      if (!userId) {
+        console.error('❌ user_id manquant dans metadata');
+        return new Response(
+          JSON.stringify({ error: 'user_id requis' }),
+          { status: 400, headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
+        )
+      }
+
+      if (!serviceId) {
+        console.error('❌ service_id manquant dans metadata');
+        return new Response(
+          JSON.stringify({ error: 'service_id requis pour créer la réservation' }),
+          { status: 400, headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
+        )
+      }
+
+      console.log('🔧 Step 4: Fetching Stripe configuration for user:', userId);
+      console.log('🔗 API URL:', `${supabaseUrl}/rest/v1/business_settings?user_id=eq.${userId}`);
+
+      const settingsResponse = await fetch(
+        `${supabaseUrl}/rest/v1/business_settings?user_id=eq.${userId}&select=stripe_enabled,stripe_secret_key`,
+        {
+          headers: {
+            'apikey': supabaseServiceKey,
+            'Authorization': `Bearer ${supabaseServiceKey}`,
+            'Content-Type': 'application/json',
+            'Prefer': 'return=representation'
+          }
+        }
+      );
+
+      console.log('📡 API Response Status:', settingsResponse.status);
 
       if (!settingsResponse.ok) {
         const errorText = await settingsResponse.text();
@@ -193,7 +398,6 @@ Deno.serve(async (req) => {
       console.log('🔧 Step 7: Building redirect URLs')
       let redirectBaseUrl: string;
       
-      // 🎯 NOUVELLE LOGIQUE : Toujours rediriger vers la page de réservation
       if (parent_url && parent_url !== 'https://bookingfast.pro') {
         redirectBaseUrl = parent_url;
         console.log('🌐 Iframe externe détecté - redirect vers:', redirectBaseUrl);
@@ -204,7 +408,6 @@ Deno.serve(async (req) => {
         console.log('🏠 Iframe BookingFast - redirect vers:', redirectBaseUrl);
       }
       
-      // ✅ REDIRECTION VERS LA PAGE DE RÉSERVATION (pas confirmation)
       const iframeSuccessUrl = `${redirectBaseUrl}/booking/${userId}?payment=success&session_id={CHECKOUT_SESSION_ID}`;
       const iframeCancelUrl = `${redirectBaseUrl}/booking/${userId}?payment=cancelled`;
 
@@ -219,6 +422,15 @@ Deno.serve(async (req) => {
         currency,
         service_name
       });
+
+      const completeMetadata = {
+        ...metadata,
+        user_id: userId,
+        service_id: serviceId,
+        payment_type: 'booking_deposit'
+      };
+
+      console.log('📦 Métadonnées complètes pour Stripe:', JSON.stringify(completeMetadata, null, 2));
 
       try {
         const sessionData = {
@@ -240,7 +452,7 @@ Deno.serve(async (req) => {
           mode: 'payment',
           success_url: iframeSuccessUrl,
           cancel_url: iframeCancelUrl,
-          metadata: metadata || {},
+          metadata: completeMetadata,
         };
 
         console.log('📋 Données session Stripe:', JSON.stringify(sessionData, null, 2));

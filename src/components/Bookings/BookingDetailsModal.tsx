@@ -134,15 +134,18 @@ export function BookingDetailsModal({ booking, onClose, onUpdate }: BookingDetai
     }
   };
 
-  // Liens de paiement actifs (pending/expired uniquement)
+  // 🔥 FILTRER : Masquer les liens "pending" et "expired" de l'historique
   const activePaymentLinks = paymentLinks.filter(link => 
     link.status === 'pending' || link.status === 'expired'
   );
 
-  // Transactions complétées uniquement (pas de pending)
+  // 🔥 FILTRER : Garder uniquement les transactions "completed" ou "paid"
   const displayTransactions = (booking.transactions || []).filter(transaction => 
     transaction.status === 'completed' || transaction.status === 'paid'
   );
+
+  console.log('🔍 [MODAL] Liens actifs (pending/expired):', activePaymentLinks.length);
+  console.log('🔍 [MODAL] Transactions affichées (completed/paid):', displayTransactions.length);
 
   return (
     <>
@@ -306,7 +309,7 @@ export function BookingDetailsModal({ booking, onClose, onUpdate }: BookingDetai
               )}
             </div>
 
-            {/* Liens de paiement actifs */}
+            {/* Liens de paiement actifs (pending/expired uniquement) */}
             {activePaymentLinks.length > 0 && (
               <div className="bg-gradient-to-br from-purple-50 to-pink-50 rounded-2xl p-6 border-2 border-purple-200">
                 <h3 className="text-lg font-bold text-gray-900 mb-4 flex items-center gap-2">
@@ -366,7 +369,7 @@ export function BookingDetailsModal({ booking, onClose, onUpdate }: BookingDetai
               </div>
             )}
 
-            {/* Historique des paiements */}
+            {/* Historique des paiements (completed/paid uniquement) */}
             {displayTransactions.length > 0 && (
               <div className="bg-gradient-to-br from-indigo-50 to-blue-50 rounded-2xl p-6 border-2 border-indigo-200">
                 <h3 className="text-lg font-bold text-gray-900 mb-4 flex items-center gap-2">
