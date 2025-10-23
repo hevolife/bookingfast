@@ -1,295 +1,399 @@
-import 'jsr:@supabase/functions-js/edge-runtime.d.ts';
-import Stripe from 'npm:stripe@17.7.0';
-import { createClient } from 'jsr:@supabase/supabase-js@2';
-
 const corsHeaders = {
   'Access-Control-Allow-Origin': '*',
   'Access-Control-Allow-Headers': 'authorization, x-client-info, apikey, content-type, stripe-signature',
   'Access-Control-Allow-Methods': 'POST, OPTIONS',
-};
+}
+
+// Cache pour éviter les doublons
+const processedSessions = new Map<string, { timestamp: number; result: any }>()
+
+// Nettoyer le cache toutes les 10 minutes
+setInterval(() => {
+  const now = Date.now()
+  const tenMinutes = 10 * 60 * 1000
+  
+  for (const [sessionId, data] of processedSessions.entries()) {
+    if (now - data.timestamp > tenMinutes) {
+      processedSessions.delete(sessionId)
+    }
+  }
+}, 10 * 60 * 1000)
+
+// Helper pour appeler l'API REST Supabase
+async function supabaseRequest(
+  endpoint: string,
+  method: string = 'GET',
+  body?: any
+) {
+  const supabaseUrl = Deno.env.get('SUPABASE_URL')
+  const serviceRoleKey = Deno.env.get('SUPABASE_SERVICE_ROLE_KEY')
+  
+  const url = `${supabaseUrl}/rest/v1/${endpoint}`
+  
+  const headers: Record<string, string> = {
+    'apikey': serviceRoleKey!,
+    'Authorization': `Bearer ${serviceRoleKey}`,
+    'Content-Type': 'application/json',
+    'Prefer': 'return=representation'
+  }
+  
+  const options: RequestInit = {
+    method,
+    headers
+  }
+  
+  if (body) {
+    options.body = JSON.stringify(body)
+  }
+  
+  const response = await fetch(url, options)
+  
+  if (!response.ok) {
+    const error = await response.text()
+    throw new Error(`Supabase API error: ${response.status} - ${error}`)
+  }
+  
+  const text = await response.text()
+  return text ? JSON.parse(text) : null
+}
 
 Deno.serve(async (req) => {
-  console.log('🎯 === STRIPE WEBHOOK V22 - POS_TRANSACTIONS === 🎯');
-  console.log('📍 Request URL:', req.url);
-  console.log('📍 Request Method:', req.method);
-
   if (req.method === 'OPTIONS') {
-    console.log('✅ OPTIONS request - returning CORS headers');
-    return new Response('ok', { headers: corsHeaders });
+    return new Response('ok', { headers: corsHeaders })
   }
 
   try {
-    console.log('🔧 Step 1: Reading environment variables');
-    const supabaseUrl = Deno.env.get('SUPABASE_URL');
-    const supabaseServiceKey = Deno.env.get('SUPABASE_SERVICE_ROLE_KEY');
-    const stripeWebhookSecret = Deno.env.get('STRIPE_WEBHOOK_SECRET');
+    console.log('🔔 Webhook Stripe reçu')
 
-    console.log('🔧 Configuration:', {
-      supabaseUrl: supabaseUrl ? '✅ Défini' : '❌ Manquant',
-      serviceKey: supabaseServiceKey ? '✅ Défini' : '❌ Manquant',
-      webhookSecret: stripeWebhookSecret ? '✅ Défini' : '❌ Manquant'
-    });
-
-    if (!supabaseUrl || !supabaseServiceKey) {
-      console.error('❌ Variables d\'environnement Supabase manquantes');
-      return new Response(
-        JSON.stringify({ error: 'Configuration Supabase manquante' }),
-        { status: 500, headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
-      );
-    }
-
-    const supabase = createClient(supabaseUrl, supabaseServiceKey);
-
-    console.log('🔧 Step 2: Reading request body');
-    const body = await req.text();
-    const signature = req.headers.get('stripe-signature');
-
-    console.log('📥 Signature présente:', !!signature);
+    const body = await req.text()
+    const signature = req.headers.get('stripe-signature')
 
     if (!signature) {
-      console.error('❌ Signature Stripe manquante');
-      return new Response(
-        JSON.stringify({ error: 'Signature manquante' }),
-        { status: 400, headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
-      );
+      console.error('❌ Signature Stripe manquante')
+      return new Response('Signature manquante', { status: 400, headers: corsHeaders })
     }
 
-    console.log('🔧 Step 3: Verifying webhook signature');
-    let event: Stripe.Event;
-
+    let event
     try {
-      // Pour le webhook, on doit récupérer la clé secrète de l'utilisateur
-      // On va d'abord parser l'événement sans vérification pour obtenir les métadonnées
-      const parsedEvent = JSON.parse(body);
-      console.log('📦 Event type:', parsedEvent.type);
-      console.log('📦 Event ID:', parsedEvent.id);
-
-      // Récupérer les métadonnées pour identifier l'utilisateur
-      const metadata = parsedEvent.data?.object?.metadata;
-      console.log('📦 Metadata:', metadata);
-
-      if (!metadata?.user_id) {
-        console.error('❌ user_id manquant dans metadata');
-        return new Response(
-          JSON.stringify({ error: 'user_id requis dans metadata' }),
-          { status: 400, headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
-        );
-      }
-
-      const userId = metadata.user_id;
-      console.log('✅ User ID trouvé:', userId);
-
-      // Récupérer la clé secrète Stripe de l'utilisateur
-      const { data: settings, error: settingsError } = await supabase
-        .from('business_settings')
-        .select('stripe_secret_key, stripe_webhook_secret')
-        .eq('user_id', userId)
-        .maybeSingle();
-
-      if (settingsError || !settings) {
-        console.error('❌ Erreur récupération settings:', settingsError);
-        return new Response(
-          JSON.stringify({ error: 'Configuration Stripe non trouvée' }),
-          { status: 404, headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
-        );
-      }
-
-      console.log('✅ Settings trouvés:', {
-        has_secret_key: !!settings.stripe_secret_key,
-        has_webhook_secret: !!settings.stripe_webhook_secret
-      });
-
-      // Vérifier la signature avec le webhook secret de l'utilisateur
-      const userWebhookSecret = settings.stripe_webhook_secret || stripeWebhookSecret;
-      
-      if (!userWebhookSecret) {
-        console.error('❌ Webhook secret manquant');
-        return new Response(
-          JSON.stringify({ error: 'Webhook secret non configuré' }),
-          { status: 500, headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
-        );
-      }
-
-      const stripe = new Stripe(settings.stripe_secret_key, {
-        appInfo: {
-          name: 'BookingFast',
-          version: '1.0.0',
-        },
-      });
-
-      event = stripe.webhooks.constructEvent(body, signature, userWebhookSecret);
-      console.log('✅ Signature vérifiée avec succès');
-
-    } catch (err: any) {
-      console.error('❌ Erreur vérification signature:', err.message);
-      return new Response(
-        JSON.stringify({ error: 'Signature invalide', details: err.message }),
-        { status: 400, headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
-      );
+      event = JSON.parse(body)
+      console.log('📦 Événement Stripe:', event.type)
+    } catch (err) {
+      console.error('❌ Erreur parsing JSON:', err)
+      return new Response('JSON invalide', { status: 400, headers: corsHeaders })
     }
 
-    console.log('🔧 Step 4: Processing event type:', event.type);
+    // Gérer les événements d'abonnement
+    if (event.type === 'customer.subscription.updated' || event.type === 'customer.subscription.deleted') {
+      const subscription = event.data.object
+      console.log('📊 Mise à jour abonnement:', subscription.id)
 
-    // 🔥 TRAITER LES ÉVÉNEMENTS DE PAIEMENT
-    if (event.type === 'checkout.session.completed') {
-      const session = event.data.object as Stripe.Checkout.Session;
-      console.log('💳 Session Stripe complétée:', session.id);
-      console.log('📦 Metadata:', session.metadata);
-
-      const metadata = session.metadata;
-      const paymentLinkId = metadata?.payment_link_id;
-
-      console.log('🔍 Payment Link ID:', paymentLinkId);
-
-      if (!paymentLinkId) {
-        console.log('⚠️ Pas de payment_link_id - paiement direct (non lien)');
-        // C'est un paiement direct (iframe), pas un lien de paiement
-        // On laisse le code existant gérer ça
-        return new Response(
-          JSON.stringify({ received: true, message: 'Paiement direct traité' }),
-          { headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
-        );
-      }
-
-      console.log('🔥 === PAIEMENT VIA LIEN DE PAIEMENT === 🔥');
-
-      // 🔥 ÉTAPE 1 : Trouver la transaction pending liée au payment_link dans pos_transactions
-      console.log('🔍 Recherche transaction pending dans pos_transactions avec payment_link_id:', paymentLinkId);
-
-      const { data: existingTransaction, error: findError } = await supabase
-        .from('pos_transactions')
-        .select('*')
-        .eq('payment_link_id', paymentLinkId)
-        .eq('status', 'pending')
-        .maybeSingle();
-
-      if (findError) {
-        console.error('❌ Erreur recherche transaction:', findError);
-        return new Response(
-          JSON.stringify({ error: 'Erreur recherche transaction', details: findError.message }),
-          { status: 500, headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
-        );
-      }
-
-      if (!existingTransaction) {
-        console.error('❌ Aucune transaction pending trouvée pour payment_link_id:', paymentLinkId);
-        return new Response(
-          JSON.stringify({ error: 'Transaction pending non trouvée' }),
-          { status: 404, headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
-        );
-      }
-
-      console.log('✅ Transaction pending trouvée:', existingTransaction.id);
-
-      // 🔥 ÉTAPE 2 : Mettre à jour la transaction de "pending" à "completed"
-      console.log('🔄 Mise à jour transaction vers "completed"...');
-
-      const { data: updatedTransaction, error: updateError } = await supabase
-        .from('pos_transactions')
-        .update({
-          status: 'completed',
-          stripe_session_id: session.id,
-          date: new Date().toISOString()
-        })
-        .eq('id', existingTransaction.id)
-        .select()
-        .single();
-
-      if (updateError) {
-        console.error('❌ Erreur mise à jour transaction:', updateError);
-        return new Response(
-          JSON.stringify({ error: 'Erreur mise à jour transaction', details: updateError.message }),
-          { status: 500, headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
-        );
-      }
-
-      console.log('✅ Transaction mise à jour:', updatedTransaction);
-
-      // 🔥 ÉTAPE 3 : Mettre à jour le payment_link en "completed"
-      console.log('🔄 Mise à jour payment_link vers "completed"...');
-
-      const { error: linkUpdateError } = await supabase
-        .from('payment_links')
-        .update({ status: 'completed' })
-        .eq('id', paymentLinkId);
-
-      if (linkUpdateError) {
-        console.error('❌ Erreur mise à jour payment_link:', linkUpdateError);
-      } else {
-        console.log('✅ Payment link mis à jour');
-      }
-
-      // 🔥 ÉTAPE 4 : Mettre à jour le statut de paiement de la réservation
-      const bookingId = existingTransaction.booking_id;
-      console.log('🔄 Mise à jour statut paiement réservation:', bookingId);
-
-      const { data: booking, error: bookingFetchError } = await supabase
-        .from('bookings')
-        .select('total_amount, payment_amount')
-        .eq('id', bookingId)
-        .single();
-
-      if (bookingFetchError) {
-        console.error('❌ Erreur récupération réservation:', bookingFetchError);
-      } else {
-        const newPaymentAmount = (booking.payment_amount || 0) + updatedTransaction.amount;
-        const newPaymentStatus = newPaymentAmount >= booking.total_amount ? 'paid' : 'partial';
-
-        console.log('💰 Calcul paiement:', {
-          ancien: booking.payment_amount,
-          ajout: updatedTransaction.amount,
-          nouveau: newPaymentAmount,
-          total: booking.total_amount,
-          statut: newPaymentStatus
-        });
-
-        const { error: bookingUpdateError } = await supabase
-          .from('bookings')
-          .update({
-            payment_amount: newPaymentAmount,
-            payment_status: newPaymentStatus
-          })
-          .eq('id', bookingId);
-
-        if (bookingUpdateError) {
-          console.error('❌ Erreur mise à jour réservation:', bookingUpdateError);
-        } else {
-          console.log('✅ Réservation mise à jour');
+      await supabaseRequest(
+        `users?stripe_subscription_id=eq.${subscription.id}`,
+        'PATCH',
+        {
+          subscription_status: subscription.status === 'active' ? 'active' : 'cancelled',
+          cancel_at_period_end: subscription.cancel_at_period_end || false,
+          current_period_end: new Date(subscription.current_period_end * 1000).toISOString(),
+          updated_at: new Date().toISOString()
         }
-      }
+      )
 
-      console.log('✅ === TRAITEMENT TERMINÉ === ✅');
+      console.log('✅ Abonnement mis à jour')
 
-      return new Response(
-        JSON.stringify({ 
-          received: true, 
-          message: 'Transaction mise à jour avec succès',
-          transaction_id: updatedTransaction.id
-        }),
-        { headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
-      );
+      return new Response(JSON.stringify({ success: true }), {
+        headers: { ...corsHeaders, 'Content-Type': 'application/json' }
+      })
     }
 
-    // Autres événements
-    console.log('ℹ️ Événement non traité:', event.type);
-    return new Response(
-      JSON.stringify({ received: true, message: 'Événement non traité' }),
-      { headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
-    );
+    // Traiter checkout.session.completed
+    if (event.type === 'checkout.session.completed') {
+      const session = event.data.object
+      const sessionId = session.id
+      
+      console.log('💳 Session de paiement complétée:', sessionId)
+      console.log('📋 Metadata:', JSON.stringify(session.metadata, null, 2))
+      
+      // ⚠️ VÉRIFICATION CRITIQUE : Paiement complet ?
+      if (session.status !== 'complete' || session.payment_status !== 'paid') {
+        console.log('⚠️ PAIEMENT NON COMPLET - Session ignorée')
+        return new Response(JSON.stringify({ 
+          success: true, 
+          type: 'payment_not_complete'
+        }), {
+          headers: { ...corsHeaders, 'Content-Type': 'application/json' }
+        })
+      }
+      
+      // 🔒 Vérifier si déjà traité (éviter doublons)
+      if (processedSessions.has(sessionId)) {
+        const cached = processedSessions.get(sessionId)!
+        console.log('🔒 SESSION DÉJÀ TRAITÉE')
+        return new Response(JSON.stringify({ 
+          success: true, 
+          type: 'cached_duplicate_prevented',
+          result: cached.result
+        }), {
+          headers: { ...corsHeaders, 'Content-Type': 'application/json' }
+        })
+      }
 
-  } catch (error: any) {
-    console.error('❌ === ERREUR GLOBALE === ❌');
-    console.error('Type:', error.constructor?.name);
-    console.error('Message:', error.message);
-    console.error('Stack:', error.stack);
+      // Marquer comme en cours de traitement
+      processedSessions.set(sessionId, { 
+        timestamp: Date.now(), 
+        result: { processing: true } 
+      })
 
-    return new Response(
-      JSON.stringify({
-        error: 'Erreur interne',
-        details: error.message,
-        type: error.constructor?.name
-      }),
-      { status: 500, headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
-    );
+      const customerEmail = session.customer_details?.email
+      const clientReferenceId = session.client_reference_id
+      const metadata = session.metadata || {}
+
+      if (!customerEmail) {
+        console.error('❌ Email client manquant')
+        processedSessions.delete(sessionId)
+        return new Response('Email client manquant', { status: 400, headers: corsHeaders })
+      }
+
+      // 📅 RÉSERVATION IFRAME (booking_deposit)
+      if (metadata.payment_type === 'booking_deposit') {
+        console.log('📅 === CRÉATION RÉSERVATION APRÈS PAIEMENT === 📅')
+        
+        const userId = metadata.user_id
+        const serviceId = metadata.service_id
+        const date = metadata.date
+        const time = metadata.time
+        const quantity = parseInt(metadata.quantity || '1')
+        const clientFirstname = metadata.client_firstname
+        const clientLastname = metadata.client_lastname
+        const clientPhone = metadata.client_phone
+        const assignedUserId = metadata.assigned_user_id
+
+        if (!userId || !serviceId || !date || !time) {
+          console.error('❌ Données réservation manquantes:', { userId, serviceId, date, time })
+          processedSessions.delete(sessionId)
+          return new Response('Données réservation manquantes', { status: 400, headers: corsHeaders })
+        }
+
+        // Récupérer les infos du service
+        const services = await supabaseRequest(`services?id=eq.${serviceId}`)
+        const service = services?.[0]
+
+        if (!service) {
+          console.error('❌ Service non trouvé')
+          processedSessions.delete(sessionId)
+          return new Response('Service non trouvé', { status: 404, headers: corsHeaders })
+        }
+
+        const totalAmount = service.price_ttc * quantity
+        const depositAmount = session.amount_total / 100 // Stripe envoie en centimes
+
+        // 🔍 Vérifier si la réservation existe déjà
+        const existingBookings = await supabaseRequest(`bookings?stripe_session_id=eq.${sessionId}`)
+        const existingBooking = existingBookings?.[0]
+
+        if (existingBooking) {
+          console.log('⚠️ Réservation déjà créée:', existingBooking.id)
+          const result = { 
+            success: true, 
+            type: 'booking_already_exists',
+            bookingId: existingBooking.id
+          }
+          processedSessions.set(sessionId, { timestamp: Date.now(), result })
+          return new Response(JSON.stringify(result), {
+            headers: { ...corsHeaders, 'Content-Type': 'application/json' }
+          })
+        }
+
+        // Créer la réservation
+        const bookingData: any = {
+          user_id: userId,
+          service_id: serviceId,
+          date: date,
+          time: time,
+          duration_minutes: service.duration_minutes,
+          quantity: quantity,
+          client_name: clientLastname,
+          client_firstname: clientFirstname,
+          client_email: customerEmail,
+          client_phone: clientPhone,
+          total_amount: totalAmount,
+          payment_status: 'paid',
+          payment_amount: depositAmount,
+          booking_status: 'confirmed',
+          stripe_session_id: sessionId
+        }
+
+        if (assignedUserId) {
+          bookingData.assigned_user_id = assignedUserId
+        }
+
+        console.log('📝 Création réservation:', bookingData)
+
+        const bookings = await supabaseRequest('bookings', 'POST', bookingData)
+        const booking = bookings?.[0]
+
+        if (!booking) {
+          console.error('❌ Erreur création réservation')
+          processedSessions.delete(sessionId)
+          return new Response('Erreur création réservation', { status: 500, headers: corsHeaders })
+        }
+
+        console.log('✅ RÉSERVATION CRÉÉE:', booking.id)
+
+        const result = { 
+          success: true, 
+          type: 'booking_created',
+          bookingId: booking.id
+        }
+        
+        processedSessions.set(sessionId, { timestamp: Date.now(), result })
+        
+        return new Response(JSON.stringify(result), {
+          headers: { ...corsHeaders, 'Content-Type': 'application/json' }
+        })
+      }
+
+      // 🔌 ABONNEMENT PLUGIN
+      if (clientReferenceId && clientReferenceId.includes('|')) {
+        console.log('🔌 ABONNEMENT PLUGIN détecté via client_reference_id')
+        
+        const [userId, pluginId] = clientReferenceId.split('|')
+        
+        console.log('👤 User ID extrait:', userId)
+        console.log('🔌 Plugin ID extrait:', pluginId)
+        
+        if (!userId || !pluginId) {
+          console.error('❌ Format client_reference_id invalide:', clientReferenceId)
+          processedSessions.delete(sessionId)
+          return new Response('Format client_reference_id invalide', { status: 400, headers: corsHeaders })
+        }
+        
+        const stripeSubscriptionId = session.subscription
+
+        const existingSubs = await supabaseRequest(
+          `plugin_subscriptions?user_id=eq.${userId}&plugin_id=eq.${pluginId}`
+        )
+        const existingSub = existingSubs?.[0]
+
+        if (existingSub) {
+          console.log('📋 Souscription existante trouvée, mise à jour...')
+          
+          await supabaseRequest(
+            `plugin_subscriptions?id=eq.${existingSub.id}`,
+            'PATCH',
+            {
+              status: 'active',
+              is_trial: false,
+              trial_ends_at: null,
+              stripe_subscription_id: stripeSubscriptionId,
+              stripe_customer_id: session.customer,
+              current_period_start: new Date().toISOString(),
+              current_period_end: session.expires_at ? new Date(session.expires_at * 1000).toISOString() : null,
+              updated_at: new Date().toISOString()
+            }
+          )
+          
+          console.log('✅ PLUGIN ACTIVÉ (mise à jour)')
+        } else {
+          console.log('➕ Création nouvelle souscription plugin...')
+          
+          await supabaseRequest('plugin_subscriptions', 'POST', {
+            user_id: userId,
+            plugin_id: pluginId,
+            status: 'active',
+            is_trial: false,
+            stripe_subscription_id: stripeSubscriptionId,
+            stripe_customer_id: session.customer,
+            current_period_start: new Date().toISOString(),
+            current_period_end: session.expires_at ? new Date(session.expires_at * 1000).toISOString() : null
+          })
+          
+          console.log('✅ PLUGIN ACTIVÉ (création)')
+        }
+        
+        const result = { 
+          success: true, 
+          type: 'plugin_subscription',
+          userId: userId,
+          pluginId: pluginId,
+          status: 'active'
+        }
+        
+        processedSessions.set(sessionId, { timestamp: Date.now(), result })
+        
+        return new Response(JSON.stringify(result), {
+          headers: { ...corsHeaders, 'Content-Type': 'application/json' }
+        })
+      }
+
+      // 💳 Abonnement plateforme
+      if (metadata.payment_type === 'platform_subscription') {
+        console.log('💳 ABONNEMENT PLATEFORME')
+        
+        const userId = metadata.user_id
+        const planId = metadata.plan_id || metadata.plan_type
+        
+        if (!userId || !planId) {
+          console.error('❌ Données abonnement manquantes')
+          processedSessions.delete(sessionId)
+          return new Response('Données abonnement manquantes', { status: 400, headers: corsHeaders })
+        }
+        
+        let subscriptionTier = 'starter'
+        if (planId === 'monthly' || planId === 'pro' || planId === 'yearly') {
+          subscriptionTier = 'pro'
+        }
+        
+        const stripeSubscriptionId = session.subscription
+
+        await supabaseRequest(
+          `users?id=eq.${userId}`,
+          'PATCH',
+          {
+            subscription_tier: subscriptionTier,
+            subscription_status: 'active',
+            trial_ends_at: null,
+            stripe_subscription_id: stripeSubscriptionId,
+            stripe_customer_id: session.customer,
+            current_period_end: session.expires_at ? new Date(session.expires_at * 1000).toISOString() : null,
+            cancel_at_period_end: false,
+            updated_at: new Date().toISOString()
+          }
+        )
+        
+        console.log('✅ ABONNEMENT ACTIVÉ')
+        
+        const result = { 
+          success: true, 
+          type: 'platform_subscription',
+          userId: userId,
+          planId: planId,
+          subscriptionTier: subscriptionTier,
+          status: 'active'
+        }
+        
+        processedSessions.set(sessionId, { timestamp: Date.now(), result })
+        
+        return new Response(JSON.stringify(result), {
+          headers: { ...corsHeaders, 'Content-Type': 'application/json' }
+        })
+      }
+
+      console.log('⚠️ Type de paiement non reconnu')
+      return new Response(JSON.stringify({ received: true }), {
+        headers: { ...corsHeaders, 'Content-Type': 'application/json' }
+      })
+    }
+
+    console.log('ℹ️ Événement non traité:', event.type)
+    return new Response(JSON.stringify({ received: true }), {
+      headers: { ...corsHeaders, 'Content-Type': 'application/json' }
+    })
+
+  } catch (error) {
+    console.error('❌ Erreur webhook:', error)
+    return new Response(JSON.stringify({ error: error.message }), {
+      status: 500,
+      headers: { ...corsHeaders, 'Content-Type': 'application/json' }
+    })
   }
-});
+})

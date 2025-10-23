@@ -8,6 +8,7 @@ export function PaymentSuccess() {
   
   const handleBackToHome = () => {
     // Fermer la fenêtre ou rediriger vers une page de confirmation
+    // Fermer l'onglet de paiement et retourner à la page de réservation
     window.close();
     
     // Si la fermeture échoue (bloquée par le navigateur), rediriger
@@ -55,7 +56,6 @@ export function PaymentSuccess() {
             <div>Le solde restant sera à régler lors de votre rendez-vous</div>
           </div>
         </div>
-
         {/* Back Button */}
         <button
           onClick={handleBackToHome}

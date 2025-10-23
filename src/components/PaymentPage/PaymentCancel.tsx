@@ -8,6 +8,7 @@ export function PaymentCancel() {
   
   const handleBackToHome = () => {
     // Fermer la fenêtre ou rediriger
+    // Fermer l'onglet de paiement
     window.close();
     
     // Si la fermeture échoue (bloquée par le navigateur), rediriger vers la réservation
@@ -60,7 +61,6 @@ export function PaymentCancel() {
             <div>Votre réservation reste en attente jusqu'au paiement de l'acompte</div>
           </div>
         </div>
-
         {/* Action Buttons */}
         <div className="space-y-3">
           <button

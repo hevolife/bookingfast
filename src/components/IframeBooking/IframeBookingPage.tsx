@@ -170,11 +170,8 @@ export function IframeBookingPage() {
       }
 
       console.log('✅ Réservation chargée:', booking);
-      console.log('💰 deposit_amount:', booking.deposit_amount);
-      console.log('💰 payment_amount:', booking.payment_amount);
-      console.log('💰 total_amount:', booking.total_amount);
 
-      // 🎯 CORRECTION CRITIQUE - Mettre à jour confirmedBooking avec TOUTES les données
+      // 🎯 Remplir tous les états avec les données de la réservation
       setConfirmedBooking(booking);
       setSelectedService(booking.services);
       setSelectedDate(booking.date);
@@ -589,28 +586,6 @@ export function IframeBookingPage() {
 
       console.log('🔗 URLs de redirection:', { success: successUrl, cancel: cancelUrl });
 
-      // 🔥 MÉTADONNÉES COMPLÈTES AVEC CHAMPS SÉPARÉS
-      const metadata = {
-        user_id: userId,
-        service_id: selectedService.id,
-        date: selectedDate,
-        time: selectedTime,
-        quantity: quantity.toString(),
-        client_firstname: clientData.firstname, // ✅ SÉPARÉ
-        client_lastname: clientData.lastname,   // ✅ SÉPARÉ
-        client_email: clientData.email,
-        client_phone: clientData.phone || '',
-        payment_type: 'booking_deposit',
-        return_origin: baseUrl
-      };
-
-      // Ajouter assigned_user_id seulement s'il existe
-      if (selectedTeamMember) {
-        metadata['assigned_user_id'] = selectedTeamMember;
-      }
-
-      console.log('📦 Métadonnées complètes:', metadata);
-
       const supabaseUrl = import.meta.env.VITE_SUPABASE_URL?.replace(/\/$/, '');
       const response = await fetch(`${supabaseUrl}/functions/v1/stripe-checkout`, {
         method: 'POST',
@@ -626,7 +601,19 @@ export function IframeBookingPage() {
           success_url: successUrl,
           cancel_url: cancelUrl,
           parent_url: baseUrl,
-          metadata: metadata
+          metadata: {
+            user_id: userId,
+            service_id: selectedService.id,
+            date: selectedDate,
+            time: selectedTime,
+            quantity: quantity.toString(),
+            client_firstname: clientData.firstname,
+            client_lastname: clientData.lastname,
+            client_phone: clientData.phone,
+            assigned_user_id: selectedTeamMember || undefined,
+            payment_type: 'booking_deposit',
+            return_origin: baseUrl
+          }
         })
       });
 
@@ -805,44 +792,6 @@ export function IframeBookingPage() {
 
   const depositAmount = calculateDepositAmount();
   const isStripeEnabled = data?.settings?.stripe_enabled;
-
-  // 🔥 FIX CRITIQUE - Calculer le montant payé et le solde restant
-  const getPaidAmount = () => {
-    if (!confirmedBooking) {
-      console.log('⚠️ getPaidAmount: confirmedBooking est null');
-      return 0;
-    }
-    
-    console.log('💰 getPaidAmount - confirmedBooking:', {
-      deposit_amount: confirmedBooking.deposit_amount,
-      payment_amount: confirmedBooking.payment_amount,
-      total_amount: confirmedBooking.total_amount
-    });
-    
-    // 🎯 CORRECTION: Lire deposit_amount au lieu de payment_amount
-    const amount = confirmedBooking.deposit_amount || 0;
-    console.log('💰 getPaidAmount retourne:', amount);
-    return amount;
-  };
-
-  const getRemainingBalance = () => {
-    if (!confirmedBooking || !selectedService) {
-      console.log('⚠️ getRemainingBalance: confirmedBooking ou selectedService manquant');
-      return 0;
-    }
-    
-    const totalAmount = selectedService.price_ttc * quantity;
-    const paidAmount = getPaidAmount();
-    const remaining = totalAmount - paidAmount;
-    
-    console.log('💰 getRemainingBalance:', {
-      totalAmount,
-      paidAmount,
-      remaining
-    });
-    
-    return remaining;
-  };
 
   if (loading) {
     return (
@@ -1493,12 +1442,12 @@ export function IframeBookingPage() {
                       <div className="space-y-1">
                         <div className="flex justify-between items-center">
                           <span className="text-gray-600">Acompte payé</span>
-                          <span className="font-bold text-green-600">{getPaidAmount().toFixed(2)}€</span>
+                          <span className="font-bold text-green-600">{depositAmount.toFixed(2)}€</span>
                         </div>
                         <div className="flex justify-between items-center">
                           <span className="text-gray-600">Solde à régler sur place</span>
                           <span className="font-bold text-gray-900">
-                            {getRemainingBalance().toFixed(2)}€
+                            {((selectedService?.price_ttc || 0) * quantity - depositAmount).toFixed(2)}€
                           </span>
                         </div>
                         <div className="pt-2 mt-2 border-t border-green-200">

@@ -8,9 +8,6 @@ import { GoogleCalendarCallback } from './components/Admin/GoogleCalendarCallbac
 import { PluginGuard } from './components/Plugins/PluginGuard';
 import { IframeBookingPage } from './components/IframeBooking/IframeBookingPage';
 import { PaymentPage } from './components/PaymentPage/PaymentPage';
-import { PaymentSuccess } from './components/PaymentPage/PaymentSuccess';
-import { PaymentCancel } from './components/PaymentPage/PaymentCancel';
-import { BookingDebug } from './components/IframeBooking/BookingDebug';
 import { LandingPage } from './components/Landing/LandingPage';
 import { ProtectedRoute } from './components/Auth/ProtectedRoute';
 import { PublicRoute } from './components/Auth/PublicRoute';
@@ -44,13 +41,8 @@ function AppRoutes() {
   // 🎯 Pages TOUJOURS publiques (pas de vérification auth)
   const isAlwaysPublicPage = 
     pathname.startsWith('/booking/') ||
-    pathname.startsWith('/booking-debug/') ||
     pathname === '/payment' ||
     pathname.startsWith('/payment?') ||
-    pathname === '/payment-success' ||
-    pathname.startsWith('/payment-success?') ||
-    pathname === '/payment-cancel' ||
-    pathname.startsWith('/payment-cancel?') ||
     pathname === '/privacy-policy' ||
     pathname === '/terms-of-service' ||
     pathname.includes('/auth/google/callback');
@@ -66,16 +58,13 @@ function AppRoutes() {
     );
   }
 
-  // 🎯 Pages TOUJOURS publiques (booking, payment, debug, etc.)
+  // 🎯 Pages TOUJOURS publiques (booking, payment, etc.)
   if (isAlwaysPublicPage) {
     return (
       <Suspense fallback={<LoadingSpinner />}>
         <Routes>
           <Route path="/booking/:userId" element={<IframeBookingPage />} />
-          <Route path="/booking-debug/:bookingId" element={<BookingDebug />} />
           <Route path="/payment" element={<PaymentPage />} />
-          <Route path="/payment-success" element={<PaymentSuccess />} />
-          <Route path="/payment-cancel" element={<PaymentCancel />} />
         </Routes>
       </Suspense>
     );
