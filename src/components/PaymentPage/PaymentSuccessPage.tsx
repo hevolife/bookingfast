@@ -1,6 +1,6 @@
 import React, { useEffect } from 'react';
 import { useNavigate, useSearchParams } from 'react-router-dom';
-import { CheckCircle, Calendar, Mail, User, ArrowRight } from 'lucide-react';
+import { CheckCircle, Calendar, Mail, User } from 'lucide-react';
 
 export function PaymentSuccessPage() {
   const navigate = useNavigate();
@@ -34,12 +34,12 @@ export function PaymentSuccessPage() {
         </h1>
 
         <p className="text-gray-600 text-lg mb-8">
-          Votre paiement a été traité avec succès. Vous allez recevoir un email de confirmation.
+          Votre acompte a été payé avec succès ! Votre réservation est maintenant confirmée.
         </p>
 
         {/* Détails de la réservation */}
         <div className="bg-gradient-to-r from-green-50 to-emerald-50 rounded-2xl p-6 mb-8 text-left">
-          <h3 className="font-bold text-green-800 mb-4 text-center">Détails de votre réservation</h3>
+          <h3 className="font-bold text-green-800 mb-4 text-center">Réservation confirmée</h3>
           
           <div className="space-y-3">
             {service && (
@@ -100,19 +100,17 @@ export function PaymentSuccessPage() {
           </div>
         </div>
 
-        <div className="space-y-3">
-          <button
-            onClick={() => window.close()}
-            className="w-full bg-gradient-to-r from-green-600 to-emerald-600 text-white py-3 px-6 rounded-2xl font-medium hover:from-green-700 hover:to-emerald-700 transition-all duration-300 transform hover:scale-105 shadow-lg flex items-center justify-center gap-2"
-          >
-            Fermer
-            <ArrowRight className="w-5 h-5" />
-          </button>
-
-          <p className="text-sm text-gray-500">
-            Cette fenêtre se fermera automatiquement dans 10 secondes
-          </p>
+        {/* Information sur le solde */}
+        <div className="bg-blue-50 border border-blue-200 rounded-2xl p-4 mb-6">
+          <div className="text-blue-700 text-sm">
+            <div className="font-medium mb-1">📧 Email de confirmation envoyé</div>
+            <div>Le solde restant sera à régler lors de votre rendez-vous</div>
+          </div>
         </div>
+
+        <p className="text-sm text-gray-500">
+          Cette fenêtre se fermera automatiquement dans 10 secondes
+        </p>
 
         <div className="mt-6 pt-6 border-t border-gray-200">
           <p className="text-xs text-gray-500">
