@@ -178,6 +178,7 @@ export function BookingModal({
     console.log('💳 Montant:', amount);
     console.log('💳 Client:', selectedClient?.email);
     console.log('💳 Service:', isCustomService ? customServiceData.name : selectedService?.name);
+    console.log('📋 Booking ID (editingBooking):', editingBooking?.id);
     
     if (!selectedClient || !selectedService) {
       console.error('❌ Client ou service manquant');
@@ -187,7 +188,11 @@ export function BookingModal({
     try {
       const expiryMinutes = settings?.payment_link_expiry_minutes || 30;
       const expiresAt = Date.now() + (expiryMinutes * 60 * 1000);
+      
+      // 🔥 CORRECTION CRITIQUE - Utiliser /payment au lieu de /booking
       const paymentUrl = new URL('/payment', window.location.origin);
+      
+      console.log('🔗 URL de base:', paymentUrl.toString());
       
       paymentUrl.searchParams.set('amount', amount.toString());
       paymentUrl.searchParams.set('service', isCustomService ? customServiceData.name : selectedService.name);
@@ -201,8 +206,17 @@ export function BookingModal({
         paymentUrl.searchParams.set('user_id', user.id);
       }
 
+      // 🔥 AJOUT CRITIQUE - booking_id dans l'URL
+      if (editingBooking?.id) {
+        paymentUrl.searchParams.set('booking_id', editingBooking.id);
+        console.log('✅ booking_id ajouté à l\'URL:', editingBooking.id);
+      } else {
+        console.warn('⚠️ Pas de booking_id (mode création)');
+      }
+
       const fullPaymentLink = paymentUrl.toString();
-      console.log('🔗 Lien de paiement généré:', fullPaymentLink);
+      console.log('🔗 Lien de paiement COMPLET généré:', fullPaymentLink);
+      console.log('🔍 Vérification route:', fullPaymentLink.includes('/payment') ? '✅ /payment' : '❌ MAUVAISE ROUTE');
 
       const pendingTransaction = {
         amount: amount,
@@ -222,7 +236,6 @@ export function BookingModal({
       console.log('💾 Transaction ajoutée:', newTransaction);
       
       // 🔥 DÉCLENCHER LE WORKFLOW payment_link_created ICI
-      // Si on est en mode édition, déclencher le workflow immédiatement
       if (editingBooking && user?.id) {
         console.log('🔥 ========================================');
         console.log('🔥 DÉCLENCHEMENT WORKFLOW payment_link_created');
@@ -230,7 +243,6 @@ export function BookingModal({
         console.log('📋 Booking ID:', editingBooking.id);
         console.log('🔗 Payment Link:', fullPaymentLink);
         
-        // Créer un objet booking avec le payment_link
         const bookingWithPaymentLink = {
           ...editingBooking,
           payment_link: fullPaymentLink,
@@ -377,7 +389,6 @@ export function BookingModal({
         if (updatedBooking) {
           bookingEvents.emit('bookingUpdated', updatedBooking);
           
-          // 🔥 Si un lien de paiement a été ajouté pendant l'édition, déclencher le workflow
           if (paymentLink && !editingBooking.payment_link && user?.id) {
             console.log('🔥 Nouveau lien de paiement ajouté - déclenchement workflow');
             try {
@@ -395,7 +406,6 @@ export function BookingModal({
           bookingEvents.emit('bookingCreated', newBooking);
           refetchLimit();
           
-          // 🔥 Si un lien de paiement a été créé avec la réservation, déclencher le workflow
           if (paymentLink && user?.id) {
             console.log('🔥 Lien de paiement créé avec la réservation - déclenchement workflow');
             try {
@@ -457,7 +467,6 @@ export function BookingModal({
     return `${unitName}(s)`;
   };
 
-  // Configuration des boutons du footer
   const footerButtons = [
     ...(editingBooking ? [{
       label: 'Supprimer',

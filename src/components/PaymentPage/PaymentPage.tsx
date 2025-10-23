@@ -20,7 +20,7 @@ export function PaymentPage() {
   console.log('  - time:', searchParams.get('time'));
   console.log('  - expires:', searchParams.get('expires'));
   console.log('  - user_id:', searchParams.get('user_id'));
-  console.log('  - booking_id:', searchParams.get('booking_id')); // 🔥 NOUVEAU
+  console.log('  - booking_id:', searchParams.get('booking_id'));
 
   const [timeLeft, setTimeLeft] = useState<number>(0);
   const [isExpired, setIsExpired] = useState(false);
@@ -43,7 +43,7 @@ export function PaymentPage() {
   const time = searchParams.get('time');
   const expiresAt = searchParams.get('expires');
   const userId = searchParams.get('user_id');
-  const bookingId = searchParams.get('booking_id'); // 🔥 NOUVEAU
+  const bookingId = searchParams.get('booking_id');
 
   // 🔍 Récupérer le service_id depuis le nom du service
   useEffect(() => {
@@ -244,7 +244,7 @@ export function PaymentPage() {
   console.log('  - isExpired:', isExpired);
   console.log('  - processing:', processing);
   console.log('  - serviceId:', serviceId);
-  console.log('  - bookingId:', bookingId); // 🔥 NOUVEAU
+  console.log('  - bookingId:', bookingId);
 
   // Affichage pendant la vérification
   if (checkingStatus) {
@@ -387,23 +387,26 @@ export function PaymentPage() {
           payment_type: 'booking_deposit',
           user_id: userId,
           service_id: serviceId,
-          booking_id: bookingId, // 🔥 AJOUT CRITIQUE
+          booking_id: bookingId,
           client: client,
           email: email,
           date: date,
           time: time,
         };
         
+        // 🔥 CORRECTION CRITIQUE - URLs de redirection Stripe
         const payload = {
           amount: parseFloat(amount),
           service_name: serviceName,
           customer_email: email,
-          success_url: `${window.location.origin}/payment-success`,
-          cancel_url: `${window.location.origin}/payment-cancel`,
+          success_url: `${window.location.origin}/payment-success?booking_id=${bookingId}`,
+          cancel_url: `${window.location.origin}/payment-cancel?booking_id=${bookingId}`,
           metadata: metadata,
         };
         
         console.log('📦 Payload:', JSON.stringify(payload, null, 2));
+        console.log('🔥 SUCCESS URL:', payload.success_url);
+        console.log('🔥 CANCEL URL:', payload.cancel_url);
         
         const response = await fetch(functionUrl, {
           method: 'POST',
