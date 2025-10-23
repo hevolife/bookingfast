@@ -170,8 +170,11 @@ export function IframeBookingPage() {
       }
 
       console.log('✅ Réservation chargée:', booking);
+      console.log('💰 deposit_amount:', booking.deposit_amount);
+      console.log('💰 payment_amount:', booking.payment_amount);
+      console.log('💰 total_amount:', booking.total_amount);
 
-      // 🎯 Remplir tous les états avec les données de la réservation
+      // 🎯 CORRECTION CRITIQUE - Mettre à jour confirmedBooking avec TOUTES les données
       setConfirmedBooking(booking);
       setSelectedService(booking.services);
       setSelectedDate(booking.date);
@@ -805,16 +808,40 @@ export function IframeBookingPage() {
 
   // 🔥 FIX CRITIQUE - Calculer le montant payé et le solde restant
   const getPaidAmount = () => {
-    if (!confirmedBooking) return 0;
+    if (!confirmedBooking) {
+      console.log('⚠️ getPaidAmount: confirmedBooking est null');
+      return 0;
+    }
+    
+    console.log('💰 getPaidAmount - confirmedBooking:', {
+      deposit_amount: confirmedBooking.deposit_amount,
+      payment_amount: confirmedBooking.payment_amount,
+      total_amount: confirmedBooking.total_amount
+    });
+    
     // 🎯 CORRECTION: Lire deposit_amount au lieu de payment_amount
-    return confirmedBooking.deposit_amount || 0;
+    const amount = confirmedBooking.deposit_amount || 0;
+    console.log('💰 getPaidAmount retourne:', amount);
+    return amount;
   };
 
   const getRemainingBalance = () => {
-    if (!confirmedBooking || !selectedService) return 0;
+    if (!confirmedBooking || !selectedService) {
+      console.log('⚠️ getRemainingBalance: confirmedBooking ou selectedService manquant');
+      return 0;
+    }
+    
     const totalAmount = selectedService.price_ttc * quantity;
     const paidAmount = getPaidAmount();
-    return totalAmount - paidAmount;
+    const remaining = totalAmount - paidAmount;
+    
+    console.log('💰 getRemainingBalance:', {
+      totalAmount,
+      paidAmount,
+      remaining
+    });
+    
+    return remaining;
   };
 
   if (loading) {

@@ -31,13 +31,40 @@ export interface Booking {
   client_email: string;
   client_phone?: string;
   total_amount: number;
-  payment_status: 'pending' | 'partial' | 'completed' | 'failed' | 'refunded';
+  payment_status: 'pending' | 'partial' | 'completed' | 'paid' | 'failed' | 'refunded';
   payment_amount: number;
   booking_status: 'pending' | 'confirmed' | 'cancelled' | 'completed';
   notes?: string;
   created_at: string;
   quantity?: number;
   assigned_user_id?: string;
+  deposit_amount?: number;
+  transactions?: Transaction[];
+}
+
+export interface Transaction {
+  id: string;
+  amount: number;
+  method: 'stripe' | 'cash' | 'card' | 'check' | 'transfer';
+  status: 'pending' | 'completed' | 'failed' | 'refunded';
+  date: string;
+  notes?: string;
+  stripe_session_id?: string;
+  payment_link_id?: string;
+}
+
+export interface PaymentLink {
+  id: string;
+  booking_id: string;
+  user_id: string;
+  amount: number;
+  status: 'pending' | 'completed' | 'expired' | 'cancelled';
+  expires_at: string;
+  payment_url?: string;
+  stripe_session_id?: string;
+  paid_at?: string;
+  created_at: string;
+  updated_at: string;
 }
 
 export interface Client {
@@ -101,16 +128,6 @@ export interface BusinessSettings {
   iframe_services?: string[];
   iframe_enable_team_selection?: boolean;
   enable_user_assignment?: boolean;
-}
-
-export interface PaymentLink {
-  id: string;
-  booking_id: string;
-  stripe_payment_intent_id?: string;
-  amount: number;
-  status: 'pending' | 'completed' | 'expired' | 'failed';
-  expires_at: string;
-  created_at: string;
 }
 
 export interface Unavailability {

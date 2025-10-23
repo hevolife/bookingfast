@@ -124,7 +124,6 @@ Deno.serve(async (req) => {
       
       console.log('💳 Session de paiement complétée:', sessionId)
       console.log('📋 Metadata:', JSON.stringify(session.metadata, null, 2))
-      console.log('👤 Customer details:', JSON.stringify(session.customer_details, null, 2))
       
       // ⚠️ VÉRIFICATION CRITIQUE : Paiement complet ?
       if (session.status !== 'complete' || session.payment_status !== 'paid') {
@@ -156,14 +155,93 @@ Deno.serve(async (req) => {
         result: { processing: true } 
       })
 
-      const customerEmail = session.customer_details?.email
-      const clientReferenceId = session.client_reference_id
       const metadata = session.metadata || {}
 
-      if (!customerEmail) {
-        console.error('❌ Email client manquant')
-        processedSessions.delete(sessionId)
-        return new Response('Email client manquant', { status: 400, headers: corsHeaders })
+      // 💳 PAIEMENT VIA LIEN DE PAIEMENT
+      if (metadata.payment_type === 'payment_link') {
+        console.log('💳 === PAIEMENT VIA LIEN === 💳')
+        
+        const paymentLinkId = metadata.payment_link_id
+        const bookingId = metadata.booking_id
+        const amount = session.amount_total / 100
+
+        if (!paymentLinkId || !bookingId) {
+          console.error('❌ payment_link_id ou booking_id manquant')
+          processedSessions.delete(sessionId)
+          return new Response('Données manquantes', { status: 400, headers: corsHeaders })
+        }
+
+        // Mettre à jour le lien de paiement
+        await supabaseRequest(
+          `payment_links?id=eq.${paymentLinkId}`,
+          'PATCH',
+          {
+            status: 'completed',
+            stripe_session_id: sessionId,
+            paid_at: new Date().toISOString()
+          }
+        )
+
+        // Récupérer la réservation
+        const bookings = await supabaseRequest(`bookings?id=eq.${bookingId}`)
+        const booking = bookings?.[0]
+
+        if (!booking) {
+          console.error('❌ Réservation non trouvée')
+          processedSessions.delete(sessionId)
+          return new Response('Réservation non trouvée', { status: 404, headers: corsHeaders })
+        }
+
+        // Ajouter la transaction
+        const transactions = booking.transactions || []
+        transactions.push({
+          id: crypto.randomUUID(),
+          amount: amount,
+          method: 'stripe',
+          status: 'completed',
+          date: new Date().toISOString(),
+          stripe_session_id: sessionId,
+          payment_link_id: paymentLinkId
+        })
+
+        // Calculer le nouveau montant payé
+        const newPaymentAmount = (booking.payment_amount || 0) + amount
+
+        // Déterminer le statut de paiement
+        let paymentStatus = 'partial'
+        if (newPaymentAmount >= booking.total_amount) {
+          paymentStatus = 'completed'
+        } else if (newPaymentAmount > 0) {
+          paymentStatus = 'partial'
+        }
+
+        // Mettre à jour la réservation
+        await supabaseRequest(
+          `bookings?id=eq.${bookingId}`,
+          'PATCH',
+          {
+            transactions: transactions,
+            payment_amount: newPaymentAmount,
+            payment_status: paymentStatus,
+            deposit_amount: amount,
+            updated_at: new Date().toISOString()
+          }
+        )
+
+        console.log('✅ PAIEMENT VIA LIEN TRAITÉ')
+
+        const result = { 
+          success: true, 
+          type: 'payment_link',
+          bookingId: bookingId,
+          amount: amount
+        }
+        
+        processedSessions.set(sessionId, { timestamp: Date.now(), result })
+        
+        return new Response(JSON.stringify(result), {
+          headers: { ...corsHeaders, 'Content-Type': 'application/json' }
+        })
       }
 
       // 📅 RÉSERVATION IFRAME (booking_deposit)
@@ -172,26 +250,15 @@ Deno.serve(async (req) => {
         
         const userId = metadata.user_id
         const serviceId = metadata.service_id
-        const bookingId = metadata.booking_id // 🔥 NOUVEAU
+        const bookingId = metadata.booking_id
         const date = metadata.date
         const time = metadata.time
         const quantity = parseInt(metadata.quantity || '1')
         
-        console.log('🔍 Métadonnées:', {
-          userId,
-          serviceId,
-          bookingId, // 🔥 NOUVEAU
-          date,
-          time,
-          quantity
-        });
-
-        // 🔥 PARSING INTELLIGENT DU NOM CLIENT
         let clientFirstname = ''
         let clientLastname = ''
         let clientPhone = metadata.phone || metadata.client_phone || ''
         
-        // 1️⃣ Essayer metadata.client (format PaymentPage: "lucas tafani")
         if (metadata.client) {
           const nameParts = metadata.client.trim().split(/\s+/)
           if (nameParts.length === 1) {
@@ -201,24 +268,13 @@ Deno.serve(async (req) => {
             clientFirstname = nameParts[0]
             clientLastname = nameParts.slice(1).join(' ')
           }
-          console.log('✅ Parsing metadata.client:', { 
-            original: metadata.client, 
-            firstname: clientFirstname, 
-            lastname: clientLastname 
-          })
         }
         
-        // 2️⃣ Fallback sur metadata.client_firstname + client_lastname
         if (!clientFirstname && metadata.client_firstname) {
           clientFirstname = metadata.client_firstname
           clientLastname = metadata.client_lastname || metadata.client_firstname
-          console.log('✅ Utilisation metadata.client_firstname/lastname:', { 
-            firstname: clientFirstname, 
-            lastname: clientLastname 
-          })
         }
         
-        // 3️⃣ Dernier fallback sur customer_details.name
         if (!clientFirstname && session.customer_details?.name) {
           const nameParts = session.customer_details.name.trim().split(/\s+/)
           if (nameParts.length === 1) {
@@ -228,30 +284,22 @@ Deno.serve(async (req) => {
             clientFirstname = nameParts[0]
             clientLastname = nameParts.slice(1).join(' ')
           }
-          console.log('✅ Fallback customer_details.name:', { 
-            original: session.customer_details.name, 
-            firstname: clientFirstname, 
-            lastname: clientLastname 
-          })
         }
         
-        // 4️⃣ Si toujours vide, utiliser l'email
         if (!clientFirstname) {
-          const emailPart = customerEmail.split('@')[0]
+          const emailPart = session.customer_details.email.split('@')[0]
           clientFirstname = emailPart
           clientLastname = emailPart
-          console.log('⚠️ Fallback email:', { firstname: clientFirstname, lastname: clientLastname })
         }
         
         const assignedUserId = metadata.assigned_user_id
 
         if (!userId || !serviceId || !date || !time) {
-          console.error('❌ Données réservation manquantes:', { userId, serviceId, date, time })
+          console.error('❌ Données réservation manquantes')
           processedSessions.delete(sessionId)
           return new Response('Données réservation manquantes', { status: 400, headers: corsHeaders })
         }
 
-        // Récupérer les infos du service
         const services = await supabaseRequest(`services?id=eq.${serviceId}`)
         const service = services?.[0]
 
@@ -262,14 +310,11 @@ Deno.serve(async (req) => {
         }
 
         const totalAmount = service.price_ttc * quantity
-        const depositAmount = session.amount_total / 100 // Stripe envoie en centimes
+        const depositAmount = session.amount_total / 100
 
-        // 🔥 LOGIQUE MISE À JOUR OU CRÉATION
         if (bookingId) {
           console.log('🔄 === MISE À JOUR RÉSERVATION EXISTANTE === 🔄')
-          console.log('🔍 Booking ID:', bookingId)
 
-          // Vérifier que la réservation existe
           const existingBookings = await supabaseRequest(`bookings?id=eq.${bookingId}`)
           const existingBooking = existingBookings?.[0]
 
@@ -279,18 +324,14 @@ Deno.serve(async (req) => {
             return new Response('Réservation non trouvée', { status: 404, headers: corsHeaders })
           }
 
-          console.log('✅ Réservation trouvée:', existingBooking)
-
-          // Mettre à jour la réservation existante
           const updateData: any = {
             payment_status: 'paid',
             payment_amount: depositAmount,
             booking_status: 'confirmed',
             stripe_session_id: sessionId,
+            deposit_amount: depositAmount,
             updated_at: new Date().toISOString()
           }
-
-          console.log('📝 Mise à jour réservation:', JSON.stringify(updateData, null, 2))
 
           await supabaseRequest(
             `bookings?id=eq.${bookingId}`,
@@ -315,7 +356,6 @@ Deno.serve(async (req) => {
         } else {
           console.log('➕ === CRÉATION NOUVELLE RÉSERVATION === ➕')
 
-          // Vérifier si la réservation existe déjà (par stripe_session_id)
           const existingBookings = await supabaseRequest(`bookings?stripe_session_id=eq.${sessionId}`)
           const existingBooking = existingBookings?.[0]
 
@@ -332,7 +372,6 @@ Deno.serve(async (req) => {
             })
           }
 
-          // Créer la réservation
           const bookingData: any = {
             user_id: userId,
             service_id: serviceId,
@@ -342,11 +381,12 @@ Deno.serve(async (req) => {
             quantity: quantity,
             client_name: clientLastname,
             client_firstname: clientFirstname,
-            client_email: customerEmail,
+            client_email: session.customer_details.email,
             client_phone: clientPhone,
             total_amount: totalAmount,
             payment_status: 'paid',
             payment_amount: depositAmount,
+            deposit_amount: depositAmount,
             booking_status: 'confirmed',
             stripe_session_id: sessionId
           }
@@ -354,8 +394,6 @@ Deno.serve(async (req) => {
           if (assignedUserId) {
             bookingData.assigned_user_id = assignedUserId
           }
-
-          console.log('📝 Création réservation:', JSON.stringify(bookingData, null, 2))
 
           const bookings = await supabaseRequest('bookings', 'POST', bookingData)
           const booking = bookings?.[0]
@@ -383,20 +421,10 @@ Deno.serve(async (req) => {
       }
 
       // 🔌 ABONNEMENT PLUGIN
-      if (clientReferenceId && clientReferenceId.includes('|')) {
-        console.log('🔌 ABONNEMENT PLUGIN détecté via client_reference_id')
+      if (session.client_reference_id && session.client_reference_id.includes('|')) {
+        console.log('🔌 ABONNEMENT PLUGIN détecté')
         
-        const [userId, pluginId] = clientReferenceId.split('|')
-        
-        console.log('👤 User ID extrait:', userId)
-        console.log('🔌 Plugin ID extrait:', pluginId)
-        
-        if (!userId || !pluginId) {
-          console.error('❌ Format client_reference_id invalide:', clientReferenceId)
-          processedSessions.delete(sessionId)
-          return new Response('Format client_reference_id invalide', { status: 400, headers: corsHeaders })
-        }
-        
+        const [userId, pluginId] = session.client_reference_id.split('|')
         const stripeSubscriptionId = session.subscription
 
         const existingSubs = await supabaseRequest(
@@ -405,8 +433,6 @@ Deno.serve(async (req) => {
         const existingSub = existingSubs?.[0]
 
         if (existingSub) {
-          console.log('📋 Souscription existante trouvée, mise à jour...')
-          
           await supabaseRequest(
             `plugin_subscriptions?id=eq.${existingSub.id}`,
             'PATCH',
@@ -421,11 +447,7 @@ Deno.serve(async (req) => {
               updated_at: new Date().toISOString()
             }
           )
-          
-          console.log('✅ PLUGIN ACTIVÉ (mise à jour)')
         } else {
-          console.log('➕ Création nouvelle souscription plugin...')
-          
           await supabaseRequest('plugin_subscriptions', 'POST', {
             user_id: userId,
             plugin_id: pluginId,
@@ -436,8 +458,6 @@ Deno.serve(async (req) => {
             current_period_start: new Date().toISOString(),
             current_period_end: session.expires_at ? new Date(session.expires_at * 1000).toISOString() : null
           })
-          
-          console.log('✅ PLUGIN ACTIVÉ (création)')
         }
         
         const result = { 
