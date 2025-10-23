@@ -153,6 +153,83 @@ Deno.serve(async (req) => {
         return new Response('Email client manquant', { status: 400, headers: corsHeaders })
       }
 
+      // 💰 LIEN DE PAIEMENT (payment_link)
+      if (metadata.payment_type === 'payment_link') {
+        console.log('💰 === MISE À JOUR TRANSACTION LIEN DE PAIEMENT === 💰')
+        
+        const paymentLinkId = metadata.payment_link_id
+        const stripePaymentIntentId = session.payment_intent
+
+        if (!paymentLinkId) {
+          console.error('❌ payment_link_id manquant dans metadata')
+          processedSessions.delete(sessionId)
+          return new Response('payment_link_id manquant', { status: 400, headers: corsHeaders })
+        }
+
+        console.log('🔍 Recherche transaction existante pour payment_link_id:', paymentLinkId)
+
+        // 1️⃣ Chercher la transaction existante avec status='pending'
+        const existingTransactions = await supabaseRequest(
+          `transactions?payment_link_id=eq.${paymentLinkId}&status=eq.pending`
+        )
+
+        if (!existingTransactions || existingTransactions.length === 0) {
+          console.error('❌ Aucune transaction pending trouvée pour payment_link_id:', paymentLinkId)
+          processedSessions.delete(sessionId)
+          return new Response('Transaction pending non trouvée', { status: 404, headers: corsHeaders })
+        }
+
+        if (existingTransactions.length > 1) {
+          console.warn('⚠️ Plusieurs transactions pending trouvées, mise à jour de la première')
+        }
+
+        const existingTransaction = existingTransactions[0]
+        console.log('✅ Transaction trouvée:', existingTransaction.id)
+
+        // 2️⃣ Mettre à jour la transaction existante
+        const updateData: any = {
+          status: 'completed',
+          stripe_payment_intent_id: stripePaymentIntentId,
+          updated_at: new Date().toISOString()
+        }
+
+        console.log('📝 Mise à jour transaction:', updateData)
+
+        await supabaseRequest(
+          `transactions?id=eq.${existingTransaction.id}`,
+          'PATCH',
+          updateData
+        )
+
+        console.log('✅ TRANSACTION MISE À JOUR:', existingTransaction.id)
+
+        // 3️⃣ Mettre à jour le payment_link
+        await supabaseRequest(
+          `payment_links?id=eq.${paymentLinkId}`,
+          'PATCH',
+          {
+            status: 'paid',
+            paid_at: new Date().toISOString(),
+            updated_at: new Date().toISOString()
+          }
+        )
+
+        console.log('✅ PAYMENT LINK MIS À JOUR')
+
+        const result = { 
+          success: true, 
+          type: 'payment_link_transaction_updated',
+          transactionId: existingTransaction.id,
+          paymentLinkId: paymentLinkId
+        }
+        
+        processedSessions.set(sessionId, { timestamp: Date.now(), result })
+        
+        return new Response(JSON.stringify(result), {
+          headers: { ...corsHeaders, 'Content-Type': 'application/json' }
+        })
+      }
+
       // 📅 RÉSERVATION IFRAME (booking_deposit)
       if (metadata.payment_type === 'booking_deposit') {
         console.log('📅 === CRÉATION RÉSERVATION APRÈS PAIEMENT === 📅')
