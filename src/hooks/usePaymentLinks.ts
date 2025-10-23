@@ -51,9 +51,6 @@ export function usePaymentLinks(bookingId?: string) {
 
       if (fetchError) throw fetchError;
 
-      console.log('🔍 [DEBUG] Payment links récupérés:', data);
-      console.log('🔍 [DEBUG] Liens avec replaced_by:', data?.filter(l => l.replaced_by_transaction_id));
-
       setPaymentLinks(data || []);
     } catch (err) {
       console.error('❌ Erreur chargement liens de paiement:', err);
@@ -86,8 +83,6 @@ export function usePaymentLinks(bookingId?: string) {
       console.log('🔥 [AUTH CHECK] Supabase User:', supabaseUser?.id);
       console.log('🔥 [AUTH CHECK] Session exists:', !!session);
       console.log('🔥 [AUTH CHECK] Access token exists:', !!session?.access_token);
-      console.log('🔥 [AUTH CHECK] User error:', userError);
-      console.log('🔥 [AUTH CHECK] Session error:', sessionError);
 
       if (!supabaseUser) {
         throw new Error('Utilisateur non authentifié dans Supabase');
@@ -138,19 +133,17 @@ export function usePaymentLinks(bookingId?: string) {
 
       console.log('✅ [CREATE] Expiration calculée:', { expiryMins, expiresAt });
 
-      // 🔥 CRITIQUE : Passer explicitement user_id
+      // 🔥 ÉTAPE 1 : Créer le lien de paiement
       const insertData = {
         booking_id: bookingId,
-        user_id: targetUserId, // ✅ EXPLICITE
+        user_id: targetUserId,
         amount,
         expires_at: expiresAt,
         status: 'pending' as const
       };
 
-      console.log('🔵 [CREATE] Données à insérer:', insertData);
+      console.log('🔵 [CREATE] Données lien de paiement:', insertData);
 
-      // 🔥 CRÉER LE LIEN DE PAIEMENT
-      console.log('🔵 [CREATE] Exécution INSERT...');
       const { data: paymentLink, error: insertError } = await supabase!
         .from('payment_links')
         .insert(insertData)
@@ -158,10 +151,7 @@ export function usePaymentLinks(bookingId?: string) {
         .single();
 
       if (insertError) {
-        console.error('❌ [CREATE] Erreur INSERT:', insertError);
-        console.error('❌ [CREATE] Code erreur:', insertError.code);
-        console.error('❌ [CREATE] Message:', insertError.message);
-        console.error('❌ [CREATE] Details:', insertError.details);
+        console.error('❌ [CREATE] Erreur INSERT payment_link:', insertError);
         throw insertError;
       }
 
@@ -171,6 +161,29 @@ export function usePaymentLinks(bookingId?: string) {
       }
 
       console.log('✅ [CREATE] Lien créé avec succès:', paymentLink);
+
+      // 🔥 ÉTAPE 2 : Créer la transaction "pending" liée au payment_link dans pos_transactions
+      console.log('🔵 [CREATE] Création transaction pending dans pos_transactions...');
+      
+      const { data: transaction, error: transactionError } = await supabase!
+        .from('pos_transactions')
+        .insert({
+          booking_id: bookingId,
+          payment_link_id: paymentLink.id, // 🔥 LIEN CRITIQUE
+          amount: amount,
+          method: 'stripe',
+          status: 'pending',
+          date: new Date().toISOString()
+        })
+        .select()
+        .single();
+
+      if (transactionError) {
+        console.error('❌ [CREATE] Erreur création transaction:', transactionError);
+        // Ne pas bloquer si la transaction échoue, le lien est créé
+      } else {
+        console.log('✅ [CREATE] Transaction pending créée:', transaction);
+      }
 
       // Générer l'URL du lien de paiement
       const paymentUrl = `${window.location.origin}/payment?link_id=${paymentLink.id}`;
