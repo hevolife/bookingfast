@@ -66,13 +66,13 @@ function AppRoutes() {
     );
   }
 
-  // 🎯 Pages TOUJOURS publiques (booking, payment, etc.)
+  // 🎯 Pages TOUJOURS publiques (booking, payment, debug, etc.)
   if (isAlwaysPublicPage) {
     return (
       <Suspense fallback={<LoadingSpinner />}>
         <Routes>
           <Route path="/booking/:userId" element={<IframeBookingPage />} />
-          <Route path="/booking-debug/:userId" element={<BookingDebug />} />
+          <Route path="/booking-debug/:bookingId" element={<BookingDebug />} />
           <Route path="/payment" element={<PaymentPage />} />
           <Route path="/payment-success" element={<PaymentSuccess />} />
           <Route path="/payment-cancel" element={<PaymentCancel />} />
