@@ -75,6 +75,9 @@ export function BookingModal({
 
   useEffect(() => {
     if (editingBooking) {
+      console.log('🔍 BookingModal - editingBooking:', editingBooking);
+      console.log('🔍 BookingModal - editingBooking.transactions:', editingBooking.transactions);
+      
       const service = services.find(s => s.id === editingBooking.service_id);
       const isCustom = !service || service.description === 'Service personnalisé';
       
@@ -110,7 +113,12 @@ export function BookingModal({
       setQuantity(editingBooking.quantity);
       setDate(editingBooking.date);
       setTime(editingBooking.time);
-      setTransactions(editingBooking.transactions || []);
+      
+      // 🔥 CORRECTION: S'assurer que les transactions sont bien chargées
+      const bookingTransactions = editingBooking.transactions || [];
+      console.log('📋 BookingModal - Transactions chargées:', bookingTransactions);
+      setTransactions(bookingTransactions);
+      
       setBookingStatus(editingBooking.booking_status || 'pending');
       setAssignedUserId(editingBooking.assigned_user_id || null);
       setNotes(editingBooking.notes || '');
@@ -154,9 +162,12 @@ export function BookingModal({
   };
 
   const calculateCurrentPaid = () => {
-    return transactions
+    console.log('💰 calculateCurrentPaid - transactions:', transactions);
+    const paid = transactions
       .filter(transaction => transaction.status !== 'pending' && transaction.status !== 'cancelled')
       .reduce((sum, transaction) => sum + transaction.amount, 0);
+    console.log('💰 calculateCurrentPaid - montant payé:', paid);
+    return paid;
   };
 
   const handleAddTransaction = (transaction: Omit<Transaction, 'id' | 'created_at'>) => {
@@ -166,11 +177,21 @@ export function BookingModal({
       status: transaction.status || 'completed',
       created_at: new Date().toISOString()
     };
-    setTransactions(prev => [...prev, newTransaction]);
+    console.log('➕ handleAddTransaction - Nouvelle transaction:', newTransaction);
+    setTransactions(prev => {
+      const updated = [...prev, newTransaction];
+      console.log('📋 handleAddTransaction - Transactions mises à jour:', updated);
+      return updated;
+    });
   };
 
   const handleDeleteTransaction = (transactionId: string) => {
-    setTransactions(prev => prev.filter(t => t.id !== transactionId));
+    console.log('🗑️ handleDeleteTransaction - ID:', transactionId);
+    setTransactions(prev => {
+      const updated = prev.filter(t => t.id !== transactionId);
+      console.log('📋 handleDeleteTransaction - Transactions mises à jour:', updated);
+      return updated;
+    });
   };
 
   const handleGeneratePaymentLink = async (amount: number) => {
@@ -346,6 +367,7 @@ export function BookingModal({
       };
 
       console.log('💾 Données de réservation à sauvegarder:', bookingData);
+      console.log('💾 Transactions incluses:', transactions);
 
       if (editingBooking) {
         const updatedBooking = await updateBooking(editingBooking.id, bookingData);

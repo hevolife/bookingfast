@@ -97,7 +97,15 @@ export function useBookings() {
       if (isRestrictedMember) {
         console.log('🔒 Réservations filtrées pour membre restreint');
       }
-      setBookings(data || []);
+      
+      // 🔥 CORRECTION: S'assurer que les transactions sont bien présentes
+      const bookingsWithTransactions = data?.map(booking => ({
+        ...booking,
+        transactions: booking.transactions || []
+      })) || [];
+      
+      console.log('📋 Bookings avec transactions:', bookingsWithTransactions);
+      setBookings(bookingsWithTransactions);
     } catch (err) {
       console.error('❌ Erreur lors du chargement des réservations:', err);
       setError(err instanceof Error ? err.message : 'Erreur de chargement');
@@ -301,7 +309,13 @@ export function useBookings() {
       console.log('✅ updateBooking - Données récupérées:', data);
 
       if (data) {
-        setBookings(prev => prev.map(b => b.id === id ? data : b));
+        // 🔥 CORRECTION: S'assurer que les transactions sont bien présentes
+        const bookingWithTransactions = {
+          ...data,
+          transactions: data.transactions || []
+        };
+        
+        setBookings(prev => prev.map(b => b.id === id ? bookingWithTransactions : b));
         
         // 🔥 DÉCLENCHEMENT DES WORKFLOWS
         console.log('🔥 ========================================');
@@ -311,18 +325,18 @@ export function useBookings() {
         // Workflow: Réservation mise à jour
         console.log('🔥 Trigger: booking_updated');
         try {
-          await triggerWorkflow('booking_updated', data, targetUserId);
+          await triggerWorkflow('booking_updated', bookingWithTransactions, targetUserId);
           console.log('✅ Workflow booking_updated déclenché');
         } catch (workflowError) {
           console.error('❌ Erreur workflow booking_updated:', workflowError);
         }
         
         // Workflow: Lien de paiement créé (si nouveau payment_link)
-        if (data.payment_link && (!oldBooking || oldBooking.payment_link !== data.payment_link)) {
+        if (bookingWithTransactions.payment_link && (!oldBooking || oldBooking.payment_link !== bookingWithTransactions.payment_link)) {
           console.log('🔥 Trigger: payment_link_created (nouveau lien)');
-          console.log('🔥 Payment link:', data.payment_link);
+          console.log('🔥 Payment link:', bookingWithTransactions.payment_link);
           try {
-            await triggerWorkflow('payment_link_created', data, targetUserId);
+            await triggerWorkflow('payment_link_created', bookingWithTransactions, targetUserId);
             console.log('✅ Workflow payment_link_created déclenché');
           } catch (workflowError) {
             console.error('❌ Erreur workflow payment_link_created:', workflowError);
@@ -330,11 +344,11 @@ export function useBookings() {
         }
         
         // Workflow: Statut de réservation changé
-        if (oldBooking && oldBooking.booking_status !== data.booking_status) {
+        if (oldBooking && oldBooking.booking_status !== bookingWithTransactions.booking_status) {
           console.log('🔥 Trigger: booking_status_changed');
-          console.log('🔥 Ancien statut:', oldBooking.booking_status, '→ Nouveau:', data.booking_status);
+          console.log('🔥 Ancien statut:', oldBooking.booking_status, '→ Nouveau:', bookingWithTransactions.booking_status);
           try {
-            await triggerWorkflow('booking_status_changed', data, targetUserId);
+            await triggerWorkflow('booking_status_changed', bookingWithTransactions, targetUserId);
             console.log('✅ Workflow booking_status_changed déclenché');
           } catch (workflowError) {
             console.error('❌ Erreur workflow booking_status_changed:', workflowError);
@@ -345,12 +359,12 @@ export function useBookings() {
         
         // Google Calendar
         try {
-          await GoogleCalendarService.updateEvent(data, targetUserId);
+          await GoogleCalendarService.updateEvent(bookingWithTransactions, targetUserId);
         } catch (calendarError) {
           console.warn('⚠️ Erreur synchronisation Google Calendar:', calendarError);
         }
         
-        return data;
+        return bookingWithTransactions;
       }
     } catch (err) {
       console.error('❌ updateBooking - Erreur globale:', err);
