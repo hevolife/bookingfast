@@ -175,7 +175,7 @@ export function BookingModal({
 
   const handleGeneratePaymentLink = async (amount: number) => {
     console.log('🔥 ========================================');
-    console.log('🔥 GÉNÉRATION LIEN DE PAIEMENT (NOUVELLE VERSION)');
+    console.log('🔥 GÉNÉRATION LIEN DE PAIEMENT');
     console.log('🔥 ========================================');
     console.log('💳 Montant:', amount);
     console.log('💳 Client:', selectedClient?.email);
@@ -205,12 +205,13 @@ export function BookingModal({
       console.log('✅ Lien créé avec succès:', paymentLink);
       console.log('🔗 URL:', paymentLink.payment_url);
 
-      // Ajouter une transaction "pending" avec le lien
+      // 🔥 AJOUTER UNE TRANSACTION "PENDING" AVEC payment_link_id
       const pendingTransaction = {
         amount: amount,
         method: 'stripe' as const,
-        note: `Lien de paiement généré (expire dans ${expiryMinutes}min) - En attente - Lien: ${paymentLink.payment_url}`,
-        status: 'pending' as const
+        note: `Lien de paiement généré (expire dans ${expiryMinutes}min) - En attente`,
+        status: 'pending' as const,
+        payment_link_id: paymentLink.id // 🔥 CRITIQUE : Lier la transaction au payment_link
       };
       
       const newTransaction: Transaction = {
@@ -221,7 +222,7 @@ export function BookingModal({
       
       setTransactions(prev => [...prev, newTransaction]);
       
-      console.log('💾 Transaction ajoutée:', newTransaction);
+      console.log('💾 Transaction ajoutée avec payment_link_id:', newTransaction);
       
       // Déclencher le workflow payment_link_created
       if (user?.id) {
@@ -320,22 +321,6 @@ export function BookingModal({
         serviceDuration = selectedService!.duration_minutes;
       }
       
-      // Chercher le lien de paiement dans les transactions
-      const paymentLinkTransaction = transactions.find(t => 
-        t.method === 'stripe' && 
-        t.status === 'pending' && 
-        t.note.includes('Lien:')
-      );
-      
-      let paymentLink: string | null = null;
-      if (paymentLinkTransaction) {
-        const linkMatch = paymentLinkTransaction.note.match(/Lien: (https?:\/\/[^\s)]+)/);
-        if (linkMatch) {
-          paymentLink = linkMatch[1];
-          console.log('🔗 Lien de paiement trouvé dans les transactions:', paymentLink);
-        }
-      }
-      
       const bookingData = {
         service_id: serviceId,
         date,
@@ -353,7 +338,6 @@ export function BookingModal({
         booking_status: bookingStatus,
         assigned_user_id: assignedUserId,
         notes: notes.trim() || null,
-        payment_link: paymentLink,
         custom_service_data: isCustomService ? {
           name: customServiceData.name,
           price: customServiceData.price,
@@ -361,10 +345,7 @@ export function BookingModal({
         } : null
       };
 
-      console.log('💾 Données de réservation à sauvegarder:', {
-        ...bookingData,
-        has_payment_link: !!paymentLink
-      });
+      console.log('💾 Données de réservation à sauvegarder:', bookingData);
 
       if (editingBooking) {
         const updatedBooking = await updateBooking(editingBooking.id, bookingData);

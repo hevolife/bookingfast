@@ -1,8 +1,45 @@
-export interface User {
+export interface Transaction {
   id: string;
-  email: string;
-  full_name?: string;
+  amount: number;
+  method: 'cash' | 'card' | 'check' | 'transfer' | 'stripe' | 'other';
+  note?: string;
+  status?: 'pending' | 'completed' | 'cancelled';
+  date?: string;
   created_at?: string;
+  stripe_session_id?: string;
+  payment_link_id?: string; // 🔥 AJOUT : Lien vers payment_links
+}
+
+export interface Booking {
+  id: string;
+  user_id: string;
+  service_id: string;
+  service?: Service;
+  date: string;
+  time: string;
+  duration_minutes: number;
+  quantity: number;
+  client_name: string;
+  client_firstname: string;
+  client_email: string;
+  client_phone: string;
+  total_amount: number;
+  payment_status: 'pending' | 'partial' | 'paid' | 'completed';
+  payment_amount?: number;
+  deposit_amount?: number;
+  transactions?: Transaction[];
+  created_at: string;
+  booking_status?: 'pending' | 'confirmed' | 'cancelled';
+  assigned_user_id?: string | null;
+  notes?: string | null;
+  google_calendar_event_id?: string | null;
+  stripe_session_id?: string | null;
+  payment_link?: string | null;
+  custom_service_data?: {
+    name: string;
+    price: number;
+    duration: number;
+  } | null;
 }
 
 export interface Service {
@@ -10,135 +47,81 @@ export interface Service {
   user_id: string;
   name: string;
   description: string;
-  duration_minutes: number;
   price_ht: number;
   price_ttc: number;
-  capacity: number;
-  image_url?: string;
-  created_at?: string;
-  unit_name?: string;
-}
-
-export interface Booking {
-  id: string;
-  user_id: string;
-  service_id: string;
-  date: string;
-  time: string;
   duration_minutes: number;
-  client_name: string;
-  client_firstname?: string;
-  client_email: string;
-  client_phone?: string;
-  total_amount: number;
-  payment_status: 'pending' | 'partial' | 'completed' | 'paid' | 'failed' | 'refunded';
-  payment_amount: number;
-  booking_status: 'pending' | 'confirmed' | 'cancelled' | 'completed';
-  notes?: string;
+  capacity: number;
+  unit_name?: string;
   created_at: string;
-  quantity?: number;
-  assigned_user_id?: string;
-  deposit_amount?: number;
-  transactions?: Transaction[];
-}
-
-export interface Transaction {
-  id: string;
-  amount: number;
-  method: 'stripe' | 'cash' | 'card' | 'check' | 'transfer';
-  status: 'pending' | 'completed' | 'failed' | 'refunded';
-  date: string;
-  notes?: string;
-  stripe_session_id?: string;
-  payment_link_id?: string;
-}
-
-export interface PaymentLink {
-  id: string;
-  booking_id: string;
-  user_id: string;
-  amount: number;
-  status: 'pending' | 'completed' | 'expired' | 'cancelled';
-  expires_at: string;
-  payment_url?: string;
-  stripe_session_id?: string;
-  paid_at?: string;
-  created_at: string;
-  updated_at: string;
 }
 
 export interface Client {
   id: string;
-  user_id: string;
+  user_id?: string;
   firstname: string;
   lastname: string;
   email: string;
-  phone?: string;
-  notes?: string;
+  phone: string;
+  created_at?: string;
+}
+
+export interface User {
+  id: string;
+  email: string;
+  subscription_tier: 'starter' | 'pro';
+  subscription_status: 'active' | 'cancelled' | 'trialing';
+  trial_ends_at: string | null;
+  stripe_customer_id: string | null;
+  stripe_subscription_id: string | null;
+  current_period_end: string | null;
+  cancel_at_period_end: boolean;
   created_at: string;
-  total_bookings?: number;
-  total_spent?: number;
-  last_booking_date?: string;
-}
-
-export interface TimeRange {
-  start: string;
-  end: string;
-}
-
-export interface DaySchedule {
-  ranges: TimeRange[];
-  closed: boolean;
-}
-
-export interface OpeningHours {
-  monday: DaySchedule;
-  tuesday: DaySchedule;
-  wednesday: DaySchedule;
-  thursday: DaySchedule;
-  friday: DaySchedule;
-  saturday: DaySchedule;
-  sunday: DaySchedule;
+  updated_at: string;
 }
 
 export interface BusinessSettings {
   id: string;
   user_id: string;
   business_name: string;
-  primary_color: string;
-  secondary_color: string;
-  opening_hours: OpeningHours;
-  buffer_minutes: number;
-  default_deposit_percentage: number;
-  minimum_booking_delay_hours: number;
+  business_address: string;
+  business_phone: string;
+  business_email: string;
+  business_siret: string;
+  business_logo_url: string | null;
+  stripe_account_id: string | null;
+  stripe_onboarding_complete: boolean;
   payment_link_expiry_minutes: number;
-  deposit_type: 'percentage' | 'fixed_amount';
-  deposit_fixed_amount: number;
-  email_notifications: boolean;
-  brevo_enabled: boolean;
-  brevo_api_key: string;
-  brevo_sender_email: string;
-  brevo_sender_name: string;
-  stripe_enabled: boolean;
-  stripe_public_key: string;
-  stripe_secret_key: string;
-  stripe_webhook_secret: string;
-  timezone: string;
-  multiply_deposit_by_services?: boolean;
-  iframe_services?: string[];
-  iframe_enable_team_selection?: boolean;
-  enable_user_assignment?: boolean;
+  created_at: string;
+  updated_at: string;
 }
 
-export interface Unavailability {
+export interface Plugin {
+  id: string;
+  name: string;
+  slug: string;
+  description: string;
+  icon: string;
+  price_monthly: number;
+  price_yearly: number;
+  features: string[];
+  is_active: boolean;
+  created_at: string;
+}
+
+export interface UserPlugin {
   id: string;
   user_id: string;
-  date: string;
-  start_time: string;
-  end_time: string;
-  reason?: string;
-  created_at?: string;
-  assigned_user_id?: string;
+  plugin_id: string;
+  plugin_slug: string;
+  status: 'active' | 'cancelled' | 'trialing';
+  is_trial: boolean;
+  trial_ends_at: string | null;
+  stripe_subscription_id: string | null;
+  stripe_customer_id: string | null;
+  current_period_start: string | null;
+  current_period_end: string | null;
+  created_at: string;
+  updated_at: string;
 }
 
 export interface TeamMember {
@@ -147,19 +130,36 @@ export interface TeamMember {
   user_id: string;
   email: string;
   role_name: string;
-  firstname?: string;
-  lastname?: string;
-  full_name?: string;
   is_active: boolean;
+  restricted_visibility: boolean;
   created_at: string;
+  updated_at: string;
 }
 
-export interface TeamInvitation {
+export interface PaymentLink {
   id: string;
-  owner_id: string;
-  email: string;
-  role_name: string;
-  status: 'pending' | 'accepted' | 'expired';
+  user_id: string;
+  booking_id: string;
+  amount: number;
+  status: 'pending' | 'completed' | 'expired' | 'cancelled';
+  payment_url: string | null;
   expires_at: string;
+  paid_at: string | null;
+  stripe_session_id: string | null;
   created_at: string;
+  updated_at: string;
+}
+
+export interface EmailWorkflow {
+  id: string;
+  user_id: string;
+  name: string;
+  trigger_event: 'booking_created' | 'booking_updated' | 'booking_cancelled' | 'booking_status_changed' | 'payment_link_created' | 'payment_received';
+  is_active: boolean;
+  send_to_client: boolean;
+  send_to_owner: boolean;
+  email_subject: string;
+  email_body: string;
+  created_at: string;
+  updated_at: string;
 }

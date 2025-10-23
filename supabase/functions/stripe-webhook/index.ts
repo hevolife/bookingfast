@@ -192,36 +192,62 @@ Deno.serve(async (req) => {
           id: booking.id,
           total_amount: booking.total_amount,
           payment_amount: booking.payment_amount,
-          payment_status: booking.payment_status
+          payment_status: booking.payment_status,
+          transactions: booking.transactions
         })
 
-        // 2️⃣ Ajouter la transaction
+        // 2️⃣ 🔥 MISE À JOUR DE LA TRANSACTION EXISTANTE AU LIEU D'EN CRÉER UNE NOUVELLE
         const transactions = booking.transactions || []
-        const newTransaction = {
-          id: crypto.randomUUID(),
-          amount: amount,
-          method: 'stripe',
-          status: 'completed',
-          date: new Date().toISOString(),
-          stripe_session_id: sessionId,
-          payment_link_id: paymentLinkId
-        }
-        transactions.push(newTransaction)
+        
+        // Chercher la transaction "pending" liée à ce payment_link_id
+        const pendingTransactionIndex = transactions.findIndex((t: any) => 
+          t.status === 'pending' && 
+          (t.payment_link_id === paymentLinkId || t.note?.includes(paymentLinkId))
+        )
 
-        console.log('💰 Nouvelle transaction:', newTransaction)
+        if (pendingTransactionIndex !== -1) {
+          console.log('🔄 MISE À JOUR transaction existante:', transactions[pendingTransactionIndex].id)
+          
+          // Mettre à jour la transaction existante
+          transactions[pendingTransactionIndex] = {
+            ...transactions[pendingTransactionIndex],
+            status: 'completed',
+            stripe_session_id: sessionId,
+            payment_link_id: paymentLinkId,
+            note: `Paiement complété via lien de paiement - ${new Date().toLocaleString('fr-FR')}`
+          }
+        } else {
+          console.log('⚠️ Aucune transaction pending trouvée, création nouvelle transaction')
+          
+          // Si aucune transaction pending n'est trouvée, en créer une nouvelle
+          const newTransaction = {
+            id: crypto.randomUUID(),
+            amount: amount,
+            method: 'stripe',
+            status: 'completed',
+            date: new Date().toISOString(),
+            stripe_session_id: sessionId,
+            payment_link_id: paymentLinkId,
+            note: `Paiement complété via lien de paiement - ${new Date().toLocaleString('fr-FR')}`
+          }
+          transactions.push(newTransaction)
+        }
+
+        console.log('💰 Transactions après mise à jour:', transactions)
 
         // 3️⃣ Calculer le nouveau montant payé
-        const newPaymentAmount = (booking.payment_amount || 0) + amount
+        const newPaymentAmount = transactions
+          .filter((t: any) => t.status === 'completed')
+          .reduce((sum: number, t: any) => sum + t.amount, 0)
 
         console.log('💵 Calcul paiement:', {
           ancien: booking.payment_amount || 0,
-          ajout: amount,
           nouveau: newPaymentAmount,
           total: booking.total_amount
         })
 
         // 4️⃣ Déterminer le statut de paiement
-        let paymentStatus = 'partial'
+        let paymentStatus = 'pending'
         if (newPaymentAmount >= booking.total_amount) {
           paymentStatus = 'completed'
           console.log('✅ Paiement COMPLET')
@@ -236,7 +262,6 @@ Deno.serve(async (req) => {
           transactions: transactions,
           payment_amount: newPaymentAmount,
           payment_status: paymentStatus,
-          deposit_amount: amount,
           updated_at: new Date().toISOString()
         }
 
@@ -248,27 +273,18 @@ Deno.serve(async (req) => {
           updateData
         )
 
-        // 6️⃣ 🔥 MARQUER LE LIEN COMME REMPLACÉ (CORRECTION)
-        console.log('🔄 Marquage lien comme remplacé...')
-        console.log('🔍 Payment Link ID:', paymentLinkId)
-        console.log('🔍 Transaction ID:', newTransaction.id)
+        // 6️⃣ Marquer le lien comme complété
+        console.log('🔄 Marquage lien comme complété...')
         
-        try {
-          const updateResult = await supabaseRequest(
-            `payment_links?id=eq.${paymentLinkId}`,
-            'PATCH',
-            {
-              status: 'completed',
-              stripe_session_id: sessionId,
-              paid_at: new Date().toISOString(),
-              replaced_by_transaction_id: newTransaction.id // 🔥 CRITIQUE
-            }
-          )
-          console.log('✅ Lien marqué comme remplacé:', updateResult)
-        } catch (updateError) {
-          console.error('❌ ERREUR mise à jour payment_link:', updateError)
-          // Ne pas bloquer le processus si cette mise à jour échoue
-        }
+        await supabaseRequest(
+          `payment_links?id=eq.${paymentLinkId}`,
+          'PATCH',
+          {
+            status: 'completed',
+            stripe_session_id: sessionId,
+            paid_at: new Date().toISOString()
+          }
+        )
 
         console.log('✅ PAIEMENT VIA LIEN TRAITÉ AVEC SUCCÈS')
 
@@ -279,7 +295,7 @@ Deno.serve(async (req) => {
           amount: amount,
           newPaymentAmount: newPaymentAmount,
           paymentStatus: paymentStatus,
-          transactionId: newTransaction.id,
+          transactionUpdated: pendingTransactionIndex !== -1,
           paymentLinkId: paymentLinkId
         }
         
