@@ -803,6 +803,20 @@ export function IframeBookingPage() {
   const depositAmount = calculateDepositAmount();
   const isStripeEnabled = data?.settings?.stripe_enabled;
 
+  // 🔥 FIX CRITIQUE - Calculer le montant payé et le solde restant
+  const getPaidAmount = () => {
+    if (!confirmedBooking) return 0;
+    // 🎯 CORRECTION: Lire deposit_amount au lieu de payment_amount
+    return confirmedBooking.deposit_amount || 0;
+  };
+
+  const getRemainingBalance = () => {
+    if (!confirmedBooking || !selectedService) return 0;
+    const totalAmount = selectedService.price_ttc * quantity;
+    const paidAmount = getPaidAmount();
+    return totalAmount - paidAmount;
+  };
+
   if (loading) {
     return (
       <div className="min-h-screen bg-white flex items-center justify-center p-4">
@@ -1452,12 +1466,12 @@ export function IframeBookingPage() {
                       <div className="space-y-1">
                         <div className="flex justify-between items-center">
                           <span className="text-gray-600">Acompte payé</span>
-                          <span className="font-bold text-green-600">{depositAmount.toFixed(2)}€</span>
+                          <span className="font-bold text-green-600">{getPaidAmount().toFixed(2)}€</span>
                         </div>
                         <div className="flex justify-between items-center">
                           <span className="text-gray-600">Solde à régler sur place</span>
                           <span className="font-bold text-gray-900">
-                            {((selectedService?.price_ttc || 0) * quantity - depositAmount).toFixed(2)}€
+                            {getRemainingBalance().toFixed(2)}€
                           </span>
                         </div>
                         <div className="pt-2 mt-2 border-t border-green-200">
