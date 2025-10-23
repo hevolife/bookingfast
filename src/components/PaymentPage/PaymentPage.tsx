@@ -153,8 +153,9 @@ export function PaymentPage() {
 
       const supabaseUrl = import.meta.env.VITE_SUPABASE_URL?.replace(/\/$/, '');
       
+      // 🔥 MÉTADONNÉES AVEC payment_type = 'payment_link'
       const metadata = {
-        payment_type: 'payment_link',
+        payment_type: 'payment_link', // ✅ TYPE CRITIQUE
         payment_link_id: paymentLinkData.id,
         booking_id: bookingData.id,
         user_id: paymentLinkData.user_id,
@@ -164,6 +165,8 @@ export function PaymentPage() {
         date: bookingData.date,
         time: bookingData.time
       };
+
+      console.log('📦 Métadonnées envoyées:', metadata);
 
       const response = await fetch(`${supabaseUrl}/functions/v1/stripe-checkout`, {
         method: 'POST',
@@ -178,18 +181,20 @@ export function PaymentPage() {
           service_name: bookingData.services?.name || 'Paiement',
           success_url: `${window.location.origin}/payment-success?link_id=${paymentLinkData.id}`,
           cancel_url: `${window.location.origin}/payment-cancel?link_id=${paymentLinkData.id}`,
-          metadata
+          metadata // ✅ MÉTADONNÉES AVEC payment_type
         })
       });
 
       if (!response.ok) {
         const errorData = await response.json();
+        console.error('❌ Erreur Stripe:', errorData);
         throw new Error(errorData.error || 'Erreur création session');
       }
 
       const { url } = await response.json();
       
       if (url) {
+        console.log('✅ Redirection vers Stripe:', url);
         window.location.href = url;
       } else {
         throw new Error('URL de paiement manquante');
