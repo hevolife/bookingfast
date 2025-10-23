@@ -134,18 +134,18 @@ export function BookingDetailsModal({ booking, onClose, onUpdate }: BookingDetai
     }
   };
 
-  // 🔥 FILTRER les liens remplacés
-  const activePaymentLinks = paymentLinks.filter(link => !link.replaced_by_transaction_id);
+  // 🔥 FILTRER : Masquer les liens "pending" et "expired" de l'historique
+  const activePaymentLinks = paymentLinks.filter(link => 
+    link.status === 'pending' || link.status === 'expired'
+  );
 
-  // 🔥 FILTRER les transactions pour exclure celles qui ont remplacé un lien
-  const displayTransactions = (booking.transactions || []).filter(transaction => {
-    // Si la transaction a un payment_link_id, vérifier qu'elle n'est pas marquée comme remplacée
-    if (transaction.payment_link_id) {
-      const link = paymentLinks.find(l => l.id === transaction.payment_link_id);
-      return !link?.replaced_by_transaction_id;
-    }
-    return true;
-  });
+  // 🔥 FILTRER : Garder uniquement les transactions "completed" ou "paid"
+  const displayTransactions = (booking.transactions || []).filter(transaction => 
+    transaction.status === 'completed' || transaction.status === 'paid'
+  );
+
+  console.log('🔍 [MODAL] Liens actifs (pending/expired):', activePaymentLinks.length);
+  console.log('🔍 [MODAL] Transactions affichées (completed/paid):', displayTransactions.length);
 
   return (
     <>
@@ -309,12 +309,12 @@ export function BookingDetailsModal({ booking, onClose, onUpdate }: BookingDetai
               )}
             </div>
 
-            {/* Liens de paiement actifs */}
+            {/* Liens de paiement actifs (pending/expired uniquement) */}
             {activePaymentLinks.length > 0 && (
               <div className="bg-gradient-to-br from-purple-50 to-pink-50 rounded-2xl p-6 border-2 border-purple-200">
                 <h3 className="text-lg font-bold text-gray-900 mb-4 flex items-center gap-2">
                   <LinkIcon className="w-5 h-5 text-purple-600" />
-                  Liens de paiement ({activePaymentLinks.length})
+                  Liens de paiement en attente ({activePaymentLinks.length})
                 </h3>
                 <div className="space-y-3">
                   {activePaymentLinks.map((link) => (
@@ -359,8 +359,8 @@ export function BookingDetailsModal({ booking, onClose, onUpdate }: BookingDetai
                         {link.status === 'pending' && link.expires_at && (
                           <>Expire le {format(new Date(link.expires_at), 'dd/MM/yyyy à HH:mm', { locale: fr })}</>
                         )}
-                        {link.status === 'completed' && link.paid_at && (
-                          <>Payé le {format(new Date(link.paid_at), 'dd/MM/yyyy à HH:mm', { locale: fr })}</>
+                        {link.status === 'expired' && link.expires_at && (
+                          <>Expiré le {format(new Date(link.expires_at), 'dd/MM/yyyy à HH:mm', { locale: fr })}</>
                         )}
                       </p>
                     </div>
@@ -369,7 +369,7 @@ export function BookingDetailsModal({ booking, onClose, onUpdate }: BookingDetai
               </div>
             )}
 
-            {/* Historique des paiements */}
+            {/* Historique des paiements (completed/paid uniquement) */}
             {displayTransactions.length > 0 && (
               <div className="bg-gradient-to-br from-indigo-50 to-blue-50 rounded-2xl p-6 border-2 border-indigo-200">
                 <h3 className="text-lg font-bold text-gray-900 mb-4 flex items-center gap-2">

@@ -248,18 +248,27 @@ Deno.serve(async (req) => {
           updateData
         )
 
-        // 6️⃣ 🔥 MARQUER LE LIEN COMME REMPLACÉ
+        // 6️⃣ 🔥 MARQUER LE LIEN COMME REMPLACÉ (CORRECTION)
         console.log('🔄 Marquage lien comme remplacé...')
-        await supabaseRequest(
-          `payment_links?id=eq.${paymentLinkId}`,
-          'PATCH',
-          {
-            status: 'completed',
-            stripe_session_id: sessionId,
-            paid_at: new Date().toISOString(),
-            replaced_by_transaction_id: newTransaction.id // 🔥 NOUVEAU
-          }
-        )
+        console.log('🔍 Payment Link ID:', paymentLinkId)
+        console.log('🔍 Transaction ID:', newTransaction.id)
+        
+        try {
+          const updateResult = await supabaseRequest(
+            `payment_links?id=eq.${paymentLinkId}`,
+            'PATCH',
+            {
+              status: 'completed',
+              stripe_session_id: sessionId,
+              paid_at: new Date().toISOString(),
+              replaced_by_transaction_id: newTransaction.id // 🔥 CRITIQUE
+            }
+          )
+          console.log('✅ Lien marqué comme remplacé:', updateResult)
+        } catch (updateError) {
+          console.error('❌ ERREUR mise à jour payment_link:', updateError)
+          // Ne pas bloquer le processus si cette mise à jour échoue
+        }
 
         console.log('✅ PAIEMENT VIA LIEN TRAITÉ AVEC SUCCÈS')
 
@@ -269,7 +278,9 @@ Deno.serve(async (req) => {
           bookingId: bookingId,
           amount: amount,
           newPaymentAmount: newPaymentAmount,
-          paymentStatus: paymentStatus
+          paymentStatus: paymentStatus,
+          transactionId: newTransaction.id,
+          paymentLinkId: paymentLinkId
         }
         
         processedSessions.set(sessionId, { timestamp: Date.now(), result })

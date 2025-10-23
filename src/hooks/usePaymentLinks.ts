@@ -51,6 +51,9 @@ export function usePaymentLinks(bookingId?: string) {
 
       if (fetchError) throw fetchError;
 
+      console.log('🔍 [DEBUG] Payment links récupérés:', data);
+      console.log('🔍 [DEBUG] Liens avec replaced_by:', data?.filter(l => l.replaced_by_transaction_id));
+
       setPaymentLinks(data || []);
     } catch (err) {
       console.error('❌ Erreur chargement liens de paiement:', err);
