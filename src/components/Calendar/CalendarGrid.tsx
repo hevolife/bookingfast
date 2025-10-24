@@ -165,8 +165,11 @@ export function CalendarGrid({
 
   useEffect(() => {
     const handleBookingChange = () => {
+      console.log('📅 CalendarGrid - Événement booking détecté, centrage de la date...');
       setRefreshTrigger(prev => prev + 1);
+      
       setTimeout(() => {
+        scrollToSelectedDate();
         window.dispatchEvent(new CustomEvent('refreshBookings'));
       }, 100);
     };
@@ -180,7 +183,28 @@ export function CalendarGrid({
       bookingEvents.off('bookingUpdated', handleBookingChange);
       bookingEvents.off('bookingDeleted', handleBookingChange);
     };
-  }, []);
+  }, [selectedDate, days]);
+
+  // 🔥 NOUVEAU: Détecteur d'animation fadeIn pour centrer automatiquement
+  useEffect(() => {
+    if (!scrollContainerRef.current) return;
+
+    const handleAnimationStart = (e: AnimationEvent) => {
+      if (e.animationName.includes('fadeIn')) {
+        console.log('🎬 CalendarGrid - Animation fadeIn détectée, centrage automatique...');
+        setTimeout(() => {
+          scrollToSelectedDate();
+        }, 50);
+      }
+    };
+
+    const container = scrollContainerRef.current;
+    container.addEventListener('animationstart', handleAnimationStart as EventListener);
+
+    return () => {
+      container.removeEventListener('animationstart', handleAnimationStart as EventListener);
+    };
+  }, [selectedDate, days]);
 
   const navigateMonth = (direction: 'prev' | 'next') => {
     const newViewMonth = new Date(viewMonth);
@@ -332,9 +356,12 @@ export function CalendarGrid({
   };
 
   const scrollToSelectedDate = () => {
+    console.log('🎯 scrollToSelectedDate - Début centrage');
     if (scrollContainerRef.current) {
       const container = scrollContainerRef.current;
       const selectedIndex = days.findIndex(day => isSelected(day.date));
+      
+      console.log('🔍 scrollToSelectedDate - Index sélectionné:', selectedIndex);
       
       if (selectedIndex !== -1) {
         const firstDateElement = container.querySelector('button');
@@ -350,10 +377,21 @@ export function CalendarGrid({
           const containerWidth = container.clientWidth;
           const scrollPosition = itemPosition - (containerWidth / 2) + (dateWidth / 2);
           
+          console.log('📐 scrollToSelectedDate - Calculs:', {
+            dateWidth,
+            gap,
+            totalItemWidth,
+            itemPosition,
+            containerWidth,
+            scrollPosition: Math.max(0, scrollPosition)
+          });
+          
           container.scrollTo({
             left: Math.max(0, scrollPosition),
             behavior: 'smooth'
           });
+          
+          console.log('✅ scrollToSelectedDate - Centrage effectué');
         }
       }
     }
