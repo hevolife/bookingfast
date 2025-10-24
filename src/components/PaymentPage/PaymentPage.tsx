@@ -7,6 +7,10 @@ export function PaymentPage() {
   const [searchParams] = useSearchParams();
   const linkId = searchParams.get('link_id');
 
+  console.log('🔍 [PaymentPage] URL complète:', window.location.href);
+  console.log('🔍 [PaymentPage] searchParams:', searchParams.toString());
+  console.log('🔍 [PaymentPage] link_id extrait:', linkId);
+
   const [timeLeft, setTimeLeft] = useState<number>(0);
   const [isExpired, setIsExpired] = useState(false);
   const [processing, setProcessing] = useState(false);
@@ -19,14 +23,19 @@ export function PaymentPage() {
   // Charger les données du lien de paiement
   useEffect(() => {
     const loadPaymentLink = async () => {
+      console.log('🔵 [loadPaymentLink] Début du chargement');
+      console.log('🔵 [loadPaymentLink] linkId reçu:', linkId);
+      
       if (!linkId) {
         console.error('❌ Aucun link_id fourni');
+        console.error('❌ URL actuelle:', window.location.href);
+        console.error('❌ searchParams:', searchParams.toString());
         setError('Aucun identifiant de lien fourni');
         setCheckingStatus(false);
         return;
       }
 
-      if (!isSupabaseConfigured) {
+      if (!isSupabaseConfigured()) {
         console.error('❌ Supabase non configuré');
         setError('Configuration manquante');
         setCheckingStatus(false);
@@ -113,7 +122,7 @@ export function PaymentPage() {
     };
 
     loadPaymentLink();
-  }, [linkId]);
+  }, [linkId, searchParams]);
 
   // Timer d'expiration
   useEffect(() => {
@@ -141,6 +150,13 @@ export function PaymentPage() {
     const minutes = Math.floor(ms / 60000);
     const seconds = Math.floor((ms % 60000) / 1000);
     return `${minutes.toString().padStart(2, '0')}:${seconds.toString().padStart(2, '0')}`;
+  };
+
+  // 🔥 FONCTION POUR FORMATER L'HEURE (HH:mm au lieu de HH:mm:ss)
+  const formatTime = (timeString: string) => {
+    if (!timeString) return '';
+    // Si le format est "HH:mm:ss", on prend seulement "HH:mm"
+    return timeString.substring(0, 5);
   };
 
   const handlePayment = async () => {
@@ -219,6 +235,10 @@ export function PaymentPage() {
           </div>
           <h1 className="text-2xl font-bold text-gray-900 mb-4">Vérification...</h1>
           <p className="text-gray-600">Vérification du lien de paiement</p>
+          <div className="mt-4 text-xs text-gray-400">
+            <div>URL: {window.location.href}</div>
+            <div>link_id: {linkId || 'NON TROUVÉ'}</div>
+          </div>
         </div>
       </div>
     );
@@ -236,9 +256,18 @@ export function PaymentPage() {
           <p className="text-gray-600 text-lg mb-6">{error}</p>
           <div className="bg-red-50 rounded-xl p-4 border border-red-200 text-left">
             <p className="text-sm text-red-800">
+              <strong>Informations de débogage :</strong>
+            </p>
+            <ul className="text-sm text-red-700 mt-2 space-y-1">
+              <li><strong>URL:</strong> {window.location.href}</li>
+              <li><strong>link_id:</strong> {linkId || 'NON TROUVÉ'}</li>
+              <li><strong>searchParams:</strong> {searchParams.toString() || 'VIDE'}</li>
+            </ul>
+            <p className="text-sm text-red-800 mt-3">
               <strong>Causes possibles :</strong>
             </p>
             <ul className="text-sm text-red-700 mt-2 space-y-1 list-disc list-inside">
+              <li>Le paramètre link_id est manquant dans l'URL</li>
               <li>La table payment_links n'existe pas encore</li>
               <li>Les politiques RLS ne sont pas configurées</li>
               <li>Le lien n'a pas été créé correctement</li>
@@ -382,7 +411,7 @@ export function PaymentPage() {
                     month: 'long'
                   })}
                 </div>
-                <div className="text-sm text-gray-600">{bookingData.time}</div>
+                <div className="text-sm text-gray-600">{formatTime(bookingData.time)}</div>
               </div>
             </div>
 

@@ -114,7 +114,6 @@ export function BookingModal({
       setDate(editingBooking.date);
       setTime(editingBooking.time);
       
-      // 🔥 CORRECTION: S'assurer que les transactions sont bien chargées
       const bookingTransactions = editingBooking.transactions || [];
       console.log('📋 BookingModal - Transactions chargées:', bookingTransactions);
       setTransactions(bookingTransactions);
@@ -224,7 +223,7 @@ export function BookingModal({
       }
 
       console.log('✅ Lien créé avec succès:', paymentLink);
-      console.log('🔗 URL:', paymentLink.payment_url);
+      console.log('🔗 URL FINALE À UTILISER:', paymentLink.payment_url);
 
       // 🔥 AJOUTER UNE TRANSACTION "PENDING" AVEC payment_link_id
       const pendingTransaction = {
@@ -232,7 +231,7 @@ export function BookingModal({
         method: 'stripe' as const,
         note: `Lien de paiement généré (expire dans ${expiryMinutes}min) - En attente`,
         status: 'pending' as const,
-        payment_link_id: paymentLink.id // 🔥 CRITIQUE : Lier la transaction au payment_link
+        payment_link_id: paymentLink.id
       };
       
       const newTransaction: Transaction = {
@@ -251,7 +250,7 @@ export function BookingModal({
         
         const bookingWithPaymentLink = {
           ...editingBooking,
-          payment_link: paymentLink.payment_url,
+          payment_link: paymentLink.payment_url, // 🔥 UTILISER L'URL RETOURNÉE PAR createPaymentLink
           transactions: [...(editingBooking.transactions || []), newTransaction]
         };
         
@@ -263,10 +262,15 @@ export function BookingModal({
         }
       }
       
-      // Copier dans le presse-papiers
+      // 🔥 COPIER ET OUVRIR LE LIEN RETOURNÉ PAR createPaymentLink
       try {
         await navigator.clipboard.writeText(paymentLink.payment_url);
-        console.log('✅ Lien copié dans le presse-papiers');
+        console.log('✅ Lien copié dans le presse-papiers:', paymentLink.payment_url);
+        
+        // 🔥 OUVRIR LE BON LIEN
+        window.open(paymentLink.payment_url, '_blank');
+        console.log('✅ Lien ouvert dans nouvel onglet:', paymentLink.payment_url);
+        
         alert('✅ Lien de paiement créé et copié dans le presse-papiers !');
       } catch (clipboardError) {
         console.warn('⚠️ Impossible de copier automatiquement:', clipboardError);

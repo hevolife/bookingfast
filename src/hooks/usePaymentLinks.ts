@@ -1,184 +1,86 @@
-import { useState, useEffect, useCallback } from 'react';
-import { supabase, isSupabaseConfigured } from '../lib/supabase';
-import { PaymentLink } from '../types';
-import { useAuth } from '../contexts/AuthContext';
+import { useState } from 'react';
+import { supabase } from '../lib/supabase';
 
-export function usePaymentLinks(bookingId?: string) {
-  const { user } = useAuth();
-  const [paymentLinks, setPaymentLinks] = useState<PaymentLink[]>([]);
+export interface PaymentLink {
+  id: string;
+  booking_id: string;
+  user_id: string;
+  amount: number;
+  status: 'pending' | 'completed' | 'expired' | 'cancelled';
+  expires_at: string;
+  payment_url: string;
+  created_at: string;
+}
+
+export function usePaymentLinks() {
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
 
-  const fetchPaymentLinks = useCallback(async () => {
-    if (!user || !isSupabaseConfigured) {
-      setPaymentLinks([]);
-      return;
-    }
+  const createPaymentLink = async (
+    bookingId: string,
+    amount: number,
+    expiryMinutes: number = 30
+  ): Promise<PaymentLink | null> => {
+    console.log('🔵 [usePaymentLinks] createPaymentLink appelé');
+    console.log('📋 Booking ID:', bookingId);
+    console.log('💰 Montant:', amount);
+    console.log('⏰ Expiration:', expiryMinutes, 'minutes');
 
     setLoading(true);
     setError(null);
 
     try {
-      let targetUserId = user.id;
-
-      // Vérifier si l'utilisateur est membre d'une équipe
-      try {
-        const { data: membershipData } = await supabase!
-          .from('team_members')
-          .select('owner_id')
-          .eq('user_id', user.id)
-          .eq('is_active', true)
-          .maybeSingle();
-
-        if (membershipData?.owner_id) {
-          targetUserId = membershipData.owner_id;
-        }
-      } catch (teamError) {
-        console.warn('⚠️ Erreur vérification équipe:', teamError);
+      if (!supabase) {
+        throw new Error('Supabase non configuré');
       }
 
-      let query = supabase!
+      // Calculer la date d'expiration
+      const expiresAt = new Date();
+      expiresAt.setMinutes(expiresAt.getMinutes() + expiryMinutes);
+
+      console.log('📅 Date d\'expiration:', expiresAt.toISOString());
+
+      // Récupérer l'utilisateur connecté
+      const { data: { user } } = await supabase.auth.getUser();
+      
+      if (!user) {
+        throw new Error('Utilisateur non connecté');
+      }
+
+      console.log('👤 User ID:', user.id);
+
+      // Créer le lien de paiement dans la base de données
+      const { data: paymentLink, error: insertError } = await supabase
         .from('payment_links')
-        .select('*')
-        .eq('user_id', targetUserId)
-        .order('created_at', { ascending: false });
-
-      if (bookingId) {
-        query = query.eq('booking_id', bookingId);
-      }
-
-      const { data, error: fetchError } = await query;
-
-      if (fetchError) throw fetchError;
-
-      console.log('🔍 [DEBUG] Payment links récupérés:', data);
-      console.log('🔍 [DEBUG] Liens avec replaced_by:', data?.filter(l => l.replaced_by_transaction_id));
-
-      setPaymentLinks(data || []);
-    } catch (err) {
-      console.error('❌ Erreur chargement liens de paiement:', err);
-      setError(err instanceof Error ? err.message : 'Erreur de chargement');
-    } finally {
-      setLoading(false);
-    }
-  }, [user?.id, bookingId]);
-
-  const createPaymentLink = async (
-    bookingId: string,
-    amount: number,
-    expiryMinutes?: number
-  ): Promise<PaymentLink | null> => {
-    console.log('🔵 [CREATE] Début création lien de paiement');
-    console.log('🔵 [CREATE] Params:', { bookingId, amount, expiryMinutes });
-
-    if (!user || !isSupabaseConfigured) {
-      console.error('❌ [CREATE] Supabase non configuré ou utilisateur non connecté');
-      throw new Error('Supabase non configuré ou utilisateur non connecté');
-    }
-
-    console.log('✅ [CREATE] User ID:', user.id);
-
-    try {
-      // 🔥 VÉRIFICATION AUTH CRITIQUE
-      const { data: { user: supabaseUser }, error: userError } = await supabase!.auth.getUser();
-      const { data: { session }, error: sessionError } = await supabase!.auth.getSession();
-
-      console.log('🔥 [AUTH CHECK] Supabase User:', supabaseUser?.id);
-      console.log('🔥 [AUTH CHECK] Session exists:', !!session);
-      console.log('🔥 [AUTH CHECK] Access token exists:', !!session?.access_token);
-      console.log('🔥 [AUTH CHECK] User error:', userError);
-      console.log('🔥 [AUTH CHECK] Session error:', sessionError);
-
-      if (!supabaseUser) {
-        throw new Error('Utilisateur non authentifié dans Supabase');
-      }
-
-      if (!session?.access_token) {
-        throw new Error('Session invalide ou expirée');
-      }
-
-      let targetUserId = user.id;
-
-      // Vérifier équipe
-      try {
-        console.log('🔍 [CREATE] Vérification équipe...');
-        const { data: membershipData } = await supabase!
-          .from('team_members')
-          .select('owner_id')
-          .eq('user_id', user.id)
-          .eq('is_active', true)
-          .maybeSingle();
-
-        if (membershipData?.owner_id) {
-          targetUserId = membershipData.owner_id;
-          console.log('✅ [CREATE] Membre d\'équipe, owner_id:', targetUserId);
-        } else {
-          console.log('✅ [CREATE] Utilisateur propriétaire');
-        }
-      } catch (teamError) {
-        console.warn('⚠️ [CREATE] Erreur vérification équipe:', teamError);
-      }
-
-      // Récupérer les paramètres de délai d'expiration
-      console.log('🔍 [CREATE] Récupération paramètres expiration...');
-      const { data: settings, error: settingsError } = await supabase!
-        .from('business_settings')
-        .select('payment_link_expiry_minutes')
-        .eq('user_id', targetUserId)
-        .maybeSingle();
-
-      if (settingsError) {
-        console.warn('⚠️ [CREATE] Erreur récupération settings:', settingsError);
-      } else {
-        console.log('✅ [CREATE] Settings:', settings);
-      }
-
-      const expiryMins = expiryMinutes || settings?.payment_link_expiry_minutes || 30;
-      const expiresAt = new Date(Date.now() + expiryMins * 60 * 1000).toISOString();
-
-      console.log('✅ [CREATE] Expiration calculée:', { expiryMins, expiresAt });
-
-      // 🔥 CRITIQUE : Passer explicitement user_id
-      const insertData = {
-        booking_id: bookingId,
-        user_id: targetUserId, // ✅ EXPLICITE
-        amount,
-        expires_at: expiresAt,
-        status: 'pending' as const
-      };
-
-      console.log('🔵 [CREATE] Données à insérer:', insertData);
-
-      // 🔥 CRÉER LE LIEN DE PAIEMENT
-      console.log('🔵 [CREATE] Exécution INSERT...');
-      const { data: paymentLink, error: insertError } = await supabase!
-        .from('payment_links')
-        .insert(insertData)
+        .insert({
+          booking_id: bookingId,
+          user_id: user.id,
+          amount: amount,
+          status: 'pending',
+          expires_at: expiresAt.toISOString()
+        })
         .select()
         .single();
 
       if (insertError) {
-        console.error('❌ [CREATE] Erreur INSERT:', insertError);
-        console.error('❌ [CREATE] Code erreur:', insertError.code);
-        console.error('❌ [CREATE] Message:', insertError.message);
-        console.error('❌ [CREATE] Details:', insertError.details);
+        console.error('❌ Erreur insertion:', insertError);
         throw insertError;
       }
 
       if (!paymentLink) {
-        console.error('❌ [CREATE] Aucune donnée retournée après INSERT');
-        throw new Error('Aucune donnée retournée après création');
+        throw new Error('Échec de création du lien');
       }
 
-      console.log('✅ [CREATE] Lien créé avec succès:', paymentLink);
+      console.log('✅ Payment link créé:', paymentLink);
 
-      // Générer l'URL du lien de paiement
-      const paymentUrl = `${window.location.origin}/payment?link_id=${paymentLink.id}`;
-      console.log('✅ [CREATE] URL générée:', paymentUrl);
+      // 🔥 GÉNÉRER L'URL AVEC LE BON FORMAT
+      const baseUrl = window.location.origin;
+      const paymentUrl = `${baseUrl}/payment?link_id=${paymentLink.id}`;
 
-      // Mettre à jour avec l'URL
-      console.log('🔵 [CREATE] Mise à jour URL...');
-      const { data: updatedLink, error: updateError } = await supabase!
+      console.log('🔗 URL générée:', paymentUrl);
+
+      // Mettre à jour le lien avec l'URL complète
+      const { data: updatedLink, error: updateError } = await supabase
         .from('payment_links')
         .update({ payment_url: paymentUrl })
         .eq('id', paymentLink.id)
@@ -186,59 +88,73 @@ export function usePaymentLinks(bookingId?: string) {
         .single();
 
       if (updateError) {
-        console.error('❌ [CREATE] Erreur UPDATE URL:', updateError);
-        throw updateError;
+        console.error('⚠️ Erreur mise à jour URL:', updateError);
+        // On continue quand même, l'URL peut être reconstruite
       }
 
-      console.log('✅ [CREATE] URL mise à jour:', updatedLink);
+      const finalLink = updatedLink || { ...paymentLink, payment_url: paymentUrl };
 
-      setPaymentLinks(prev => [updatedLink, ...prev]);
-      
-      console.log('✅ [CREATE] Création terminée avec succès');
-      return updatedLink;
+      console.log('✅ Lien final:', finalLink);
+
+      setLoading(false);
+      return finalLink;
     } catch (err) {
-      console.error('❌ [CREATE] Erreur globale:', err);
-      console.error('❌ [CREATE] Stack:', err instanceof Error ? err.stack : 'N/A');
-      throw err;
+      console.error('❌ Erreur createPaymentLink:', err);
+      setError(err instanceof Error ? err.message : 'Erreur inconnue');
+      setLoading(false);
+      return null;
     }
   };
 
-  const cancelPaymentLink = async (linkId: string) => {
-    if (!user || !isSupabaseConfigured) {
-      throw new Error('Supabase non configuré ou utilisateur non connecté');
-    }
-
+  const getPaymentLink = async (linkId: string): Promise<PaymentLink | null> => {
     try {
-      const { error } = await supabase!
+      if (!supabase) {
+        throw new Error('Supabase non configuré');
+      }
+
+      const { data, error } = await supabase
         .from('payment_links')
-        .update({ status: 'cancelled' })
+        .select('*')
+        .eq('id', linkId)
+        .single();
+
+      if (error) throw error;
+      return data;
+    } catch (err) {
+      console.error('Erreur récupération lien:', err);
+      setError(err instanceof Error ? err.message : 'Erreur inconnue');
+      return null;
+    }
+  };
+
+  const updatePaymentLinkStatus = async (
+    linkId: string,
+    status: PaymentLink['status']
+  ): Promise<boolean> => {
+    try {
+      if (!supabase) {
+        throw new Error('Supabase non configuré');
+      }
+
+      const { error } = await supabase
+        .from('payment_links')
+        .update({ status })
         .eq('id', linkId);
 
       if (error) throw error;
-
-      setPaymentLinks(prev =>
-        prev.map(link =>
-          link.id === linkId ? { ...link, status: 'cancelled' as const } : link
-        )
-      );
+      return true;
     } catch (err) {
-      console.error('❌ Erreur annulation lien:', err);
-      throw err;
+      console.error('Erreur mise à jour statut:', err);
+      setError(err instanceof Error ? err.message : 'Erreur inconnue');
+      return false;
     }
   };
 
-  useEffect(() => {
-    if (user) {
-      fetchPaymentLinks();
-    }
-  }, [user?.id, fetchPaymentLinks]);
-
   return {
-    paymentLinks,
-    loading,
-    error,
-    refetch: fetchPaymentLinks,
     createPaymentLink,
-    cancelPaymentLink
+    getPaymentLink,
+    updatePaymentLinkStatus,
+    loading,
+    error
   };
 }
