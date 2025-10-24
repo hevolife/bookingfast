@@ -157,7 +157,7 @@ Deno.serve(async (req) => {
 
       const metadata = session.metadata || {}
 
-      // 💳 PAIEMENT VIA LIEN DE PAIEMENT
+      // 💳 PAIEMENT VIA LIEN DE PAIEMENT (CODE ORIGINAL QUI FONCTIONNAIT)
       if (metadata.payment_type === 'payment_link') {
         console.log('💳 === PAIEMENT VIA LIEN === 💳')
         
@@ -196,7 +196,7 @@ Deno.serve(async (req) => {
           transactions: booking.transactions
         })
 
-        // 2️⃣ 🔥 MISE À JOUR DE LA TRANSACTION EXISTANTE AU LIEU D'EN CRÉER UNE NOUVELLE
+        // 2️⃣ 🔥 MISE À JOUR DE LA TRANSACTION EXISTANTE (CODE ORIGINAL)
         const transactions = booking.transactions || []
         
         // Chercher la transaction "pending" liée à ce payment_link_id
@@ -226,6 +226,7 @@ Deno.serve(async (req) => {
             method: 'stripe',
             status: 'completed',
             date: new Date().toISOString(),
+            created_at: new Date().toISOString(),
             stripe_session_id: sessionId,
             payment_link_id: paymentLinkId,
             note: `Paiement complété via lien de paiement - ${new Date().toLocaleString('fr-FR')}`
@@ -306,9 +307,9 @@ Deno.serve(async (req) => {
         })
       }
 
-      // 📅 RÉSERVATION IFRAME (booking_deposit)
+      // 📅 RÉSERVATION IFRAME (booking_deposit) - AVEC TRANSACTIONS
       if (metadata.payment_type === 'booking_deposit') {
-        console.log('📅 === PAIEMENT RÉSERVATION === 📅')
+        console.log('📅 === PAIEMENT RÉSERVATION IFRAME === 📅')
         
         const userId = metadata.user_id
         const serviceId = metadata.service_id
@@ -374,6 +375,20 @@ Deno.serve(async (req) => {
         const totalAmount = service.price_ttc * quantity
         const depositAmount = session.amount_total / 100
 
+        // 🔥 CRÉER LA TRANSACTION POUR LE PAIEMENT IFRAME
+        console.log('💰 === CRÉATION TRANSACTION IFRAME === 💰')
+        const iframeTransaction = {
+          id: crypto.randomUUID(),
+          amount: depositAmount,
+          method: 'stripe',
+          status: 'completed',
+          date: new Date().toISOString(),
+          created_at: new Date().toISOString(),
+          stripe_session_id: sessionId,
+          note: `Acompte payé via iframe - ${new Date().toLocaleString('fr-FR')}`
+        }
+        console.log('📋 Transaction iframe créée:', iframeTransaction)
+
         if (bookingId) {
           console.log('🔄 === MISE À JOUR RÉSERVATION EXISTANTE === 🔄')
 
@@ -386,14 +401,24 @@ Deno.serve(async (req) => {
             return new Response('Réservation non trouvée', { status: 404, headers: corsHeaders })
           }
 
+          // 🔥 AJOUTER LA TRANSACTION AU TABLEAU EXISTANT
+          const existingTransactions = existingBooking.transactions || []
+          const updatedTransactions = [...existingTransactions, iframeTransaction]
+          
+          console.log('📋 Transactions existantes:', existingTransactions)
+          console.log('📋 Transactions mises à jour:', updatedTransactions)
+
           const updateData: any = {
             payment_status: 'paid',
             payment_amount: depositAmount,
             booking_status: 'confirmed',
             stripe_session_id: sessionId,
             deposit_amount: depositAmount,
+            transactions: updatedTransactions,
             updated_at: new Date().toISOString()
           }
+
+          console.log('📦 Données de mise à jour:', updateData)
 
           await supabaseRequest(
             `bookings?id=eq.${bookingId}`,
@@ -401,12 +426,13 @@ Deno.serve(async (req) => {
             updateData
           )
 
-          console.log('✅ RÉSERVATION MISE À JOUR:', bookingId)
+          console.log('✅ RÉSERVATION MISE À JOUR AVEC TRANSACTION:', bookingId)
 
           const result = { 
             success: true, 
             type: 'booking_updated',
-            bookingId: bookingId
+            bookingId: bookingId,
+            transaction: iframeTransaction
           }
           
           processedSessions.set(sessionId, { timestamp: Date.now(), result })
@@ -450,12 +476,15 @@ Deno.serve(async (req) => {
             payment_amount: depositAmount,
             deposit_amount: depositAmount,
             booking_status: 'confirmed',
-            stripe_session_id: sessionId
+            stripe_session_id: sessionId,
+            transactions: [iframeTransaction]
           }
 
           if (assignedUserId) {
             bookingData.assigned_user_id = assignedUserId
           }
+
+          console.log('📦 Données réservation avec transaction:', bookingData)
 
           const bookings = await supabaseRequest('bookings', 'POST', bookingData)
           const booking = bookings?.[0]
@@ -466,12 +495,13 @@ Deno.serve(async (req) => {
             return new Response('Erreur création réservation', { status: 500, headers: corsHeaders })
           }
 
-          console.log('✅ RÉSERVATION CRÉÉE:', booking.id)
+          console.log('✅ RÉSERVATION CRÉÉE AVEC TRANSACTION:', booking.id)
 
           const result = { 
             success: true, 
             type: 'booking_created',
-            bookingId: booking.id
+            bookingId: booking.id,
+            transaction: iframeTransaction
           }
           
           processedSessions.set(sessionId, { timestamp: Date.now(), result })
