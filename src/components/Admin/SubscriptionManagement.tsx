@@ -12,6 +12,7 @@ interface SubscriptionData {
   stripe_customer_id: string | null;
   current_period_end: string | null;
   cancel_at_period_end: boolean;
+  created_at: string;
 }
 
 export function SubscriptionManagement() {
@@ -34,11 +35,15 @@ export function SubscriptionManagement() {
     try {
       const { data, error } = await supabase
         .from('users')
-        .select('subscription_tier, subscription_status, stripe_subscription_id, stripe_customer_id, current_period_end, cancel_at_period_end')
+        .select('subscription_tier, subscription_status, stripe_subscription_id, stripe_customer_id, current_period_end, cancel_at_period_end, created_at')
         .eq('id', user.id)
         .single();
 
       if (error) throw error;
+      
+      console.log('📊 Subscription data:', data);
+      console.log('📅 current_period_end:', data?.current_period_end);
+      
       setSubscription(data);
     } catch (error) {
       console.error('Erreur chargement abonnement:', error);
@@ -69,7 +74,6 @@ export function SubscriptionManagement() {
         throw new Error(data.error || 'Erreur lors de l\'annulation');
       }
 
-      // Recharger les données
       await loadSubscription();
       setShowCancelModal(false);
       
@@ -107,14 +111,15 @@ export function SubscriptionManagement() {
     );
   }
 
-  if (!subscription || subscription.subscription_status !== 'active') {
+  // 🔥 CORRECTION : Afficher les détails si l'utilisateur a un abonnement (starter ou pro)
+  if (!subscription || (subscription.subscription_tier !== 'starter' && subscription.subscription_tier !== 'pro')) {
     return (
-      <div className="bg-gradient-to-r from-blue-500 to-cyan-500 rounded-2xl p-6 text-white">
+      <div className="bg-gradient-to-r from-gray-500 to-gray-600 rounded-2xl p-6 text-white">
         <div className="flex items-center gap-4">
-          <CheckCircle className="w-12 h-12" />
+          <AlertTriangle className="w-12 h-12" />
           <div>
-            <h2 className="text-2xl font-bold">Abonnement actif</h2>
-            <p className="text-white/80">Toutes les fonctionnalités sont disponibles</p>
+            <h2 className="text-2xl font-bold">Aucun abonnement actif</h2>
+            <p className="text-white/80">Souscrivez à un plan pour accéder aux fonctionnalités</p>
           </div>
         </div>
       </div>
@@ -143,12 +148,12 @@ export function SubscriptionManagement() {
               </div>
               <div>
                 <h2 className="text-2xl font-bold">
-                  {isScheduledForCancellation ? 'Annulation programmée' : `Plan ${getTierName(subscription.subscription_tier)}`}
+                  {isScheduledForCancellation ? 'Annulation programmée' : `Abonnement ${getTierName(subscription.subscription_tier)} actif`}
                 </h2>
                 <p className="text-white/80">
                   {isScheduledForCancellation 
                     ? 'Votre abonnement sera annulé à la fin de la période'
-                    : 'Abonnement mensuel actif'
+                    : 'Plan Starter - Toutes les fonctionnalités disponibles'
                   }
                 </p>
               </div>
@@ -160,24 +165,30 @@ export function SubscriptionManagement() {
             <div className="bg-white/20 backdrop-blur-sm rounded-xl p-4">
               <div className="flex items-center gap-2 text-white/80 text-sm mb-1">
                 <Calendar className="w-4 h-4" />
-                {isScheduledForCancellation ? 'Accès jusqu\'au' : 'Prochaine facturation'}
+                Compte créé
               </div>
               <div className="text-lg font-bold">
-                {formatDate(subscription.current_period_end)}
+                {formatDate(subscription.created_at)}
               </div>
             </div>
 
             <div className="bg-white/20 backdrop-blur-sm rounded-xl p-4">
-              <div className="text-white/80 text-sm mb-1">Statut</div>
+              <div className="flex items-center gap-2 text-white/80 text-sm mb-1">
+                <Calendar className="w-4 h-4" />
+                {isScheduledForCancellation ? 'Accès jusqu\'au' : 'Prochaine facturation'}
+              </div>
               <div className="text-lg font-bold">
-                {isScheduledForCancellation ? 'Annulation en attente' : 'Actif'}
+                {subscription.current_period_end 
+                  ? formatDate(subscription.current_period_end)
+                  : 'Non défini'
+                }
               </div>
             </div>
           </div>
         </div>
 
         {/* Actions */}
-        {!isScheduledForCancellation && (
+        {!isScheduledForCancellation && subscription.stripe_subscription_id && (
           <div className="bg-white rounded-2xl shadow-lg p-6">
             <h3 className="text-lg font-bold text-gray-900 mb-4">Gérer l'abonnement</h3>
             
@@ -187,7 +198,7 @@ export function SubscriptionManagement() {
                 <div className="flex-1">
                   <h4 className="font-medium text-red-900 mb-1">Annuler l'abonnement</h4>
                   <p className="text-sm text-red-700 mb-3">
-                    Vous conserverez l'accès jusqu'au {formatDate(subscription.current_period_end)}
+                    Vous conserverez l'accès jusqu'au {subscription.current_period_end ? formatDate(subscription.current_period_end) : 'fin de période'}
                   </p>
                   <Button
                     onClick={() => setShowCancelModal(true)}
@@ -211,7 +222,7 @@ export function SubscriptionManagement() {
               <div>
                 <h3 className="text-lg font-bold text-gray-900 mb-2">Annulation confirmée</h3>
                 <p className="text-gray-700">
-                  Votre abonnement sera annulé le {formatDate(subscription.current_period_end)}. 
+                  Votre abonnement sera annulé le {subscription.current_period_end ? formatDate(subscription.current_period_end) : 'fin de période'}. 
                   Vous conservez l'accès à toutes les fonctionnalités jusqu'à cette date.
                 </p>
               </div>
@@ -233,7 +244,7 @@ export function SubscriptionManagement() {
             <div>
               <h4 className="font-medium text-orange-900 mb-1">Êtes-vous sûr ?</h4>
               <p className="text-sm text-orange-700">
-                Votre abonnement sera annulé à la fin de la période en cours ({formatDate(subscription?.current_period_end)}).
+                Votre abonnement sera annulé à la fin de la période en cours ({subscription?.current_period_end ? formatDate(subscription.current_period_end) : 'fin de période'}).
                 Vous conserverez l'accès jusqu'à cette date.
               </p>
             </div>

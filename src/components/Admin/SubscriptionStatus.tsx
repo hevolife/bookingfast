@@ -1,5 +1,5 @@
 import React, { useState, useEffect } from 'react';
-import { Crown, Clock, CreditCard, Gift, Zap, CheckCircle, Star, AlertTriangle, Calendar, User, Settings, Key, Sparkles, ExternalLink } from 'lucide-react';
+import { Crown, Clock, CreditCard, Gift, Zap, CheckCircle, Star, AlertTriangle, Calendar, User, Settings, Key, Sparkles, ExternalLink, XCircle, Loader2 } from 'lucide-react';
 import { useAuth } from '../../contexts/AuthContext';
 import { supabase } from '../../lib/supabase';
 import { AccessCodeRedemption } from '../Auth/AccessCodeRedemption';
@@ -15,7 +15,8 @@ export function SubscriptionStatus() {
   const [showCodeRedemption, setShowCodeRedemption] = useState(false);
   const [allRedemptions, setAllRedemptions] = useState<any[]>([]);
   const [isTeamMember, setIsTeamMember] = useState(false);
-  const [activeSubscription, setActiveSubscription] = useState<any>(null);
+  const [showCancelModal, setShowCancelModal] = useState(false);
+  const [cancelling, setCancelling] = useState(false);
 
   useEffect(() => {
     loadUserStatus();
@@ -123,44 +124,28 @@ export function SubscriptionStatus() {
         console.log('👑 PROPRIÉTAIRE - Chargement données propres:', targetUserId);
       }
 
-      // ✅ CORRECTION : Charger l'abonnement depuis la table subscriptions
-      console.log('🔍 Recherche abonnement actif dans subscriptions...');
-      const { data: subscriptionData, error: subscriptionError } = await supabase
-        .from('subscriptions')
+      // 🔥 CORRECTION : Charger DIRECTEMENT depuis la table users
+      console.log('🔍 Chargement données utilisateur depuis table users...');
+      const { data: userData, error: userError } = await supabase
+        .from('users')
         .select('*')
-        .eq('user_id', targetUserId)
-        .in('status', ['active', 'trial'])
-        .order('created_at', { ascending: false })
-        .limit(1)
+        .eq('id', targetUserId)
         .maybeSingle();
 
-      if (subscriptionError) {
-        console.error('❌ Erreur chargement abonnement:', subscriptionError);
-      } else if (subscriptionData) {
-        console.log('✅ Abonnement trouvé:', subscriptionData);
-        setActiveSubscription(subscriptionData);
-        
-        // Créer un objet userStatus compatible avec l'ancien format
-        setUserStatus({
-          id: targetUserId,
-          subscription_status: subscriptionData.status,
-          subscription_tier: subscriptionData.plan_type,
-          trial_ends_at: subscriptionData.trial_end,
-          created_at: subscriptionData.created_at
+      if (userError) {
+        console.error('❌ Erreur chargement utilisateur:', userError);
+      } else if (userData) {
+        console.log('✅ Données utilisateur trouvées:', {
+          subscription_status: userData.subscription_status,
+          subscription_tier: userData.subscription_tier,
+          trial_ends_at: userData.trial_ends_at,
+          current_period_end: userData.current_period_end,
+          cancel_at_period_end: userData.cancel_at_period_end,
+          stripe_subscription_id: userData.stripe_subscription_id
         });
+        setUserStatus(userData);
       } else {
-        console.log('⚠️ Aucun abonnement actif trouvé');
-        
-        // Charger les données utilisateur de base
-        const { data: userData, error: userError } = await supabase
-          .from('users')
-          .select('*')
-          .eq('id', targetUserId)
-          .maybeSingle();
-
-        if (!userError && userData) {
-          setUserStatus(userData);
-        }
+        console.log('⚠️ Aucune donnée utilisateur trouvée');
       }
 
       // Charger les codes d'accès
@@ -202,6 +187,45 @@ export function SubscriptionStatus() {
       console.error('Erreur chargement statut:', error);
     } finally {
       setLoading(false);
+    }
+  };
+
+  const handleCancelSubscription = async () => {
+    if (!userStatus?.stripe_subscription_id || cancelling) return;
+
+    setCancelling(true);
+    try {
+      console.log('🔄 Annulation abonnement:', userStatus.stripe_subscription_id);
+
+      const response = await fetch(`${import.meta.env.VITE_SUPABASE_URL}/functions/v1/cancel-subscription`, {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+          'Authorization': `Bearer ${import.meta.env.VITE_SUPABASE_ANON_KEY}`
+        },
+        body: JSON.stringify({
+          subscription_id: userStatus.stripe_subscription_id
+        })
+      });
+
+      const data = await response.json();
+
+      if (!response.ok) {
+        throw new Error(data.error || 'Erreur lors de l\'annulation');
+      }
+
+      console.log('✅ Abonnement annulé avec succès:', data);
+
+      // Recharger les données
+      await loadUserStatus();
+      setShowCancelModal(false);
+      
+      alert('✅ Votre abonnement sera annulé à la fin de la période en cours. Vous conservez l\'accès jusqu\'à cette date.');
+    } catch (error) {
+      console.error('❌ Erreur annulation:', error);
+      alert(error instanceof Error ? error.message : 'Erreur lors de l\'annulation');
+    } finally {
+      setCancelling(false);
     }
   };
 
@@ -289,12 +313,16 @@ export function SubscriptionStatus() {
       return 'from-green-500 to-emerald-500';
     }
     
-    // ✅ CORRECTION : Vérifier activeSubscription en priorité
-    if (activeSubscription?.status === 'active' || activeAccessCode || userStatus?.subscription_status === 'active') {
+    // Si annulation programmée
+    if (userStatus?.cancel_at_period_end) {
+      return 'from-orange-500 to-red-500';
+    }
+    
+    if (activeAccessCode || userStatus?.subscription_status === 'active') {
       return 'from-blue-500 to-cyan-500';
     }
     
-    if (activeSubscription?.status === 'trial' || userStatus?.subscription_status === 'trial') {
+    if (userStatus?.subscription_status === 'trial') {
       const remainingDays = getRemainingTrialDays();
       return remainingDays <= 2 ? 'from-red-500 to-pink-500' : 'from-orange-500 to-yellow-500';
     }
@@ -320,13 +348,17 @@ export function SubscriptionStatus() {
       })`;
     }
     
-    // ✅ CORRECTION : Vérifier activeSubscription en priorité
-    if (activeSubscription?.status === 'active' || userStatus?.subscription_status === 'active') {
-      const tierName = (activeSubscription?.plan_type || userStatus?.subscription_tier) === 'starter' ? 'Starter' : 'Pro';
+    // Si annulation programmée
+    if (userStatus?.cancel_at_period_end) {
+      return '⚠️ Annulation programmée';
+    }
+    
+    if (userStatus?.subscription_status === 'active') {
+      const tierName = userStatus?.subscription_tier === 'starter' ? 'Starter' : 'Pro';
       return `✅ Abonnement ${tierName} actif`;
     }
     
-    if (activeSubscription?.status === 'trial' || userStatus?.subscription_status === 'trial') {
+    if (userStatus?.subscription_status === 'trial') {
       const remainingDays = getRemainingTrialDays();
       return `⏳ Essai gratuit (${remainingDays} jour(s) restant(s))`;
     }
@@ -356,6 +388,8 @@ export function SubscriptionStatus() {
     );
   }
 
+  const isScheduledForCancellation = userStatus?.cancel_at_period_end;
+
   return (
     <div className="space-y-6">
       <div className="space-y-6">
@@ -363,11 +397,13 @@ export function SubscriptionStatus() {
         <div className={`bg-gradient-to-r ${getStatusColor()} rounded-2xl p-6 text-white`}>
           <div className="flex items-center gap-4 mb-4">
             <div className="w-16 h-16 bg-white/20 rounded-2xl flex items-center justify-center backdrop-blur-sm">
-              {activeAccessCode?.access_type === 'lifetime' ? (
+              {isScheduledForCancellation ? (
+                <AlertTriangle className="w-8 h-8 text-white" />
+              ) : activeAccessCode?.access_type === 'lifetime' ? (
                 <Crown className="w-8 h-8 text-white" />
               ) : activeAccessCode ? (
                 <Gift className="w-8 h-8 text-white" />
-              ) : (activeSubscription?.status === 'active' || userStatus?.subscription_status === 'active') ? (
+              ) : userStatus?.subscription_status === 'active' ? (
                 <CheckCircle className="w-8 h-8 text-white" />
               ) : (
                 <Clock className="w-8 h-8 text-white" />
@@ -376,16 +412,18 @@ export function SubscriptionStatus() {
             <div>
               <h2 className="text-2xl font-bold">{getStatusText()}</h2>
               <p className="text-white/80">
-                {activeAccessCode?.access_type === 'lifetime' 
+                {isScheduledForCancellation
+                  ? 'Votre abonnement sera annulé à la fin de la période. Vous conservez l\'accès jusqu\'à cette date.'
+                  : activeAccessCode?.access_type === 'lifetime' 
                   ? 'Vous avez un accès illimité à toutes les fonctionnalités'
                   : isTeamMember
                   ? 'Vous êtes membre d\'une équipe avec accès complet aux fonctionnalités'
                   : activeAccessCode
                   ? `Code "${activeAccessCode.code}" - ${activeAccessCode.description || 'Code d\'accès secret'}`
-                  : (activeSubscription?.status === 'active' || userStatus?.subscription_status === 'active')
-                  ? `Plan ${(activeSubscription?.plan_type || userStatus?.subscription_tier) === 'starter' ? 'Starter' : 'Pro'} - Toutes les fonctionnalités disponibles`
-                  : (activeSubscription?.status === 'trial' || userStatus?.subscription_status === 'trial')
-                  ? `Essai gratuit jusqu'au ${formatDate(activeSubscription?.trial_end || userStatus?.trial_ends_at)}`
+                  : userStatus?.subscription_status === 'active'
+                  ? `Plan ${userStatus?.subscription_tier === 'starter' ? 'Starter' : 'Pro'} - Toutes les fonctionnalités disponibles`
+                  : userStatus?.subscription_status === 'trial'
+                  ? `Essai gratuit jusqu'au ${formatDate(userStatus?.trial_ends_at)}`
                   : 'Abonnez-vous pour accéder aux fonctionnalités'
                 }
               </p>
@@ -399,10 +437,19 @@ export function SubscriptionStatus() {
               <div className="text-lg font-bold">{formatDate(userStatus?.created_at)}</div>
             </div>
             
-            {(activeSubscription?.status === 'trial' || userStatus?.subscription_status === 'trial') && (
+            {userStatus?.subscription_status === 'trial' && (
               <div className="bg-white/20 backdrop-blur-sm rounded-xl p-4 text-center">
                 <div className="text-white/80 text-sm">Essai expire</div>
-                <div className="text-lg font-bold">{formatDate(activeSubscription?.trial_end || userStatus?.trial_ends_at)}</div>
+                <div className="text-lg font-bold">{formatDate(userStatus?.trial_ends_at)}</div>
+              </div>
+            )}
+            
+            {userStatus?.subscription_status === 'active' && userStatus?.current_period_end && (
+              <div className="bg-white/20 backdrop-blur-sm rounded-xl p-4 text-center">
+                <div className="text-white/80 text-sm">
+                  {isScheduledForCancellation ? 'Accès jusqu\'au' : 'Prochaine facturation'}
+                </div>
+                <div className="text-lg font-bold">{formatDate(userStatus?.current_period_end)}</div>
               </div>
             )}
             
@@ -447,9 +494,32 @@ export function SubscriptionStatus() {
               </p>
             </button>
 
+            {/* Annuler l'abonnement */}
+            {userStatus?.subscription_status === 'active' && 
+             userStatus?.stripe_subscription_id && 
+             !isScheduledForCancellation &&
+             !isTeamMember && (
+              <button
+                onClick={() => setShowCancelModal(true)}
+                className="p-6 bg-gradient-to-r from-red-50 to-orange-50 border-2 border-red-200 rounded-2xl hover:border-red-400 transition-all duration-300 transform hover:scale-[1.02] text-left"
+              >
+                <div className="flex items-center gap-4 mb-3">
+                  <div className="w-12 h-12 bg-gradient-to-r from-red-500 to-orange-500 rounded-xl flex items-center justify-center">
+                    <XCircle className="w-6 h-6 text-white" />
+                  </div>
+                  <div>
+                    <h4 className="font-bold text-red-800">Annuler le renouvellement</h4>
+                    <p className="text-red-600 text-sm">Arrêter l'abonnement</p>
+                  </div>
+                </div>
+                <p className="text-red-700 text-sm">
+                  Votre abonnement sera annulé à la fin de la période. Vous conserverez l'accès jusqu'au {formatDate(userStatus?.current_period_end)}
+                </p>
+              </button>
+            )}
+
             {/* S'abonner */}
             {(!activeAccessCode || activeAccessCode.access_type !== 'lifetime') && 
-             !activeSubscription && 
              userStatus?.subscription_status !== 'active' && 
              !isTeamMember && (
               <button
@@ -474,6 +544,22 @@ export function SubscriptionStatus() {
             )}
           </div>
         </div>
+
+        {/* Message si annulation programmée */}
+        {isScheduledForCancellation && (
+          <div className="bg-white rounded-2xl shadow-lg p-6">
+            <div className="flex items-start gap-3">
+              <CheckCircle className="w-6 h-6 text-green-600 flex-shrink-0" />
+              <div>
+                <h3 className="text-lg font-bold text-gray-900 mb-2">Annulation confirmée</h3>
+                <p className="text-gray-700">
+                  Votre abonnement sera annulé le {formatDate(userStatus?.current_period_end)}. 
+                  Vous conservez l'accès à toutes les fonctionnalités jusqu'à cette date.
+                </p>
+              </div>
+            </div>
+          </div>
+        )}
 
         {/* Historique des codes utilisés */}
         {allRedemptions.length > 0 && (
@@ -570,7 +656,6 @@ export function SubscriptionStatus() {
 
         {/* Plans d'abonnement */}
         {(!activeAccessCode || activeAccessCode.access_type !== 'lifetime') && 
-         !activeSubscription && 
          userStatus?.subscription_status !== 'active' && 
          !isTeamMember && (
           <div id="subscription-plans" className="bg-white rounded-2xl shadow-lg p-6">
@@ -692,6 +777,56 @@ export function SubscriptionStatus() {
           </div>
         </div>
       </div>
+
+      {/* Modal de confirmation d'annulation */}
+      {showCancelModal && (
+        <Modal
+          isOpen={showCancelModal}
+          onClose={() => setShowCancelModal(false)}
+          title="Confirmer l'annulation"
+          size="md"
+        >
+          <div className="space-y-4">
+            <div className="flex items-start gap-3 p-4 bg-orange-50 border border-orange-200 rounded-xl">
+              <AlertTriangle className="w-6 h-6 text-orange-600 flex-shrink-0" />
+              <div>
+                <h4 className="font-medium text-orange-900 mb-1">Êtes-vous sûr ?</h4>
+                <p className="text-sm text-orange-700">
+                  Votre abonnement sera annulé à la fin de la période en cours ({formatDate(userStatus?.current_period_end)}).
+                  Vous conserverez l'accès jusqu'à cette date.
+                </p>
+              </div>
+            </div>
+
+            <div className="flex gap-3 justify-end">
+              <Button
+                onClick={() => setShowCancelModal(false)}
+                variant="outline"
+                disabled={cancelling}
+              >
+                Garder mon abonnement
+              </Button>
+              <Button
+                onClick={handleCancelSubscription}
+                disabled={cancelling}
+                className="bg-red-600 hover:bg-red-700"
+              >
+                {cancelling ? (
+                  <>
+                    <Loader2 className="w-4 h-4 animate-spin" />
+                    Annulation...
+                  </>
+                ) : (
+                  <>
+                    <XCircle className="w-4 h-4" />
+                    Confirmer l'annulation
+                  </>
+                )}
+              </Button>
+            </div>
+          </div>
+        </Modal>
+      )}
 
       {/* Modal pour utiliser un code secret */}
       {showCodeRedemption && (

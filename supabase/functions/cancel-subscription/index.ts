@@ -69,13 +69,13 @@ Deno.serve(async (req) => {
     console.log('📅 Annulation effective le:', new Date(subscription.cancel_at! * 1000).toISOString())
     console.log('📅 Fin période actuelle:', new Date(subscription.current_period_end * 1000).toISOString())
 
-    // 🆕 Mettre à jour la base de données avec current_period_end
+    // Mettre à jour la base de données
     const currentPeriodEnd = new Date(subscription.current_period_end * 1000).toISOString()
     
     const { error: updateError } = await supabaseClient
-      .from('plugin_subscriptions')
+      .from('users')
       .update({
-        status: 'cancelled',
+        cancel_at_period_end: true,
         current_period_end: currentPeriodEnd,
         updated_at: new Date().toISOString()
       })
@@ -84,7 +84,7 @@ Deno.serve(async (req) => {
     if (updateError) {
       console.error('❌ Erreur mise à jour base:', updateError)
     } else {
-      console.log('✅ Base de données mise à jour avec grace period jusqu\'au:', currentPeriodEnd)
+      console.log('✅ Base de données mise à jour avec annulation programmée')
     }
 
     return new Response(
@@ -93,7 +93,7 @@ Deno.serve(async (req) => {
         cancel_at: subscription.cancel_at,
         current_period_end: subscription.current_period_end,
         current_period_end_iso: currentPeriodEnd,
-        message: 'Abonnement programmé pour annulation à la fin de la période. Le plugin restera actif jusqu\'au ' + new Date(subscription.current_period_end * 1000).toLocaleDateString('fr-FR')
+        message: 'Abonnement programmé pour annulation à la fin de la période. Vous conservez l\'accès jusqu\'au ' + new Date(subscription.current_period_end * 1000).toLocaleDateString('fr-FR')
       }),
       { headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
     )
