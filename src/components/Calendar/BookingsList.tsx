@@ -7,6 +7,7 @@ import { usePlugins } from '../../hooks/usePlugins';
 import { Booking } from '../../types';
 import { LoadingSpinner } from '../UI/LoadingSpinner';
 import { bookingEvents } from '../../lib/bookingEvents';
+import { formatTime } from '../../utils/dateUtils';
 
 interface BookingsListProps {
   onEditBooking: (booking: Booking) => void;
@@ -39,19 +40,16 @@ export function BookingsList({ onEditBooking }: BookingsListProps) {
     checkAccess();
   }, [hasPluginAccess, isOwner]);
 
-  // ✅ CORRECTION: Écouter les événements de booking pour rafraîchir
   useEffect(() => {
     const handleBookingChange = () => {
       console.log('📋 BookingsList - Événement booking détecté, rafraîchissement...');
       refetch();
     };
 
-    // Écouter tous les événements de booking
     bookingEvents.on('bookingCreated', handleBookingChange);
     bookingEvents.on('bookingUpdated', handleBookingChange);
     bookingEvents.on('bookingDeleted', handleBookingChange);
 
-    // Écouter aussi l'événement global de rafraîchissement
     const handleRefresh = () => {
       console.log('🔄 BookingsList - Rafraîchissement global demandé');
       refetch();
@@ -82,8 +80,6 @@ export function BookingsList({ onEditBooking }: BookingsListProps) {
   const getFilteredBookings = () => {
     let filtered = bookings;
 
-    // ✅ CORRECTION: Ne plus filtrer les réservations annulées par défaut
-    // Chaque vue décide si elle veut les afficher ou non
     if (statusFilter !== 'all') {
       filtered = filtered.filter(b => b.booking_status === statusFilter);
     }
@@ -389,7 +385,7 @@ export function BookingsList({ onEditBooking }: BookingsListProps) {
                         </div>
                         <div className="flex items-center gap-2">
                           <Clock className="w-4 h-4 text-blue-500" />
-                          <span>{booking.time.slice(0, 5)} ({booking.duration_minutes} min)</span>
+                          <span>{formatTime(booking.time)} ({booking.duration_minutes} min)</span>
                         </div>
                       </div>
                     </div>

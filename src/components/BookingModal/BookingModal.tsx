@@ -67,6 +67,7 @@ export function BookingModal({
   const [assignedUserId, setAssignedUserId] = useState<string | null>(null);
   const [notes, setNotes] = useState('');
   const [tempBookingId, setTempBookingId] = useState<string | null>(null);
+  const [isEditMode, setIsEditMode] = useState(false);
 
   const hasMultiUserPlugin = userPlugins.some(p => p.plugin_slug === 'multi-user');
 
@@ -123,6 +124,7 @@ export function BookingModal({
       setAssignedUserId(editingBooking.assigned_user_id || null);
       setNotes(editingBooking.notes || '');
       setTempBookingId(editingBooking.id);
+      setIsEditMode(true);
     } else {
       setSelectedService(null);
       setIsCustomService(false);
@@ -136,6 +138,7 @@ export function BookingModal({
       setAssignedUserId(null);
       setNotes('');
       setTempBookingId(null);
+      setIsEditMode(false);
     }
   }, [editingBooking, services, selectedDate, selectedTime]);
 
@@ -147,6 +150,7 @@ export function BookingModal({
     setAssignedUserId(null);
     setNotes('');
     setTempBookingId(null);
+    setIsEditMode(false);
     
     setTimeout(() => {
       const event = new CustomEvent('resetDatePicker');
@@ -199,11 +203,13 @@ export function BookingModal({
 
   const handleGeneratePaymentLink = async (amount: number) => {
     console.log('🔥 ========================================');
-    console.log('🔥 GÉNÉRATION LIEN DE PAIEMENT (SANS SAUVEGARDE)');
+    console.log('🔥 GÉNÉRATION LIEN DE PAIEMENT (SANS SAUVEGARDE AUTO)');
     console.log('🔥 ========================================');
     console.log('💳 Montant:', amount);
     console.log('💳 Client:', selectedClient?.email);
     console.log('💳 Service:', isCustomService ? customServiceData.name : selectedService?.name);
+    console.log('🔍 État actuel - isEditMode:', isEditMode);
+    console.log('🔍 État actuel - tempBookingId:', tempBookingId);
     
     if (!selectedClient || (!selectedService && !isCustomService)) {
       console.error('❌ Client ou service manquant');
@@ -219,7 +225,7 @@ export function BookingModal({
     try {
       setSaving(true);
 
-      // 🔥 CRÉER UNE RÉSERVATION TEMPORAIRE SI NÉCESSAIRE
+      // 🔥 CRÉER UNE RÉSERVATION TEMPORAIRE SI NÉCESSAIRE (MAIS NE PAS PASSER EN MODE EDIT)
       let bookingId = tempBookingId || editingBooking?.id;
 
       if (!bookingId) {
@@ -285,6 +291,7 @@ export function BookingModal({
         setTempBookingId(bookingId);
         
         console.log('✅ Réservation temporaire créée:', bookingId);
+        console.log('⚠️ IMPORTANT: NE PAS PASSER EN MODE EDIT');
       }
 
       // 🔥 GÉNÉRER LE LIEN DE PAIEMENT
@@ -324,14 +331,15 @@ export function BookingModal({
         await navigator.clipboard.writeText(paymentLink.payment_url);
         console.log('✅ Lien copié dans le presse-papiers:', paymentLink.payment_url);
         
-        alert(`✅ Lien de paiement créé et copié dans le presse-papiers !\n\n${paymentLink.payment_url}\n\nVous pouvez maintenant le partager avec votre client.`);
+        alert(`✅ Lien de paiement créé et copié dans le presse-papiers !\n\n${paymentLink.payment_url}\n\nVous pouvez maintenant le partager avec votre client.\n\n⚠️ N'oubliez pas de cliquer sur "Créer" pour finaliser la réservation !`);
       } catch (clipboardError) {
         console.warn('⚠️ Impossible de copier automatiquement:', clipboardError);
         
         // Fallback : afficher le lien dans une alerte
         const userChoice = confirm(
           `✅ Lien de paiement créé !\n\n${paymentLink.payment_url}\n\n` +
-          `Voulez-vous ouvrir le lien dans un nouvel onglet ?`
+          `Voulez-vous ouvrir le lien dans un nouvel onglet ?\n\n` +
+          `⚠️ N'oubliez pas de cliquer sur "Créer" pour finaliser la réservation !`
         );
         
         if (userChoice) {
@@ -372,6 +380,8 @@ export function BookingModal({
         }
       }
       
+      console.log('🔥 IMPORTANT: Modal reste en mode "Créer" - isEditMode:', isEditMode);
+      
     } catch (error) {
       console.error('❌ Erreur lors de la génération du lien:', error);
       
@@ -390,6 +400,11 @@ export function BookingModal({
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
+    
+    console.log('💾 handleSubmit - Début sauvegarde');
+    console.log('🔍 isEditMode:', isEditMode);
+    console.log('🔍 editingBooking:', editingBooking?.id);
+    console.log('🔍 tempBookingId:', tempBookingId);
     
     if ((!selectedService && !isCustomService) || !selectedClient) {
       alert('Veuillez sélectionner un service et un client');
@@ -472,12 +487,14 @@ export function BookingModal({
 
       if (editingBooking || tempBookingId) {
         const bookingIdToUpdate = editingBooking?.id || tempBookingId!;
+        console.log('✏️ Mise à jour réservation:', bookingIdToUpdate);
         const updatedBooking = await updateBooking(bookingIdToUpdate, bookingData);
         
         if (updatedBooking) {
           bookingEvents.emit('bookingUpdated', updatedBooking);
         }
       } else {
+        console.log('✨ Création nouvelle réservation');
         const newBooking = await addBooking(bookingData);
         
         if (newBooking) {
@@ -537,7 +554,7 @@ export function BookingModal({
   };
 
   const footerButtons = [
-    ...((editingBooking || tempBookingId) ? [{
+    ...((editingBooking || (tempBookingId && isEditMode)) ? [{
       label: 'Supprimer',
       onClick: () => setShowDeleteConfirm(true),
       variant: 'danger' as const,
@@ -551,14 +568,14 @@ export function BookingModal({
       disabled: saving
     },
     {
-      label: (editingBooking || tempBookingId) ? 'Modifier' : 'Créer',
+      label: (editingBooking || (tempBookingId && isEditMode)) ? 'Modifier' : 'Créer',
       onClick: () => {},
       variant: 'primary' as const,
       disabled: saving || (!selectedService && (!isCustomService || !customServiceData.name || customServiceData.price <= 0)) || 
         !selectedClient?.firstname || !selectedClient?.lastname || !selectedClient?.email || !selectedClient?.phone ||
         (!editingBooking && !tempBookingId && !canCreateBooking),
       loading: saving,
-      icon: (editingBooking || tempBookingId) ? '✏️' : '✨'
+      icon: (editingBooking || (tempBookingId && isEditMode)) ? '✏️' : '✨'
     }
   ];
 
@@ -583,11 +600,11 @@ export function BookingModal({
       <Modal
         isOpen={isOpen}
         onClose={handleClose}
-        title={(editingBooking || tempBookingId) ? 'Modifier la réservation' : 'Nouvelle réservation'}
+        title={(editingBooking || (tempBookingId && isEditMode)) ? 'Modifier la réservation' : 'Nouvelle réservation'}
         size="xl"
       >
         <form onSubmit={handleSubmit} className="space-y-4 sm:space-y-6">
-          {!editingBooking && !tempBookingId && limitInfo && !isUnlimited && (
+          {!editingBooking && !isEditMode && limitInfo && !isUnlimited && (
             <div className={`rounded-xl p-4 ${
               canCreateBooking 
                 ? limitInfo.remaining! <= 10
@@ -631,6 +648,22 @@ export function BookingModal({
                         }`
                       : `Vous avez atteint votre limite de ${limitInfo.limit} réservations pour ce mois. Passez au plan Pro pour continuer !`
                     }
+                  </p>
+                </div>
+              </div>
+            </div>
+          )}
+
+          {tempBookingId && !isEditMode && (
+            <div className="rounded-xl p-4 bg-blue-50 border-2 border-blue-300">
+              <div className="flex items-start gap-3">
+                <AlertCircle className="w-5 h-5 mt-0.5 text-blue-600" />
+                <div className="flex-1">
+                  <h4 className="font-bold mb-1 text-blue-800">
+                    ⚠️ Réservation temporaire créée
+                  </h4>
+                  <p className="text-sm text-blue-700">
+                    Un lien de paiement a été généré. N'oubliez pas de cliquer sur <strong>"Créer"</strong> pour finaliser la réservation !
                   </p>
                 </div>
               </div>

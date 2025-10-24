@@ -5,6 +5,7 @@ import { format } from 'date-fns';
 import { fr } from 'date-fns/locale';
 import { PaymentLinkModal } from './PaymentLinkModal';
 import { usePaymentLinks } from '../../hooks/usePaymentLinks';
+import { formatTime } from '../../utils/dateUtils';
 
 interface BookingDetailsModalProps {
   booking: Booking;
@@ -134,12 +135,10 @@ export function BookingDetailsModal({ booking, onClose, onUpdate }: BookingDetai
     }
   };
 
-  // 🔥 FILTRER : Masquer les liens "pending" et "expired" de l'historique
   const activePaymentLinks = paymentLinks.filter(link => 
     link.status === 'pending' || link.status === 'expired'
   );
 
-  // 🔥 FILTRER : Garder uniquement les transactions "completed" ou "paid"
   const displayTransactions = (booking.transactions || []).filter(transaction => 
     transaction.status === 'completed' || transaction.status === 'paid'
   );
@@ -246,7 +245,7 @@ export function BookingDetailsModal({ booking, onClose, onUpdate }: BookingDetai
                   </div>
                   <div>
                     <p className="text-sm text-gray-600">Heure</p>
-                    <p className="font-semibold text-gray-900">{booking.time}</p>
+                    <p className="font-semibold text-gray-900">{formatTime(booking.time)}</p>
                   </div>
                 </div>
                 {booking.service_name && (
@@ -297,7 +296,6 @@ export function BookingDetailsModal({ booking, onClose, onUpdate }: BookingDetai
                 </div>
               </div>
 
-              {/* Bouton créer lien de paiement */}
               {booking.payment_status !== 'paid' && booking.payment_status !== 'completed' && (
                 <button
                   onClick={() => setShowPaymentLinkModal(true)}
@@ -309,7 +307,6 @@ export function BookingDetailsModal({ booking, onClose, onUpdate }: BookingDetai
               )}
             </div>
 
-            {/* Liens de paiement actifs (pending/expired uniquement) */}
             {activePaymentLinks.length > 0 && (
               <div className="bg-gradient-to-br from-purple-50 to-pink-50 rounded-2xl p-6 border-2 border-purple-200">
                 <h3 className="text-lg font-bold text-gray-900 mb-4 flex items-center gap-2">
@@ -369,7 +366,6 @@ export function BookingDetailsModal({ booking, onClose, onUpdate }: BookingDetai
               </div>
             )}
 
-            {/* Historique des paiements (completed/paid uniquement) */}
             {displayTransactions.length > 0 && (
               <div className="bg-gradient-to-br from-indigo-50 to-blue-50 rounded-2xl p-6 border-2 border-indigo-200">
                 <h3 className="text-lg font-bold text-gray-900 mb-4 flex items-center gap-2">
@@ -404,7 +400,6 @@ export function BookingDetailsModal({ booking, onClose, onUpdate }: BookingDetai
               </div>
             )}
 
-            {/* Notes */}
             {booking.notes && (
               <div className="bg-gray-50 rounded-2xl p-6 border-2 border-gray-200">
                 <h3 className="text-lg font-bold text-gray-900 mb-3 flex items-center gap-2">

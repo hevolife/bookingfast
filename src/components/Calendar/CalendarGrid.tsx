@@ -8,6 +8,7 @@ import { DatePicker } from './DatePicker';
 import { isSupabaseConfigured } from '../../lib/supabase';
 import { LoadingSpinner } from '../UI/LoadingSpinner';
 import { bookingEvents } from '../../lib/bookingEvents';
+import { formatTime } from '../../utils/dateUtils';
 
 interface CalendarGridProps {
   currentDate: Date;
@@ -383,8 +384,8 @@ export function CalendarGrid({
     const dayUnavailabilities = unavailabilities.filter(u => u.date === dateString);
     
     return dayUnavailabilities.map(unavailability => {
-      const startTime = unavailability.start_time.slice(0, 5);
-      const endTime = unavailability.end_time.slice(0, 5);
+      const startTime = formatTime(unavailability.start_time);
+      const endTime = formatTime(unavailability.end_time);
       const timeIndex = timeSlots.findIndex(slot => slot.time === startTime);
       
       if (timeIndex === -1) return null;
@@ -410,7 +411,7 @@ export function CalendarGrid({
     const serviceTimeGroups = new Map<string, Booking[]>();
     
     bookings.forEach(booking => {
-      const normalizedTime = booking.time.slice(0, 5);
+      const normalizedTime = formatTime(booking.time);
       const key = `${booking.service_id}-${normalizedTime}`;
       if (!serviceTimeGroups.has(key)) {
         serviceTimeGroups.set(key, []);
@@ -423,7 +424,7 @@ export function CalendarGrid({
       if (!firstBooking) return;
       
       const serviceName = firstBooking.service?.name || `Service ${firstBooking.service_id.slice(0, 8)}`;
-      const bookingTime = firstBooking.time.slice(0, 5);
+      const bookingTime = formatTime(firstBooking.time);
       const timeIndex = timeSlots.findIndex(slot => slot.time === bookingTime);
       
       if (timeIndex !== -1) {
@@ -515,7 +516,6 @@ export function CalendarGrid({
       await onDeleteUnavailability(unavailabilityId);
       console.log('✅ CalendarGrid.handleDeleteUnavailability - Suppression réussie');
       
-      // Rafraîchir les indisponibilités
       window.dispatchEvent(new CustomEvent('refreshUnavailabilities'));
     } catch (error) {
       console.error('❌ CalendarGrid.handleDeleteUnavailability - Erreur:', error);

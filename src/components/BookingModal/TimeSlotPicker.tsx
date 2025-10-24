@@ -4,6 +4,7 @@ import { useBusinessSettings } from '../../hooks/useBusinessSettings';
 import { TimeSlot } from '../../types';
 import { getBusinessTimezone } from '../../lib/timezone';
 import { validateBookingDateTime } from '../../lib/bookingValidation';
+import { formatTime } from '../../utils/dateUtils';
 
 interface TimeSlotPickerProps {
   selectedDate: string;
@@ -46,10 +47,8 @@ export function TimeSlotPicker({
     
     const slots: TimeSlot[] = [];
     
-    // Handle new ranges structure or fallback to old structure
     const ranges = daySettings.ranges || [{ start: daySettings.start, end: daySettings.end }];
     
-    // Check if we have valid ranges
     if (!ranges || ranges.length === 0) {
       setAvailableSlots([]);
       return;
@@ -71,14 +70,11 @@ export function TimeSlotPicker({
       while (currentHour < endHour || (currentHour === endHour && currentMinute < endMinute)) {
         const time = `${currentHour.toString().padStart(2, '0')}:${currentMinute.toString().padStart(2, '0')}`;
         
-        // Vérifier si le créneau est occupé
         const isOccupied = occupiedSlots.includes(time);
         
-        // Vérifier si le créneau respecte le délai minimum
-        const validation = validateBookingDateTime(selectedDate, time, settings, false); // Backend = pas de restriction
+        const validation = validateBookingDateTime(selectedDate, time, settings, false);
         const isAvailable = !isOccupied && validation.isValid;
         
-        // Avoid duplicate time slots
         if (!slots.find(slot => slot.time === time)) {
           slots.push({
             time,
@@ -94,7 +90,6 @@ export function TimeSlotPicker({
       }
     });
     
-    // Sort slots by time
     slots.sort((a, b) => a.time.localeCompare(b.time));
     
     setAvailableSlots(slots);
@@ -134,7 +129,7 @@ export function TimeSlotPicker({
           </div>
           <div className="text-left">
             <div className="font-medium text-gray-900">
-              {selectedTime ? selectedTime.slice(0, 5) : 'Sélectionner une heure'}
+              {selectedTime ? formatTime(selectedTime) : 'Sélectionner une heure'}
             </div>
           </div>
         </div>
@@ -143,7 +138,6 @@ export function TimeSlotPicker({
         }`} />
       </button>
 
-      {/* Dropdown des créneaux */}
       {isOpen && (
         <>
           <div className="absolute top-full left-0 right-0 mt-2 bg-white border border-gray-200 rounded-2xl shadow-2xl z-[100000] max-h-80 overflow-y-auto">
@@ -182,7 +176,6 @@ export function TimeSlotPicker({
             )}
           </div>
 
-          {/* Overlay pour fermer */}
           <div 
             className="fixed inset-0 z-[99999]" 
             onClick={() => setIsOpen(false)}
