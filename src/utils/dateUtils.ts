@@ -7,9 +7,14 @@ export function formatDate(date: Date | string): string {
   });
 }
 
-export function formatTime(date: Date | string): string {
-  const d = typeof date === 'string' ? new Date(date) : date;
-  return d.toLocaleTimeString('fr-FR', {
+// 🔥 FONCTION POUR FORMATER L'HEURE (HH:mm au lieu de HH:mm:ss)
+export function formatTime(time: string | Date): string {
+  if (typeof time === 'string') {
+    // Si c'est une chaîne "HH:mm:ss", on prend seulement "HH:mm"
+    return time.substring(0, 5);
+  }
+  // Si c'est un objet Date
+  return time.toLocaleTimeString('fr-FR', {
     hour: '2-digit',
     minute: '2-digit'
   });
