@@ -66,6 +66,7 @@ export function BookingModal({
   const [bookingStatus, setBookingStatus] = useState<'pending' | 'confirmed' | 'cancelled'>('pending');
   const [assignedUserId, setAssignedUserId] = useState<string | null>(null);
   const [notes, setNotes] = useState('');
+  const [tempBookingId, setTempBookingId] = useState<string | null>(null);
 
   const hasMultiUserPlugin = userPlugins.some(p => p.plugin_slug === 'multi-user');
 
@@ -121,6 +122,7 @@ export function BookingModal({
       setBookingStatus(editingBooking.booking_status || 'pending');
       setAssignedUserId(editingBooking.assigned_user_id || null);
       setNotes(editingBooking.notes || '');
+      setTempBookingId(editingBooking.id);
     } else {
       setSelectedService(null);
       setIsCustomService(false);
@@ -133,6 +135,7 @@ export function BookingModal({
       setBookingStatus('confirmed');
       setAssignedUserId(null);
       setNotes('');
+      setTempBookingId(null);
     }
   }, [editingBooking, services, selectedDate, selectedTime]);
 
@@ -143,6 +146,7 @@ export function BookingModal({
     setCustomServiceData({ name: '', price: 0, duration: 60 });
     setAssignedUserId(null);
     setNotes('');
+    setTempBookingId(null);
     
     setTimeout(() => {
       const event = new CustomEvent('resetDatePicker');
@@ -195,37 +199,108 @@ export function BookingModal({
 
   const handleGeneratePaymentLink = async (amount: number) => {
     console.log('🔥 ========================================');
-    console.log('🔥 GÉNÉRATION LIEN DE PAIEMENT');
+    console.log('🔥 GÉNÉRATION LIEN DE PAIEMENT (SANS SAUVEGARDE)');
     console.log('🔥 ========================================');
     console.log('💳 Montant:', amount);
     console.log('💳 Client:', selectedClient?.email);
     console.log('💳 Service:', isCustomService ? customServiceData.name : selectedService?.name);
-    console.log('📋 Booking ID (editingBooking):', editingBooking?.id);
     
-    if (!selectedClient || !selectedService) {
+    if (!selectedClient || (!selectedService && !isCustomService)) {
       console.error('❌ Client ou service manquant');
+      alert('⚠️ Veuillez sélectionner un client et un service avant de générer un lien de paiement.');
       return;
     }
 
-    if (!editingBooking?.id) {
-      alert('⚠️ Veuillez d\'abord sauvegarder la réservation avant de générer un lien de paiement.');
+    if (isCustomService && (!customServiceData.name || customServiceData.price <= 0)) {
+      alert('⚠️ Veuillez remplir le nom et le prix du service personnalisé.');
       return;
     }
 
     try {
+      setSaving(true);
+
+      // 🔥 CRÉER UNE RÉSERVATION TEMPORAIRE SI NÉCESSAIRE
+      let bookingId = tempBookingId || editingBooking?.id;
+
+      if (!bookingId) {
+        console.log('📝 Création d\'une réservation temporaire...');
+        
+        const client = await getOrCreateClient({
+          firstname: selectedClient.firstname,
+          lastname: selectedClient.lastname,
+          email: selectedClient.email,
+          phone: selectedClient.phone
+        });
+
+        const totalAmount = calculateTotalAmount();
+        
+        let serviceId: string | null = null;
+        let serviceDuration;
+        
+        if (isCustomService) {
+          let customServiceTemplate = services.find(s => s.description === 'Service personnalisé');
+          
+          if (!customServiceTemplate) {
+            customServiceTemplate = await ensureCustomServiceExists();
+          }
+          
+          serviceId = customServiceTemplate.id;
+          serviceDuration = customServiceData.duration;
+        } else {
+          serviceId = selectedService!.id;
+          serviceDuration = selectedService!.duration_minutes;
+        }
+        
+        const bookingData = {
+          service_id: serviceId,
+          date,
+          time,
+          duration_minutes: serviceDuration,
+          quantity,
+          client_name: client.lastname,
+          client_firstname: client.firstname,
+          client_email: client.email,
+          client_phone: client.phone,
+          total_amount: totalAmount,
+          payment_status: 'pending' as const,
+          payment_amount: 0,
+          transactions: [],
+          booking_status: 'pending' as const,
+          assigned_user_id: assignedUserId,
+          notes: notes.trim() || null,
+          custom_service_data: isCustomService ? {
+            name: customServiceData.name,
+            price: customServiceData.price,
+            duration: customServiceData.duration
+          } : null
+        };
+
+        const newBooking = await addBooking(bookingData);
+        
+        if (!newBooking) {
+          throw new Error('Impossible de créer la réservation temporaire');
+        }
+
+        bookingId = newBooking.id;
+        setTempBookingId(bookingId);
+        
+        console.log('✅ Réservation temporaire créée:', bookingId);
+      }
+
+      // 🔥 GÉNÉRER LE LIEN DE PAIEMENT
       const expiryMinutes = settings?.payment_link_expiry_minutes || 30;
       
       console.log('🔵 Appel createPaymentLink...');
-      const paymentLink = await createPaymentLink(editingBooking.id, amount, expiryMinutes);
+      const paymentLink = await createPaymentLink(bookingId, amount, expiryMinutes);
       
       if (!paymentLink) {
         throw new Error('Échec de création du lien de paiement');
       }
 
       console.log('✅ Lien créé avec succès:', paymentLink);
-      console.log('🔗 URL FINALE À UTILISER:', paymentLink.payment_url);
+      console.log('🔗 URL FINALE:', paymentLink.payment_url);
 
-      // 🔥 AJOUTER UNE TRANSACTION "PENDING" AVEC payment_link_id
+      // 🔥 AJOUTER UNE TRANSACTION "PENDING"
       const pendingTransaction = {
         amount: amount,
         method: 'stripe' as const,
@@ -244,14 +319,49 @@ export function BookingModal({
       
       console.log('💾 Transaction ajoutée avec payment_link_id:', newTransaction);
       
+      // 🔥 COPIER LE LIEN AU LIEU DE L'OUVRIR
+      try {
+        await navigator.clipboard.writeText(paymentLink.payment_url);
+        console.log('✅ Lien copié dans le presse-papiers:', paymentLink.payment_url);
+        
+        alert(`✅ Lien de paiement créé et copié dans le presse-papiers !\n\n${paymentLink.payment_url}\n\nVous pouvez maintenant le partager avec votre client.`);
+      } catch (clipboardError) {
+        console.warn('⚠️ Impossible de copier automatiquement:', clipboardError);
+        
+        // Fallback : afficher le lien dans une alerte
+        const userChoice = confirm(
+          `✅ Lien de paiement créé !\n\n${paymentLink.payment_url}\n\n` +
+          `Voulez-vous ouvrir le lien dans un nouvel onglet ?`
+        );
+        
+        if (userChoice) {
+          window.open(paymentLink.payment_url, '_blank');
+        }
+      }
+      
       // Déclencher le workflow payment_link_created
       if (user?.id) {
         console.log('🔥 DÉCLENCHEMENT WORKFLOW payment_link_created');
         
         const bookingWithPaymentLink = {
-          ...editingBooking,
-          payment_link: paymentLink.payment_url, // 🔥 UTILISER L'URL RETOURNÉE PAR createPaymentLink
-          transactions: [...(editingBooking.transactions || []), newTransaction]
+          id: bookingId,
+          service_id: isCustomService ? null : selectedService?.id,
+          date,
+          time,
+          duration_minutes: isCustomService ? customServiceData.duration : selectedService?.duration_minutes,
+          quantity,
+          client_name: selectedClient.lastname,
+          client_firstname: selectedClient.firstname,
+          client_email: selectedClient.email,
+          client_phone: selectedClient.phone,
+          total_amount: calculateTotalAmount(),
+          payment_status: 'pending' as const,
+          payment_amount: 0,
+          booking_status: 'pending' as const,
+          assigned_user_id: assignedUserId,
+          notes: notes.trim() || null,
+          payment_link: paymentLink.payment_url,
+          transactions: [newTransaction]
         };
         
         try {
@@ -260,21 +370,6 @@ export function BookingModal({
         } catch (workflowError) {
           console.error('❌ Erreur workflow payment_link_created:', workflowError);
         }
-      }
-      
-      // 🔥 COPIER ET OUVRIR LE LIEN RETOURNÉ PAR createPaymentLink
-      try {
-        await navigator.clipboard.writeText(paymentLink.payment_url);
-        console.log('✅ Lien copié dans le presse-papiers:', paymentLink.payment_url);
-        
-        // 🔥 OUVRIR LE BON LIEN
-        window.open(paymentLink.payment_url, '_blank');
-        console.log('✅ Lien ouvert dans nouvel onglet:', paymentLink.payment_url);
-        
-        alert('✅ Lien de paiement créé et copié dans le presse-papiers !');
-      } catch (clipboardError) {
-        console.warn('⚠️ Impossible de copier automatiquement:', clipboardError);
-        alert(`✅ Lien de paiement créé !\n\n${paymentLink.payment_url}`);
       }
       
     } catch (error) {
@@ -286,6 +381,8 @@ export function BookingModal({
       }
       
       alert(errorMessage);
+    } finally {
+      setSaving(false);
     }
     
     console.log('🏁 ========================================');
@@ -304,7 +401,7 @@ export function BookingModal({
       return;
     }
 
-    if (!editingBooking && !canCreateBooking) {
+    if (!editingBooking && !tempBookingId && !canCreateBooking) {
       alert(
         `Limite de réservations atteinte !\n\n` +
         `Vous avez utilisé ${limitInfo?.current}/${limitInfo?.limit} réservations ce mois-ci.\n\n` +
@@ -373,8 +470,9 @@ export function BookingModal({
       console.log('💾 Données de réservation à sauvegarder:', bookingData);
       console.log('💾 Transactions incluses:', transactions);
 
-      if (editingBooking) {
-        const updatedBooking = await updateBooking(editingBooking.id, bookingData);
+      if (editingBooking || tempBookingId) {
+        const bookingIdToUpdate = editingBooking?.id || tempBookingId!;
+        const updatedBooking = await updateBooking(bookingIdToUpdate, bookingData);
         
         if (updatedBooking) {
           bookingEvents.emit('bookingUpdated', updatedBooking);
@@ -399,12 +497,13 @@ export function BookingModal({
   };
 
   const handleDelete = async () => {
-    if (!editingBooking) return;
+    if (!editingBooking && !tempBookingId) return;
     
     setSaving(true);
     try {
-      await deleteBooking(editingBooking.id);
-      bookingEvents.emit('bookingDeleted', editingBooking.id);
+      const bookingIdToDelete = editingBooking?.id || tempBookingId!;
+      await deleteBooking(bookingIdToDelete);
+      bookingEvents.emit('bookingDeleted', bookingIdToDelete);
       refetchLimit();
       onSuccess();
       handleClose();
@@ -438,7 +537,7 @@ export function BookingModal({
   };
 
   const footerButtons = [
-    ...(editingBooking ? [{
+    ...((editingBooking || tempBookingId) ? [{
       label: 'Supprimer',
       onClick: () => setShowDeleteConfirm(true),
       variant: 'danger' as const,
@@ -452,14 +551,14 @@ export function BookingModal({
       disabled: saving
     },
     {
-      label: editingBooking ? 'Modifier' : 'Créer',
+      label: (editingBooking || tempBookingId) ? 'Modifier' : 'Créer',
       onClick: () => {},
       variant: 'primary' as const,
       disabled: saving || (!selectedService && (!isCustomService || !customServiceData.name || customServiceData.price <= 0)) || 
         !selectedClient?.firstname || !selectedClient?.lastname || !selectedClient?.email || !selectedClient?.phone ||
-        (!editingBooking && !canCreateBooking),
+        (!editingBooking && !tempBookingId && !canCreateBooking),
       loading: saving,
-      icon: editingBooking ? '✏️' : '✨'
+      icon: (editingBooking || tempBookingId) ? '✏️' : '✨'
     }
   ];
 
@@ -484,11 +583,11 @@ export function BookingModal({
       <Modal
         isOpen={isOpen}
         onClose={handleClose}
-        title={editingBooking ? 'Modifier la réservation' : 'Nouvelle réservation'}
+        title={(editingBooking || tempBookingId) ? 'Modifier la réservation' : 'Nouvelle réservation'}
         size="xl"
       >
         <form onSubmit={handleSubmit} className="space-y-4 sm:space-y-6">
-          {!editingBooking && limitInfo && !isUnlimited && (
+          {!editingBooking && !tempBookingId && limitInfo && !isUnlimited && (
             <div className={`rounded-xl p-4 ${
               canCreateBooking 
                 ? limitInfo.remaining! <= 10
