@@ -1,6 +1,37 @@
 import jsPDF from 'jspdf';
 import { Invoice } from '../types';
 
+// Fonction pour récupérer les couleurs personnalisées
+function getCustomColors() {
+  const savedColors = localStorage.getItem('pdfCustomColors');
+  if (savedColors) {
+    try {
+      return JSON.parse(savedColors);
+    } catch (e) {
+      console.error('Erreur parsing couleurs:', e);
+    }
+  }
+  
+  // Couleurs par défaut
+  return {
+    primary: '#9333ea',
+    accent: '#ec4899',
+    text: '#1f2937'
+  };
+}
+
+// Fonction pour convertir hex en RGB
+function hexToRgb(hex: string): [number, number, number] {
+  const result = /^#?([a-f\d]{2})([a-f\d]{2})([a-f\d]{2})$/i.exec(hex);
+  return result
+    ? [
+        parseInt(result[1], 16),
+        parseInt(result[2], 16),
+        parseInt(result[3], 16)
+      ]
+    : [147, 51, 234]; // Fallback violet
+}
+
 export function generateInvoicePDF(invoice: Invoice, companyInfo?: any) {
   const doc = createInvoicePDF(invoice, companyInfo);
   doc.save(`Facture_${invoice.invoice_number}.pdf`);
@@ -22,44 +53,45 @@ function createInvoicePDF(invoice: Invoice, companyInfo?: any): jsPDF {
   
   const doc = new jsPDF();
   
-  // Configuration des couleurs modernes
-  const primaryColor = [147, 51, 234]; // Purple
-  const primaryLight = [196, 181, 253]; // Light purple
-  const accentColor = [236, 72, 153]; // Pink
-  const textDark = [31, 41, 55]; // Gray-800
-  const textMedium = [107, 114, 128]; // Gray-500
-  const bgLight = [249, 250, 251]; // Gray-50
-  const white = [255, 255, 255];
+  // Récupérer les couleurs personnalisées
+  const customColors = getCustomColors();
+  console.log('🎨 Couleurs personnalisées:', customColors);
+  
+  // Configuration des couleurs
+  const primaryColor = hexToRgb(customColors.primary);
+  const primaryLight: [number, number, number] = [
+    Math.min(primaryColor[0] + 50, 255),
+    Math.min(primaryColor[1] + 50, 255),
+    Math.min(primaryColor[2] + 50, 255)
+  ];
+  const accentColor = hexToRgb(customColors.accent);
+  const textDark = hexToRgb(customColors.text);
+  const textMedium: [number, number, number] = [107, 114, 128];
+  const bgLight: [number, number, number] = [249, 250, 251];
+  const white: [number, number, number] = [255, 255, 255];
 
   let yPos = 20;
 
   // ===== EN-TÊTE AVEC DÉGRADÉ =====
-  // Fond principal
   doc.setFillColor(...primaryColor);
   doc.roundedRect(0, 0, 210, 50, 0, 0, 'F');
   
-  // Accent décoratif
   doc.setFillColor(...accentColor);
   doc.circle(200, 10, 15, 'F');
   doc.setFillColor(...primaryLight);
   doc.circle(190, 45, 10, 'F');
   
-  // Titre FACTURE
   doc.setTextColor(...white);
   doc.setFontSize(32);
   doc.setFont('helvetica', 'bold');
   doc.text('FACTURE', 20, 28);
   
-  // Numéro de facture
   doc.setFontSize(14);
   doc.setFont('helvetica', 'normal');
   doc.text(invoice.invoice_number, 20, 40);
 
   // ===== SECTION ÉMETTEUR ET CLIENT =====
   yPos = 65;
-  
-  // Carte Émetteur
-  console.log('🏢 Affichage émetteur, companyInfo:', companyInfo);
   
   doc.setFillColor(...bgLight);
   doc.roundedRect(15, yPos, 85, 50, 3, 3, 'F');
@@ -77,7 +109,6 @@ function createInvoicePDF(invoice: Invoice, companyInfo?: any): jsPDF {
     doc.setFontSize(11);
     
     if (companyInfo.company_name) {
-      console.log('✅ Nom entreprise:', companyInfo.company_name);
       doc.text(companyInfo.company_name, 20, emitterYPos);
       emitterYPos += 6;
     }
@@ -86,7 +117,6 @@ function createInvoicePDF(invoice: Invoice, companyInfo?: any): jsPDF {
     doc.setFontSize(9);
     
     if (companyInfo.address) {
-      console.log('✅ Adresse:', companyInfo.address);
       const addressLines = doc.splitTextToSize(companyInfo.address, 75);
       doc.text(addressLines, 20, emitterYPos);
       emitterYPos += addressLines.length * 4;
@@ -94,13 +124,11 @@ function createInvoicePDF(invoice: Invoice, companyInfo?: any): jsPDF {
     
     if (companyInfo.postal_code || companyInfo.city) {
       const location = `${companyInfo.postal_code || ''} ${companyInfo.city || ''}`.trim();
-      console.log('✅ Localisation:', location);
       doc.text(location, 20, emitterYPos);
       emitterYPos += 4;
     }
     
     if (companyInfo.siret) {
-      console.log('✅ SIRET:', companyInfo.siret);
       doc.setTextColor(...textMedium);
       doc.text(`SIRET: ${companyInfo.siret}`, 20, emitterYPos);
       emitterYPos += 4;
@@ -108,17 +136,14 @@ function createInvoicePDF(invoice: Invoice, companyInfo?: any): jsPDF {
     }
     
     if (companyInfo.email) {
-      console.log('✅ Email:', companyInfo.email);
       doc.text(companyInfo.email, 20, emitterYPos);
       emitterYPos += 4;
     }
     
     if (companyInfo.phone) {
-      console.log('✅ Téléphone:', companyInfo.phone);
       doc.text(companyInfo.phone, 20, emitterYPos);
     }
   } else {
-    console.warn('⚠️ Aucune information entreprise disponible');
     doc.setTextColor(...textMedium);
     doc.setFontSize(9);
     doc.setFont('helvetica', 'italic');
@@ -176,7 +201,6 @@ function createInvoicePDF(invoice: Invoice, companyInfo?: any): jsPDF {
   // ===== TABLEAU DES PRODUITS =====
   yPos += 28;
   
-  // En-tête du tableau avec coins arrondis
   doc.setFillColor(...primaryColor);
   doc.roundedRect(15, yPos, 180, 12, 3, 3, 'F');
   
@@ -191,13 +215,11 @@ function createInvoicePDF(invoice: Invoice, companyInfo?: any): jsPDF {
   
   yPos += 12;
 
-  // Lignes du tableau avec espacement
   doc.setTextColor(...textDark);
   doc.setFont('helvetica', 'normal');
   doc.setFontSize(9);
   
   invoice.items?.forEach((item, index) => {
-    // Carte pour chaque ligne
     if (index % 2 === 0) {
       doc.setFillColor(...bgLight);
     } else {
@@ -205,39 +227,29 @@ function createInvoicePDF(invoice: Invoice, companyInfo?: any): jsPDF {
     }
     doc.roundedRect(15, yPos, 180, 10, 2, 2, 'F');
     
-    // Description (tronquée si trop longue)
     const description = item.description.length > 45 
       ? item.description.substring(0, 42) + '...' 
       : item.description;
     doc.text(description, 20, yPos + 6);
-    
-    // Quantité
     doc.text(item.quantity.toString(), 125, yPos + 6, { align: 'center' });
-    
-    // Prix HT
     doc.text(`${item.unit_price_ht.toFixed(2)}€`, 145, yPos + 6, { align: 'center' });
-    
-    // TVA
     doc.text(`${item.tva_rate}%`, 165, yPos + 6, { align: 'center' });
     
-    // Total TTC
     doc.setFont('helvetica', 'bold');
     doc.text(`${item.total_ttc.toFixed(2)}€`, 185, yPos + 6, { align: 'right' });
     doc.setFont('helvetica', 'normal');
     
     yPos += 12;
     
-    // Nouvelle page si nécessaire
     if (yPos > 240) {
       doc.addPage();
       yPos = 20;
     }
   });
 
-  // ===== TOTAUX AVEC DESIGN MODERNE =====
+  // ===== TOTAUX =====
   yPos += 5;
   
-  // Carte des totaux
   doc.setFillColor(...bgLight);
   doc.roundedRect(110, yPos, 85, 35, 3, 3, 'F');
   
@@ -245,15 +257,12 @@ function createInvoicePDF(invoice: Invoice, companyInfo?: any): jsPDF {
   doc.setFontSize(10);
   doc.setFont('helvetica', 'normal');
   
-  // Sous-total HT
   doc.text('Sous-total HT:', 115, yPos + 8);
   doc.text(`${invoice.subtotal_ht.toFixed(2)}€`, 190, yPos + 8, { align: 'right' });
   
-  // TVA
   doc.text('TVA:', 115, yPos + 16);
   doc.text(`${invoice.total_tva.toFixed(2)}€`, 190, yPos + 16, { align: 'right' });
   
-  // Total TTC avec accent
   doc.setFillColor(...accentColor);
   doc.roundedRect(110, yPos + 20, 85, 15, 3, 3, 'F');
   
@@ -268,7 +277,6 @@ function createInvoicePDF(invoice: Invoice, companyInfo?: any): jsPDF {
   if (invoice.notes) {
     yPos += 45;
     
-    // Vérifier si on a assez d'espace
     if (yPos > 240) {
       doc.addPage();
       yPos = 20;
@@ -289,16 +297,14 @@ function createInvoicePDF(invoice: Invoice, companyInfo?: any): jsPDF {
     doc.text(splitNotes, 20, yPos + 12);
   }
 
-  // ===== PIED DE PAGE MODERNE =====
+  // ===== PIED DE PAGE =====
   const pageCount = doc.getNumberOfPages();
   for (let i = 1; i <= pageCount; i++) {
     doc.setPage(i);
     
-    // Barre de pied de page
     doc.setFillColor(...primaryColor);
     doc.roundedRect(0, 282, 210, 15, 0, 0, 'F');
     
-    // Accent décoratif
     doc.setFillColor(...accentColor);
     doc.circle(10, 289.5, 3, 'F');
     doc.circle(200, 289.5, 3, 'F');

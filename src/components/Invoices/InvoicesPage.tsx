@@ -1,5 +1,5 @@
-import React, { useState } from 'react';
-import { FileText, Plus, Search, Filter, Eye, Send, Check, X, Edit, Trash2, RefreshCw } from 'lucide-react';
+import React, { useState, useEffect } from 'react';
+import { FileText, Plus, Search, Filter, Eye, Send, Check, X, Edit, Trash2, RefreshCw, Palette } from 'lucide-react';
 import { useInvoices } from '../../hooks/useInvoices';
 import { Invoice } from '../../types';
 import { LoadingSpinner } from '../UI/LoadingSpinner';
@@ -9,14 +9,16 @@ import { CreateInvoiceModal } from './CreateInvoiceModal';
 import { InvoiceDetailsModal } from './InvoiceDetailsModal';
 import { SendInvoiceModal } from './SendInvoiceModal';
 import { InvoicePreviewModal } from './InvoicePreviewModal';
+import { PDFCustomizationModal } from './PDFCustomizationModal';
 
 export function InvoicesPage() {
-  const { invoices, loading, updateInvoice, deleteInvoice } = useInvoices();
+  const { invoices, loading, fetchInvoices, updateInvoice, deleteInvoice } = useInvoices();
   const [showCreateModal, setShowCreateModal] = useState(false);
   const [selectedInvoice, setSelectedInvoice] = useState<Invoice | null>(null);
   const [showDetailsModal, setShowDetailsModal] = useState(false);
   const [showSendModal, setShowSendModal] = useState(false);
   const [showPreviewModal, setShowPreviewModal] = useState(false);
+  const [showCustomizationModal, setShowCustomizationModal] = useState(false);
   const [searchTerm, setSearchTerm] = useState('');
   const [statusFilter, setStatusFilter] = useState<string>('all');
 
@@ -82,6 +84,13 @@ export function InvoicesPage() {
     setShowPreviewModal(true);
   };
 
+  // ✅ CALLBACK pour forcer le refresh après création
+  const handleInvoiceCreated = async () => {
+    console.log('🔄 handleInvoiceCreated - Force refresh');
+    await fetchInvoices();
+    setShowCreateModal(false);
+  };
+
   if (loading) {
     return (
       <div className="flex items-center justify-center h-64">
@@ -104,19 +113,29 @@ export function InvoicesPage() {
             </p>
           </div>
 
-          <Button
-            onClick={() => setShowCreateModal(true)}
-            className="flex items-center gap-2"
-          >
-            <Plus className="w-5 h-5" />
-            <span className="hidden sm:inline">Nouvelle facture</span>
-          </Button>
+          <div className="flex gap-2">
+            <Button
+              onClick={() => setShowCustomizationModal(true)}
+              variant="secondary"
+              className="flex items-center gap-2"
+            >
+              <Palette className="w-5 h-5" />
+              <span className="hidden sm:inline">Personnaliser PDF</span>
+            </Button>
+
+            <Button
+              onClick={() => setShowCreateModal(true)}
+              className="flex items-center gap-2"
+            >
+              <Plus className="w-5 h-5" />
+              <span className="hidden sm:inline">Nouvelle facture</span>
+            </Button>
+          </div>
         </div>
 
         {/* Filtres */}
         <div className="bg-white rounded-xl sm:rounded-2xl shadow-lg p-4 sm:p-6 mb-6">
           <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4">
-            {/* Recherche */}
             <div className="relative">
               <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 text-gray-400 w-5 h-5" />
               <input
@@ -128,7 +147,6 @@ export function InvoicesPage() {
               />
             </div>
 
-            {/* Filtre statut */}
             <div>
               <select
                 value={statusFilter}
@@ -143,7 +161,6 @@ export function InvoicesPage() {
               </select>
             </div>
 
-            {/* Stats */}
             <div className="bg-gradient-to-r from-purple-50 to-pink-50 border border-purple-200 rounded-xl p-3 text-center">
               <div className="text-lg font-bold text-purple-600">
                 {invoices.reduce((sum, inv) => sum + inv.total_ttc, 0).toFixed(2)}€
@@ -157,7 +174,6 @@ export function InvoicesPage() {
         <div className="bg-white rounded-xl sm:rounded-2xl shadow-lg overflow-hidden">
           {filteredInvoices.length > 0 ? (
             <>
-              {/* Version desktop */}
               <div className="hidden lg:block overflow-x-auto">
                 <table className="w-full">
                   <thead className="bg-gradient-to-r from-gray-50 to-purple-50 border-b border-gray-200">
@@ -250,7 +266,6 @@ export function InvoicesPage() {
                 </table>
               </div>
 
-              {/* Version mobile */}
               <div className="lg:hidden space-y-4 p-4">
                 {filteredInvoices.map((invoice, index) => (
                   <div
@@ -342,6 +357,7 @@ export function InvoicesPage() {
         <CreateInvoiceModal
           isOpen={showCreateModal}
           onClose={() => setShowCreateModal(false)}
+          onInvoiceCreated={handleInvoiceCreated}
         />
       )}
 
@@ -375,6 +391,13 @@ export function InvoicesPage() {
             setShowPreviewModal(false);
             setSelectedInvoice(null);
           }}
+        />
+      )}
+
+      {showCustomizationModal && (
+        <PDFCustomizationModal
+          isOpen={showCustomizationModal}
+          onClose={() => setShowCustomizationModal(false)}
         />
       )}
     </>

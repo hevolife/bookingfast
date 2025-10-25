@@ -8,9 +8,13 @@ export function useInvoices() {
   const [invoices, setInvoices] = useState<Invoice[]>([]);
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
+  const [refreshKey, setRefreshKey] = useState(0); // ✅ AJOUT : Clé de refresh
 
   const fetchInvoices = async () => {
+    console.log('🔄 fetchInvoices appelé, user:', user?.id);
+    
     if (!user || !isSupabaseConfigured()) {
+      console.log('❌ Pas de user ou Supabase non configuré');
       setInvoices([]);
       return;
     }
@@ -19,6 +23,7 @@ export function useInvoices() {
       setLoading(true);
       setError(null);
 
+      console.log('📡 Requête Supabase en cours...');
       const { data, error } = await supabase!
         .from('invoices')
         .select(`
@@ -29,10 +34,22 @@ export function useInvoices() {
         .eq('user_id', user.id)
         .order('invoice_date', { ascending: false });
 
-      if (error) throw error;
-      setInvoices(data || []);
+      if (error) {
+        console.error('❌ Erreur Supabase:', error);
+        throw error;
+      }
+      
+      console.log('✅ Factures récupérées:', data?.length, 'factures');
+      console.log('📋 Détail des factures:', data?.map(inv => inv.invoice_number));
+      
+      // ✅ CORRECTION : Créer un NOUVEAU tableau pour forcer le re-render
+      setInvoices([...(data || [])]);
+      
+      // ✅ AJOUT : Incrémenter la clé de refresh pour forcer le re-render
+      setRefreshKey(prev => prev + 1);
+      console.log('🔑 RefreshKey incrémenté');
     } catch (err) {
-      console.error('Erreur chargement factures:', err);
+      console.error('❌ Erreur chargement factures:', err);
       setError(err instanceof Error ? err.message : 'Erreur inconnue');
     } finally {
       setLoading(false);
@@ -61,6 +78,8 @@ export function useInvoices() {
   };
 
   const createInvoice = async (invoiceData: Partial<Invoice>, items: Partial<InvoiceItem>[]): Promise<Invoice> => {
+    console.log('🆕 createInvoice appelé');
+    
     if (!user || !isSupabaseConfigured()) {
       throw new Error('Supabase non configuré');
     }
@@ -70,6 +89,7 @@ export function useInvoices() {
 
       // Générer le numéro de facture
       const invoiceNumber = await generateInvoiceNumber();
+      console.log('📝 Numéro de facture généré:', invoiceNumber);
 
       // Calculer les totaux
       let subtotal_ht = 0;
@@ -87,7 +107,10 @@ export function useInvoices() {
 
       const total_ttc = subtotal_ht + total_tva;
 
+      console.log('💰 Totaux calculés - HT:', subtotal_ht, 'TVA:', total_tva, 'TTC:', total_ttc);
+
       // Créer la facture
+      console.log('📤 Insertion facture en base...');
       const { data: invoice, error: invoiceError } = await supabase!
         .from('invoices')
         .insert({
@@ -101,7 +124,12 @@ export function useInvoices() {
         .select()
         .single();
 
-      if (invoiceError) throw invoiceError;
+      if (invoiceError) {
+        console.error('❌ Erreur insertion facture:', invoiceError);
+        throw invoiceError;
+      }
+
+      console.log('✅ Facture créée:', invoice.id);
 
       // Créer les lignes de facture
       const invoiceItems = items.map(item => {
@@ -120,18 +148,26 @@ export function useInvoices() {
         };
       });
 
+      console.log('📤 Insertion items en base...');
       const { error: itemsError } = await supabase!
         .from('invoice_items')
         .insert(invoiceItems);
 
-      if (itemsError) throw itemsError;
+      if (itemsError) {
+        console.error('❌ Erreur insertion items:', itemsError);
+        throw itemsError;
+      }
+
+      console.log('✅ Items créés');
 
       // ✅ REFRESH AUTOMATIQUE APRÈS CRÉATION
+      console.log('🔄 Appel fetchInvoices pour refresh...');
       await fetchInvoices();
+      console.log('✅ Refresh terminé');
       
       return invoice;
     } catch (err) {
-      console.error('Erreur création facture:', err);
+      console.error('❌ Erreur création facture:', err);
       setError(err instanceof Error ? err.message : 'Erreur inconnue');
       throw err;
     }
@@ -189,6 +225,7 @@ export function useInvoices() {
   };
 
   useEffect(() => {
+    console.log('🎯 useEffect useInvoices, user:', user?.id);
     if (user) {
       fetchInvoices();
     }
@@ -198,6 +235,7 @@ export function useInvoices() {
     invoices,
     loading,
     error,
+    refreshKey, // ✅ AJOUT : Exposer la clé de refresh
     fetchInvoices,
     generateInvoiceNumber,
     createInvoice,
