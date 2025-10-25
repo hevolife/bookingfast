@@ -1,6 +1,6 @@
 import React, { useState, useEffect } from 'react';
 import { useNavigate, useLocation } from 'react-router-dom';
-import { Calendar, Settings, LayoutDashboard, Package, Mail, BarChart3, Users, ShoppingCart, LogOut, Menu, X, ChevronDown, ChevronRight, Puzzle, List, UserCircle } from 'lucide-react';
+import { Calendar, Settings, LayoutDashboard, Package, Mail, BarChart3, Users, ShoppingCart, LogOut, Menu, X, ChevronDown, ChevronRight, Puzzle, List, UserCircle, FileText } from 'lucide-react';
 import { useAuth } from '../../contexts/AuthContext';
 import { usePlugins } from '../../hooks/usePlugins';
 
@@ -141,6 +141,18 @@ export function Navbar() {
               >
                 <Package className="w-5 h-5" />
                 <span>Services</span>
+              </button>
+
+              <button
+                onClick={() => handleNavigation('invoices')}
+                className={`flex items-center gap-2 px-4 py-2 rounded-xl font-medium transition-all ${
+                  currentPage === 'invoices'
+                    ? 'bg-gradient-to-r from-yellow-600 to-orange-600 text-white shadow-lg'
+                    : 'text-gray-700 hover:bg-gray-100'
+                }`}
+              >
+                <FileText className="w-5 h-5" />
+                <span>Factures</span>
               </button>
 
               <button
@@ -389,6 +401,32 @@ export function Navbar() {
                   </div>
                   {currentPage === 'services' && (
                     <div className="w-2 h-2 rounded-full bg-gradient-to-r from-green-600 to-emerald-600 animate-pulse"></div>
+                  )}
+                </button>
+
+                <button
+                  onClick={() => handleNavigation('invoices')}
+                  className={`w-full flex items-center gap-4 p-4 rounded-2xl font-medium transition-all transform hover:scale-105 ${
+                    currentPage === 'invoices'
+                      ? 'bg-white text-gray-900 shadow-2xl'
+                      : 'bg-white/10 text-white hover:bg-white/20 backdrop-blur-sm'
+                  }`}
+                >
+                  <div className={`w-12 h-12 rounded-xl flex items-center justify-center ${
+                    currentPage === 'invoices'
+                      ? 'bg-gradient-to-r from-yellow-500 to-orange-500'
+                      : 'bg-white/20'
+                  }`}>
+                    <FileText className="w-6 h-6 text-white" />
+                  </div>
+                  <div className="flex-1 text-left">
+                    <div className="font-bold">Factures</div>
+                    <div className={`text-xs ${currentPage === 'invoices' ? 'text-gray-500' : 'text-purple-200'}`}>
+                      Facturation clients
+                    </div>
+                  </div>
+                  {currentPage === 'invoices' && (
+                    <div className="w-2 h-2 rounded-full bg-gradient-to-r from-yellow-600 to-orange-600 animate-pulse"></div>
                   )}
                 </button>
 

@@ -7,8 +7,7 @@ import {
   Clock, 
   Star, 
   CheckCircle, 
-  ArrowRight, 
-  Play,
+  ArrowRight,
   Building2,
   Smartphone,
   Globe,
@@ -19,7 +18,16 @@ import {
   Award,
   Target,
   Sparkles,
-  Settings
+  Settings,
+  BarChart3,
+  Bell,
+  Lock,
+  Palette,
+  MessageSquare,
+  Rocket,
+  Crown,
+  Gift,
+  Infinity
 } from 'lucide-react';
 import { useNavigate } from 'react-router-dom';
 import { useAuth } from '../../contexts/AuthContext';
@@ -30,7 +38,6 @@ export function LandingPage() {
   const [currentFeature, setCurrentFeature] = useState(0);
   const [isVisible, setIsVisible] = useState(false);
 
-  // 🔥 CORRECTION : Rediriger si déjà authentifié
   useEffect(() => {
     if (isAuthenticated) {
       console.log('✅ LandingPage - Utilisateur authentifié détecté, redirection vers /dashboard');
@@ -42,65 +49,153 @@ export function LandingPage() {
     {
       icon: Calendar,
       title: "Planning Intelligent",
-      description: "Gérez vos créneaux avec un calendrier intuitif et des notifications automatiques",
-      color: "from-blue-500 to-cyan-500"
+      description: "Gérez vos créneaux avec un calendrier intuitif et des notifications automatiques. Synchronisation en temps réel avec votre équipe.",
+      color: "from-blue-500 to-cyan-500",
+      image: "https://images.pexels.com/photos/6694543/pexels-photo-6694543.jpeg?auto=compress&cs=tinysrgb&w=1200",
+      benefits: [
+        "Vue calendrier intuitive",
+        "Synchronisation temps réel",
+        "Notifications automatiques",
+        "Gestion des disponibilités"
+      ]
     },
     {
       icon: CreditCard,
       title: "Paiements Sécurisés",
-      description: "Encaissez en ligne avec Stripe, générez des liens de paiement instantanés",
-      color: "from-green-500 to-emerald-500"
+      description: "Encaissez en ligne avec Stripe, générez des liens de paiement instantanés. Sécurité bancaire maximale garantie.",
+      color: "from-green-500 to-emerald-500",
+      image: "https://images.pexels.com/photos/4968630/pexels-photo-4968630.jpeg?auto=compress&cs=tinysrgb&w=1200",
+      benefits: [
+        "Paiements Stripe sécurisés",
+        "Liens de paiement instantanés",
+        "Facturation automatique",
+        "Suivi des transactions"
+      ]
     },
     {
       icon: Mail,
       title: "Emails Automatiques",
-      description: "Confirmations, rappels et suivis envoyés automatiquement à vos clients",
-      color: "from-purple-500 to-pink-500"
+      description: "Confirmations, rappels et suivis envoyés automatiquement à vos clients. Personnalisez vos messages et workflows.",
+      color: "from-purple-500 to-pink-500",
+      image: "https://images.pexels.com/photos/5668858/pexels-photo-5668858.jpeg?auto=compress&cs=tinysrgb&w=1200",
+      benefits: [
+        "Confirmations automatiques",
+        "Rappels personnalisés",
+        "Workflows sur mesure",
+        "Templates professionnels"
+      ]
     },
     {
       icon: Users,
       title: "Gestion d'Équipe",
-      description: "Ajoutez jusqu'à 10 membres avec le plan Pro, illimité avec Pack Société",
-      color: "from-orange-500 to-red-500"
+      description: "Collaborez efficacement avec votre équipe, gérez les accès et permissions. Tableau de bord centralisé pour tous.",
+      color: "from-orange-500 to-red-500",
+      image: "https://images.pexels.com/photos/3184291/pexels-photo-3184291.jpeg?auto=compress&cs=tinysrgb&w=1200",
+      benefits: [
+        "Gestion des rôles",
+        "Permissions granulaires",
+        "Tableau de bord équipe",
+        "Communication intégrée"
+      ]
     }
   ];
 
   const testimonials = [
     {
       name: "Marie Dubois",
-      business: "Salon de beauté",
-      text: "BookingFast a révolutionné ma gestion ! Plus de double réservations, paiements automatiques. Je recommande !",
+      business: "Salon de beauté Le Chic",
+      text: "BookingFast a révolutionné ma gestion ! Plus de double réservations, paiements automatiques. Mon chiffre d'affaires a augmenté de 40% en 3 mois. Je recommande à 100% !",
       rating: 5,
-      avatar: "M"
+      avatar: "https://images.pexels.com/photos/774909/pexels-photo-774909.jpeg?auto=compress&cs=tinysrgb&w=200",
+      image: "https://images.pexels.com/photos/3993449/pexels-photo-3993449.jpeg?auto=compress&cs=tinysrgb&w=1200",
+      stats: "+40% CA"
     },
     {
       name: "Thomas Martin",
-      business: "Coach sportif",
-      text: "Interface intuitive, clients ravis. Le système de rappels automatiques a réduit mes no-shows de 80% !",
+      business: "Coach sportif Pro Fitness",
+      text: "Interface intuitive, clients ravis. Le système de rappels automatiques a réduit mes no-shows de 80% ! Gain de temps énorme, je peux me concentrer sur mes clients.",
       rating: 5,
-      avatar: "T"
+      avatar: "https://images.pexels.com/photos/220453/pexels-photo-220453.jpeg?auto=compress&cs=tinysrgb&w=200",
+      image: "https://images.pexels.com/photos/416778/pexels-photo-416778.jpeg?auto=compress&cs=tinysrgb&w=1200",
+      stats: "-80% absences"
     },
     {
       name: "Sophie Laurent",
-      business: "Thérapeute",
-      text: "Parfait pour mon cabinet ! Les liens de paiement facilitent tout. Support client exceptionnel.",
+      business: "Cabinet de thérapie Zen",
+      text: "Parfait pour mon cabinet ! Les liens de paiement facilitent tout. Support client exceptionnel, réponse en moins de 2h. Mes patients adorent la simplicité de réservation.",
       rating: 5,
-      avatar: "S"
+      avatar: "https://images.pexels.com/photos/415829/pexels-photo-415829.jpeg?auto=compress&cs=tinysrgb&w=200",
+      image: "https://images.pexels.com/photos/3759657/pexels-photo-3759657.jpeg?auto=compress&cs=tinysrgb&w=1200",
+      stats: "5/5 satisfaction"
     }
   ];
 
   const stats = [
-    { number: "10,000+", label: "Réservations gérées", icon: Calendar },
-    { number: "500+", label: "Professionnels satisfaits", icon: Users },
-    { number: "99.9%", label: "Temps de disponibilité", icon: Shield },
-    { number: "24/7", label: "Support client", icon: Heart }
+    { number: "15,000+", label: "Réservations gérées", icon: Calendar, color: "from-blue-500 to-cyan-500" },
+    { number: "800+", label: "Professionnels satisfaits", icon: Users, color: "from-purple-500 to-pink-500" },
+    { number: "99.9%", label: "Temps de disponibilité", icon: Shield, color: "from-green-500 to-emerald-500" },
+    { number: "24/7", label: "Support client", icon: Heart, color: "from-red-500 to-orange-500" }
+  ];
+
+  const useCases = [
+    {
+      title: "Salons de beauté",
+      description: "Gérez vos rendez-vous coiffure, esthétique et bien-être avec élégance",
+      icon: Sparkles,
+      image: "https://images.pexels.com/photos/3993449/pexels-photo-3993449.jpeg?auto=compress&cs=tinysrgb&w=800",
+      gradient: "from-pink-500 to-rose-500"
+    },
+    {
+      title: "Coachs sportifs",
+      description: "Planifiez vos séances individuelles et collectives en toute simplicité",
+      icon: Target,
+      image: "https://images.pexels.com/photos/416778/pexels-photo-416778.jpeg?auto=compress&cs=tinysrgb&w=800",
+      gradient: "from-orange-500 to-amber-500"
+    },
+    {
+      title: "Thérapeutes",
+      description: "Organisez vos consultations avec professionnalisme et sérénité",
+      icon: Heart,
+      image: "https://images.pexels.com/photos/3759657/pexels-photo-3759657.jpeg?auto=compress&cs=tinysrgb&w=800",
+      gradient: "from-green-500 to-teal-500"
+    },
+    {
+      title: "Consultants",
+      description: "Gérez vos rendez-vous clients professionnels avec efficacité",
+      icon: Award,
+      image: "https://images.pexels.com/photos/3184291/pexels-photo-3184291.jpeg?auto=compress&cs=tinysrgb&w=800",
+      gradient: "from-blue-500 to-indigo-500"
+    }
+  ];
+
+  const advantages = [
+    {
+      icon: Rocket,
+      title: "Démarrage rapide",
+      description: "Configuration en 5 minutes, formation gratuite incluse"
+    },
+    {
+      icon: Shield,
+      title: "Sécurité maximale",
+      description: "Données cryptées, conformité RGPD, hébergement sécurisé"
+    },
+    {
+      icon: Zap,
+      title: "Performance optimale",
+      description: "99.9% de disponibilité, vitesse ultra-rapide"
+    },
+    {
+      icon: Heart,
+      title: "Support dédié",
+      description: "Équipe disponible 24/7, réponse en moins de 2h"
+    }
   ];
 
   useEffect(() => {
     setIsVisible(true);
     const interval = setInterval(() => {
       setCurrentFeature((prev) => (prev + 1) % features.length);
-    }, 4000);
+    }, 5000);
     return () => clearInterval(interval);
   }, []);
 
@@ -109,341 +204,492 @@ export function LandingPage() {
   };
 
   return (
-    <div className="landing-page min-h-screen bg-gradient-to-br from-blue-50 via-purple-50 to-pink-50">
-      {/* Navigation */}
-      <nav className="fixed top-0 left-0 right-0 z-50 bg-white/95 backdrop-blur-md border-b border-gray-200 shadow-lg">
+    <div className="landing-page min-h-screen bg-white">
+      {/* Navigation Premium */}
+      <nav className="fixed top-0 left-0 right-0 z-50 bg-white/98 backdrop-blur-xl border-b border-gray-100 shadow-sm">
         <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
-          <div className="flex items-center justify-between h-16">
+          <div className="flex items-center justify-between h-20">
             <div className="flex items-center gap-3">
-              <div className="w-10 h-10 bg-gradient-to-r from-blue-600 to-purple-600 rounded-xl flex items-center justify-center">
-                <Building2 className="w-6 h-6 text-white" />
+              <div className="w-12 h-12 bg-gradient-to-br from-blue-600 via-purple-600 to-pink-600 rounded-2xl flex items-center justify-center shadow-xl animate-glow">
+                <Building2 className="w-7 h-7 text-white" />
               </div>
               <div>
-                <h1 className="text-xl font-bold bg-gradient-to-r from-blue-600 to-purple-600 bg-clip-text text-transparent">
+                <h1 className="text-2xl font-bold bg-gradient-to-r from-blue-600 via-purple-600 to-pink-600 bg-clip-text text-transparent">
                   BookingFast
                 </h1>
-                <p className="text-xs text-gray-500 hidden sm:block">Système de réservation professionnel</p>
+                <p className="text-xs text-gray-500 hidden sm:block font-medium">Réservation professionnelle</p>
               </div>
             </div>
 
-            <div className="hidden md:flex items-center gap-6">
-              <button onClick={() => scrollToSection('features')} className="text-gray-600 hover:text-blue-600 font-medium transition-colors">
+            <div className="hidden md:flex items-center gap-8">
+              <button onClick={() => scrollToSection('features')} className="text-gray-700 hover:text-blue-600 font-semibold transition-colors">
                 Fonctionnalités
               </button>
-              <button onClick={() => scrollToSection('pricing')} className="text-gray-600 hover:text-blue-600 font-medium transition-colors">
+              <button onClick={() => scrollToSection('pricing')} className="text-gray-700 hover:text-blue-600 font-semibold transition-colors">
                 Tarifs
               </button>
-              <button onClick={() => scrollToSection('testimonials')} className="text-gray-600 hover:text-blue-600 font-medium transition-colors">
+              <button onClick={() => scrollToSection('testimonials')} className="text-gray-700 hover:text-blue-600 font-semibold transition-colors">
                 Témoignages
               </button>
             </div>
 
             <button
               onClick={() => navigate('/login')}
-              className="bg-gradient-to-r from-blue-600 to-purple-600 text-white px-6 py-2 rounded-xl hover:from-blue-700 hover:to-purple-700 transition-all duration-300 transform hover:scale-105 shadow-lg font-medium"
+              className="bg-gradient-to-r from-blue-600 via-purple-600 to-pink-600 text-white px-8 py-3 rounded-xl hover:shadow-2xl transition-all duration-300 transform hover:scale-105 shadow-lg font-bold relative overflow-hidden group"
             >
-              Commencer
+              <span className="relative z-10 flex items-center gap-2">
+                <Sparkles className="w-5 h-5" />
+                Connexion
+              </span>
+              <div className="absolute inset-0 bg-gradient-to-r from-pink-600 via-purple-600 to-blue-600 opacity-0 group-hover:opacity-100 transition-opacity duration-300"></div>
             </button>
           </div>
         </div>
       </nav>
 
-      {/* Hero Section */}
-      <section className="pt-32 pb-16 px-4 sm:px-6 lg:px-8 relative overflow-hidden">
-        {/* Background decorations */}
-        <div className="absolute inset-0">
-          <div className="absolute -top-40 -right-40 w-80 h-80 bg-gradient-to-r from-purple-400 to-pink-400 rounded-full opacity-20 animate-float"></div>
-          <div className="absolute -bottom-40 -left-40 w-80 h-80 bg-gradient-to-r from-blue-400 to-cyan-400 rounded-full opacity-20 animate-float" style={{ animationDelay: '2s' }}></div>
+      {/* Hero Section Premium */}
+      <section className="pt-32 pb-24 px-4 sm:px-6 lg:px-8 bg-gradient-to-br from-blue-50 via-purple-50 to-pink-50 relative overflow-hidden">
+        {/* Animated background elements */}
+        <div className="absolute inset-0 overflow-hidden">
+          <div className="absolute -top-40 -right-40 w-80 h-80 bg-purple-300 rounded-full mix-blend-multiply filter blur-3xl opacity-30 animate-float"></div>
+          <div className="absolute -bottom-40 -left-40 w-80 h-80 bg-blue-300 rounded-full mix-blend-multiply filter blur-3xl opacity-30 animate-float" style={{ animationDelay: '2s' }}></div>
+          <div className="absolute top-1/2 left-1/2 w-80 h-80 bg-pink-300 rounded-full mix-blend-multiply filter blur-3xl opacity-30 animate-float" style={{ animationDelay: '4s' }}></div>
         </div>
 
         <div className="max-w-7xl mx-auto relative z-10">
-          <div className="text-center mb-16">
+          <div className="grid grid-cols-1 lg:grid-cols-2 gap-16 items-center">
+            {/* Contenu gauche */}
             <div className={`transition-all duration-1000 ${isVisible ? 'opacity-100 translate-y-0' : 'opacity-0 translate-y-10'}`}>
-              <div className="mb-6">
-                <h1 className="text-3xl sm:text-5xl lg:text-6xl font-bold text-gray-900 leading-tight">
-                  <span className="bg-gradient-to-r from-blue-600 via-purple-600 to-pink-600 bg-clip-text text-transparent">
-                    Révolutionnez votre
-                  </span>
-                  <br />
-                  <span className="bg-gradient-to-r from-blue-600 via-purple-600 to-pink-600 bg-clip-text text-transparent relative inline-block">
-                    Gestion de Réservations
-                    <div className="absolute -bottom-2 left-0 right-0 h-1 bg-gradient-to-r from-blue-600 to-purple-600 rounded-full animate-pulse"></div>
-                  </span>
-                </h1>
+              <div className="inline-flex items-center gap-2 bg-gradient-to-r from-blue-600 to-purple-600 text-white px-6 py-3 rounded-full text-sm font-bold mb-8 shadow-xl animate-glow">
+                <Gift className="w-5 h-5" />
+                Essai gratuit 7 jours - Sans carte bancaire
               </div>
               
-              <p className="text-lg sm:text-xl text-gray-600 mb-8 max-w-3xl mx-auto leading-relaxed">
-                La solution complète pour gérer vos rendez-vous, encaisser vos paiements et fidéliser vos clients.
-                <span className="block mt-2 text-base sm:text-lg text-purple-600 font-medium">
-                  ✨ Simple, puissant, professionnel
+              <h1 className="text-5xl sm:text-6xl lg:text-7xl font-black text-gray-900 leading-tight mb-8">
+                Gérez vos réservations
+                <span className="block bg-gradient-to-r from-blue-600 via-purple-600 to-pink-600 bg-clip-text text-transparent mt-2">
+                  comme un pro
                 </span>
+              </h1>
+              
+              <p className="text-2xl text-gray-700 mb-10 leading-relaxed font-medium">
+                La solution <span className="text-purple-600 font-bold">tout-en-un</span> pour gérer vos rendez-vous, encaisser vos paiements et fidéliser vos clients. 
+                <span className="block mt-2 text-xl text-gray-600">Simple. Puissant. Professionnel.</span>
               </p>
 
-              <div className="flex flex-col sm:flex-row gap-4 justify-center items-center mb-12">
+              <div className="flex flex-col sm:flex-row gap-4 mb-10">
                 <button
                   onClick={() => navigate('/login')}
-                  className="bg-gradient-to-r from-green-600 to-emerald-600 text-white px-6 sm:px-8 py-3 sm:py-4 rounded-2xl hover:from-green-700 hover:to-emerald-700 transition-all duration-300 transform hover:scale-105 shadow-2xl font-bold text-base sm:text-lg flex items-center gap-2 sm:gap-3 group"
+                  className="bg-gradient-to-r from-blue-600 via-purple-600 to-pink-600 text-white px-10 py-5 rounded-2xl hover:shadow-2xl transition-all duration-300 transform hover:scale-105 shadow-xl font-black text-xl flex items-center justify-center gap-3 group relative overflow-hidden"
                 >
-                  <Sparkles className="w-5 h-5 sm:w-6 sm:h-6 group-hover:rotate-12 transition-transform" />
-                  Essai gratuit 7 jours
-                  <ArrowRight className="w-5 h-5 sm:w-6 sm:h-6 group-hover:translate-x-1 transition-transform" />
+                  <span className="relative z-10 flex items-center gap-3">
+                    <Rocket className="w-7 h-7 group-hover:rotate-12 transition-transform" />
+                    Commencer
+                    <ArrowRight className="w-7 h-7 group-hover:translate-x-2 transition-transform" />
+                  </span>
+                  <div className="absolute inset-0 bg-gradient-to-r from-pink-600 via-purple-600 to-blue-600 opacity-0 group-hover:opacity-100 transition-opacity duration-300"></div>
+                </button>
+                
+                <button
+                  onClick={() => scrollToSection('features')}
+                  className="bg-white text-gray-900 px-10 py-5 rounded-2xl hover:bg-gray-50 transition-all duration-300 border-2 border-gray-300 font-bold text-xl flex items-center justify-center gap-3 shadow-lg hover:shadow-xl"
+                >
+                  Découvrir
+                  <ArrowRight className="w-6 h-6" />
                 </button>
               </div>
 
-              {/* Trust indicators */}
-              <div className="flex flex-wrap justify-center items-center gap-8 text-gray-500 text-sm">
-                <div className="flex items-center gap-2">
-                  <Shield className="w-5 h-5 text-green-500" />
-                  <span>Sécurisé SSL</span>
+              {/* Trust indicators premium */}
+              <div className="grid grid-cols-3 gap-4">
+                <div className="flex flex-col items-center gap-2 bg-white/80 backdrop-blur-sm p-4 rounded-2xl shadow-lg">
+                  <Shield className="w-8 h-8 text-green-500" />
+                  <span className="text-sm font-bold text-gray-900">Sécurisé SSL</span>
                 </div>
-                <div className="flex items-center gap-2">
-                  <CheckCircle className="w-5 h-5 text-blue-500" />
-                  <span>RGPD Conforme</span>
+                <div className="flex flex-col items-center gap-2 bg-white/80 backdrop-blur-sm p-4 rounded-2xl shadow-lg">
+                  <CheckCircle className="w-8 h-8 text-blue-500" />
+                  <span className="text-sm font-bold text-gray-900">RGPD Conforme</span>
                 </div>
-                <div className="flex items-center gap-2">
-                  <Star className="w-5 h-5 text-yellow-500" />
-                  <span>Support 24/7</span>
+                <div className="flex flex-col items-center gap-2 bg-white/80 backdrop-blur-sm p-4 rounded-2xl shadow-lg">
+                  <Star className="w-8 h-8 text-yellow-500" />
+                  <span className="text-sm font-bold text-gray-900">Support 24/7</span>
                 </div>
               </div>
             </div>
+
+            {/* Image droite - Dashboard Premium */}
+            <div className="relative">
+              <div className="relative z-10">
+                <div className="relative rounded-3xl overflow-hidden shadow-2xl border-8 border-white transform hover:scale-105 transition-all duration-500">
+                  <img 
+                    src="https://images.pexels.com/photos/3184292/pexels-photo-3184292.jpeg?auto=compress&cs=tinysrgb&w=1400" 
+                    alt="Dashboard BookingFast Premium"
+                    className="w-full h-auto"
+                  />
+                  <div className="absolute inset-0 bg-gradient-to-t from-purple-900/20 to-transparent"></div>
+                </div>
+                
+                {/* Floating stats cards */}
+                <div className="absolute -bottom-8 -left-8 bg-white rounded-3xl shadow-2xl p-6 animate-float border-4 border-green-100">
+                  <div className="flex items-center gap-4">
+                    <div className="w-16 h-16 bg-gradient-to-br from-green-500 to-emerald-500 rounded-2xl flex items-center justify-center shadow-lg">
+                      <TrendingUp className="w-8 h-8 text-white" />
+                    </div>
+                    <div>
+                      <div className="text-3xl font-black text-gray-900">+127%</div>
+                      <div className="text-sm font-bold text-gray-600">Réservations</div>
+                    </div>
+                  </div>
+                </div>
+                
+                <div className="absolute -top-8 -right-8 bg-white rounded-3xl shadow-2xl p-6 animate-float border-4 border-yellow-100" style={{ animationDelay: '1s' }}>
+                  <div className="flex items-center gap-4">
+                    <div className="w-16 h-16 bg-gradient-to-br from-yellow-500 to-orange-500 rounded-2xl flex items-center justify-center shadow-lg">
+                      <Star className="w-8 h-8 text-white" />
+                    </div>
+                    <div>
+                      <div className="text-3xl font-black text-gray-900">4.9/5</div>
+                      <div className="text-sm font-bold text-gray-600">Satisfaction</div>
+                    </div>
+                  </div>
+                </div>
+              </div>
+              
+              {/* Background glow */}
+              <div className="absolute inset-0 bg-gradient-to-r from-blue-400 via-purple-400 to-pink-400 rounded-3xl blur-3xl opacity-30 -z-10 animate-pulse"></div>
+            </div>
           </div>
 
-          {/* Stats Section */}
-          <div className="grid grid-cols-2 lg:grid-cols-4 gap-6 mb-16">
+          {/* Stats Section Premium */}
+          <div className="grid grid-cols-2 lg:grid-cols-4 gap-6 mt-24">
             {stats.map((stat, index) => (
               <div
                 key={index}
-                className={`bg-white/80 backdrop-blur-sm rounded-2xl p-6 text-center shadow-xl border border-white/20 transform hover:scale-105 transition-all duration-300 animate-fadeIn`}
-                style={{ animationDelay: `${index * 200}ms` }}
+                className="bg-white/90 backdrop-blur-sm rounded-3xl p-8 text-center shadow-xl border-2 border-gray-100 transform hover:scale-110 transition-all duration-300 animate-fadeIn hover:shadow-2xl group"
+                style={{ animationDelay: `${index * 100}ms` }}
               >
-                <div className="w-12 h-12 bg-gradient-to-r from-blue-500 to-purple-500 rounded-xl flex items-center justify-center mx-auto mb-4">
-                  <stat.icon className="w-6 h-6 text-white" />
+                <div className={`w-16 h-16 bg-gradient-to-r ${stat.color} rounded-2xl flex items-center justify-center mx-auto mb-6 shadow-lg group-hover:scale-110 transition-transform`}>
+                  <stat.icon className="w-8 h-8 text-white" />
                 </div>
-                <div className="text-2xl sm:text-3xl font-bold text-gray-900 mb-2">{stat.number}</div>
-                <div className="text-gray-600 font-medium">{stat.label}</div>
+                <div className="text-4xl font-black text-gray-900 mb-3">{stat.number}</div>
+                <div className="text-gray-700 font-bold text-lg">{stat.label}</div>
               </div>
             ))}
           </div>
         </div>
       </section>
 
-      {/* Features Section */}
-      <section id="features" className="py-20 px-4 sm:px-6 lg:px-8 bg-white/50 backdrop-blur-sm">
+      {/* Advantages Section */}
+      <section className="py-20 px-4 sm:px-6 lg:px-8 bg-white">
         <div className="max-w-7xl mx-auto">
           <div className="text-center mb-16">
-            <h2 className="text-2xl sm:text-4xl font-bold text-gray-900 mb-6">
+            <h2 className="text-5xl font-black text-gray-900 mb-6">
+              Pourquoi choisir BookingFast ?
+            </h2>
+            <p className="text-2xl text-gray-600 max-w-3xl mx-auto font-medium">
+              Des avantages qui font la différence
+            </p>
+          </div>
+
+          <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-8">
+            {advantages.map((advantage, index) => (
+              <div
+                key={index}
+                className="bg-gradient-to-br from-gray-50 to-white rounded-3xl p-8 shadow-xl hover:shadow-2xl transition-all duration-300 transform hover:scale-105 border-2 border-gray-100"
+              >
+                <div className="w-16 h-16 bg-gradient-to-br from-blue-500 to-purple-500 rounded-2xl flex items-center justify-center mb-6 shadow-lg">
+                  <advantage.icon className="w-8 h-8 text-white" />
+                </div>
+                <h3 className="text-2xl font-black text-gray-900 mb-4">{advantage.title}</h3>
+                <p className="text-gray-600 leading-relaxed font-medium">{advantage.description}</p>
+              </div>
+            ))}
+          </div>
+        </div>
+      </section>
+
+      {/* Use Cases Section Premium */}
+      <section className="py-24 px-4 sm:px-6 lg:px-8 bg-gradient-to-br from-gray-50 to-white">
+        <div className="max-w-7xl mx-auto">
+          <div className="text-center mb-20">
+            <h2 className="text-5xl font-black text-gray-900 mb-6">
+              Parfait pour votre activité
+            </h2>
+            <p className="text-2xl text-gray-600 max-w-3xl mx-auto font-medium">
+              Des centaines de professionnels nous font confiance
+            </p>
+          </div>
+
+          <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-8">
+            {useCases.map((useCase, index) => (
+              <div
+                key={index}
+                className="group bg-white rounded-3xl overflow-hidden shadow-xl hover:shadow-2xl transition-all duration-500 transform hover:scale-105 border-2 border-gray-100"
+              >
+                <div className="relative h-64 overflow-hidden">
+                  <img 
+                    src={useCase.image} 
+                    alt={useCase.title}
+                    className="w-full h-full object-cover group-hover:scale-110 transition-transform duration-700"
+                  />
+                  <div className={`absolute inset-0 bg-gradient-to-t ${useCase.gradient} opacity-60 group-hover:opacity-40 transition-opacity`}></div>
+                  <div className="absolute bottom-6 left-6">
+                    <div className="w-16 h-16 bg-white rounded-2xl flex items-center justify-center mb-3 shadow-xl">
+                      <useCase.icon className="w-8 h-8 text-gray-900" />
+                    </div>
+                  </div>
+                </div>
+                <div className="p-8">
+                  <h3 className="text-2xl font-black text-gray-900 mb-3">{useCase.title}</h3>
+                  <p className="text-gray-600 leading-relaxed font-medium">{useCase.description}</p>
+                </div>
+              </div>
+            ))}
+          </div>
+        </div>
+      </section>
+
+      {/* Features Section Premium */}
+      <section id="features" className="py-24 px-4 sm:px-6 lg:px-8 bg-white">
+        <div className="max-w-7xl mx-auto">
+          <div className="text-center mb-20">
+            <h2 className="text-5xl font-black text-gray-900 mb-6">
               Tout ce dont vous avez besoin
             </h2>
-            <p className="text-lg text-gray-600 max-w-3xl mx-auto">
+            <p className="text-2xl text-gray-600 max-w-3xl mx-auto font-medium">
               Une suite complète d'outils professionnels pour transformer votre activité
             </p>
           </div>
 
-          <div className="grid grid-cols-1 lg:grid-cols-2 gap-12 items-center">
-            {/* Feature showcase */}
-            <div className="space-y-6 sm:space-y-8">
-              {features.map((feature, index) => (
-                <div
-                  key={index}
-                  className={`flex items-center gap-4 sm:gap-6 p-4 sm:p-6 rounded-2xl transition-all duration-500 cursor-pointer transform hover:scale-105 ${
-                    currentFeature === index
-                      ? 'bg-gradient-to-r from-white to-blue-50 shadow-2xl border-2 border-blue-200'
-                      : 'bg-white/80 shadow-lg hover:shadow-xl border border-gray-200'
-                  }`}
-                  onClick={() => setCurrentFeature(index)}
-                >
-                  <div className={`w-12 h-12 sm:w-16 sm:h-16 rounded-2xl flex items-center justify-center text-white bg-gradient-to-r ${feature.color} shadow-lg flex-shrink-0`}>
-                    <feature.icon className="w-6 h-6 sm:w-8 sm:h-8" />
-                  </div>
-                  <div className="flex-1">
-                    <h3 className="text-lg sm:text-xl font-bold text-gray-900 mb-1 sm:mb-2">{feature.title}</h3>
-                    <p className="text-gray-600 text-sm sm:text-base">{feature.description}</p>
-                  </div>
-                  {currentFeature === index && (
-                    <div className="w-2 h-2 sm:w-3 sm:h-3 bg-gradient-to-r from-blue-500 to-purple-500 rounded-full animate-pulse flex-shrink-0"></div>
-                  )}
-                </div>
-              ))}
-            </div>
-
-            {/* Demo mockup */}
-            <div className="relative">
-              <div className="bg-gradient-to-r from-gray-900 to-gray-800 rounded-3xl p-4 sm:p-8 shadow-2xl transform rotate-3 hover:rotate-0 transition-transform duration-500">
-                <div className="bg-white rounded-2xl overflow-hidden shadow-xl">
-                  {/* Mockup header */}
-                  <div className="bg-gradient-to-r from-blue-600 to-purple-600 p-3 sm:p-4 flex items-center gap-2 sm:gap-3">
-                    <div className="w-6 h-6 sm:w-8 sm:h-8 bg-white/20 rounded-lg flex items-center justify-center">
-                      <Building2 className="w-4 h-4 sm:w-5 sm:h-5 text-white" />
-                    </div>
-                    <div className="text-white font-bold text-sm sm:text-base">BookingFast Dashboard</div>
+          <div className="space-y-32">
+            {features.map((feature, index) => (
+              <div
+                key={index}
+                className={`grid grid-cols-1 lg:grid-cols-2 gap-16 items-center ${
+                  index % 2 === 1 ? 'lg:flex-row-reverse' : ''
+                }`}
+              >
+                <div className={index % 2 === 1 ? 'lg:order-2' : ''}>
+                  <div className={`inline-flex items-center gap-3 bg-gradient-to-r ${feature.color} text-white px-6 py-3 rounded-full text-sm font-bold mb-8 shadow-xl`}>
+                    <feature.icon className="w-5 h-5" />
+                    Fonctionnalité Premium
                   </div>
                   
-                  {/* Mockup content */}
-                  <div className="p-4 sm:p-6 space-y-3 sm:space-y-4">
-                    <div className="flex items-center gap-2 sm:gap-3 p-2 sm:p-3 bg-green-50 rounded-xl border border-green-200">
-                      <div className="w-8 h-8 sm:w-10 sm:h-10 bg-green-500 rounded-xl flex items-center justify-center text-white">
-                        <CheckCircle className="w-4 h-4 sm:w-5 sm:h-5" />
-                      </div>
-                      <div>
-                        <div className="font-bold text-green-800 text-sm sm:text-base">Réservation confirmée</div>
-                        <div className="text-xs sm:text-sm text-green-600">Marie D. - Massage 14h30</div>
-                      </div>
+                  <h3 className="text-4xl font-black text-gray-900 mb-6">
+                    {feature.title}
+                  </h3>
+                  
+                  <p className="text-xl text-gray-700 mb-8 leading-relaxed font-medium">
+                    {feature.description}
+                  </p>
+
+                  <ul className="space-y-4">
+                    {feature.benefits.map((benefit, i) => (
+                      <li key={i} className="flex items-center gap-4 bg-gradient-to-r from-gray-50 to-white p-4 rounded-2xl shadow-md hover:shadow-lg transition-all">
+                        <CheckCircle className="w-6 h-6 text-green-500 flex-shrink-0" />
+                        <span className="text-gray-900 font-bold text-lg">{benefit}</span>
+                      </li>
+                    ))}
+                  </ul>
+                </div>
+
+                <div className={index % 2 === 1 ? 'lg:order-1' : ''}>
+                  <div className="relative group">
+                    <div className="relative rounded-3xl overflow-hidden shadow-2xl border-8 border-white transform group-hover:scale-105 transition-all duration-500">
+                      <img 
+                        src={feature.image} 
+                        alt={feature.title}
+                        className="w-full h-auto"
+                      />
+                      <div className={`absolute inset-0 bg-gradient-to-t ${feature.color} opacity-20 group-hover:opacity-10 transition-opacity`}></div>
                     </div>
-                    
-                    <div className="flex items-center gap-2 sm:gap-3 p-2 sm:p-3 bg-blue-50 rounded-xl border border-blue-200">
-                      <div className="w-8 h-8 sm:w-10 sm:h-10 bg-blue-500 rounded-xl flex items-center justify-center text-white">
-                        <CreditCard className="w-4 h-4 sm:w-5 sm:h-5" />
-                      </div>
-                      <div>
-                        <div className="font-bold text-blue-800 text-sm sm:text-base">Paiement reçu</div>
-                        <div className="text-xs sm:text-sm text-blue-600">80.00€ - Stripe</div>
-                      </div>
-                    </div>
-                    
-                    <div className="flex items-center gap-2 sm:gap-3 p-2 sm:p-3 bg-purple-50 rounded-xl border border-purple-200">
-                      <div className="w-8 h-8 sm:w-10 sm:h-10 bg-purple-500 rounded-xl flex items-center justify-center text-white">
-                        <Mail className="w-4 h-4 sm:w-5 sm:h-5" />
-                      </div>
-                      <div>
-                        <div className="font-bold text-purple-800 text-sm sm:text-base">Email envoyé</div>
-                        <div className="text-xs sm:text-sm text-purple-600">Confirmation automatique</div>
-                      </div>
-                    </div>
+                    <div className={`absolute inset-0 bg-gradient-to-r ${feature.color} rounded-3xl blur-3xl opacity-30 -z-10 group-hover:opacity-50 transition-opacity`}></div>
                   </div>
                 </div>
               </div>
-              
-              {/* Floating elements */}
-              <div className="absolute -top-2 -right-2 sm:-top-4 sm:-right-4 w-12 h-12 sm:w-20 sm:h-20 bg-gradient-to-r from-green-400 to-emerald-400 rounded-full flex items-center justify-center text-white font-bold text-lg sm:text-2xl animate-bounce shadow-xl">
-                ✓
-              </div>
-              <div className="absolute -bottom-2 -left-2 sm:-bottom-4 sm:-left-4 w-10 h-10 sm:w-16 sm:h-16 bg-gradient-to-r from-purple-400 to-pink-400 rounded-full flex items-center justify-center text-white animate-pulse shadow-xl">
-                <Star className="w-5 h-5 sm:w-8 sm:h-8" />
-              </div>
-            </div>
+            ))}
           </div>
         </div>
       </section>
 
-      {/* Pricing Section */}
-      <section id="pricing" className="py-20 px-4 sm:px-6 lg:px-8">
-        <div className="max-w-7xl mx-auto">
-          <div className="text-center mb-16">
-            <h2 className="text-2xl sm:text-4xl font-bold text-gray-900 mb-6">
+      {/* Pricing Section Premium */}
+      <section id="pricing" className="py-24 px-4 sm:px-6 lg:px-8 bg-gradient-to-br from-blue-50 via-purple-50 to-pink-50 relative overflow-hidden">
+        {/* Animated background */}
+        <div className="absolute inset-0 overflow-hidden">
+          <div className="absolute top-0 left-0 w-96 h-96 bg-blue-300 rounded-full mix-blend-multiply filter blur-3xl opacity-20 animate-float"></div>
+          <div className="absolute bottom-0 right-0 w-96 h-96 bg-purple-300 rounded-full mix-blend-multiply filter blur-3xl opacity-20 animate-float" style={{ animationDelay: '2s' }}></div>
+        </div>
+
+        <div className="max-w-7xl mx-auto relative z-10">
+          <div className="text-center mb-20">
+            <h2 className="text-5xl font-black text-gray-900 mb-6">
               Tarifs transparents
             </h2>
-            <p className="text-lg text-gray-600 max-w-3xl mx-auto">
+            <p className="text-2xl text-gray-600 max-w-3xl mx-auto font-medium">
               Commencez gratuitement, évoluez selon vos besoins
             </p>
           </div>
 
-          <div className="grid grid-cols-1 lg:grid-cols-2 gap-8 max-w-4xl mx-auto">
-            {/* Plan Mensuel */}
-            <div className="bg-white rounded-3xl shadow-xl p-8 border-2 border-gray-200 hover:border-blue-400 transition-all duration-300 transform hover:scale-105">
-              <div className="text-center mb-8">
-                <div className="w-16 h-16 bg-gradient-to-r from-blue-500 to-cyan-500 rounded-2xl flex items-center justify-center mx-auto mb-4">
-                  <CreditCard className="w-8 h-8 text-white" />
-                </div>
-                <h3 className="text-2xl font-bold text-gray-900 mb-4">Plan Mensuel</h3>
-                <div className="text-5xl font-bold text-blue-600 mb-2">59,99€</div>
-                <div className="text-gray-600">par mois</div>
+          <div className="grid grid-cols-1 lg:grid-cols-3 gap-8 max-w-6xl mx-auto">
+            {/* Plan Starter */}
+            <div className="bg-white rounded-3xl shadow-2xl border-4 border-green-400 hover:border-green-600 transition-all duration-300 transform hover:scale-105 relative pt-16">
+              <div className="absolute -top-5 left-1/2 transform -translate-x-1/2 z-30">
+                <span className="bg-gradient-to-r from-green-500 to-emerald-500 text-white px-8 py-3 rounded-full text-sm font-black shadow-2xl whitespace-nowrap block">
+                  🚀 Idéal pour démarrer
+                </span>
               </div>
 
-              <div className="space-y-4 mb-8">
-                {[
-                  'Réservations illimitées',
-                  'Gestion des clients',
-                  'Paiements en ligne',
-                  'Workflows email',
-                  'Jusqu\'à 10 membres d\'équipe',
-                  'Support email'
-                ].map((feature, index) => (
-                  <div key={index} className="flex items-center gap-3">
-                    <CheckCircle className="w-5 h-5 text-green-500 flex-shrink-0" />
-                    <span className="text-gray-700">{feature}</span>
+              <div className="p-10">
+                <div className="text-center mb-10">
+                  <div className="w-20 h-20 bg-gradient-to-br from-green-500 to-emerald-500 rounded-3xl flex items-center justify-center mx-auto mb-6 shadow-xl">
+                    <Sparkles className="w-10 h-10 text-white" />
                   </div>
-                ))}
-              </div>
+                  <h3 className="text-3xl font-black text-gray-900 mb-6">Starter</h3>
+                  <div className="text-6xl font-black text-green-600 mb-3">29,99€</div>
+                  <div className="text-gray-600 font-bold text-lg">par mois</div>
+                </div>
 
-              <button
-                onClick={() => navigate('/login')}
-                className="w-full bg-gradient-to-r from-blue-600 to-cyan-600 text-white py-4 px-6 rounded-2xl font-bold text-lg hover:from-blue-700 hover:to-cyan-700 transition-all duration-300 transform hover:scale-105 shadow-lg"
-              >
-                Essai gratuit 7 jours
-              </button>
+                <div className="space-y-5 mb-10">
+                  {[
+                    '100 réservations par mois',
+                    'Gestion des clients',
+                    'Calendrier intégré',
+                    'Notifications email',
+                    'Support email',
+                    'Idéal pour démarrer'
+                  ].map((feature, index) => (
+                    <div key={index} className="flex items-center gap-4 bg-green-50 p-4 rounded-2xl">
+                      <CheckCircle className="w-6 h-6 text-green-500 flex-shrink-0" />
+                      <span className="text-gray-900 font-bold">{feature}</span>
+                    </div>
+                  ))}
+                </div>
+
+                <button
+                  onClick={() => navigate('/login')}
+                  className="w-full bg-gradient-to-r from-green-600 to-emerald-600 text-white py-5 px-6 rounded-2xl font-black text-xl hover:from-green-700 hover:to-emerald-700 transition-all duration-300 transform hover:scale-105 shadow-xl"
+                >
+                  Commencer
+                </button>
+              </div>
             </div>
 
-            {/* Plan Annuel */}
-            <div className="bg-white rounded-3xl shadow-xl p-8 border-2 border-purple-400 hover:border-purple-600 transition-all duration-300 transform hover:scale-105 relative">
-              <div className="absolute -top-4 left-1/2 transform -translate-x-1/2">
-                <span className="bg-gradient-to-r from-purple-500 to-pink-500 text-white px-6 py-2 rounded-full text-sm font-bold shadow-lg">
+            {/* Plan Pro Mensuel */}
+            <div className="bg-white rounded-3xl shadow-2xl border-4 border-blue-400 hover:border-blue-600 transition-all duration-300 transform hover:scale-110 relative pt-16">
+              <div className="absolute -top-5 left-1/2 transform -translate-x-1/2 z-30">
+                <span className="bg-gradient-to-r from-blue-500 to-cyan-500 text-white px-8 py-3 rounded-full text-sm font-black shadow-2xl animate-glow whitespace-nowrap block">
+                  ⭐ Le plus populaire
+                </span>
+              </div>
+
+              <div className="p-10">
+                <div className="text-center mb-10">
+                  <div className="w-20 h-20 bg-gradient-to-br from-blue-500 to-cyan-500 rounded-3xl flex items-center justify-center mx-auto mb-6 shadow-xl">
+                    <Zap className="w-10 h-10 text-white" />
+                  </div>
+                  <h3 className="text-3xl font-black text-gray-900 mb-6">Pro Mensuel</h3>
+                  <div className="text-6xl font-black text-blue-600 mb-3">49,99€</div>
+                  <div className="text-gray-600 font-bold text-lg">par mois</div>
+                </div>
+
+                <div className="space-y-5 mb-10">
+                  {[
+                    'Réservations illimitées',
+                    'Paiements en ligne Stripe',
+                    'Workflows email automatiques',
+                    'Jusqu\'à 10 membres d\'équipe',
+                    'Support prioritaire',
+                    'Rapports avancés'
+                  ].map((feature, index) => (
+                    <div key={index} className="flex items-center gap-4 bg-blue-50 p-4 rounded-2xl">
+                      <CheckCircle className="w-6 h-6 text-blue-500 flex-shrink-0" />
+                      <span className="text-gray-900 font-bold">{feature}</span>
+                    </div>
+                  ))}
+                </div>
+
+                <button
+                  onClick={() => navigate('/login')}
+                  className="w-full bg-gradient-to-r from-blue-600 to-cyan-600 text-white py-5 px-6 rounded-2xl font-black text-xl hover:from-blue-700 hover:to-cyan-700 transition-all duration-300 transform hover:scale-105 shadow-xl"
+                >
+                  Commencer
+                </button>
+              </div>
+            </div>
+
+            {/* Plan Pro Annuel */}
+            <div className="bg-white rounded-3xl shadow-2xl border-4 border-purple-400 hover:border-purple-600 transition-all duration-300 transform hover:scale-105 relative pt-16">
+              <div className="absolute -top-5 left-1/2 transform -translate-x-1/2 z-30">
+                <span className="bg-gradient-to-r from-purple-500 to-pink-500 text-white px-8 py-3 rounded-full text-sm font-black shadow-2xl whitespace-nowrap block">
                   🎉 Économisez 17%
                 </span>
               </div>
 
-              <div className="text-center mb-8">
-                <div className="w-16 h-16 bg-gradient-to-r from-purple-500 to-pink-500 rounded-2xl flex items-center justify-center mx-auto mb-4">
-                  <Star className="w-8 h-8 text-white" />
-                </div>
-                <h3 className="text-2xl font-bold text-gray-900 mb-4">Plan Annuel</h3>
-                <div className="text-5xl font-bold text-purple-600 mb-2">499,99€</div>
-                <div className="text-gray-600">par an</div>
-                <div className="text-sm text-green-600 font-medium mt-2">
-                  Soit 41,67€/mois
-                </div>
-              </div>
-
-              <div className="space-y-4 mb-8">
-                {[
-                  'Tout du plan mensuel',
-                  '2 mois gratuits',
-                  'Jusqu\'à 10 membres d\'équipe',
-                  'Support prioritaire',
-                  'Fonctionnalités avancées',
-                  'Accès aux bêtas'
-                ].map((feature, index) => (
-                  <div key={index} className="flex items-center gap-3">
-                    <CheckCircle className="w-5 h-5 text-green-500 flex-shrink-0" />
-                    <span className="text-gray-700">{feature}</span>
+              <div className="p-10">
+                <div className="text-center mb-10">
+                  <div className="w-20 h-20 bg-gradient-to-br from-purple-500 to-pink-500 rounded-3xl flex items-center justify-center mx-auto mb-6 shadow-xl">
+                    <Crown className="w-10 h-10 text-white" />
                   </div>
-                ))}
-              </div>
+                  <h3 className="text-3xl font-black text-gray-900 mb-6">Pro Annuel</h3>
+                  <div className="text-6xl font-black text-purple-600 mb-3">41,66€</div>
+                  <div className="text-gray-600 font-bold text-lg">par mois</div>
+                  <div className="text-sm text-green-600 font-black mt-3 bg-green-50 px-4 py-2 rounded-full inline-block">
+                    Soit 499,99€/an
+                  </div>
+                </div>
 
-              <button
-                onClick={() => navigate('/login')}
-                className="w-full bg-gradient-to-r from-purple-600 to-pink-600 text-white py-4 px-6 rounded-2xl font-bold text-lg hover:from-purple-700 hover:to-pink-700 transition-all duration-300 transform hover:scale-105 shadow-lg"
-              >
-                Commencer maintenant
-              </button>
+                <div className="space-y-5 mb-10">
+                  {[
+                    'Tout du plan Pro',
+                    '2 mois gratuits',
+                    'Support prioritaire 24/7',
+                    'Fonctionnalités avancées',
+                    'Accès aux bêtas',
+                    'Formation personnalisée'
+                  ].map((feature, index) => (
+                    <div key={index} className="flex items-center gap-4 bg-purple-50 p-4 rounded-2xl">
+                      <CheckCircle className="w-6 h-6 text-purple-500 flex-shrink-0" />
+                      <span className="text-gray-900 font-bold">{feature}</span>
+                    </div>
+                  ))}
+                </div>
+
+                <button
+                  onClick={() => navigate('/login')}
+                  className="w-full bg-gradient-to-r from-purple-600 to-pink-600 text-white py-5 px-6 rounded-2xl font-black text-xl hover:from-purple-700 hover:to-pink-700 transition-all duration-300 transform hover:scale-105 shadow-xl"
+                >
+                  Commencer
+                </button>
+              </div>
             </div>
           </div>
 
-          {/* Pack Société Plugin Info */}
-          <div className="mt-12 max-w-4xl mx-auto">
-            <div className="bg-gradient-to-r from-orange-50 to-amber-50 rounded-3xl p-8 border-2 border-orange-200 shadow-xl">
-              <div className="flex items-start gap-6">
-                <div className="w-16 h-16 bg-gradient-to-r from-orange-500 to-amber-500 rounded-2xl flex items-center justify-center flex-shrink-0">
-                  <Users className="w-8 h-8 text-white" />
+          {/* Pack Société Premium */}
+          <div className="mt-16 max-w-5xl mx-auto">
+            <div className="bg-gradient-to-r from-orange-50 to-amber-50 rounded-3xl p-10 border-4 border-orange-300 shadow-2xl relative overflow-hidden">
+              <div className="absolute top-0 right-0 w-64 h-64 bg-orange-300 rounded-full mix-blend-multiply filter blur-3xl opacity-20"></div>
+              <div className="relative z-10 flex items-start gap-8">
+                <div className="w-20 h-20 bg-gradient-to-br from-orange-500 to-amber-500 rounded-3xl flex items-center justify-center flex-shrink-0 shadow-xl">
+                  <Infinity className="w-10 h-10 text-white" />
                 </div>
                 <div className="flex-1">
-                  <h3 className="text-2xl font-bold text-gray-900 mb-3">
-                    🚀 Pack Société - Membres d'équipe illimités
+                  <h3 className="text-3xl font-black text-gray-900 mb-4">
+                    🚀 Pack Société - Membres illimités
                   </h3>
-                  <p className="text-gray-700 mb-4 leading-relaxed">
-                    Besoin de plus de 10 membres d'équipe ? Activez le <strong>Pack Société</strong> pour débloquer un nombre illimité de collaborateurs et gérer votre entreprise sans limites.
+                  <p className="text-xl text-gray-700 mb-6 leading-relaxed font-medium">
+                    Besoin de plus de 10 membres d'équipe ? Activez le <strong>Pack Société</strong> pour débloquer un nombre illimité de collaborateurs et des fonctionnalités entreprise.
                   </p>
-                  <div className="flex flex-wrap gap-3">
-                    <div className="flex items-center gap-2 bg-white px-4 py-2 rounded-xl border border-orange-200">
-                      <CheckCircle className="w-5 h-5 text-green-500" />
-                      <span className="text-sm font-medium text-gray-700">Membres illimités</span>
+                  <div className="flex flex-wrap gap-4">
+                    <div className="flex items-center gap-3 bg-white px-6 py-3 rounded-2xl border-2 border-orange-200 shadow-lg">
+                      <CheckCircle className="w-6 h-6 text-green-500" />
+                      <span className="font-black text-gray-900">Membres illimités</span>
                     </div>
-                    <div className="flex items-center gap-2 bg-white px-4 py-2 rounded-xl border border-orange-200">
-                      <CheckCircle className="w-5 h-5 text-green-500" />
-                      <span className="text-sm font-medium text-gray-700">Gestion multi-sites</span>
+                    <div className="flex items-center gap-3 bg-white px-6 py-3 rounded-2xl border-2 border-orange-200 shadow-lg">
+                      <CheckCircle className="w-6 h-6 text-green-500" />
+                      <span className="font-black text-gray-900">Gestion multi-sites</span>
                     </div>
-                    <div className="flex items-center gap-2 bg-white px-4 py-2 rounded-xl border border-orange-200">
-                      <CheckCircle className="w-5 h-5 text-green-500" />
-                      <span className="text-sm font-medium text-gray-700">Support prioritaire</span>
+                    <div className="flex items-center gap-3 bg-white px-6 py-3 rounded-2xl border-2 border-orange-200 shadow-lg">
+                      <CheckCircle className="w-6 h-6 text-green-500" />
+                      <span className="font-black text-gray-900">Support dédié</span>
                     </div>
                   </div>
                 </div>
@@ -453,14 +699,14 @@ export function LandingPage() {
         </div>
       </section>
 
-      {/* Testimonials */}
-      <section id="testimonials" className="py-20 px-4 sm:px-6 lg:px-8 bg-gradient-to-r from-purple-50 to-pink-50">
+      {/* Testimonials Premium */}
+      <section id="testimonials" className="py-24 px-4 sm:px-6 lg:px-8 bg-white">
         <div className="max-w-7xl mx-auto">
-          <div className="text-center mb-16">
-            <h2 className="text-2xl sm:text-4xl font-bold text-gray-900 mb-6">
+          <div className="text-center mb-20">
+            <h2 className="text-5xl font-black text-gray-900 mb-6">
               Ils nous font confiance
             </h2>
-            <p className="text-lg text-gray-600 max-w-3xl mx-auto">
+            <p className="text-2xl text-gray-600 max-w-3xl mx-auto font-medium">
               Découvrez pourquoi des centaines de professionnels choisissent BookingFast
             </p>
           </div>
@@ -469,57 +715,73 @@ export function LandingPage() {
             {testimonials.map((testimonial, index) => (
               <div
                 key={index}
-                className={`bg-white rounded-2xl p-8 shadow-xl hover:shadow-2xl transition-all duration-500 transform hover:scale-105 animate-fadeIn`}
+                className="bg-white rounded-3xl shadow-2xl hover:shadow-3xl transition-all duration-500 transform hover:scale-105 overflow-hidden animate-fadeIn border-2 border-gray-100"
                 style={{ animationDelay: `${index * 200}ms` }}
               >
-                <div className="flex items-center gap-4 mb-6">
-                  <div className="w-12 h-12 bg-gradient-to-r from-purple-500 to-pink-500 rounded-full flex items-center justify-center text-white font-bold text-lg">
-                    {testimonial.avatar}
-                  </div>
-                  <div>
-                    <div className="font-bold text-gray-900">{testimonial.name}</div>
-                    <div className="text-sm text-gray-600">{testimonial.business}</div>
+                <div className="relative h-56">
+                  <img 
+                    src={testimonial.image} 
+                    alt={testimonial.business}
+                    className="w-full h-full object-cover"
+                  />
+                  <div className="absolute inset-0 bg-gradient-to-t from-black/80 via-black/40 to-transparent"></div>
+                  <div className="absolute top-4 right-4 bg-white px-4 py-2 rounded-full shadow-xl">
+                    <span className="text-sm font-black text-gray-900">{testimonial.stats}</span>
                   </div>
                 </div>
                 
-                <div className="flex gap-1 mb-4">
-                  {Array.from({ length: testimonial.rating }).map((_, i) => (
-                    <Star key={i} className="w-5 h-5 text-yellow-400 fill-current" />
-                  ))}
+                <div className="p-8">
+                  <div className="flex items-center gap-4 mb-6">
+                    <img 
+                      src={testimonial.avatar} 
+                      alt={testimonial.name}
+                      className="w-16 h-16 rounded-full border-4 border-white shadow-xl"
+                    />
+                    <div>
+                      <div className="font-black text-gray-900 text-lg">{testimonial.name}</div>
+                      <div className="text-sm text-gray-600 font-bold">{testimonial.business}</div>
+                    </div>
+                  </div>
+                  
+                  <div className="flex gap-1 mb-6">
+                    {Array.from({ length: testimonial.rating }).map((_, i) => (
+                      <Star key={i} className="w-6 h-6 text-yellow-400 fill-current" />
+                    ))}
+                  </div>
+                  
+                  <p className="text-gray-700 italic leading-relaxed font-medium text-lg">"{testimonial.text}"</p>
                 </div>
-                
-                <p className="text-gray-700 italic leading-relaxed">"{testimonial.text}"</p>
               </div>
             ))}
           </div>
         </div>
       </section>
 
-      {/* CTA Section */}
-      <section className="py-20 px-4 sm:px-6 lg:px-8 bg-gradient-to-r from-blue-600 via-purple-600 to-pink-600 relative overflow-hidden">
+      {/* CTA Section Premium */}
+      <section className="py-24 px-4 sm:px-6 lg:px-8 bg-gradient-to-r from-blue-600 via-purple-600 to-pink-600 relative overflow-hidden">
         <div className="absolute inset-0">
-          <div className="absolute top-0 left-0 w-full h-full bg-gradient-to-r from-transparent via-white/10 to-transparent -skew-x-12 animate-shimmer"></div>
+          <div className="absolute top-0 left-0 w-full h-full bg-gradient-to-r from-transparent via-white/20 to-transparent -skew-x-12 animate-shimmer"></div>
         </div>
 
         <div className="max-w-4xl mx-auto text-center relative z-10">
-          <h2 className="text-2xl sm:text-4xl font-bold text-white mb-6">
+          <h2 className="text-5xl font-black text-white mb-8">
             Prêt à transformer votre activité ?
           </h2>
-          <p className="text-lg text-white/90 mb-8 max-w-2xl mx-auto">
+          <p className="text-2xl text-white/95 mb-12 max-w-2xl mx-auto font-medium">
             Rejoignez des centaines de professionnels qui ont déjà choisi BookingFast
           </p>
           
-          <div className="flex flex-col sm:flex-row gap-4 justify-center items-center">
+          <div className="flex flex-col sm:flex-row gap-6 justify-center items-center">
             <button
               onClick={() => navigate('/login')}
-              className="bg-white text-purple-600 px-8 py-4 rounded-2xl hover:bg-gray-50 transition-all duration-300 transform hover:scale-105 shadow-2xl font-bold text-lg flex items-center gap-3 group"
+              className="bg-white text-purple-600 px-12 py-6 rounded-2xl hover:bg-gray-50 transition-all duration-300 transform hover:scale-110 shadow-2xl font-black text-2xl flex items-center gap-4 group"
             >
-              <Sparkles className="w-6 h-6 group-hover:rotate-12 transition-transform" />
-              Commencer gratuitement
-              <ArrowRight className="w-6 h-6 group-hover:translate-x-1 transition-transform" />
+              <Rocket className="w-8 h-8 group-hover:rotate-12 transition-transform" />
+              Commencer
+              <ArrowRight className="w-8 h-8 group-hover:translate-x-2 transition-transform" />
             </button>
             
-            <div className="text-white/80 text-sm">
+            <div className="text-white/90 text-lg font-bold bg-white/10 backdrop-blur-sm px-6 py-4 rounded-2xl">
               ✓ Aucune carte bancaire requise
               <br />
               ✓ Configuration en 5 minutes
@@ -528,38 +790,38 @@ export function LandingPage() {
         </div>
       </section>
 
-      {/* Footer */}
-      <footer className="bg-gray-900 text-white py-12 px-4 sm:px-6 lg:px-8">
+      {/* Footer Premium */}
+      <footer className="bg-gray-900 text-white py-16 px-4 sm:px-6 lg:px-8">
         <div className="max-w-7xl mx-auto">
-          <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-4 gap-8">
+          <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-4 gap-12">
             <div className="md:col-span-2">
-              <div className="flex items-center gap-3 mb-4">
-                <div className="w-10 h-10 bg-gradient-to-r from-blue-600 to-purple-600 rounded-xl flex items-center justify-center">
-                  <Building2 className="w-6 h-6 text-white" />
+              <div className="flex items-center gap-3 mb-6">
+                <div className="w-12 h-12 bg-gradient-to-br from-blue-600 via-purple-600 to-pink-600 rounded-2xl flex items-center justify-center shadow-xl">
+                  <Building2 className="w-7 h-7 text-white" />
                 </div>
                 <div>
-                  <h3 className="text-xl font-bold">BookingFast</h3>
-                  <p className="text-gray-400 text-sm">Système de réservation professionnel</p>
+                  <h3 className="text-2xl font-black">BookingFast</h3>
+                  <p className="text-gray-400 text-sm font-bold">Réservation professionnelle</p>
                 </div>
               </div>
-              <p className="text-gray-400 leading-relaxed max-w-md">
+              <p className="text-gray-400 leading-relaxed max-w-md font-medium text-lg">
                 La solution complète pour gérer vos réservations, automatiser vos paiements et fidéliser vos clients.
               </p>
             </div>
             
             <div>
-              <h4 className="font-bold mb-4">Fonctionnalités</h4>
-              <ul className="space-y-2 text-gray-400 text-sm">
-                <li>Planning intelligent</li>
-                <li>Paiements en ligne</li>
-                <li>Emails automatiques</li>
-                <li>Gestion d'équipe</li>
+              <h4 className="font-black mb-6 text-xl">Fonctionnalités</h4>
+              <ul className="space-y-3 text-gray-400 font-medium">
+                <li className="hover:text-white transition-colors cursor-pointer">Planning intelligent</li>
+                <li className="hover:text-white transition-colors cursor-pointer">Paiements en ligne</li>
+                <li className="hover:text-white transition-colors cursor-pointer">Emails automatiques</li>
+                <li className="hover:text-white transition-colors cursor-pointer">Gestion d'équipe</li>
               </ul>
             </div>
             
             <div>
-              <h4 className="font-bold mb-4">Légal</h4>
-              <ul className="space-y-2 text-gray-400 text-sm">
+              <h4 className="font-black mb-6 text-xl">Légal</h4>
+              <ul className="space-y-3 text-gray-400 font-medium">
                 <li>
                   <button 
                     onClick={() => navigate('/privacy-policy')}
@@ -576,14 +838,14 @@ export function LandingPage() {
                     Conditions d'utilisation
                   </button>
                 </li>
-                <li>Support 24/7</li>
-                <li>Formation gratuite</li>
+                <li className="hover:text-white transition-colors cursor-pointer">Support 24/7</li>
+                <li className="hover:text-white transition-colors cursor-pointer">Formation gratuite</li>
               </ul>
             </div>
           </div>
           
-          <div className="border-t border-gray-800 mt-8 pt-8 text-center text-gray-400">
-            <p className="text-sm">&copy; 2025 BookingFast. Tous droits réservés.</p>
+          <div className="border-t border-gray-800 mt-12 pt-8 text-center text-gray-400">
+            <p className="font-bold">&copy; 2025 BookingFast. Tous droits réservés.</p>
           </div>
         </div>
       </footer>

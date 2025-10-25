@@ -7,7 +7,7 @@ export interface Transaction {
   date?: string;
   created_at?: string;
   stripe_session_id?: string;
-  payment_link_id?: string; // 🔥 AJOUT : Lien vers payment_links
+  payment_link_id?: string;
 }
 
 export interface Booking {
@@ -52,6 +52,7 @@ export interface Service {
   duration_minutes: number;
   capacity: number;
   unit_name?: string;
+  image_url?: string;
   created_at: string;
 }
 
@@ -83,16 +84,36 @@ export interface BusinessSettings {
   id: string;
   user_id: string;
   business_name: string;
-  business_address: string;
-  business_phone: string;
-  business_email: string;
-  business_siret: string;
-  business_logo_url: string | null;
-  stripe_account_id: string | null;
-  stripe_onboarding_complete: boolean;
+  primary_color: string;
+  secondary_color: string;
+  opening_hours: {
+    [key: string]: {
+      ranges: Array<{ start: string; end: string }>;
+      closed: boolean;
+    };
+  };
+  buffer_minutes: number;
+  default_deposit_percentage: number;
+  minimum_booking_delay_hours: number;
   payment_link_expiry_minutes: number;
-  created_at: string;
-  updated_at: string;
+  deposit_type: 'percentage' | 'fixed';
+  deposit_fixed_amount: number;
+  email_notifications: boolean;
+  brevo_enabled: boolean;
+  brevo_api_key: string;
+  brevo_sender_email: string;
+  brevo_sender_name: string;
+  stripe_enabled: boolean;
+  stripe_public_key: string;
+  stripe_secret_key: string;
+  stripe_webhook_secret: string;
+  timezone: string;
+  multiply_deposit_by_services: boolean;
+  enable_user_assignment?: boolean;
+  iframe_enable_team_selection?: boolean;
+  iframe_services?: string[];
+  created_at?: string;
+  updated_at?: string;
 }
 
 export interface Plugin {
@@ -129,6 +150,9 @@ export interface TeamMember {
   owner_id: string;
   user_id: string;
   email: string;
+  firstname?: string;
+  lastname?: string;
+  full_name?: string;
   role_name: string;
   is_active: boolean;
   restricted_visibility: boolean;
@@ -160,6 +184,90 @@ export interface EmailWorkflow {
   send_to_owner: boolean;
   email_subject: string;
   email_body: string;
+  created_at: string;
+  updated_at: string;
+}
+
+export interface Unavailability {
+  id: string;
+  user_id: string;
+  date: string;
+  start_time: string;
+  end_time: string;
+  reason?: string;
+  assigned_user_id?: string | null;
+  created_at: string;
+}
+
+// 🆕 Types pour le système de facturation
+export interface Product {
+  id: string;
+  user_id: string;
+  name: string;
+  description?: string;
+  price_ht: number;
+  price_ttc: number;
+  tva_rate: number;
+  unit: string;
+  is_active: boolean;
+  created_at: string;
+  updated_at: string;
+}
+
+export interface InvoiceItem {
+  id: string;
+  invoice_id: string;
+  product_id?: string;
+  description: string;
+  quantity: number;
+  unit_price_ht: number;
+  tva_rate: number;
+  discount_percent: number;
+  total_ht: number;
+  total_tva: number;
+  total_ttc: number;
+  created_at: string;
+}
+
+export interface Invoice {
+  id: string;
+  user_id: string;
+  client_id: string;
+  client?: Client;
+  invoice_number: string;
+  invoice_date: string;
+  due_date: string;
+  status: 'draft' | 'sent' | 'paid' | 'cancelled';
+  subtotal_ht: number;
+  total_tva: number;
+  total_ttc: number;
+  notes?: string;
+  payment_conditions: string;
+  sent_at?: string;
+  paid_at?: string;
+  items?: InvoiceItem[];
+  created_at: string;
+  updated_at: string;
+}
+
+export interface CompanyInfo {
+  id: string;
+  user_id: string;
+  company_name: string;
+  legal_form?: string;
+  siret?: string;
+  tva_number?: string;
+  address?: string;
+  postal_code?: string;
+  city?: string;
+  country: string;
+  phone?: string;
+  email?: string;
+  website?: string;
+  logo_url?: string;
+  bank_name?: string;
+  iban?: string;
+  bic?: string;
   created_at: string;
   updated_at: string;
 }

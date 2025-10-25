@@ -55,15 +55,6 @@ export function PaymentSuccess() {
             <div>Le solde restant sera à régler lors de votre rendez-vous</div>
           </div>
         </div>
-
-        {/* Back Button */}
-        <button
-          onClick={handleBackToHome}
-          className="w-full bg-gradient-to-r from-green-600 to-emerald-600 text-white py-3 px-6 rounded-2xl font-medium hover:from-green-700 hover:to-emerald-700 transition-all duration-300 transform hover:scale-105 shadow-lg flex items-center justify-center gap-2"
-        >
-          <CheckCircle className="w-5 h-5" />
-          Fermer
-        </button>
       </div>
     </div>
   );

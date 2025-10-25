@@ -1,6 +1,7 @@
 import React, { useState, useEffect } from 'react';
-import { Save, Building2, Palette, Clock, Euro, Mail, CreditCard, Eye, EyeOff, Globe, Shield, AlertTriangle, CheckCircle, Percent, Trash2, RefreshCw, Calculator, Calendar } from 'lucide-react';
+import { Save, Building2, Palette, Clock, Euro, Mail, CreditCard, Eye, EyeOff, Globe, Shield, AlertTriangle, CheckCircle, Percent, Trash2, RefreshCw, Calculator, Calendar, FileText } from 'lucide-react';
 import { useBusinessSettings } from '../../hooks/useBusinessSettings';
+import { useCompanyInfo } from '../../hooks/useCompanyInfo';
 import { BusinessSettings } from '../../types';
 import { Button } from '../UI/Button';
 import { LoadingSpinner } from '../UI/LoadingSpinner';
@@ -9,8 +10,25 @@ import { GoogleCalendarSettings } from './GoogleCalendarSettings';
 import { BlockedDateRanges } from './BlockedDateRanges';
 
 export function BusinessSettingsForm() {
-  const { settings, loading, updateSettings } = useBusinessSettings();
+  const { settings, loading: settingsLoading, updateSettings } = useBusinessSettings();
+  const { companyInfo, loading: companyLoading, updateCompanyInfo } = useCompanyInfo();
   const [formData, setFormData] = useState<Partial<BusinessSettings>>({});
+  const [companyData, setCompanyData] = useState({
+    company_name: '',
+    legal_form: '',
+    siret: '',
+    tva_number: '',
+    address: '',
+    postal_code: '',
+    city: '',
+    country: 'France',
+    phone: '',
+    email: '',
+    website: '',
+    bank_name: '',
+    iban: '',
+    bic: ''
+  });
   const [saving, setSaving] = useState(false);
   const [showStripeKeys, setShowStripeKeys] = useState(false);
   const [showBrevoKey, setShowBrevoKey] = useState(false);
@@ -18,13 +36,34 @@ export function BusinessSettingsForm() {
   const [stripeTestResult, setStripeTestResult] = useState<string | null>(null);
   const [clearingCache, setClearingCache] = useState(false);
   const [cacheCleared, setCacheCleared] = useState(false);
-  const [activeSection, setActiveSection] = useState<'general' | 'calendar' | 'blocked-dates'>('general');
+  const [activeSection, setActiveSection] = useState<'general' | 'company' | 'calendar' | 'blocked-dates'>('general');
 
   useEffect(() => {
     if (settings) {
       setFormData(settings);
     }
   }, [settings]);
+
+  useEffect(() => {
+    if (companyInfo) {
+      setCompanyData({
+        company_name: companyInfo.company_name || '',
+        legal_form: companyInfo.legal_form || '',
+        siret: companyInfo.siret || '',
+        tva_number: companyInfo.tva_number || '',
+        address: companyInfo.address || '',
+        postal_code: companyInfo.postal_code || '',
+        city: companyInfo.city || '',
+        country: companyInfo.country || 'France',
+        phone: companyInfo.phone || '',
+        email: companyInfo.email || '',
+        website: companyInfo.website || '',
+        bank_name: companyInfo.bank_name || '',
+        iban: companyInfo.iban || '',
+        bic: companyInfo.bic || ''
+      });
+    }
+  }, [companyInfo]);
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
@@ -33,6 +72,21 @@ export function BusinessSettingsForm() {
     try {
       await updateSettings(formData);
       alert('Paramètres sauvegardés avec succès !');
+    } catch (error) {
+      console.error('Erreur lors de la sauvegarde:', error);
+      alert(`Erreur: ${error instanceof Error ? error.message : 'Erreur inconnue'}`);
+    } finally {
+      setSaving(false);
+    }
+  };
+
+  const handleCompanySubmit = async (e: React.FormEvent) => {
+    e.preventDefault();
+    setSaving(true);
+    
+    try {
+      await updateCompanyInfo(companyData);
+      alert('Informations entreprise sauvegardées avec succès !');
     } catch (error) {
       console.error('Erreur lors de la sauvegarde:', error);
       alert(`Erreur: ${error instanceof Error ? error.message : 'Erreur inconnue'}`);
@@ -167,7 +221,7 @@ export function BusinessSettingsForm() {
     }
   };
 
-  if (loading) {
+  if (settingsLoading || companyLoading) {
     return (
       <div className="flex items-center justify-center h-64">
         <LoadingSpinner size="lg" />
@@ -201,6 +255,17 @@ export function BusinessSettingsForm() {
           <span>Paramètres généraux</span>
         </button>
         <button
+          onClick={() => setActiveSection('company')}
+          className={`flex-1 min-w-[150px] px-6 py-3 rounded-xl font-medium transition-all duration-300 flex items-center justify-center gap-2 ${
+            activeSection === 'company'
+              ? 'bg-gradient-to-r from-blue-500 to-purple-500 text-white shadow-lg'
+              : 'text-gray-600 hover:bg-gray-100'
+          }`}
+        >
+          <FileText className="w-5 h-5" />
+          <span>Entreprise</span>
+        </button>
+        <button
           onClick={() => setActiveSection('calendar')}
           className={`flex-1 min-w-[150px] px-6 py-3 rounded-xl font-medium transition-all duration-300 flex items-center justify-center gap-2 ${
             activeSection === 'calendar'
@@ -229,6 +294,227 @@ export function BusinessSettingsForm() {
         <GoogleCalendarSettings />
       ) : activeSection === 'blocked-dates' ? (
         <BlockedDateRanges />
+      ) : activeSection === 'company' ? (
+        <form onSubmit={handleCompanySubmit} className="space-y-6 sm:space-y-8">
+          {/* Informations entreprise */}
+          <div className="bg-gradient-to-r from-blue-50 to-purple-50 rounded-2xl p-6 border-2 border-blue-200">
+            <div className="flex items-center gap-3 mb-6">
+              <div className="w-12 h-12 bg-gradient-to-r from-blue-500 to-purple-500 rounded-xl flex items-center justify-center">
+                <Building2 className="w-6 h-6 text-white" />
+              </div>
+              <div>
+                <h3 className="text-xl font-bold text-gray-900">Informations entreprise</h3>
+                <p className="text-sm text-gray-600">Données légales et coordonnées</p>
+              </div>
+            </div>
+
+            <div className="space-y-4">
+              <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                <div>
+                  <label className="block text-sm font-medium text-gray-700 mb-2">
+                    Nom de l'entreprise *
+                  </label>
+                  <input
+                    type="text"
+                    value={companyData.company_name}
+                    onChange={(e) => setCompanyData({ ...companyData, company_name: e.target.value })}
+                    className="w-full px-4 py-3 border-2 border-blue-300 rounded-xl focus:border-blue-500 focus:ring-2 focus:ring-blue-200 transition-all"
+                    required
+                  />
+                </div>
+
+                <div>
+                  <label className="block text-sm font-medium text-gray-700 mb-2">
+                    Forme juridique
+                  </label>
+                  <input
+                    type="text"
+                    value={companyData.legal_form}
+                    onChange={(e) => setCompanyData({ ...companyData, legal_form: e.target.value })}
+                    placeholder="SARL, SAS, Auto-entrepreneur..."
+                    className="w-full px-4 py-3 border-2 border-blue-300 rounded-xl focus:border-blue-500 focus:ring-2 focus:ring-blue-200 transition-all"
+                  />
+                </div>
+
+                <div>
+                  <label className="block text-sm font-medium text-gray-700 mb-2">
+                    SIRET
+                  </label>
+                  <input
+                    type="text"
+                    value={companyData.siret}
+                    onChange={(e) => setCompanyData({ ...companyData, siret: e.target.value })}
+                    className="w-full px-4 py-3 border-2 border-blue-300 rounded-xl focus:border-blue-500 focus:ring-2 focus:ring-blue-200 transition-all"
+                  />
+                </div>
+
+                <div>
+                  <label className="block text-sm font-medium text-gray-700 mb-2">
+                    N° TVA Intracommunautaire
+                  </label>
+                  <input
+                    type="text"
+                    value={companyData.tva_number}
+                    onChange={(e) => setCompanyData({ ...companyData, tva_number: e.target.value })}
+                    className="w-full px-4 py-3 border-2 border-blue-300 rounded-xl focus:border-blue-500 focus:ring-2 focus:ring-blue-200 transition-all"
+                  />
+                </div>
+              </div>
+
+              <div>
+                <label className="block text-sm font-medium text-gray-700 mb-2">
+                  Adresse
+                </label>
+                <input
+                  type="text"
+                  value={companyData.address}
+                  onChange={(e) => setCompanyData({ ...companyData, address: e.target.value })}
+                  className="w-full px-4 py-3 border-2 border-blue-300 rounded-xl focus:border-blue-500 focus:ring-2 focus:ring-blue-200 transition-all"
+                />
+              </div>
+
+              <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
+                <div>
+                  <label className="block text-sm font-medium text-gray-700 mb-2">
+                    Code postal
+                  </label>
+                  <input
+                    type="text"
+                    value={companyData.postal_code}
+                    onChange={(e) => setCompanyData({ ...companyData, postal_code: e.target.value })}
+                    className="w-full px-4 py-3 border-2 border-blue-300 rounded-xl focus:border-blue-500 focus:ring-2 focus:ring-blue-200 transition-all"
+                  />
+                </div>
+
+                <div>
+                  <label className="block text-sm font-medium text-gray-700 mb-2">
+                    Ville
+                  </label>
+                  <input
+                    type="text"
+                    value={companyData.city}
+                    onChange={(e) => setCompanyData({ ...companyData, city: e.target.value })}
+                    className="w-full px-4 py-3 border-2 border-blue-300 rounded-xl focus:border-blue-500 focus:ring-2 focus:ring-blue-200 transition-all"
+                  />
+                </div>
+
+                <div>
+                  <label className="block text-sm font-medium text-gray-700 mb-2">
+                    Pays
+                  </label>
+                  <input
+                    type="text"
+                    value={companyData.country}
+                    onChange={(e) => setCompanyData({ ...companyData, country: e.target.value })}
+                    className="w-full px-4 py-3 border-2 border-blue-300 rounded-xl focus:border-blue-500 focus:ring-2 focus:ring-blue-200 transition-all"
+                  />
+                </div>
+              </div>
+
+              <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                <div>
+                  <label className="block text-sm font-medium text-gray-700 mb-2">
+                    Téléphone
+                  </label>
+                  <input
+                    type="tel"
+                    value={companyData.phone}
+                    onChange={(e) => setCompanyData({ ...companyData, phone: e.target.value })}
+                    className="w-full px-4 py-3 border-2 border-blue-300 rounded-xl focus:border-blue-500 focus:ring-2 focus:ring-blue-200 transition-all"
+                  />
+                </div>
+
+                <div>
+                  <label className="block text-sm font-medium text-gray-700 mb-2">
+                    Email
+                  </label>
+                  <input
+                    type="email"
+                    value={companyData.email}
+                    onChange={(e) => setCompanyData({ ...companyData, email: e.target.value })}
+                    className="w-full px-4 py-3 border-2 border-blue-300 rounded-xl focus:border-blue-500 focus:ring-2 focus:ring-blue-200 transition-all"
+                  />
+                </div>
+              </div>
+
+              <div>
+                <label className="block text-sm font-medium text-gray-700 mb-2">
+                  Site web
+                </label>
+                <input
+                  type="url"
+                  value={companyData.website}
+                  onChange={(e) => setCompanyData({ ...companyData, website: e.target.value })}
+                  className="w-full px-4 py-3 border-2 border-blue-300 rounded-xl focus:border-blue-500 focus:ring-2 focus:ring-blue-200 transition-all"
+                />
+              </div>
+            </div>
+          </div>
+
+          {/* Coordonnées bancaires */}
+          <div className="bg-gradient-to-r from-green-50 to-emerald-50 rounded-2xl p-6 border-2 border-green-200">
+            <div className="flex items-center gap-3 mb-6">
+              <div className="w-12 h-12 bg-gradient-to-r from-green-500 to-emerald-500 rounded-xl flex items-center justify-center">
+                <CreditCard className="w-6 h-6 text-white" />
+              </div>
+              <div>
+                <h3 className="text-xl font-bold text-gray-900">Coordonnées bancaires</h3>
+                <p className="text-sm text-gray-600">Pour les factures et paiements</p>
+              </div>
+            </div>
+
+            <div className="space-y-4">
+              <div>
+                <label className="block text-sm font-medium text-gray-700 mb-2">
+                  Nom de la banque
+                </label>
+                <input
+                  type="text"
+                  value={companyData.bank_name}
+                  onChange={(e) => setCompanyData({ ...companyData, bank_name: e.target.value })}
+                  className="w-full px-4 py-3 border-2 border-green-300 rounded-xl focus:border-green-500 focus:ring-2 focus:ring-green-200 transition-all"
+                />
+              </div>
+
+              <div>
+                <label className="block text-sm font-medium text-gray-700 mb-2">
+                  IBAN
+                </label>
+                <input
+                  type="text"
+                  value={companyData.iban}
+                  onChange={(e) => setCompanyData({ ...companyData, iban: e.target.value })}
+                  className="w-full px-4 py-3 border-2 border-green-300 rounded-xl focus:border-green-500 focus:ring-2 focus:ring-green-200 transition-all"
+                />
+              </div>
+
+              <div>
+                <label className="block text-sm font-medium text-gray-700 mb-2">
+                  BIC
+                </label>
+                <input
+                  type="text"
+                  value={companyData.bic}
+                  onChange={(e) => setCompanyData({ ...companyData, bic: e.target.value })}
+                  className="w-full px-4 py-3 border-2 border-green-300 rounded-xl focus:border-green-500 focus:ring-2 focus:ring-green-200 transition-all"
+                />
+              </div>
+            </div>
+          </div>
+
+          {/* Bouton de sauvegarde */}
+          <div className="flex justify-end">
+            <Button
+              type="submit"
+              loading={saving}
+              variant="primary"
+              size="lg"
+            >
+              <Save className="w-5 h-5" />
+              Enregistrer les informations
+            </Button>
+          </div>
+        </form>
       ) : (
         <form onSubmit={handleSubmit} className="space-y-6 sm:space-y-8">
           {/* Informations générales */}
@@ -504,6 +790,41 @@ export function BusinessSettingsForm() {
                   />
                 </div>
               )}
+
+              <div className="bg-gradient-to-r from-yellow-50 to-amber-50 rounded-xl p-4 border-2 border-yellow-200">
+                <div className="flex items-start gap-3">
+                  <input
+                    type="checkbox"
+                    id="multiply_deposit"
+                    checked={formData.multiply_deposit_by_services || false}
+                    onChange={(e) => setFormData({ ...formData, multiply_deposit_by_services: e.target.checked })}
+                    className="w-5 h-5 rounded border-2 border-yellow-300 mt-1"
+                  />
+                  <div className="flex-1">
+                    <label htmlFor="multiply_deposit" className="block text-sm font-bold text-gray-900 mb-1 cursor-pointer">
+                      <Calculator className="w-4 h-4 inline mr-2" />
+                      Multiplier l'acompte par la quantité (iframe)
+                    </label>
+                    <p className="text-xs text-gray-600">
+                      {formData.deposit_type === 'percentage' ? (
+                        <>
+                          <strong>Activé :</strong> L'acompte sera calculé sur chaque service individuellement<br />
+                          <em>Exemple : 3 services à 50€ avec 30% = (50€ × 30%) × 3 = 45€</em><br /><br />
+                          <strong>Désactivé :</strong> L'acompte sera calculé sur le total<br />
+                          <em>Exemple : 3 services à 50€ avec 30% = (50€ × 3) × 30% = 45€</em>
+                        </>
+                      ) : (
+                        <>
+                          <strong>Activé :</strong> L'acompte fixe sera multiplié par la quantité<br />
+                          <em>Exemple : 3 services avec acompte de 20€ = 20€ × 3 = 60€</em><br /><br />
+                          <strong>Désactivé :</strong> L'acompte fixe reste le même quelle que soit la quantité<br />
+                          <em>Exemple : 3 services avec acompte de 20€ = 20€</em>
+                        </>
+                      )}
+                    </p>
+                  </div>
+                </div>
+              </div>
 
               <div>
                 <label className="block text-sm font-medium text-gray-700 mb-2">

@@ -26,6 +26,7 @@ const MultiUserSettingsPage = lazy(() => import('./components/MultiUser/MultiUse
 const POSPage = lazy(() => import('./components/POS/POSPage').then(m => ({ default: m.POSPage })));
 const PluginsPage = lazy(() => import('./components/Plugins/PluginsPage').then(m => ({ default: m.PluginsPage })));
 const LoginPage = lazy(() => import('./components/Auth/LoginPage').then(m => ({ default: m.LoginPage })));
+const InvoicesPage = lazy(() => import('./components/Invoices/InvoicesPage').then(m => ({ default: m.InvoicesPage })));
 
 function App() {
   return (
@@ -115,6 +116,7 @@ function AppRoutes() {
               <Route path="/bookings-list" element={<CalendarPage view="list" />} />
               <Route path="/clients" element={<ClientsPage />} />
               <Route path="/services" element={<ServicesPage />} />
+              <Route path="/invoices" element={<InvoicesPage />} />
               <Route path="/emails" element={<EmailWorkflowPage />} />
               <Route path="/admin" element={<AdminPage />} />
               <Route path="/reports" element={
