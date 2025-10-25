@@ -8,14 +8,14 @@ import { useInvoices } from '../../hooks/useInvoices';
 import { Client, Product, InvoiceItem } from '../../types';
 import { CreateClientModal } from './CreateClientModal';
 import { CreateProductModal } from './CreateProductModal';
+import { DatePicker } from '../BookingModal/DatePicker';
 
 interface CreateInvoiceModalProps {
   isOpen: boolean;
   onClose: () => void;
-  onInvoiceCreated: () => void; // ✅ AJOUT callback
 }
 
-export function CreateInvoiceModal({ isOpen, onClose, onInvoiceCreated }: CreateInvoiceModalProps) {
+export function CreateInvoiceModal({ isOpen, onClose }: CreateInvoiceModalProps) {
   const { clients, fetchClients } = useClients();
   const { products, fetchProducts } = useProducts();
   const { createInvoice } = useInvoices();
@@ -30,6 +30,7 @@ export function CreateInvoiceModal({ isOpen, onClose, onInvoiceCreated }: Create
   const [searchTerm, setSearchTerm] = useState('');
   const [loading, setLoading] = useState(false);
   
+  // États pour les modals
   const [showCreateClientModal, setShowCreateClientModal] = useState(false);
   const [showCreateProductModal, setShowCreateProductModal] = useState(false);
 
@@ -80,6 +81,8 @@ export function CreateInvoiceModal({ isOpen, onClose, onInvoiceCreated }: Create
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
 
+    console.log('🚀 handleSubmit appelé');
+
     if (!selectedClient) {
       alert('Veuillez sélectionner un client');
       return;
@@ -92,6 +95,7 @@ export function CreateInvoiceModal({ isOpen, onClose, onInvoiceCreated }: Create
 
     try {
       setLoading(true);
+      console.log('⏳ Création de la facture...');
 
       await createInvoice(
         {
@@ -105,15 +109,18 @@ export function CreateInvoiceModal({ isOpen, onClose, onInvoiceCreated }: Create
         items
       );
 
+      console.log('✅ Facture créée avec succès !');
       alert('✅ Facture créée avec succès !');
       
+      // Réinitialiser le formulaire
       setSelectedClient(null);
       setItems([]);
       setNotes('');
       setSearchTerm('');
       
-      // ✅ APPEL DU CALLBACK pour forcer le refresh
-      onInvoiceCreated();
+      console.log('🚪 Fermeture du modal...');
+      // Fermer le modal - la liste se rafraîchit automatiquement via useInvoices
+      onClose();
     } catch (error) {
       console.error('❌ Erreur création facture:', error);
       alert('❌ Erreur lors de la création de la facture');
@@ -146,6 +153,7 @@ export function CreateInvoiceModal({ isOpen, onClose, onInvoiceCreated }: Create
     <>
       <Modal isOpen={isOpen} onClose={onClose} title="Nouvelle facture" size="xl">
         <form onSubmit={handleSubmit} className="space-y-6">
+          {/* Sélection client avec bouton créer */}
           <div>
             <div className="flex items-center justify-between mb-2">
               <label className="block text-sm font-bold text-gray-700">
@@ -178,33 +186,24 @@ export function CreateInvoiceModal({ isOpen, onClose, onInvoiceCreated }: Create
             </select>
           </div>
 
-          <div className="grid grid-cols-2 gap-4">
-            <div>
-              <label className="block text-sm font-bold text-gray-700 mb-2">
-                Date de facture *
-              </label>
-              <input
-                type="date"
-                value={invoiceDate}
-                onChange={(e) => setInvoiceDate(e.target.value)}
-                className="w-full p-3 border border-gray-300 rounded-xl focus:ring-2 focus:ring-purple-500 focus:border-purple-500"
-                required
-              />
-            </div>
-            <div>
-              <label className="block text-sm font-bold text-gray-700 mb-2">
-                Date d'échéance *
-              </label>
-              <input
-                type="date"
-                value={dueDate}
-                onChange={(e) => setDueDate(e.target.value)}
-                className="w-full p-3 border border-gray-300 rounded-xl focus:ring-2 focus:ring-purple-500 focus:border-purple-500"
-                required
-              />
-            </div>
+          {/* Dates avec DatePicker */}
+          <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+            <DatePicker
+              label="Date"
+              value={invoiceDate}
+              onChange={setInvoiceDate}
+              required
+            />
+            
+            <DatePicker
+              label="Date d'échéance"
+              value={dueDate}
+              onChange={setDueDate}
+              required
+            />
           </div>
 
+          {/* Produits avec recherche et bouton créer */}
           <div>
             <div className="flex items-center justify-between mb-3">
               <label className="block text-sm font-bold text-gray-700">
@@ -220,6 +219,7 @@ export function CreateInvoiceModal({ isOpen, onClose, onInvoiceCreated }: Create
               </button>
             </div>
 
+            {/* Barre de recherche */}
             <div className="mb-4 p-4 bg-gradient-to-r from-purple-50 to-pink-50 rounded-xl border-2 border-purple-200">
               <div className="relative mb-3">
                 <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 text-purple-400 w-5 h-5" />
@@ -232,88 +232,80 @@ export function CreateInvoiceModal({ isOpen, onClose, onInvoiceCreated }: Create
                 />
               </div>
 
-              {searchTerm && (
-                <div className="space-y-2 max-h-64 overflow-y-auto">
-                  {filteredProducts.length > 0 ? (
-                    <>
-                      {filteredProducts.map(product => (
-                        <button
-                          key={product.id}
-                          type="button"
-                          onClick={() => addItem(product)}
-                          className="w-full text-left p-4 bg-white rounded-xl border-2 border-purple-200 hover:border-purple-500 hover:bg-purple-50 transition-all group"
-                        >
-                          <div className="flex items-center justify-between">
-                            <div className="flex-1">
-                              <div className="font-bold text-gray-900 group-hover:text-purple-600 transition-colors">
-                                {product.name}
-                              </div>
-                              {product.description && (
-                                <div className="text-sm text-gray-600 mt-1">
-                                  {product.description}
-                                </div>
-                              )}
-                            </div>
-                            <div className="text-right ml-4">
-                              <div className="font-bold text-purple-600">
-                                {product.price_ht.toFixed(2)}€ HT
-                              </div>
-                              <div className="text-xs text-gray-500">
-                                TVA {product.tva_rate}%
-                              </div>
-                            </div>
-                          </div>
-                        </button>
-                      ))}
-                      
+              {/* Liste des produits - TOUJOURS AFFICHÉE */}
+              <div className="space-y-2 max-h-64 overflow-y-auto">
+                {filteredProducts.length > 0 ? (
+                  <>
+                    {filteredProducts.map(product => (
                       <button
+                        key={product.id}
                         type="button"
-                        onClick={() => addItem()}
-                        className="w-full text-left p-4 bg-white rounded-xl border-2 border-dashed border-purple-300 hover:border-purple-500 hover:bg-purple-50 transition-all"
+                        onClick={() => addItem(product)}
+                        className="w-full text-left p-4 bg-white rounded-xl border-2 border-purple-200 hover:border-purple-500 hover:bg-purple-50 transition-all group"
                       >
-                        <div className="flex items-center gap-3">
-                          <Plus className="w-5 h-5 text-purple-600" />
-                          <div className="font-bold text-purple-600">
-                            Ajouter un produit personnalisé
+                        <div className="flex items-center justify-between">
+                          <div className="flex-1">
+                            <div className="font-bold text-gray-900 group-hover:text-purple-600 transition-colors">
+                              {product.name}
+                            </div>
+                            {product.description && (
+                              <div className="text-sm text-gray-600 mt-1">
+                                {product.description}
+                              </div>
+                            )}
+                          </div>
+                          <div className="text-right ml-4">
+                            <div className="font-bold text-purple-600">
+                              {product.price_ht.toFixed(2)}€ HT
+                            </div>
+                            <div className="text-xs text-gray-500">
+                              TVA {product.tva_rate}%
+                            </div>
                           </div>
                         </div>
                       </button>
-                    </>
-                  ) : (
-                    <div className="text-center py-8">
-                      <Package className="w-12 h-12 mx-auto mb-3 text-gray-400" />
-                      <p className="text-gray-600 font-medium">Aucun produit trouvé</p>
-                      <p className="text-sm text-gray-500 mt-1">
-                        Essayez un autre terme de recherche
-                      </p>
-                      <button
-                        type="button"
-                        onClick={() => addItem()}
-                        className="mt-4 px-4 py-2 bg-purple-600 text-white rounded-lg hover:bg-purple-700 transition-colors font-medium"
-                      >
-                        Créer un produit personnalisé
-                      </button>
-                    </div>
-                  )}
-                </div>
-              )}
-
-              {!searchTerm && (
-                <div className="text-center py-6">
-                  <Search className="w-10 h-10 mx-auto mb-2 text-purple-400" />
-                  <p className="text-purple-700 font-medium">
-                    Tapez pour rechercher un produit
-                  </p>
-                  <p className="text-sm text-purple-600 mt-1">
-                    ou créez un produit personnalisé
-                  </p>
-                </div>
-              )}
+                    ))}
+                    
+                    {/* Bouton produit personnalisé */}
+                    <button
+                      type="button"
+                      onClick={() => addItem()}
+                      className="w-full text-left p-4 bg-white rounded-xl border-2 border-dashed border-purple-300 hover:border-purple-500 hover:bg-purple-50 transition-all"
+                    >
+                      <div className="flex items-center gap-3">
+                        <Plus className="w-5 h-5 text-purple-600" />
+                        <div className="font-bold text-purple-600">
+                          Ajouter un produit personnalisé
+                        </div>
+                      </div>
+                    </button>
+                  </>
+                ) : (
+                  <div className="text-center py-8">
+                    <Package className="w-12 h-12 mx-auto mb-3 text-gray-400" />
+                    <p className="text-gray-600 font-medium">
+                      {searchTerm ? 'Aucun produit trouvé' : 'Aucun produit disponible'}
+                    </p>
+                    <p className="text-sm text-gray-500 mt-1">
+                      {searchTerm ? 'Essayez un autre terme de recherche' : 'Créez votre premier produit'}
+                    </p>
+                    <button
+                      type="button"
+                      onClick={() => setShowCreateProductModal(true)}
+                      className="mt-4 px-4 py-2 bg-purple-600 text-white rounded-lg hover:bg-purple-700 transition-colors font-medium"
+                    >
+                      Créer un produit
+                    </button>
+                  </div>
+                )}
+              </div>
             </div>
 
+            {/* Liste des items ajoutés */}
             <div className="space-y-4">
               {items.map((item, index) => (
                 <div key={index} className="p-4 bg-gradient-to-r from-gray-50 to-purple-50 rounded-xl border-2 border-purple-200">
+                  {/* Description */}
                   <div className="mb-3">
                     <label className="flex items-center text-xs font-bold text-gray-700 mb-1">
                       <Package className="w-4 h-4 mr-1 text-purple-600" />
@@ -329,7 +321,9 @@ export function CreateInvoiceModal({ isOpen, onClose, onInvoiceCreated }: Create
                     />
                   </div>
 
+                  {/* Grille des champs numériques */}
                   <div className="grid grid-cols-1 sm:grid-cols-4 gap-3">
+                    {/* Quantité */}
                     <div>
                       <label className="flex items-center text-xs font-bold text-gray-700 mb-1">
                         <Hash className="w-4 h-4 mr-1 text-blue-600" />
@@ -347,6 +341,7 @@ export function CreateInvoiceModal({ isOpen, onClose, onInvoiceCreated }: Create
                       />
                     </div>
 
+                    {/* Prix unitaire HT */}
                     <div>
                       <label className="flex items-center text-xs font-bold text-gray-700 mb-1">
                         <Euro className="w-4 h-4 mr-1 text-green-600" />
@@ -364,6 +359,7 @@ export function CreateInvoiceModal({ isOpen, onClose, onInvoiceCreated }: Create
                       />
                     </div>
 
+                    {/* TVA */}
                     <div>
                       <label className="flex items-center text-xs font-bold text-gray-700 mb-1">
                         <Percent className="w-4 h-4 mr-1 text-orange-600" />
@@ -381,6 +377,7 @@ export function CreateInvoiceModal({ isOpen, onClose, onInvoiceCreated }: Create
                       />
                     </div>
 
+                    {/* Bouton supprimer */}
                     <div className="flex items-end">
                       <button
                         type="button"
@@ -394,6 +391,7 @@ export function CreateInvoiceModal({ isOpen, onClose, onInvoiceCreated }: Create
                     </div>
                   </div>
 
+                  {/* Aperçu du total de la ligne */}
                   <div className="mt-3 pt-3 border-t border-purple-200">
                     <div className="flex justify-between text-sm">
                       <span className="text-gray-600">Total ligne HT:</span>
@@ -409,12 +407,13 @@ export function CreateInvoiceModal({ isOpen, onClose, onInvoiceCreated }: Create
                 <div className="text-center py-8 text-gray-500">
                   <Package className="w-12 h-12 mx-auto mb-2 text-gray-400" />
                   <p>Aucun produit ajouté</p>
-                  <p className="text-sm">Recherchez un produit pour commencer</p>
+                  <p className="text-sm">Sélectionnez un produit ci-dessus</p>
                 </div>
               )}
             </div>
           </div>
 
+          {/* Notes */}
           <div>
             <label className="block text-sm font-bold text-gray-700 mb-2">
               Notes
@@ -428,6 +427,7 @@ export function CreateInvoiceModal({ isOpen, onClose, onInvoiceCreated }: Create
             />
           </div>
 
+          {/* Totaux */}
           <div className="bg-gradient-to-r from-purple-50 to-pink-50 rounded-xl p-6 border border-purple-200">
             <div className="space-y-2">
               <div className="flex justify-between text-gray-700">
@@ -445,6 +445,7 @@ export function CreateInvoiceModal({ isOpen, onClose, onInvoiceCreated }: Create
             </div>
           </div>
 
+          {/* Actions */}
           <div className="flex gap-3">
             <Button
               type="button"
@@ -466,6 +467,7 @@ export function CreateInvoiceModal({ isOpen, onClose, onInvoiceCreated }: Create
         </form>
       </Modal>
 
+      {/* Modal création client */}
       {showCreateClientModal && (
         <CreateClientModal
           isOpen={showCreateClientModal}
@@ -474,6 +476,7 @@ export function CreateInvoiceModal({ isOpen, onClose, onInvoiceCreated }: Create
         />
       )}
 
+      {/* Modal création produit */}
       {showCreateProductModal && (
         <CreateProductModal
           isOpen={showCreateProductModal}

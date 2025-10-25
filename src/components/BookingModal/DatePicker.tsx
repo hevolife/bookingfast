@@ -12,9 +12,10 @@ interface DatePickerProps {
   isOpen?: boolean;
   onOpenChange?: (isOpen: boolean) => void;
   showInline?: boolean;
+  label?: string; // Nouveau prop pour personnaliser le label
 }
 
-export function DatePicker({ value, onChange, disabled, required, isOpen: externalIsOpen, onOpenChange, showInline }: DatePickerProps) {
+export function DatePicker({ value, onChange, disabled, required, isOpen: externalIsOpen, onOpenChange, showInline, label = 'Date' }: DatePickerProps) {
   const { settings } = useBusinessSettings();
   const [internalIsOpen, setInternalIsOpen] = useState(false);
   const [currentMonth, setCurrentMonth] = useState(new Date());
@@ -306,7 +307,7 @@ export function DatePicker({ value, onChange, disabled, required, isOpen: extern
   return (
     <div className="relative">
       <label className="block text-sm font-medium text-gray-700 mb-2">
-        Date {required && '*'}
+        {label} {required && '*'}
       </label>
       
       <button

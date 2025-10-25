@@ -16,30 +16,38 @@ export function CreateProductModal({ isOpen, onClose, onProductCreated }: Create
   const [formData, setFormData] = useState({
     name: '',
     description: '',
-    price_ht: 0,
-    tva_rate: 20,
+    price_ht: '',
+    tva_rate: '20',
     unit: 'unité'
   });
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
 
-    if (!formData.name || formData.price_ht <= 0) {
+    const priceHT = parseFloat(formData.price_ht);
+    const tvaRate = parseFloat(formData.tva_rate);
+
+    if (!formData.name || isNaN(priceHT) || priceHT <= 0) {
       alert('Veuillez remplir tous les champs obligatoires');
+      return;
+    }
+
+    if (isNaN(tvaRate) || tvaRate < 0) {
+      alert('Le taux de TVA doit être un nombre valide');
       return;
     }
 
     try {
       setLoading(true);
 
-      const price_ttc = formData.price_ht * (1 + formData.tva_rate / 100);
+      const price_ttc = priceHT * (1 + tvaRate / 100);
 
       await createProduct({
         name: formData.name,
         description: formData.description,
-        price_ht: formData.price_ht,
+        price_ht: priceHT,
         price_ttc,
-        tva_rate: formData.tva_rate,
+        tva_rate: tvaRate,
         unit: formData.unit,
         is_active: true
       });
@@ -50,8 +58,8 @@ export function CreateProductModal({ isOpen, onClose, onProductCreated }: Create
       setFormData({
         name: '',
         description: '',
-        price_ht: 0,
-        tva_rate: 20,
+        price_ht: '',
+        tva_rate: '20',
         unit: 'unité'
       });
 
@@ -66,6 +74,15 @@ export function CreateProductModal({ isOpen, onClose, onProductCreated }: Create
     } finally {
       setLoading(false);
     }
+  };
+
+  const calculatePriceTTC = () => {
+    const priceHT = parseFloat(formData.price_ht);
+    const tvaRate = parseFloat(formData.tva_rate);
+    
+    if (isNaN(priceHT) || isNaN(tvaRate)) return '0.00';
+    
+    return (priceHT * (1 + tvaRate / 100)).toFixed(2);
   };
 
   return (
@@ -106,16 +123,21 @@ export function CreateProductModal({ isOpen, onClose, onProductCreated }: Create
           <div>
             <label className="flex items-center text-sm font-bold text-gray-700 mb-2">
               <Euro className="w-4 h-4 mr-2 text-green-600" />
-              Prix HT *
+              Prix HT (€) *
             </label>
             <input
-              type="number"
+              type="text"
+              inputMode="decimal"
               value={formData.price_ht}
-              onChange={(e) => setFormData({ ...formData, price_ht: parseFloat(e.target.value) })}
+              onChange={(e) => {
+                const value = e.target.value;
+                // Permet les nombres décimaux avec point ou virgule
+                if (value === '' || /^\d*[.,]?\d*$/.test(value)) {
+                  setFormData({ ...formData, price_ht: value.replace(',', '.') });
+                }
+              }}
               placeholder="0.00"
-              min="0"
-              step="0.01"
-              className="w-full p-3 border border-gray-300 rounded-xl focus:ring-2 focus:ring-green-500 focus:border-green-500"
+              className="w-full p-3 border border-gray-300 rounded-xl focus:ring-2 focus:ring-green-500 focus:border-green-500 text-lg font-semibold"
               required
             />
           </div>
@@ -126,13 +148,18 @@ export function CreateProductModal({ isOpen, onClose, onProductCreated }: Create
               TVA (%)
             </label>
             <input
-              type="number"
+              type="text"
+              inputMode="decimal"
               value={formData.tva_rate}
-              onChange={(e) => setFormData({ ...formData, tva_rate: parseFloat(e.target.value) })}
+              onChange={(e) => {
+                const value = e.target.value;
+                // Permet les nombres décimaux avec point ou virgule
+                if (value === '' || /^\d*[.,]?\d*$/.test(value)) {
+                  setFormData({ ...formData, tva_rate: value.replace(',', '.') });
+                }
+              }}
               placeholder="20"
-              min="0"
-              step="0.01"
-              className="w-full p-3 border border-gray-300 rounded-xl focus:ring-2 focus:ring-orange-500 focus:border-orange-500"
+              className="w-full p-3 border border-gray-300 rounded-xl focus:ring-2 focus:ring-orange-500 focus:border-orange-500 text-lg font-semibold"
             />
           </div>
         </div>
@@ -156,7 +183,7 @@ export function CreateProductModal({ isOpen, onClose, onProductCreated }: Create
           <div className="flex justify-between items-center">
             <span className="text-sm font-bold text-gray-700">Prix TTC:</span>
             <span className="text-lg font-black text-purple-600">
-              {(formData.price_ht * (1 + formData.tva_rate / 100)).toFixed(2)}€
+              {calculatePriceTTC()}€
             </span>
           </div>
         </div>

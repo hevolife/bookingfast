@@ -12,7 +12,7 @@ import { InvoicePreviewModal } from './InvoicePreviewModal';
 import { PDFCustomizationModal } from './PDFCustomizationModal';
 
 export function InvoicesPage() {
-  const { invoices, loading, fetchInvoices, updateInvoice, deleteInvoice } = useInvoices();
+  const { invoices, loading, refreshKey, updateInvoice, deleteInvoice } = useInvoices();
   const [showCreateModal, setShowCreateModal] = useState(false);
   const [selectedInvoice, setSelectedInvoice] = useState<Invoice | null>(null);
   const [showDetailsModal, setShowDetailsModal] = useState(false);
@@ -21,6 +21,19 @@ export function InvoicesPage() {
   const [showCustomizationModal, setShowCustomizationModal] = useState(false);
   const [searchTerm, setSearchTerm] = useState('');
   const [statusFilter, setStatusFilter] = useState<string>('all');
+
+  // ✅ AJOUT : Log à chaque render pour debug
+  console.log('🎨 InvoicesPage RENDER - invoices:', invoices.length, 'refreshKey:', refreshKey);
+
+  useEffect(() => {
+    console.log('📊 InvoicesPage useEffect - invoices mis à jour:', invoices.length, 'factures (refreshKey:', refreshKey, ')');
+    console.log('📋 Liste des factures:', invoices.map(inv => ({
+      id: inv.id,
+      number: inv.invoice_number,
+      client: `${inv.client?.firstname} ${inv.client?.lastname}`,
+      total: inv.total_ttc
+    })));
+  }, [invoices, refreshKey]);
 
   const filteredInvoices = invoices.filter(invoice => {
     const matchesSearch = 
@@ -33,6 +46,8 @@ export function InvoicesPage() {
 
     return matchesSearch && matchesStatus;
   });
+
+  console.log('🔎 Factures filtrées:', filteredInvoices.length, 'sur', invoices.length);
 
   const getStatusBadge = (status: Invoice['status']) => {
     const badges = {
@@ -84,13 +99,6 @@ export function InvoicesPage() {
     setShowPreviewModal(true);
   };
 
-  // ✅ CALLBACK pour forcer le refresh après création
-  const handleInvoiceCreated = async () => {
-    console.log('🔄 handleInvoiceCreated - Force refresh');
-    await fetchInvoices();
-    setShowCreateModal(false);
-  };
-
   if (loading) {
     return (
       <div className="flex items-center justify-center h-64">
@@ -101,7 +109,9 @@ export function InvoicesPage() {
 
   return (
     <>
-      <div className="p-4 sm:p-6 bg-gradient-to-br from-blue-50 via-purple-50 to-pink-50 mobile-optimized">
+      <div className="p-4 sm:p-6 bg-gradient-to-br from-blue-50 via-purple-50 to-pink-50 mobile-optimized" key={`invoices-page-${refreshKey}`}>
+        {/* ✅ AJOUT : key sur la div principale pour forcer le re-render complet */}
+        
         {/* Header */}
         <div className="flex items-center justify-between mb-6">
           <div>
@@ -114,6 +124,7 @@ export function InvoicesPage() {
           </div>
 
           <div className="flex gap-2">
+            {/* Bouton Personnaliser PDF */}
             <Button
               onClick={() => setShowCustomizationModal(true)}
               variant="secondary"
@@ -123,6 +134,7 @@ export function InvoicesPage() {
               <span className="hidden sm:inline">Personnaliser PDF</span>
             </Button>
 
+            {/* Bouton Nouvelle facture */}
             <Button
               onClick={() => setShowCreateModal(true)}
               className="flex items-center gap-2"
@@ -136,6 +148,7 @@ export function InvoicesPage() {
         {/* Filtres */}
         <div className="bg-white rounded-xl sm:rounded-2xl shadow-lg p-4 sm:p-6 mb-6">
           <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4">
+            {/* Recherche */}
             <div className="relative">
               <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 text-gray-400 w-5 h-5" />
               <input
@@ -147,6 +160,7 @@ export function InvoicesPage() {
               />
             </div>
 
+            {/* Filtre statut */}
             <div>
               <select
                 value={statusFilter}
@@ -161,6 +175,7 @@ export function InvoicesPage() {
               </select>
             </div>
 
+            {/* Stats */}
             <div className="bg-gradient-to-r from-purple-50 to-pink-50 border border-purple-200 rounded-xl p-3 text-center">
               <div className="text-lg font-bold text-purple-600">
                 {invoices.reduce((sum, inv) => sum + inv.total_ttc, 0).toFixed(2)}€
@@ -174,6 +189,7 @@ export function InvoicesPage() {
         <div className="bg-white rounded-xl sm:rounded-2xl shadow-lg overflow-hidden">
           {filteredInvoices.length > 0 ? (
             <>
+              {/* Version desktop */}
               <div className="hidden lg:block overflow-x-auto">
                 <table className="w-full">
                   <thead className="bg-gradient-to-r from-gray-50 to-purple-50 border-b border-gray-200">
@@ -187,85 +203,89 @@ export function InvoicesPage() {
                     </tr>
                   </thead>
                   <tbody className="divide-y divide-gray-100">
-                    {filteredInvoices.map((invoice, index) => (
-                      <tr
-                        key={invoice.id}
-                        className="hover:bg-gray-50 transition-colors animate-fadeIn"
-                        style={{ animationDelay: `${index * 50}ms` }}
-                      >
-                        <td className="px-6 py-4">
-                          <div className="font-bold text-purple-600">{invoice.invoice_number}</div>
-                        </td>
-                        <td className="px-6 py-4">
-                          <div className="font-medium text-gray-900">
-                            {invoice.client?.firstname} {invoice.client?.lastname}
-                          </div>
-                          <div className="text-sm text-gray-600">{invoice.client?.email}</div>
-                        </td>
-                        <td className="px-6 py-4">
-                          <div className="text-sm text-gray-900">{formatDate(invoice.invoice_date)}</div>
-                          <div className="text-xs text-gray-600">Échéance: {formatDate(invoice.due_date)}</div>
-                        </td>
-                        <td className="px-6 py-4">
-                          <div className="font-bold text-gray-900">{invoice.total_ttc.toFixed(2)}€</div>
-                        </td>
-                        <td className="px-6 py-4">
-                          {getStatusBadge(invoice.status)}
-                        </td>
-                        <td className="px-6 py-4">
-                          <div className="flex gap-2">
-                            <button
-                              onClick={() => handlePreviewInvoice(invoice)}
-                              className="p-2 bg-indigo-500 text-white rounded-lg hover:bg-indigo-600 transition-colors"
-                              title="Aperçu"
-                            >
-                              <Eye className="w-4 h-4" />
-                            </button>
-                            <button
-                              onClick={() => {
-                                setSelectedInvoice(invoice);
-                                setShowDetailsModal(true);
-                              }}
-                              className="p-2 bg-blue-500 text-white rounded-lg hover:bg-blue-600 transition-colors"
-                              title="Détails"
-                            >
-                              <FileText className="w-4 h-4" />
-                            </button>
-                            {invoice.status === 'draft' && (
+                    {filteredInvoices.map((invoice, index) => {
+                      console.log('🖼️ Render facture:', invoice.invoice_number);
+                      return (
+                        <tr
+                          key={invoice.id}
+                          className="hover:bg-gray-50 transition-colors animate-fadeIn"
+                          style={{ animationDelay: `${index * 50}ms` }}
+                        >
+                          <td className="px-6 py-4">
+                            <div className="font-bold text-purple-600">{invoice.invoice_number}</div>
+                          </td>
+                          <td className="px-6 py-4">
+                            <div className="font-medium text-gray-900">
+                              {invoice.client?.firstname} {invoice.client?.lastname}
+                            </div>
+                            <div className="text-sm text-gray-600">{invoice.client?.email}</div>
+                          </td>
+                          <td className="px-6 py-4">
+                            <div className="text-sm text-gray-900">{formatDate(invoice.invoice_date)}</div>
+                            <div className="text-xs text-gray-600">Échéance: {formatDate(invoice.due_date)}</div>
+                          </td>
+                          <td className="px-6 py-4">
+                            <div className="font-bold text-gray-900">{invoice.total_ttc.toFixed(2)}€</div>
+                          </td>
+                          <td className="px-6 py-4">
+                            {getStatusBadge(invoice.status)}
+                          </td>
+                          <td className="px-6 py-4">
+                            <div className="flex gap-2">
                               <button
-                                onClick={() => handleSendInvoice(invoice)}
-                                className="p-2 bg-green-500 text-white rounded-lg hover:bg-green-600 transition-colors"
-                                title="Envoyer"
+                                onClick={() => handlePreviewInvoice(invoice)}
+                                className="p-2 bg-indigo-500 text-white rounded-lg hover:bg-indigo-600 transition-colors"
+                                title="Aperçu"
                               >
-                                <Send className="w-4 h-4" />
+                                <Eye className="w-4 h-4" />
                               </button>
-                            )}
-                            {(invoice.status === 'sent' || invoice.status === 'paid') && (
                               <button
-                                onClick={() => handleResendInvoice(invoice)}
-                                className="p-2 bg-orange-500 text-white rounded-lg hover:bg-orange-600 transition-colors"
-                                title="Renvoyer"
+                                onClick={() => {
+                                  setSelectedInvoice(invoice);
+                                  setShowDetailsModal(true);
+                                }}
+                                className="p-2 bg-blue-500 text-white rounded-lg hover:bg-blue-600 transition-colors"
+                                title="Détails"
                               >
-                                <RefreshCw className="w-4 h-4" />
+                                <FileText className="w-4 h-4" />
                               </button>
-                            )}
-                            {invoice.status === 'sent' && (
-                              <button
-                                onClick={() => handleMarkAsPaid(invoice)}
-                                className="p-2 bg-purple-500 text-white rounded-lg hover:bg-purple-600 transition-colors"
-                                title="Marquer comme payée"
-                              >
-                                <Check className="w-4 h-4" />
-                              </button>
-                            )}
-                          </div>
-                        </td>
-                      </tr>
-                    ))}
+                              {invoice.status === 'draft' && (
+                                <button
+                                  onClick={() => handleSendInvoice(invoice)}
+                                  className="p-2 bg-green-500 text-white rounded-lg hover:bg-green-600 transition-colors"
+                                  title="Envoyer"
+                                >
+                                  <Send className="w-4 h-4" />
+                                </button>
+                              )}
+                              {(invoice.status === 'sent' || invoice.status === 'paid') && (
+                                <button
+                                  onClick={() => handleResendInvoice(invoice)}
+                                  className="p-2 bg-orange-500 text-white rounded-lg hover:bg-orange-600 transition-colors"
+                                  title="Renvoyer"
+                                >
+                                  <RefreshCw className="w-4 h-4" />
+                                </button>
+                              )}
+                              {invoice.status === 'sent' && (
+                                <button
+                                  onClick={() => handleMarkAsPaid(invoice)}
+                                  className="p-2 bg-purple-500 text-white rounded-lg hover:bg-purple-600 transition-colors"
+                                  title="Marquer comme payée"
+                                >
+                                  <Check className="w-4 h-4" />
+                                </button>
+                              )}
+                            </div>
+                          </td>
+                        </tr>
+                      );
+                    })}
                   </tbody>
                 </table>
               </div>
 
+              {/* Version mobile */}
               <div className="lg:hidden space-y-4 p-4">
                 {filteredInvoices.map((invoice, index) => (
                   <div
@@ -357,7 +377,6 @@ export function InvoicesPage() {
         <CreateInvoiceModal
           isOpen={showCreateModal}
           onClose={() => setShowCreateModal(false)}
-          onInvoiceCreated={handleInvoiceCreated}
         />
       )}
 
