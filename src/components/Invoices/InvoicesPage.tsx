@@ -1,5 +1,5 @@
 import React, { useState } from 'react';
-import { FileText, Plus, Search, Filter, Eye, Send, Check, X, Edit, Trash2 } from 'lucide-react';
+import { FileText, Plus, Search, Filter, Eye, Send, Check, X, Edit, Trash2, RefreshCw } from 'lucide-react';
 import { useInvoices } from '../../hooks/useInvoices';
 import { Invoice } from '../../types';
 import { LoadingSpinner } from '../UI/LoadingSpinner';
@@ -7,12 +7,14 @@ import { Modal } from '../UI/Modal';
 import { Button } from '../UI/Button';
 import { CreateInvoiceModal } from './CreateInvoiceModal';
 import { InvoiceDetailsModal } from './InvoiceDetailsModal';
+import { SendInvoiceModal } from './SendInvoiceModal';
 
 export function InvoicesPage() {
   const { invoices, loading, updateInvoice, deleteInvoice } = useInvoices();
   const [showCreateModal, setShowCreateModal] = useState(false);
   const [selectedInvoice, setSelectedInvoice] = useState<Invoice | null>(null);
   const [showDetailsModal, setShowDetailsModal] = useState(false);
+  const [showSendModal, setShowSendModal] = useState(false);
   const [searchTerm, setSearchTerm] = useState('');
   const [statusFilter, setStatusFilter] = useState<string>('all');
 
@@ -63,16 +65,14 @@ export function InvoicesPage() {
     }
   };
 
-  const handleSendInvoice = async (invoice: Invoice) => {
-    try {
-      await updateInvoice(invoice.id, {
-        status: 'sent',
-        sent_at: new Date().toISOString()
-      });
-      alert('Facture envoyée avec succès !');
-    } catch (error) {
-      alert('Erreur lors de l\'envoi de la facture');
-    }
+  const handleSendInvoice = (invoice: Invoice) => {
+    setSelectedInvoice(invoice);
+    setShowSendModal(true);
+  };
+
+  const handleResendInvoice = (invoice: Invoice) => {
+    setSelectedInvoice(invoice);
+    setShowSendModal(true);
   };
 
   if (loading) {
@@ -210,6 +210,15 @@ export function InvoicesPage() {
                                 <Send className="w-4 h-4" />
                               </button>
                             )}
+                            {(invoice.status === 'sent' || invoice.status === 'paid') && (
+                              <button
+                                onClick={() => handleResendInvoice(invoice)}
+                                className="p-2 bg-orange-500 text-white rounded-lg hover:bg-orange-600 transition-colors"
+                                title="Renvoyer"
+                              >
+                                <RefreshCw className="w-4 h-4" />
+                              </button>
+                            )}
                             {invoice.status === 'sent' && (
                               <button
                                 onClick={() => handleMarkAsPaid(invoice)}
@@ -270,6 +279,14 @@ export function InvoicesPage() {
                             <Send className="w-4 h-4" />
                           </button>
                         )}
+                        {(invoice.status === 'sent' || invoice.status === 'paid') && (
+                          <button
+                            onClick={() => handleResendInvoice(invoice)}
+                            className="p-2 bg-orange-500 text-white rounded-lg hover:bg-orange-600 transition-colors mobile-tap-target"
+                          >
+                            <RefreshCw className="w-4 h-4" />
+                          </button>
+                        )}
                         {invoice.status === 'sent' && (
                           <button
                             onClick={() => handleMarkAsPaid(invoice)}
@@ -314,6 +331,17 @@ export function InvoicesPage() {
           isOpen={showDetailsModal}
           onClose={() => {
             setShowDetailsModal(false);
+            setSelectedInvoice(null);
+          }}
+        />
+      )}
+
+      {showSendModal && selectedInvoice && (
+        <SendInvoiceModal
+          invoice={selectedInvoice}
+          isOpen={showSendModal}
+          onClose={() => {
+            setShowSendModal(false);
             setSelectedInvoice(null);
           }}
         />

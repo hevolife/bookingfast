@@ -1,8 +1,9 @@
 import React, { useState } from 'react';
-import { Plus, Eye, Download, Trash2, FileText } from 'lucide-react';
+import { Plus, Eye, Download, Trash2, FileText, Send } from 'lucide-react';
 import { Button } from '../components/UI/Button';
 import { CreateInvoiceModal } from '../components/Invoices/CreateInvoiceModal';
 import { InvoiceDetailsModal } from '../components/Invoices/InvoiceDetailsModal';
+import { SendInvoiceModal } from '../components/Invoices/SendInvoiceModal';
 import { useInvoices } from '../hooks/useInvoices';
 import { useCompanyInfo } from '../hooks/useCompanyInfo';
 import { Invoice } from '../types';
@@ -13,6 +14,7 @@ export function InvoicesPage() {
   const { companyInfo } = useCompanyInfo();
   const [showCreateModal, setShowCreateModal] = useState(false);
   const [selectedInvoice, setSelectedInvoice] = useState<Invoice | null>(null);
+  const [invoiceToSend, setInvoiceToSend] = useState<Invoice | null>(null);
 
   const handleDelete = async (invoiceId: string) => {
     if (confirm('Êtes-vous sûr de vouloir supprimer cette facture ?')) {
@@ -134,6 +136,13 @@ export function InvoicesPage() {
                           <Download className="w-5 h-5" />
                         </button>
                         <button
+                          onClick={() => setInvoiceToSend(invoice)}
+                          className="p-2 text-emerald-600 hover:bg-emerald-50 rounded-lg transition-colors"
+                          title="Envoyer par email"
+                        >
+                          <Send className="w-5 h-5" />
+                        </button>
+                        <button
                           onClick={() => handleDelete(invoice.id)}
                           className="p-2 text-red-600 hover:bg-red-50 rounded-lg transition-colors"
                           title="Supprimer"
@@ -161,6 +170,14 @@ export function InvoicesPage() {
           invoice={selectedInvoice}
           isOpen={!!selectedInvoice}
           onClose={() => setSelectedInvoice(null)}
+        />
+      )}
+
+      {invoiceToSend && (
+        <SendInvoiceModal
+          invoice={invoiceToSend}
+          isOpen={!!invoiceToSend}
+          onClose={() => setInvoiceToSend(null)}
         />
       )}
     </div>
