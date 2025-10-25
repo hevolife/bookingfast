@@ -12,11 +12,14 @@ export async function generateInvoicePDFBlob(invoice: Invoice, companyInfo?: any
 }
 
 export async function generateInvoicePDFDataUrl(invoice: Invoice, companyInfo?: any): Promise<string> {
+  console.log('📄 Création PDF avec companyInfo:', companyInfo);
   const doc = createInvoicePDF(invoice, companyInfo);
   return doc.output('dataurlstring');
 }
 
 function createInvoicePDF(invoice: Invoice, companyInfo?: any): jsPDF {
+  console.log('🏗️ Construction PDF, companyInfo reçu:', companyInfo);
+  
   const doc = new jsPDF();
   
   // Configuration des couleurs modernes
@@ -55,60 +58,77 @@ function createInvoicePDF(invoice: Invoice, companyInfo?: any): jsPDF {
   // ===== SECTION ÉMETTEUR ET CLIENT =====
   yPos = 65;
   
-  // Carte Émetteur (si disponible)
+  // Carte Émetteur
+  console.log('🏢 Affichage émetteur, companyInfo:', companyInfo);
+  
+  doc.setFillColor(...bgLight);
+  doc.roundedRect(15, yPos, 85, 50, 3, 3, 'F');
+  
+  doc.setTextColor(...textMedium);
+  doc.setFontSize(9);
+  doc.setFont('helvetica', 'bold');
+  doc.text('ÉMETTEUR', 20, yPos + 6);
+  
+  let emitterYPos = yPos + 12;
+  
   if (companyInfo) {
-    doc.setFillColor(...bgLight);
-    doc.roundedRect(15, yPos, 85, 45, 3, 3, 'F');
-    
-    doc.setTextColor(...textMedium);
-    doc.setFontSize(9);
-    doc.setFont('helvetica', 'bold');
-    doc.text('ÉMETTEUR', 20, yPos + 6);
-    
     doc.setTextColor(...textDark);
     doc.setFont('helvetica', 'bold');
     doc.setFontSize(11);
-    yPos += 12;
     
     if (companyInfo.company_name) {
-      doc.text(companyInfo.company_name, 20, yPos);
-      yPos += 6;
+      console.log('✅ Nom entreprise:', companyInfo.company_name);
+      doc.text(companyInfo.company_name, 20, emitterYPos);
+      emitterYPos += 6;
     }
     
     doc.setFont('helvetica', 'normal');
     doc.setFontSize(9);
     
     if (companyInfo.address) {
+      console.log('✅ Adresse:', companyInfo.address);
       const addressLines = doc.splitTextToSize(companyInfo.address, 75);
-      doc.text(addressLines, 20, yPos);
-      yPos += addressLines.length * 4;
+      doc.text(addressLines, 20, emitterYPos);
+      emitterYPos += addressLines.length * 4;
     }
     
     if (companyInfo.postal_code || companyInfo.city) {
-      doc.text(`${companyInfo.postal_code || ''} ${companyInfo.city || ''}`, 20, yPos);
-      yPos += 4;
+      const location = `${companyInfo.postal_code || ''} ${companyInfo.city || ''}`.trim();
+      console.log('✅ Localisation:', location);
+      doc.text(location, 20, emitterYPos);
+      emitterYPos += 4;
     }
     
     if (companyInfo.siret) {
+      console.log('✅ SIRET:', companyInfo.siret);
       doc.setTextColor(...textMedium);
-      doc.text(`SIRET: ${companyInfo.siret}`, 20, yPos);
-      yPos += 4;
+      doc.text(`SIRET: ${companyInfo.siret}`, 20, emitterYPos);
+      emitterYPos += 4;
+      doc.setTextColor(...textDark);
     }
     
     if (companyInfo.email) {
-      doc.text(companyInfo.email, 20, yPos);
-      yPos += 4;
+      console.log('✅ Email:', companyInfo.email);
+      doc.text(companyInfo.email, 20, emitterYPos);
+      emitterYPos += 4;
     }
     
     if (companyInfo.phone) {
-      doc.text(companyInfo.phone, 20, yPos);
+      console.log('✅ Téléphone:', companyInfo.phone);
+      doc.text(companyInfo.phone, 20, emitterYPos);
     }
+  } else {
+    console.warn('⚠️ Aucune information entreprise disponible');
+    doc.setTextColor(...textMedium);
+    doc.setFontSize(9);
+    doc.setFont('helvetica', 'italic');
+    doc.text('Informations non renseignées', 20, emitterYPos);
   }
 
   // Carte Client
   yPos = 65;
   doc.setFillColor(...bgLight);
-  doc.roundedRect(110, yPos, 85, 45, 3, 3, 'F');
+  doc.roundedRect(110, yPos, 85, 50, 3, 3, 'F');
   
   doc.setTextColor(...textMedium);
   doc.setFontSize(9);
@@ -138,7 +158,7 @@ function createInvoicePDF(invoice: Invoice, companyInfo?: any): jsPDF {
   }
 
   // ===== DATES =====
-  yPos = 120;
+  yPos = 125;
   doc.setFillColor(...primaryLight);
   doc.roundedRect(15, yPos, 180, 18, 3, 3, 'F');
   
@@ -294,5 +314,6 @@ function createInvoicePDF(invoice: Invoice, companyInfo?: any): jsPDF {
     );
   }
 
+  console.log('✅ PDF créé avec succès');
   return doc;
 }

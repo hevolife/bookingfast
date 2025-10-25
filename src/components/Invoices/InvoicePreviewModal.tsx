@@ -14,26 +14,28 @@ interface InvoicePreviewModalProps {
 }
 
 export function InvoicePreviewModal({ invoice, isOpen, onClose }: InvoicePreviewModalProps) {
-  const { companyInfo } = useCompanyInfo();
+  const { companyInfo, loading: companyLoading } = useCompanyInfo();
   const [pdfDataUrl, setPdfDataUrl] = useState<string | null>(null);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
 
   useEffect(() => {
-    if (isOpen) {
+    if (isOpen && !companyLoading) {
+      console.log('📋 Company Info:', companyInfo);
       generatePreview();
     }
 
     return () => {
       setPdfDataUrl(null);
     };
-  }, [isOpen, invoice]);
+  }, [isOpen, invoice, companyInfo, companyLoading]);
 
   const generatePreview = async () => {
     try {
       setLoading(true);
       setError(null);
       console.log('🔄 Génération du PDF preview...');
+      console.log('🏢 Infos entreprise:', companyInfo);
       
       const dataUrl = await generateInvoicePDFDataUrl(invoice, companyInfo);
       console.log('✅ PDF généré, taille:', dataUrl.length, 'caractères');
@@ -59,10 +61,12 @@ export function InvoicePreviewModal({ invoice, isOpen, onClose }: InvoicePreview
   return (
     <Modal isOpen={isOpen} onClose={onClose} title="Aperçu de la facture" size="xl">
       <div className="space-y-4">
-        {loading ? (
+        {(loading || companyLoading) ? (
           <div className="flex flex-col items-center justify-center h-96 space-y-4">
             <LoadingSpinner size="lg" />
-            <p className="text-gray-600">Génération du PDF en cours...</p>
+            <p className="text-gray-600">
+              {companyLoading ? 'Chargement des informations...' : 'Génération du PDF en cours...'}
+            </p>
           </div>
         ) : error ? (
           <div className="text-center py-12">
