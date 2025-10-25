@@ -2,10 +2,11 @@ import React, { useState } from 'react';
 import { Modal } from '../UI/Modal';
 import { Button } from '../UI/Button';
 import { Invoice } from '../../types';
-import { FileText, Calendar, User, Mail, Phone, Download, RefreshCw } from 'lucide-react';
+import { FileText, Calendar, User, Mail, Phone, Download, RefreshCw, Eye } from 'lucide-react';
 import { generateInvoicePDF } from '../../utils/pdfGenerator';
 import { useCompanyInfo } from '../../hooks/useCompanyInfo';
 import { SendInvoiceModal } from './SendInvoiceModal';
+import { InvoicePreviewModal } from './InvoicePreviewModal';
 
 interface InvoiceDetailsModalProps {
   invoice: Invoice;
@@ -16,6 +17,7 @@ interface InvoiceDetailsModalProps {
 export function InvoiceDetailsModal({ invoice, isOpen, onClose }: InvoiceDetailsModalProps) {
   const { companyInfo } = useCompanyInfo();
   const [showSendModal, setShowSendModal] = useState(false);
+  const [showPreviewModal, setShowPreviewModal] = useState(false);
 
   const formatDate = (date: string) => {
     return new Date(date).toLocaleDateString('fr-FR', {
@@ -31,6 +33,10 @@ export function InvoiceDetailsModal({ invoice, isOpen, onClose }: InvoiceDetails
 
   const handleResend = () => {
     setShowSendModal(true);
+  };
+
+  const handlePreview = () => {
+    setShowPreviewModal(true);
   };
 
   return (
@@ -132,6 +138,13 @@ export function InvoiceDetailsModal({ invoice, isOpen, onClose }: InvoiceDetails
             <Button variant="secondary" onClick={onClose} className="flex-1">
               Fermer
             </Button>
+            <Button 
+              onClick={handlePreview}
+              className="flex-1 bg-gradient-to-r from-indigo-600 to-purple-600 hover:from-indigo-700 hover:to-purple-700"
+            >
+              <Eye className="w-4 h-4 mr-2" />
+              Aperçu
+            </Button>
             {(invoice.status === 'sent' || invoice.status === 'paid') && (
               <Button 
                 onClick={handleResend}
@@ -146,7 +159,7 @@ export function InvoiceDetailsModal({ invoice, isOpen, onClose }: InvoiceDetails
               className="flex-1 bg-gradient-to-r from-purple-600 to-pink-600 hover:from-purple-700 hover:to-pink-700"
             >
               <Download className="w-4 h-4 mr-2" />
-              Télécharger PDF
+              Télécharger
             </Button>
           </div>
         </div>
@@ -157,6 +170,14 @@ export function InvoiceDetailsModal({ invoice, isOpen, onClose }: InvoiceDetails
           invoice={invoice}
           isOpen={showSendModal}
           onClose={() => setShowSendModal(false)}
+        />
+      )}
+
+      {showPreviewModal && (
+        <InvoicePreviewModal
+          invoice={invoice}
+          isOpen={showPreviewModal}
+          onClose={() => setShowPreviewModal(false)}
         />
       )}
     </>

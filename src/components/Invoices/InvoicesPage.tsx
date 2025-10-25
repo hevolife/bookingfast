@@ -8,6 +8,7 @@ import { Button } from '../UI/Button';
 import { CreateInvoiceModal } from './CreateInvoiceModal';
 import { InvoiceDetailsModal } from './InvoiceDetailsModal';
 import { SendInvoiceModal } from './SendInvoiceModal';
+import { InvoicePreviewModal } from './InvoicePreviewModal';
 
 export function InvoicesPage() {
   const { invoices, loading, updateInvoice, deleteInvoice } = useInvoices();
@@ -15,6 +16,7 @@ export function InvoicesPage() {
   const [selectedInvoice, setSelectedInvoice] = useState<Invoice | null>(null);
   const [showDetailsModal, setShowDetailsModal] = useState(false);
   const [showSendModal, setShowSendModal] = useState(false);
+  const [showPreviewModal, setShowPreviewModal] = useState(false);
   const [searchTerm, setSearchTerm] = useState('');
   const [statusFilter, setStatusFilter] = useState<string>('all');
 
@@ -73,6 +75,11 @@ export function InvoicesPage() {
   const handleResendInvoice = (invoice: Invoice) => {
     setSelectedInvoice(invoice);
     setShowSendModal(true);
+  };
+
+  const handlePreviewInvoice = (invoice: Invoice) => {
+    setSelectedInvoice(invoice);
+    setShowPreviewModal(true);
   };
 
   if (loading) {
@@ -192,14 +199,21 @@ export function InvoicesPage() {
                         <td className="px-6 py-4">
                           <div className="flex gap-2">
                             <button
+                              onClick={() => handlePreviewInvoice(invoice)}
+                              className="p-2 bg-indigo-500 text-white rounded-lg hover:bg-indigo-600 transition-colors"
+                              title="Aperçu"
+                            >
+                              <Eye className="w-4 h-4" />
+                            </button>
+                            <button
                               onClick={() => {
                                 setSelectedInvoice(invoice);
                                 setShowDetailsModal(true);
                               }}
                               className="p-2 bg-blue-500 text-white rounded-lg hover:bg-blue-600 transition-colors"
-                              title="Voir"
+                              title="Détails"
                             >
-                              <Eye className="w-4 h-4" />
+                              <FileText className="w-4 h-4" />
                             </button>
                             {invoice.status === 'draft' && (
                               <button
@@ -263,13 +277,19 @@ export function InvoicesPage() {
                       <div className="font-bold text-gray-900">{invoice.total_ttc.toFixed(2)}€</div>
                       <div className="flex gap-2">
                         <button
+                          onClick={() => handlePreviewInvoice(invoice)}
+                          className="p-2 bg-indigo-500 text-white rounded-lg hover:bg-indigo-600 transition-colors mobile-tap-target"
+                        >
+                          <Eye className="w-4 h-4" />
+                        </button>
+                        <button
                           onClick={() => {
                             setSelectedInvoice(invoice);
                             setShowDetailsModal(true);
                           }}
                           className="p-2 bg-blue-500 text-white rounded-lg hover:bg-blue-600 transition-colors mobile-tap-target"
                         >
-                          <Eye className="w-4 h-4" />
+                          <FileText className="w-4 h-4" />
                         </button>
                         {invoice.status === 'draft' && (
                           <button
@@ -342,6 +362,17 @@ export function InvoicesPage() {
           isOpen={showSendModal}
           onClose={() => {
             setShowSendModal(false);
+            setSelectedInvoice(null);
+          }}
+        />
+      )}
+
+      {showPreviewModal && selectedInvoice && (
+        <InvoicePreviewModal
+          invoice={selectedInvoice}
+          isOpen={showPreviewModal}
+          onClose={() => {
+            setShowPreviewModal(false);
             setSelectedInvoice(null);
           }}
         />

@@ -16,7 +16,7 @@ export function Modal({ isOpen, onClose, title, children, size = 'md' }: ModalPr
     } else {
       document.body.style.overflow = 'unset';
     }
-    
+
     return () => {
       document.body.style.overflow = 'unset';
     };
@@ -25,120 +25,36 @@ export function Modal({ isOpen, onClose, title, children, size = 'md' }: ModalPr
   if (!isOpen) return null;
 
   const sizeClasses = {
-    sm: 'sm:max-w-sm',
-    md: 'sm:max-w-lg',
-    lg: 'sm:max-w-2xl',
-    xl: 'sm:max-w-4xl'
+    sm: 'max-w-md',
+    md: 'max-w-2xl',
+    lg: 'max-w-4xl',
+    xl: 'max-w-6xl'
   };
 
   return (
-    <>
-      {/* Desktop modal */}
-      <div 
-        className="hidden sm:flex fixed bg-black/60 backdrop-blur-sm items-center justify-center modal-container"
-        style={{
-          zIndex: 50,
-          top: 0,
-          left: 0,
-          right: 0,
-          bottom: 0,
-          padding: '2rem',
-          paddingTop: '6rem'
-        }}
-      >
-        <div 
-          className={`bg-white w-full ${sizeClasses[size]} overflow-y-auto rounded-3xl shadow-2xl transform animate-slideUp modal-content`}
-          style={{
-            maxHeight: '85vh',
-            height: 'auto'
-          }}
-        >
-          <div className="relative overflow-hidden touch-action-none sticky top-0 z-10 modal-header">
-            <div className="absolute inset-0 bg-gradient-to-br from-blue-600 via-purple-600 to-pink-600"></div>
-            <div className="absolute inset-0 bg-gradient-to-r from-transparent via-white/30 to-transparent -skew-x-12 animate-shimmer"></div>
-            <div className="absolute inset-0 opacity-10">
-              <div className="absolute top-0 left-0 w-32 h-32 bg-white rounded-full blur-3xl"></div>
-              <div className="absolute bottom-0 right-0 w-40 h-40 bg-white rounded-full blur-3xl"></div>
-            </div>
-            <div className="relative z-10 p-6">
-              <div className="flex items-center justify-between">
-                <h2 className="text-xl font-bold text-white drop-shadow-lg flex-1 pr-2">
-                  {title}
-                </h2>
-                <button
-                  onClick={onClose}
-                  className="group relative p-3 text-white hover:bg-white/20 rounded-2xl transition-all duration-300 transform hover:scale-110 hover:rotate-90 mobile-tap-target flex-shrink-0 backdrop-blur-sm"
-                  aria-label="Fermer"
-                >
-                  <div className="absolute inset-0 bg-white/10 rounded-2xl opacity-0 group-hover:opacity-100 transition-opacity duration-300"></div>
-                  <X className="w-6 h-6 relative z-10" />
-                </button>
-              </div>
-            </div>
-            <div className="absolute bottom-0 left-0 right-0 h-1 bg-gradient-to-r from-transparent via-white/50 to-transparent"></div>
+    <div className="fixed inset-0 z-50 overflow-y-auto">
+      <div className="flex min-h-screen items-center justify-center p-4">
+        <div
+          className="fixed inset-0 bg-black bg-opacity-50 transition-opacity"
+          onClick={onClose}
+        />
+        
+        <div className={`relative bg-white rounded-2xl shadow-2xl ${sizeClasses[size]} w-full max-h-[90vh] overflow-y-auto animate-slideUp`}>
+          <div className="sticky top-0 bg-white border-b border-gray-200 px-6 py-4 flex items-center justify-between rounded-t-2xl z-10">
+            <h2 className="text-xl font-bold text-gray-900">{title}</h2>
+            <button
+              onClick={onClose}
+              className="p-2 hover:bg-gray-100 rounded-lg transition-colors"
+            >
+              <X className="w-5 h-5 text-gray-500" />
+            </button>
           </div>
-          <div className="modal-body p-6 scrollable-area" style={{
-            overflowY: 'auto',
-            WebkitOverflowScrolling: 'touch',
-            touchAction: 'pan-y'
-          }}>
+          
+          <div className="p-6">
             {children}
           </div>
         </div>
       </div>
-
-      {/* Mobile modal - collé sous la navbar */}
-      <div 
-        className="sm:hidden fixed bg-black/60 backdrop-blur-sm modal-container"
-        style={{
-          zIndex: 50,
-          top: 'calc(64px + env(safe-area-inset-top, 0px))',
-          left: 0,
-          right: 0,
-          bottom: 0,
-          padding: 0
-        }}
-      >
-        <div 
-          className="bg-white w-full overflow-y-auto rounded-t-3xl shadow-2xl transform animate-slideUp modal-content"
-          style={{
-            height: '100%',
-            maxHeight: '100%'
-          }}
-        >
-          <div className="relative overflow-hidden touch-action-none sticky top-0 z-10 modal-header">
-            <div className="absolute inset-0 bg-gradient-to-br from-blue-600 via-purple-600 to-pink-600"></div>
-            <div className="absolute inset-0 bg-gradient-to-r from-transparent via-white/30 to-transparent -skew-x-12 animate-shimmer"></div>
-            <div className="absolute inset-0 opacity-10">
-              <div className="absolute top-0 left-0 w-32 h-32 bg-white rounded-full blur-3xl"></div>
-              <div className="absolute bottom-0 right-0 w-40 h-40 bg-white rounded-full blur-3xl"></div>
-            </div>
-            <div className="relative z-10 p-3">
-              <div className="flex items-center justify-between">
-                <h2 className="text-base font-bold text-white drop-shadow-lg flex-1 pr-2">
-                  {title}
-                </h2>
-                <button
-                  onClick={onClose}
-                  className="group relative p-1.5 text-white hover:bg-white/20 rounded-lg transition-all duration-300 transform hover:scale-110 hover:rotate-90 mobile-tap-target flex-shrink-0 backdrop-blur-sm"
-                  aria-label="Fermer"
-                >
-                  <div className="absolute inset-0 bg-white/10 rounded-lg opacity-0 group-hover:opacity-100 transition-opacity duration-300"></div>
-                  <X className="w-5 h-5 relative z-10" />
-                </button>
-              </div>
-            </div>
-            <div className="absolute bottom-0 left-0 right-0 h-1 bg-gradient-to-r from-transparent via-white/50 to-transparent"></div>
-          </div>
-          <div className="modal-body p-4 scrollable-area" style={{
-            overflowY: 'auto',
-            WebkitOverflowScrolling: 'touch',
-            touchAction: 'pan-y'
-          }}>
-            {children}
-          </div>
-        </div>
-      </div>
-    </>
+    </div>
   );
 }
