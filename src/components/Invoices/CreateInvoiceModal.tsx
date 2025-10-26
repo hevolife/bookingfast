@@ -330,13 +330,17 @@ export function CreateInvoiceModal({ isOpen, onClose }: CreateInvoiceModalProps)
                         Quantité
                       </label>
                       <input
-                        type="number"
-                        value={item.quantity || 1}
-                        onChange={(e) => updateItem(index, 'quantity', parseFloat(e.target.value))}
+                        type="text"
+                        inputMode="decimal"
+                        value={item.quantity || ''}
+                        onChange={(e) => {
+                          const value = e.target.value;
+                          if (value === '' || /^\d*[.,]?\d*$/.test(value)) {
+                            updateItem(index, 'quantity', value === '' ? 0 : parseFloat(value.replace(',', '.')));
+                          }
+                        }}
                         placeholder="1"
-                        min="0"
-                        step="0.01"
-                        className="w-full p-3 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 text-center font-bold"
+                        className="w-full p-3 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 font-medium"
                         required
                       />
                     </div>
@@ -348,13 +352,17 @@ export function CreateInvoiceModal({ isOpen, onClose }: CreateInvoiceModalProps)
                         Prix unitaire HT
                       </label>
                       <input
-                        type="number"
-                        value={item.unit_price_ht || 0}
-                        onChange={(e) => updateItem(index, 'unit_price_ht', parseFloat(e.target.value))}
+                        type="text"
+                        inputMode="decimal"
+                        value={item.unit_price_ht || ''}
+                        onChange={(e) => {
+                          const value = e.target.value;
+                          if (value === '' || /^\d*[.,]?\d*$/.test(value)) {
+                            updateItem(index, 'unit_price_ht', value === '' ? 0 : parseFloat(value.replace(',', '.')));
+                          }
+                        }}
                         placeholder="0.00"
-                        min="0"
-                        step="0.01"
-                        className="w-full p-3 border border-gray-300 rounded-lg focus:ring-2 focus:ring-green-500 text-center font-bold"
+                        className="w-full p-3 border border-gray-300 rounded-lg focus:ring-2 focus:ring-green-500 font-medium"
                         required
                       />
                     </div>
@@ -366,13 +374,17 @@ export function CreateInvoiceModal({ isOpen, onClose }: CreateInvoiceModalProps)
                         TVA (%)
                       </label>
                       <input
-                        type="number"
-                        value={item.tva_rate || 20}
-                        onChange={(e) => updateItem(index, 'tva_rate', parseFloat(e.target.value))}
+                        type="text"
+                        inputMode="decimal"
+                        value={item.tva_rate || ''}
+                        onChange={(e) => {
+                          const value = e.target.value;
+                          if (value === '' || /^\d*[.,]?\d*$/.test(value)) {
+                            updateItem(index, 'tva_rate', value === '' ? 0 : parseFloat(value.replace(',', '.')));
+                          }
+                        }}
                         placeholder="20"
-                        min="0"
-                        step="0.01"
-                        className="w-full p-3 border border-gray-300 rounded-lg focus:ring-2 focus:ring-orange-500 text-center font-bold"
+                        className="w-full p-3 border border-gray-300 rounded-lg focus:ring-2 focus:ring-orange-500 font-medium"
                         required
                       />
                     </div>
