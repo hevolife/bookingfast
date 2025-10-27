@@ -1,5 +1,5 @@
 import React, { useState, useEffect } from 'react';
-import { Calendar, User, Euro, Package, Search, Mail, Phone, X, FileText, AlertCircle } from 'lucide-react';
+import { Calendar, User, Euro, Package, Search, Mail, Phone, X, FileText, AlertCircle, ChevronDown } from 'lucide-react';
 import { useClients } from '../../hooks/useClients';
 import { useBookings } from '../../hooks/useBookings';
 import { useServices } from '../../hooks/useServices';
@@ -68,6 +68,7 @@ export function BookingModal({
   const [notes, setNotes] = useState('');
   const [tempBookingId, setTempBookingId] = useState<string | null>(null);
   const [isEditMode, setIsEditMode] = useState(false);
+  const [isServiceListExpanded, setIsServiceListExpanded] = useState(true);
 
   const hasMultiUserPlugin = userPlugins.some(p => p.plugin_slug === 'multi-user');
 
@@ -125,6 +126,7 @@ export function BookingModal({
       setNotes(editingBooking.notes || '');
       setTempBookingId(editingBooking.id);
       setIsEditMode(true);
+      setIsServiceListExpanded(false);
     } else {
       setSelectedService(null);
       setIsCustomService(false);
@@ -139,6 +141,7 @@ export function BookingModal({
       setNotes('');
       setTempBookingId(null);
       setIsEditMode(false);
+      setIsServiceListExpanded(true);
     }
   }, [editingBooking, services, selectedDate, selectedTime]);
 
@@ -151,6 +154,7 @@ export function BookingModal({
     setNotes('');
     setTempBookingId(null);
     setIsEditMode(false);
+    setIsServiceListExpanded(true);
     
     setTimeout(() => {
       const event = new CustomEvent('resetDatePicker');
@@ -532,6 +536,15 @@ export function BookingModal({
     }
   };
 
+  const handleServiceSelect = (service: Service) => {
+    setSelectedService(service);
+    setIsServiceListExpanded(false);
+  };
+
+  const handleCustomServiceComplete = () => {
+    setIsServiceListExpanded(false);
+  };
+
   const totalAmount = calculateTotalAmount();
   const currentPaid = calculateCurrentPaid();
 
@@ -683,6 +696,7 @@ export function BookingModal({
                     onClick={() => {
                       setIsCustomService(false);
                       setSelectedService(null);
+                      setIsServiceListExpanded(true);
                     }}
                     className={`flex-1 py-2 px-3 rounded-lg font-medium transition-all duration-300 text-sm ${
                       !isCustomService
@@ -697,6 +711,7 @@ export function BookingModal({
                     onClick={() => {
                       setIsCustomService(true);
                       setSelectedService(null);
+                      setIsServiceListExpanded(true);
                     }}
                     className={`flex-1 py-2 px-3 rounded-lg font-medium transition-all duration-300 text-sm ${
                       isCustomService
@@ -713,119 +728,162 @@ export function BookingModal({
                     <LoadingSpinner size="lg" />
                   </div>
                 ) : !isCustomService ? (
-                  <div className="grid grid-cols-1 gap-2 sm:gap-3">
-                    {services.filter(service => service.description !== 'Service personnalisé').map((service) => (
+                  <>
+                    {!isServiceListExpanded && selectedService ? (
                       <button
-                        key={service.id}
                         type="button"
-                        onClick={() => setSelectedService(service)}
-                        className={`p-3 sm:p-4 rounded-xl sm:rounded-2xl border-2 transition-all duration-300 transform hover:scale-[1.02] text-left ${
-                          selectedService?.id === service.id
-                            ? 'border-blue-500 bg-gradient-to-r from-blue-50 to-purple-50 shadow-lg'
-                            : 'border-gray-200 bg-white hover:border-blue-300 hover:shadow-md'
-                        }`}
+                        onClick={() => setIsServiceListExpanded(true)}
+                        className="w-full p-3 sm:p-4 rounded-xl sm:rounded-2xl border-2 border-blue-500 bg-gradient-to-r from-blue-50 to-purple-50 shadow-lg text-left hover:shadow-xl transition-all duration-300"
                       >
                         <div className="flex items-center gap-3 sm:gap-4">
-                          <div className={`w-10 h-10 sm:w-12 sm:h-12 rounded-lg sm:rounded-xl flex items-center justify-center ${
-                            selectedService?.id === service.id
-                              ? 'bg-gradient-to-r from-blue-500 to-purple-500 text-white'
-                              : 'bg-gray-100 text-gray-600'
-                          }`}>
+                          <div className="w-10 h-10 sm:w-12 sm:h-12 rounded-lg sm:rounded-xl flex items-center justify-center bg-gradient-to-r from-blue-500 to-purple-500 text-white">
                             <Package className="w-5 h-5 sm:w-6 sm:h-6" />
                           </div>
                           <div className="flex-1">
-                            <div className="font-bold text-gray-900 text-sm sm:text-base">{service.name}</div>
-                            <div className="text-xs sm:text-sm text-gray-600 mt-1 line-clamp-1 sm:line-clamp-none">{service.description}</div>
+                            <div className="font-bold text-gray-900 text-sm sm:text-base">{selectedService.name}</div>
+                            <div className="text-xs sm:text-sm text-gray-600 mt-1">{selectedService.description}</div>
                             <div className="flex items-center gap-2 sm:gap-4 mt-2 text-xs sm:text-sm">
-                              <span className="font-medium text-green-600">{service.price_ttc.toFixed(2)}€</span>
-                              <span className="text-gray-500">{service.duration_minutes}min</span>
-                              <span className="text-gray-500">Max {service.capacity} {service.unit_name || 'pers.'}</span>
+                              <span className="font-medium text-green-600">{selectedService.price_ttc.toFixed(2)}€</span>
+                              <span className="text-gray-500">{selectedService.duration_minutes}min</span>
+                              <span className="text-gray-500">Max {selectedService.capacity} {selectedService.unit_name || 'pers.'}</span>
                             </div>
                           </div>
+                          <ChevronDown className="w-5 h-5 text-blue-500" />
                         </div>
                       </button>
-                    ))}
-                  </div>
-                ) : (
-                  <div className="bg-gradient-to-r from-purple-50 to-pink-50 border-2 border-purple-200 rounded-xl sm:rounded-2xl p-4 sm:p-6">
-                    <div className="flex items-center gap-3 mb-4">
-                      <div className="w-10 h-10 sm:w-12 sm:h-12 bg-gradient-to-r from-purple-500 to-pink-500 rounded-lg sm:rounded-xl flex items-center justify-center text-white">
-                        <Package className="w-5 h-5 sm:w-6 sm:h-6" />
-                      </div>
-                      <div>
-                        <h3 className="text-base sm:text-lg font-bold text-purple-800">Service personnalisé</h3>
-                        <p className="text-purple-600 text-xs sm:text-sm">Créez un service sur mesure</p>
-                      </div>
-                    </div>
-                    
-                    <div className="space-y-4">
-                      <div>
-                        <label className="block text-sm font-medium text-purple-700 mb-2">
-                          Nom du service *
-                        </label>
-                        <input
-                          type="text"
-                          value={customServiceData.name}
-                          onChange={(e) => setCustomServiceData(prev => ({ ...prev, name: e.target.value }))}
-                          className="w-full pl-12 pr-4 py-3 border border-purple-300 rounded-xl focus:ring-2 focus:ring-purple-500 focus:border-purple-500 transition-all duration-300 text-base bg-white"
-                          placeholder="Ex: Consultation spécialisée"
-                          required
-                        />
-                      </div>
-                      
-                      <div className="grid grid-cols-2 gap-3">
-                        <div>
-                          <label className="block text-sm font-medium text-purple-700 mb-2">
-                            Prix (€) *
-                          </label>
-                          <input
-                            type="number"
-                            step="0.01"
-                            min="0.01"
-                            value={customServiceData.price || ''}
-                            onChange={(e) => setCustomServiceData(prev => ({ ...prev, price: parseFloat(e.target.value) || 0 }))}
-                            className="w-full p-3 border border-purple-300 rounded-xl focus:ring-2 focus:ring-purple-500 focus:border-purple-500 transition-all duration-300 text-base bg-white"
-                            placeholder="0.00"
-                            required
-                          />
-                        </div>
-                        
-                        <div>
-                          <label className="block text-sm font-medium text-purple-700 mb-2">
-                            Durée (min) *
-                          </label>
-                          <input
-                            type="number"
-                            min="15"
-                            step="15"
-                            value={customServiceData.duration || ''}
-                            onChange={(e) => setCustomServiceData(prev => ({ ...prev, duration: parseInt(e.target.value) || 60 }))}
-                            className="w-full p-3 border border-purple-300 rounded-xl focus:ring-2 focus:ring-purple-500 focus:border-purple-500 transition-all duration-300 text-base bg-white"
-                            placeholder="60"
-                            required
-                          />
-                        </div>
-                      </div>
-                      
-                      {customServiceData.name && customServiceData.price > 0 && (
-                        <div className="bg-white border border-purple-300 rounded-xl p-3">
-                          <div className="flex items-center gap-3">
-                            <div className="w-8 h-8 bg-gradient-to-r from-purple-500 to-pink-500 rounded-lg flex items-center justify-center text-white">
-                              <Package className="w-4 h-4" />
-                            </div>
-                            <div className="flex-1">
-                              <div className="font-bold text-gray-900 text-sm">{customServiceData.name}</div>
-                              <div className="flex items-center gap-3 mt-1 text-xs text-gray-600">
-                                <span className="font-medium text-green-600">{customServiceData.price.toFixed(2)}€</span>
-                                <span className="text-gray-500">{customServiceData.duration}min</span>
-                                <span className="text-gray-500">Capacité illimitée</span>
+                    ) : (
+                      <div className="grid grid-cols-1 gap-2 sm:gap-3">
+                        {services.filter(service => service.description !== 'Service personnalisé').map((service) => (
+                          <button
+                            key={service.id}
+                            type="button"
+                            onClick={() => handleServiceSelect(service)}
+                            className={`p-3 sm:p-4 rounded-xl sm:rounded-2xl border-2 transition-all duration-300 transform hover:scale-[1.02] text-left ${
+                              selectedService?.id === service.id
+                                ? 'border-blue-500 bg-gradient-to-r from-blue-50 to-purple-50 shadow-lg'
+                                : 'border-gray-200 bg-white hover:border-blue-300 hover:shadow-md'
+                            }`}
+                          >
+                            <div className="flex items-center gap-3 sm:gap-4">
+                              <div className={`w-10 h-10 sm:w-12 sm:h-12 rounded-lg sm:rounded-xl flex items-center justify-center ${
+                                selectedService?.id === service.id
+                                  ? 'bg-gradient-to-r from-blue-500 to-purple-500 text-white'
+                                  : 'bg-gray-100 text-gray-600'
+                              }`}>
+                                <Package className="w-5 h-5 sm:w-6 sm:h-6" />
+                              </div>
+                              <div className="flex-1">
+                                <div className="font-bold text-gray-900 text-sm sm:text-base">{service.name}</div>
+                                <div className="text-xs sm:text-sm text-gray-600 mt-1 line-clamp-1 sm:line-clamp-none">{service.description}</div>
+                                <div className="flex items-center gap-2 sm:gap-4 mt-2 text-xs sm:text-sm">
+                                  <span className="font-medium text-green-600">{service.price_ttc.toFixed(2)}€</span>
+                                  <span className="text-gray-500">{service.duration_minutes}min</span>
+                                  <span className="text-gray-500">Max {service.capacity} {service.unit_name || 'pers.'}</span>
+                                </div>
                               </div>
                             </div>
+                          </button>
+                        ))}
+                      </div>
+                    )}
+                  </>
+                ) : (
+                  <>
+                    {!isServiceListExpanded && customServiceData.name && customServiceData.price > 0 ? (
+                      <button
+                        type="button"
+                        onClick={() => setIsServiceListExpanded(true)}
+                        className="w-full bg-gradient-to-r from-purple-50 to-pink-50 border-2 border-purple-500 rounded-xl sm:rounded-2xl p-4 sm:p-6 text-left hover:shadow-xl transition-all duration-300"
+                      >
+                        <div className="flex items-center gap-3">
+                          <div className="w-10 h-10 sm:w-12 sm:h-12 bg-gradient-to-r from-purple-500 to-pink-500 rounded-lg sm:rounded-xl flex items-center justify-center text-white">
+                            <Package className="w-5 h-5 sm:w-6 sm:h-6" />
+                          </div>
+                          <div className="flex-1">
+                            <div className="font-bold text-gray-900 text-sm sm:text-base">{customServiceData.name}</div>
+                            <div className="flex items-center gap-3 mt-1 text-xs sm:text-sm text-gray-600">
+                              <span className="font-medium text-green-600">{customServiceData.price.toFixed(2)}€</span>
+                              <span className="text-gray-500">{customServiceData.duration}min</span>
+                              <span className="text-gray-500">Capacité illimitée</span>
+                            </div>
+                          </div>
+                          <ChevronDown className="w-5 h-5 text-purple-500" />
+                        </div>
+                      </button>
+                    ) : (
+                      <div className="bg-gradient-to-r from-purple-50 to-pink-50 border-2 border-purple-200 rounded-xl sm:rounded-2xl p-4 sm:p-6">
+                        <div className="flex items-center gap-3 mb-4">
+                          <div className="w-10 h-10 sm:w-12 sm:h-12 bg-gradient-to-r from-purple-500 to-pink-500 rounded-lg sm:rounded-xl flex items-center justify-center text-white">
+                            <Package className="w-5 h-5 sm:w-6 sm:h-6" />
+                          </div>
+                          <div>
+                            <h3 className="text-base sm:text-lg font-bold text-purple-800">Service personnalisé</h3>
+                            <p className="text-purple-600 text-xs sm:text-sm">Créez un service sur mesure</p>
                           </div>
                         </div>
-                      )}
-                    </div>
-                  </div>
+                        
+                        <div className="space-y-4">
+                          <div>
+                            <label className="block text-sm font-medium text-purple-700 mb-2">
+                              Nom du service *
+                            </label>
+                            <input
+                              type="text"
+                              value={customServiceData.name}
+                              onChange={(e) => setCustomServiceData(prev => ({ ...prev, name: e.target.value }))}
+                              className="w-full pl-12 pr-4 py-3 border border-purple-300 rounded-xl focus:ring-2 focus:ring-purple-500 focus:border-purple-500 transition-all duration-300 text-base bg-white"
+                              placeholder="Ex: Consultation spécialisée"
+                              required
+                            />
+                          </div>
+                          
+                          <div className="grid grid-cols-2 gap-3">
+                            <div>
+                              <label className="block text-sm font-medium text-purple-700 mb-2">
+                                Prix (€) *
+                              </label>
+                              <input
+                                type="number"
+                                step="0.01"
+                                min="0.01"
+                                value={customServiceData.price || ''}
+                                onChange={(e) => setCustomServiceData(prev => ({ ...prev, price: parseFloat(e.target.value) || 0 }))}
+                                className="w-full p-3 border border-purple-300 rounded-xl focus:ring-2 focus:ring-purple-500 focus:border-purple-500 transition-all duration-300 text-base bg-white"
+                                placeholder="0.00"
+                                required
+                              />
+                            </div>
+                            
+                            <div>
+                              <label className="block text-sm font-medium text-purple-700 mb-2">
+                                Durée (min) *
+                              </label>
+                              <input
+                                type="number"
+                                min="15"
+                                step="15"
+                                value={customServiceData.duration || ''}
+                                onChange={(e) => setCustomServiceData(prev => ({ ...prev, duration: parseInt(e.target.value) || 60 }))}
+                                className="w-full p-3 border border-purple-300 rounded-xl focus:ring-2 focus:ring-purple-500 focus:border-purple-500 transition-all duration-300 text-base bg-white"
+                                placeholder="60"
+                                required
+                              />
+                            </div>
+                          </div>
+                          
+                          {customServiceData.name && customServiceData.price > 0 && (
+                            <button
+                              type="button"
+                              onClick={handleCustomServiceComplete}
+                              className="w-full bg-gradient-to-r from-purple-500 to-pink-500 text-white py-3 rounded-xl hover:from-purple-600 hover:to-pink-600 transition-all duration-300 font-medium"
+                            >
+                              ✓ Valider le service
+                            </button>
+                          )}
+                        </div>
+                      </div>
+                    )}
+                  </>
                 )}
               </div>
 

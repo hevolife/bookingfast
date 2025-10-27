@@ -143,9 +143,6 @@ export function BookingDetailsModal({ booking, onClose, onUpdate }: BookingDetai
     transaction.status === 'completed' || transaction.status === 'paid'
   );
 
-  console.log('🔍 [MODAL] Liens actifs (pending/expired):', activePaymentLinks.length);
-  console.log('🔍 [MODAL] Transactions affichées (completed/paid):', displayTransactions.length);
-
   return (
     <>
       {/* Desktop: Modal centré avec overlay */}
