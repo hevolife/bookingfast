@@ -217,12 +217,10 @@ export function BookingModal({
     
     if (!selectedClient || (!selectedService && !isCustomService)) {
       console.error('❌ Client ou service manquant');
-      alert('⚠️ Veuillez sélectionner un client et un service avant de générer un lien de paiement.');
       return;
     }
 
     if (isCustomService && (!customServiceData.name || customServiceData.price <= 0)) {
-      alert('⚠️ Veuillez remplir le nom et le prix du service personnalisé.');
       return;
     }
 
@@ -330,25 +328,12 @@ export function BookingModal({
       
       console.log('💾 Transaction ajoutée avec payment_link_id:', newTransaction);
       
-      // 🔥 COPIER LE LIEN AU LIEU DE L'OUVRIR
+      // 🔥 COPIER LE LIEN SILENCIEUSEMENT (SANS POPUP)
       try {
         await navigator.clipboard.writeText(paymentLink.payment_url);
         console.log('✅ Lien copié dans le presse-papiers:', paymentLink.payment_url);
-        
-        alert(`✅ Lien de paiement créé et copié dans le presse-papiers !\n\n${paymentLink.payment_url}\n\nVous pouvez maintenant le partager avec votre client.\n\n⚠️ N'oubliez pas de cliquer sur "Créer" pour finaliser la réservation !`);
       } catch (clipboardError) {
         console.warn('⚠️ Impossible de copier automatiquement:', clipboardError);
-        
-        // Fallback : afficher le lien dans une alerte
-        const userChoice = confirm(
-          `✅ Lien de paiement créé !\n\n${paymentLink.payment_url}\n\n` +
-          `Voulez-vous ouvrir le lien dans un nouvel onglet ?\n\n` +
-          `⚠️ N'oubliez pas de cliquer sur "Créer" pour finaliser la réservation !`
-        );
-        
-        if (userChoice) {
-          window.open(paymentLink.payment_url, '_blank');
-        }
       }
       
       // Déclencher le workflow payment_link_created
@@ -388,13 +373,6 @@ export function BookingModal({
       
     } catch (error) {
       console.error('❌ Erreur lors de la génération du lien:', error);
-      
-      let errorMessage = 'Erreur lors de la génération du lien de paiement';
-      if (error instanceof Error) {
-        errorMessage += `\n\nDétails: ${error.message}`;
-      }
-      
-      alert(errorMessage);
     } finally {
       setSaving(false);
     }
@@ -566,30 +544,44 @@ export function BookingModal({
     return `${unitName}(s)`;
   };
 
+  // 🎯 NOUVEL ORDRE DES BOUTONS : Modifier → Annuler → Supprimer
   const footerButtons = [
+    // 1️⃣ MODIFIER (en premier, à la place de Supprimer)
     ...((editingBooking || (tempBookingId && isEditMode)) ? [{
-      label: 'Supprimer',
-      onClick: () => setShowDeleteConfirm(true),
-      variant: 'danger' as const,
-      disabled: saving,
-      icon: '🗑️'
-    }] : []),
+      label: 'Modifier',
+      onClick: () => {},
+      variant: 'primary' as const,
+      disabled: saving || (!selectedService && (!isCustomService || !customServiceData.name || customServiceData.price <= 0)) || 
+        !selectedClient?.firstname || !selectedClient?.lastname || !selectedClient?.email || !selectedClient?.phone ||
+        (!editingBooking && !tempBookingId && !canCreateBooking),
+      icon: '✏️'
+    }] : [
+      // Bouton CRÉER pour les nouvelles réservations
+      {
+        label: 'Créer',
+        onClick: () => {},
+        variant: 'primary' as const,
+        disabled: saving || (!selectedService && (!isCustomService || !customServiceData.name || customServiceData.price <= 0)) || 
+          !selectedClient?.firstname || !selectedClient?.lastname || !selectedClient?.email || !selectedClient?.phone ||
+          (!editingBooking && !tempBookingId && !canCreateBooking),
+        icon: '✨'
+      }
+    ]),
+    // 2️⃣ ANNULER (au milieu)
     {
       label: 'Annuler',
       onClick: handleClose,
       variant: 'secondary' as const,
       disabled: saving
     },
-    {
-      label: (editingBooking || (tempBookingId && isEditMode)) ? 'Modifier' : 'Créer',
-      onClick: () => {},
-      variant: 'primary' as const,
-      disabled: saving || (!selectedService && (!isCustomService || !customServiceData.name || customServiceData.price <= 0)) || 
-        !selectedClient?.firstname || !selectedClient?.lastname || !selectedClient?.email || !selectedClient?.phone ||
-        (!editingBooking && !tempBookingId && !canCreateBooking),
-      loading: saving,
-      icon: (editingBooking || (tempBookingId && isEditMode)) ? '✏️' : '✨'
-    }
+    // 3️⃣ SUPPRIMER (en dernier, en dessous de Annuler)
+    ...((editingBooking || (tempBookingId && isEditMode)) ? [{
+      label: 'Supprimer',
+      onClick: () => setShowDeleteConfirm(true),
+      variant: 'danger' as const,
+      disabled: saving,
+      icon: '🗑️'
+    }] : [])
   ];
 
   const deleteConfirmButtons = [
@@ -603,7 +595,6 @@ export function BookingModal({
       onClick: handleDelete,
       variant: 'danger' as const,
       disabled: saving,
-      loading: saving,
       icon: '🗑️'
     }
   ];

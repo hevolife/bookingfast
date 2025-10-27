@@ -54,6 +54,12 @@ export function Navbar() {
     setCalendarMenuOpen(false);
   };
 
+  const handleCloseMobileMenu = () => {
+    setMobileMenuOpen(false);
+    setPluginsMenuOpen(false);
+    setCalendarMenuOpen(false);
+  };
+
   return (
     <>
       <nav 
@@ -255,6 +261,15 @@ export function Navbar() {
             overscrollBehavior: 'contain'
           }}
         >
+          {/* Bouton de fermeture en haut à droite */}
+          <button
+            onClick={handleCloseMobileMenu}
+            className="fixed top-4 right-4 z-50 w-12 h-12 bg-white/20 backdrop-blur-sm rounded-xl flex items-center justify-center hover:bg-white/30 transition-all shadow-lg"
+            style={{ top: 'calc(env(safe-area-inset-top) + 1rem)' }}
+          >
+            <X className="w-6 h-6 text-white" />
+          </button>
+
           <div 
             className="h-full overflow-y-auto p-6 pt-20 scrollable-area"
             style={{

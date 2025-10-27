@@ -1,5 +1,5 @@
 import React, { useState, useEffect } from 'react';
-import { Save, Building2, Palette, Clock, Euro, Mail, CreditCard, Eye, EyeOff, Globe, Shield, AlertTriangle, CheckCircle, Percent, Trash2, RefreshCw, Calculator, Calendar, FileText } from 'lucide-react';
+import { Save, Building2, Clock, Euro, Mail, CreditCard, Eye, EyeOff, Globe, Shield, AlertTriangle, CheckCircle, Percent, Trash2, RefreshCw, Calculator, Calendar, FileText } from 'lucide-react';
 import { useBusinessSettings } from '../../hooks/useBusinessSettings';
 import { useCompanyInfo } from '../../hooks/useCompanyInfo';
 import { BusinessSettings } from '../../types';
@@ -559,63 +559,6 @@ export function BusinessSettingsForm() {
                     </option>
                   ))}
                 </select>
-              </div>
-            </div>
-          </div>
-
-          {/* Couleurs */}
-          <div className="bg-gradient-to-r from-purple-50 to-pink-50 rounded-2xl p-6 border-2 border-purple-200">
-            <div className="flex items-center gap-3 mb-6">
-              <div className="w-12 h-12 bg-gradient-to-r from-purple-500 to-pink-500 rounded-xl flex items-center justify-center">
-                <Palette className="w-6 h-6 text-white" />
-              </div>
-              <div>
-                <h3 className="text-xl font-bold text-gray-900">Couleurs de la marque</h3>
-                <p className="text-sm text-gray-600">Personnalisez l'apparence de votre interface</p>
-              </div>
-            </div>
-
-            <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
-              <div>
-                <label className="block text-sm font-medium text-gray-700 mb-2">
-                  Couleur principale
-                </label>
-                <div className="flex gap-3">
-                  <input
-                    type="color"
-                    value={formData.primary_color || '#3B82F6'}
-                    onChange={(e) => setFormData({ ...formData, primary_color: e.target.value })}
-                    className="w-16 h-12 rounded-xl border-2 border-purple-300 cursor-pointer"
-                  />
-                  <input
-                    type="text"
-                    value={formData.primary_color || '#3B82F6'}
-                    onChange={(e) => setFormData({ ...formData, primary_color: e.target.value })}
-                    className="flex-1 px-4 py-3 border-2 border-purple-300 rounded-xl focus:border-purple-500 focus:ring-2 focus:ring-purple-200 transition-all"
-                    placeholder="#3B82F6"
-                  />
-                </div>
-              </div>
-
-              <div>
-                <label className="block text-sm font-medium text-gray-700 mb-2">
-                  Couleur secondaire
-                </label>
-                <div className="flex gap-3">
-                  <input
-                    type="color"
-                    value={formData.secondary_color || '#8B5CF6'}
-                    onChange={(e) => setFormData({ ...formData, secondary_color: e.target.value })}
-                    className="w-16 h-12 rounded-xl border-2 border-purple-300 cursor-pointer"
-                  />
-                  <input
-                    type="text"
-                    value={formData.secondary_color || '#8B5CF6'}
-                    onChange={(e) => setFormData({ ...formData, secondary_color: e.target.value })}
-                    className="flex-1 px-4 py-3 border-2 border-purple-300 rounded-xl focus:border-purple-500 focus:ring-2 focus:ring-purple-200 transition-all"
-                    placeholder="#8B5CF6"
-                  />
-                </div>
               </div>
             </div>
           </div>
