@@ -59,7 +59,7 @@ export function Modal({ isOpen, onClose, title, children, size = 'md' }: ModalPr
         </div>
       </div>
 
-      {/* Mobile: Modal plein écran sous la navbar */}
+      {/* Mobile: Modal plein écran SOUS la navbar - CONTRAINTE GLOBALE */}
       <div className="sm:hidden fixed inset-0 z-40 modal-container-mobile">
         {/* Overlay */}
         <div
@@ -68,11 +68,11 @@ export function Modal({ isOpen, onClose, title, children, size = 'md' }: ModalPr
           style={{ zIndex: 40 }}
         />
         
-        {/* Modal content - positionné sous la navbar */}
+        {/* Modal content - COMMENCE À 80px (SOUS LA NAVBAR) */}
         <div 
           className="fixed left-0 right-0 bottom-0 bg-white rounded-t-2xl shadow-2xl animate-slideUp modal-content-mobile"
           style={{ 
-            top: 'calc(64px + env(safe-area-inset-top, 0px))',
+            top: '80px',
             zIndex: 45
           }}
         >
@@ -87,12 +87,15 @@ export function Modal({ isOpen, onClose, title, children, size = 'md' }: ModalPr
             </button>
           </div>
           
-          {/* Body scrollable */}
-          <div className="p-4 overflow-y-auto modal-body" style={{ 
+          {/* Body scrollable avec padding bottom pour les boutons */}
+          <div className="overflow-y-auto modal-body" style={{ 
             height: 'calc(100% - 60px)',
-            WebkitOverflowScrolling: 'touch'
+            WebkitOverflowScrolling: 'touch',
+            paddingBottom: '120px'
           }}>
-            {children}
+            <div className="p-4">
+              {children}
+            </div>
           </div>
         </div>
       </div>

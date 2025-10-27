@@ -473,13 +473,13 @@ export function CreateInvoiceModal({ isOpen, onClose, onInvoiceCreated }: Create
             >
               Annuler
             </Button>
-            <Button
+            <button
               type="submit"
-              className="flex-1"
               disabled={loading}
+              className="flex-1 px-6 py-3 bg-gradient-to-r from-green-600 to-emerald-600 text-white rounded-xl hover:from-green-700 hover:to-emerald-700 transition-all font-bold shadow-lg hover:shadow-xl disabled:opacity-50 disabled:cursor-not-allowed"
             >
               {loading ? 'Création...' : 'Créer le devis'}
-            </Button>
+            </button>
           </div>
         </form>
       </Modal>

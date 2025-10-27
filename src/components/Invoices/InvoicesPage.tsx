@@ -103,7 +103,7 @@ export function InvoicesPage() {
           <div className="flex gap-2">
             <button
               onClick={() => handlePreviewDocument(doc)}
-              className="p-2 bg-indigo-500 text-white rounded-lg hover:bg-indigo-600 transition-colors"
+              className="p-2 bg-gradient-to-r from-indigo-500 to-purple-500 text-white rounded-lg hover:from-indigo-600 hover:to-purple-600 transition-all duration-300 transform hover:scale-105 shadow-lg"
               title="Aperçu"
             >
               <Eye className="w-4 h-4" />
@@ -113,7 +113,7 @@ export function InvoicesPage() {
                 setSelectedInvoice(doc);
                 setShowDetailsModal(true);
               }}
-              className="p-2 bg-blue-500 text-white rounded-lg hover:bg-blue-600 transition-colors"
+              className="p-2 bg-gradient-to-r from-blue-500 to-cyan-500 text-white rounded-lg hover:from-blue-600 hover:to-cyan-600 transition-all duration-300 transform hover:scale-105 shadow-lg"
               title="Détails"
             >
               <FileText className="w-4 h-4" />
@@ -123,7 +123,7 @@ export function InvoicesPage() {
             {viewMode === 'quotes' && doc.status === 'draft' && (
               <button
                 onClick={() => handleSendDocument(doc)}
-                className="p-2 bg-green-500 text-white rounded-lg hover:bg-green-600 transition-colors"
+                className="p-2 bg-gradient-to-r from-green-500 to-emerald-500 text-white rounded-lg hover:from-green-600 hover:to-emerald-600 transition-all duration-300 transform hover:scale-105 shadow-lg"
                 title="Envoyer"
               >
                 <Send className="w-4 h-4" />
@@ -134,7 +134,7 @@ export function InvoicesPage() {
             {viewMode === 'quotes' && doc.status === 'sent' && (
               <button
                 onClick={() => handleResendDocument(doc)}
-                className="p-2 bg-orange-500 text-white rounded-lg hover:bg-orange-600 transition-colors"
+                className="p-2 bg-gradient-to-r from-orange-500 to-yellow-500 text-white rounded-lg hover:from-orange-600 hover:to-yellow-600 transition-all duration-300 transform hover:scale-105 shadow-lg"
                 title="Renvoyer"
               >
                 <RefreshCw className="w-4 h-4" />
@@ -145,7 +145,7 @@ export function InvoicesPage() {
             {viewMode === 'quotes' && doc.status === 'sent' && (
               <button
                 onClick={() => handleConvertToInvoice(doc)}
-                className="p-2 bg-purple-500 text-white rounded-lg hover:bg-purple-600 transition-colors"
+                className="p-2 bg-gradient-to-r from-purple-500 to-pink-500 text-white rounded-lg hover:from-purple-600 hover:to-pink-600 transition-all duration-300 transform hover:scale-105 shadow-lg"
                 title="Convertir en facture"
               >
                 <FileCheck className="w-4 h-4" />
@@ -159,7 +159,7 @@ export function InvoicesPage() {
                   setSelectedInvoice(doc);
                   setShowDetailsModal(true);
                 }}
-                className="p-2 bg-red-500 text-white rounded-lg hover:bg-red-600 transition-colors"
+                className="p-2 bg-gradient-to-r from-red-500 to-pink-500 text-white rounded-lg hover:from-red-600 hover:to-pink-600 transition-all duration-300 transform hover:scale-105 shadow-lg"
                 title="Rembourser"
               >
                 <Undo2 className="w-4 h-4" />
@@ -468,6 +468,11 @@ function MobileInvoiceCard({ doc, index }: { doc: Invoice; index: number }) {
   const totalPaid = getTotalPaid();
   const remainingAmount = doc.total_ttc - totalPaid;
   const isPartiallyPaid = totalPaid > 0 && remainingAmount > 0;
+  const [selectedInvoice, setSelectedInvoice] = useState<Invoice | null>(null);
+  const [showDetailsModal, setShowDetailsModal] = useState(false);
+  const [showSendModal, setShowSendModal] = useState(false);
+  const [showPreviewModal, setShowPreviewModal] = useState(false);
+  const { convertQuoteToInvoice } = useInvoices();
 
   const formatDate = (date: string) => {
     return new Date(date).toLocaleDateString('fr-FR', {
@@ -502,47 +507,174 @@ function MobileInvoiceCard({ doc, index }: { doc: Invoice; index: number }) {
 
   const actualStatus = getPaymentStatus();
 
+  const handlePreviewDocument = (invoice: Invoice) => {
+    setSelectedInvoice(invoice);
+    setShowPreviewModal(true);
+  };
+
+  const handleSendDocument = (invoice: Invoice) => {
+    setSelectedInvoice(invoice);
+    setShowSendModal(true);
+  };
+
+  const handleConvertToInvoice = async (quote: Invoice) => {
+    if (!confirm('Confirmer la conversion de ce devis en facture après validation du paiement ?')) {
+      return;
+    }
+
+    try {
+      await convertQuoteToInvoice(quote.id);
+      alert('✅ Devis converti en facture avec succès !');
+    } catch (error) {
+      alert('❌ Erreur lors de la conversion');
+    }
+  };
+
   return (
-    <div
-      className="bg-gradient-to-r from-gray-50 to-purple-50 rounded-xl border border-purple-200 p-4 animate-fadeIn"
-      style={{ animationDelay: `${index * 100}ms` }}
-    >
-      <div className="flex items-center justify-between mb-3">
-        <div>
-          <div className="font-bold text-purple-600">
-            {doc.invoice_number}
-          </div>
-          <div className="text-sm text-gray-600">{formatDate(doc.invoice_date)}</div>
-        </div>
-        {isPartiallyPaid ? (
-          <span className="px-3 py-1 rounded-full text-xs font-bold bg-orange-100 text-orange-700">
-            Partiellement payé
-          </span>
-        ) : (
-          getStatusBadge(actualStatus)
-        )}
-      </div>
-
-      <div className="mb-3">
-        <div className="font-medium text-gray-900">
-          {doc.client?.firstname} {doc.client?.lastname}
-        </div>
-        <div className="text-sm text-gray-600">{doc.client?.email}</div>
-      </div>
-
-      <div className="flex items-center justify-between">
-        <div>
-          <div className="font-bold text-gray-900">{doc.total_ttc.toFixed(2)}€</div>
-          {isPartiallyPaid && (
-            <div className="text-xs text-orange-600 font-bold">
-              Payé: {totalPaid.toFixed(2)}€
+    <>
+      <div
+        className="bg-gradient-to-r from-gray-50 to-purple-50 rounded-xl border border-purple-200 p-4 animate-fadeIn"
+        style={{ animationDelay: `${index * 100}ms` }}
+      >
+        <div className="flex items-center justify-between mb-3">
+          <div>
+            <div className="font-bold text-purple-600">
+              {doc.invoice_number || doc.quote_number}
             </div>
+            <div className="text-sm text-gray-600">{formatDate(doc.invoice_date)}</div>
+          </div>
+          {isPartiallyPaid ? (
+            <span className="px-3 py-1 rounded-full text-xs font-bold bg-orange-100 text-orange-700">
+              Partiellement payé
+            </span>
+          ) : (
+            getStatusBadge(actualStatus)
           )}
         </div>
-        <div className="flex gap-2">
-          {/* Boutons actions mobile */}
+
+        <div className="mb-3">
+          <div className="font-medium text-gray-900">
+            {doc.client?.firstname} {doc.client?.lastname}
+          </div>
+          <div className="text-sm text-gray-600">{doc.client?.email}</div>
+        </div>
+
+        <div className="flex items-center justify-between mb-4">
+          <div>
+            <div className="font-bold text-gray-900">{doc.total_ttc.toFixed(2)}€</div>
+            {isPartiallyPaid && (
+              <div className="text-xs text-orange-600 font-bold">
+                Payé: {totalPaid.toFixed(2)}€
+              </div>
+            )}
+          </div>
+        </div>
+
+        {/* Section Actions avec titre */}
+        <div className="border-t border-purple-200 pt-3">
+          <div className="text-xs font-bold text-gray-600 mb-2">Actions</div>
+          <div className="flex gap-2 flex-wrap">
+            <button
+              onClick={() => handlePreviewDocument(doc)}
+              className="flex-1 min-w-[60px] p-3 bg-gradient-to-r from-indigo-500 to-purple-500 text-white rounded-xl hover:from-indigo-600 hover:to-purple-600 transition-all duration-300 transform hover:scale-105 shadow-lg flex items-center justify-center"
+              title="Aperçu"
+            >
+              <Eye className="w-5 h-5" />
+            </button>
+            <button
+              onClick={() => {
+                setSelectedInvoice(doc);
+                setShowDetailsModal(true);
+              }}
+              className="flex-1 min-w-[60px] p-3 bg-gradient-to-r from-blue-500 to-cyan-500 text-white rounded-xl hover:from-blue-600 hover:to-cyan-600 transition-all duration-300 transform hover:scale-105 shadow-lg flex items-center justify-center"
+              title="Détails"
+            >
+              <FileText className="w-5 h-5" />
+            </button>
+            
+            {/* Bouton Envoyer - Devis brouillon */}
+            {doc.status === 'draft' && (
+              <button
+                onClick={() => handleSendDocument(doc)}
+                className="flex-1 min-w-[60px] p-3 bg-gradient-to-r from-green-500 to-emerald-500 text-white rounded-xl hover:from-green-600 hover:to-emerald-600 transition-all duration-300 transform hover:scale-105 shadow-lg flex items-center justify-center"
+                title="Envoyer"
+              >
+                <Send className="w-5 h-5" />
+              </button>
+            )}
+            
+            {/* Bouton Renvoyer - Devis envoyé */}
+            {doc.status === 'sent' && !doc.invoice_number && (
+              <button
+                onClick={() => handleSendDocument(doc)}
+                className="flex-1 min-w-[60px] p-3 bg-gradient-to-r from-orange-500 to-yellow-500 text-white rounded-xl hover:from-orange-600 hover:to-yellow-600 transition-all duration-300 transform hover:scale-105 shadow-lg flex items-center justify-center"
+                title="Renvoyer"
+              >
+                <RefreshCw className="w-5 h-5" />
+              </button>
+            )}
+            
+            {/* Bouton Convertir en facture - Devis envoyé */}
+            {doc.status === 'sent' && !doc.invoice_number && (
+              <button
+                onClick={() => handleConvertToInvoice(doc)}
+                className="flex-1 min-w-[60px] p-3 bg-gradient-to-r from-purple-500 to-pink-500 text-white rounded-xl hover:from-purple-600 hover:to-pink-600 transition-all duration-300 transform hover:scale-105 shadow-lg flex items-center justify-center"
+                title="Convertir en facture"
+              >
+                <FileCheck className="w-5 h-5" />
+              </button>
+            )}
+
+            {/* Bouton Rembourser - Facture payée ou partiellement payée */}
+            {totalPaid > 0 && (
+              <button
+                onClick={() => {
+                  setSelectedInvoice(doc);
+                  setShowDetailsModal(true);
+                }}
+                className="flex-1 min-w-[60px] p-3 bg-gradient-to-r from-red-500 to-pink-500 text-white rounded-xl hover:from-red-600 hover:to-pink-600 transition-all duration-300 transform hover:scale-105 shadow-lg flex items-center justify-center"
+                title="Rembourser"
+              >
+                <Undo2 className="w-5 h-5" />
+              </button>
+            )}
+          </div>
         </div>
       </div>
-    </div>
+
+      {/* Modals */}
+      {showDetailsModal && selectedInvoice && (
+        <InvoiceDetailsModal
+          invoice={selectedInvoice}
+          isOpen={showDetailsModal}
+          onClose={() => {
+            setShowDetailsModal(false);
+            setSelectedInvoice(null);
+          }}
+        />
+      )}
+
+      {showSendModal && selectedInvoice && (
+        <SendInvoiceModal
+          invoice={selectedInvoice}
+          isOpen={showSendModal}
+          onClose={() => {
+            setShowSendModal(false);
+            setSelectedInvoice(null);
+          }}
+        />
+      )}
+
+      {showPreviewModal && selectedInvoice && (
+        <InvoicePreviewModal
+          invoice={selectedInvoice}
+          isOpen={showPreviewModal}
+          onClose={() => {
+            setShowPreviewModal(false);
+            setSelectedInvoice(null);
+          }}
+        />
+      )}
+    </>
   );
 }

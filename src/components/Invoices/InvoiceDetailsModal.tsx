@@ -77,6 +77,7 @@ export function InvoiceDetailsModal({ invoice, isOpen, onClose }: InvoiceDetails
 
   return (
     <>
+      {/* Modal utilise maintenant la contrainte globale de 80px */}
       <Modal isOpen={isOpen} onClose={onClose} title="Détails de la facture" size="lg">
         <div className="space-y-6">
           {/* En-tête facture */}
@@ -112,7 +113,7 @@ export function InvoiceDetailsModal({ invoice, isOpen, onClose }: InvoiceDetails
               ? 'bg-gradient-to-r from-orange-50 to-yellow-50 border-orange-300'
               : 'bg-gradient-to-r from-red-50 to-pink-50 border-red-300'
           }`}>
-            <div className="flex items-center justify-between mb-4">
+            <div className="flex flex-col sm:flex-row items-start sm:items-center justify-between gap-4 mb-4">
               <div>
                 <div className={`text-2xl font-black ${
                   isFullyPaid ? 'text-green-600' : totalPaid > 0 ? 'text-orange-600' : 'text-red-600'
@@ -123,25 +124,24 @@ export function InvoiceDetailsModal({ invoice, isOpen, onClose }: InvoiceDetails
                   {totalPaid.toFixed(2)}€ / {invoice.total_ttc.toFixed(2)}€
                 </div>
               </div>
-              <div className="flex gap-2">
+              <div className="flex flex-col sm:flex-row gap-2 w-full sm:w-auto">
                 {!isFullyPaid && (
-                  <Button
+                  <button
                     onClick={() => setShowAddPaymentModal(true)}
-                    className="bg-gradient-to-r from-green-600 to-emerald-600 hover:from-green-700 hover:to-emerald-700"
+                    className="inline-flex items-center justify-center px-4 py-2 bg-gradient-to-r from-blue-600 to-cyan-600 hover:from-blue-700 hover:to-cyan-700 text-white font-medium rounded-xl transition-all duration-300 transform hover:scale-105 shadow-lg"
                   >
                     <Plus className="w-4 h-4 mr-2" />
                     Ajouter un paiement
-                  </Button>
+                  </button>
                 )}
                 {totalPaid > 0 && (
-                  <Button
+                  <button
                     onClick={handleRefund}
-                    variant="secondary"
-                    className="bg-gradient-to-r from-red-600 to-pink-600 hover:from-red-700 hover:to-pink-700 text-white"
+                    className="inline-flex items-center justify-center px-4 py-2 bg-gradient-to-r from-red-600 to-pink-600 hover:from-red-700 hover:to-pink-700 text-white font-medium rounded-xl transition-all duration-300 transform hover:scale-105 shadow-lg"
                   >
                     <Undo2 className="w-4 h-4 mr-2" />
                     Rembourser
-                  </Button>
+                  </button>
                 )}
               </div>
             </div>
@@ -274,34 +274,37 @@ export function InvoiceDetailsModal({ invoice, isOpen, onClose }: InvoiceDetails
             </div>
           )}
 
-          {/* Actions */}
-          <div className="flex gap-3">
-            <Button variant="secondary" onClick={onClose} className="flex-1">
+          {/* Actions - DESIGN SYSTEM - Mobile responsive */}
+          <div className="flex flex-col sm:flex-row gap-3">
+            <button
+              onClick={onClose}
+              className="w-full sm:flex-1 inline-flex items-center justify-center px-4 py-3 bg-gradient-to-r from-gray-500 to-gray-600 hover:from-gray-600 hover:to-gray-700 text-white font-medium rounded-xl transition-all duration-300 transform hover:scale-105 shadow-lg"
+            >
               Fermer
-            </Button>
-            <Button 
+            </button>
+            <button
               onClick={handlePreview}
-              className="flex-1 bg-gradient-to-r from-indigo-600 to-purple-600 hover:from-indigo-700 hover:to-purple-700"
+              className="w-full sm:flex-1 inline-flex items-center justify-center px-4 py-3 bg-gradient-to-r from-orange-500 to-yellow-500 hover:from-orange-600 hover:to-yellow-600 text-white font-medium rounded-xl transition-all duration-300 transform hover:scale-105 shadow-lg"
             >
               <Eye className="w-4 h-4 mr-2" />
               Aperçu
-            </Button>
+            </button>
             {(invoice.status === 'sent' || invoice.status === 'paid') && (
-              <Button 
+              <button
                 onClick={handleResend}
-                className="flex-1 bg-gradient-to-r from-orange-600 to-red-600 hover:from-orange-700 hover:to-red-700"
+                className="w-full sm:flex-1 inline-flex items-center justify-center px-4 py-3 bg-gradient-to-r from-purple-600 to-pink-600 hover:from-purple-700 hover:to-pink-700 text-white font-medium rounded-xl transition-all duration-300 transform hover:scale-105 shadow-lg"
               >
                 <RefreshCw className="w-4 h-4 mr-2" />
                 Renvoyer
-              </Button>
+              </button>
             )}
-            <Button 
+            <button
               onClick={handleDownloadPDF}
-              className="flex-1 bg-gradient-to-r from-purple-600 to-pink-600 hover:from-purple-700 hover:to-pink-700"
+              className="w-full sm:flex-1 inline-flex items-center justify-center px-4 py-3 bg-gradient-to-r from-green-500 to-emerald-500 hover:from-green-600 hover:to-emerald-600 text-white font-medium rounded-xl transition-all duration-300 transform hover:scale-105 shadow-lg"
             >
               <Download className="w-4 h-4 mr-2" />
               Télécharger
-            </Button>
+            </button>
           </div>
         </div>
       </Modal>

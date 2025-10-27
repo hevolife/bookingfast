@@ -11,7 +11,7 @@ import { useTeamMembers } from '../../hooks/useTeamMembers';
 import { usePlugins } from '../../hooks/usePlugins';
 import { PermissionGate, UsageLimitIndicator } from '../UI/PermissionGate';
 import { Booking } from '../../types';
-import { UserCheck, X, Ban } from 'lucide-react';
+import { UserCheck, X, Ban, RotateCcw } from 'lucide-react';
 import { bookingEvents } from '../../lib/bookingEvents';
 import { unavailabilityEvents } from '../../lib/unavailabilityEvents';
 
@@ -246,21 +246,21 @@ export function CalendarPage({ view = 'calendar' }: CalendarPageProps) {
               {selectedTeamMember !== 'all' && (
                 <button
                   onClick={() => setSelectedTeamMember('all')}
-                  className="px-3 py-2 text-sm text-white bg-purple-600 hover:bg-purple-700 rounded-lg transition-colors flex items-center gap-1"
+                  className="px-3 sm:px-4 py-2 text-sm font-medium text-white bg-gradient-to-r from-purple-600 to-pink-600 hover:from-purple-700 hover:to-pink-700 rounded-xl transition-all duration-300 transform hover:scale-105 shadow-lg flex items-center gap-2"
                   title="Réinitialiser le filtre"
                 >
-                  <X className="w-4 h-4" />
-                  <span className="hidden md:inline">Réinitialiser</span>
+                  <RotateCcw className="w-4 h-4" />
+                  <span className="hidden sm:inline">Réinitialiser</span>
                 </button>
               )}
 
               <button
                 onClick={() => handleAddUnavailability()}
-                className="px-3 py-2 text-sm text-white bg-red-600 hover:bg-red-700 rounded-lg transition-colors flex items-center gap-1"
+                className="px-3 sm:px-4 py-2 text-sm font-medium text-white bg-gradient-to-r from-red-600 to-pink-600 hover:from-red-700 hover:to-pink-700 rounded-xl transition-all duration-300 transform hover:scale-105 shadow-lg flex items-center gap-2"
                 title="Ajouter une indisponibilité"
               >
                 <Ban className="w-4 h-4" />
-                <span className="hidden md:inline">Indisponibilité</span>
+                <span className="hidden sm:inline">Indisponibilité</span>
               </button>
             </div>
           </div>
