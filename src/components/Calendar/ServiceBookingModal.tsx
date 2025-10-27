@@ -47,7 +47,7 @@ export function ServiceBookingModal({
   const totalPaid = bookings.reduce((sum, booking) => sum + (booking.payment_amount || 0), 0);
 
   // Calcul dynamique du top pour mobile en fonction du mode PWA
-  const mobileModalTop = isPWAMode ? '100px' : '80px';
+  const mobileModalTop = isPWAMode ? '120px' : '80px';
 
   const getAssignedUser = (booking: Booking) => {
     if (!booking.assigned_user_id) {
@@ -272,14 +272,15 @@ export function ServiceBookingModal({
           />
           
           <div 
-            className="fixed left-0 right-0 bottom-0 bg-white shadow-2xl animate-slideUp"
+            className="fixed left-0 right-0 bottom-0 shadow-2xl animate-slideUp"
             style={{ 
               top: mobileModalTop,
               zIndex: 45,
               display: 'flex',
               flexDirection: 'column',
               borderTopLeftRadius: '24px',
-              borderTopRightRadius: '24px'
+              borderTopRightRadius: '24px',
+              background: 'transparent'
             }}
           >
             <div 
@@ -302,7 +303,7 @@ export function ServiceBookingModal({
             </div>
             
             <div 
-              className="overflow-y-auto flex-1"
+              className="overflow-y-auto flex-1 bg-white"
               style={{ 
                 WebkitOverflowScrolling: 'touch',
                 paddingBottom: '120px'
@@ -594,14 +595,15 @@ export function ServiceBookingModal({
         />
         
         <div 
-          className="fixed left-0 right-0 bottom-0 bg-white shadow-2xl animate-slideUp"
+          className="fixed left-0 right-0 bottom-0 shadow-2xl animate-slideUp"
           style={{ 
             top: mobileModalTop,
             zIndex: 45,
             display: 'flex',
             flexDirection: 'column',
             borderTopLeftRadius: '24px',
-            borderTopRightRadius: '24px'
+            borderTopRightRadius: '24px',
+            background: 'transparent'
           }}
         >
           <div 
@@ -639,7 +641,7 @@ export function ServiceBookingModal({
           </div>
           
           <div 
-            className="overflow-y-auto flex-1"
+            className="overflow-y-auto flex-1 bg-white"
             style={{ 
               WebkitOverflowScrolling: 'touch',
               paddingBottom: '120px'
