@@ -241,7 +241,7 @@ export function InvoicesPage() {
     <>
       <div className="p-4 sm:p-6 bg-gradient-to-br from-blue-50 via-purple-50 to-pink-50 mobile-optimized">
         {/* Header */}
-        <div className="flex items-center justify-between mb-6">
+        <div className="flex flex-col sm:flex-row items-start sm:items-center justify-between mb-6 gap-4">
           <div>
             <h1 className="text-2xl sm:text-3xl font-bold bg-gradient-to-r from-purple-600 to-pink-600 bg-clip-text text-transparent">
               {viewMode === 'quotes' ? 'Devis' : 'Factures'}
@@ -254,22 +254,24 @@ export function InvoicesPage() {
             </p>
           </div>
 
-          <div className="flex gap-2">
+          <div className="flex flex-col sm:flex-row gap-2 w-full sm:w-auto">
             <Button
               onClick={() => setShowCustomizationModal(true)}
               variant="secondary"
-              className="flex items-center gap-2"
+              className="flex items-center justify-center gap-2 w-full sm:w-auto"
             >
               <Palette className="w-5 h-5" />
               <span className="hidden sm:inline">Personnaliser PDF</span>
+              <span className="sm:hidden">PDF</span>
             </Button>
 
             <Button
               onClick={() => setShowCreateModal(true)}
-              className="flex items-center gap-2"
+              className="flex items-center justify-center gap-2 w-full sm:w-auto"
             >
               <Plus className="w-5 h-5" />
               <span className="hidden sm:inline">Nouveau devis</span>
+              <span className="sm:hidden">Nouveau</span>
             </Button>
           </div>
         </div>
@@ -378,7 +380,7 @@ export function InvoicesPage() {
               </div>
             </>
           ) : (
-            <div className="text-center py-12">
+            <div className="text-center py-12 px-4">
               <div className="w-16 h-16 bg-gray-100 rounded-full flex items-center justify-center mx-auto mb-4">
                 {viewMode === 'quotes' ? (
                   <FileText className="w-8 h-8 text-gray-400" />
@@ -396,10 +398,12 @@ export function InvoicesPage() {
                 }
               </p>
               {viewMode === 'quotes' && (
-                <Button onClick={() => setShowCreateModal(true)}>
-                  <Plus className="w-5 h-5 mr-2" />
-                  Nouveau devis
-                </Button>
+                <div className="flex justify-center">
+                  <Button onClick={() => setShowCreateModal(true)} className="w-full sm:w-auto">
+                    <Plus className="w-5 h-5 mr-2" />
+                    Nouveau devis
+                  </Button>
+                </div>
               )}
             </div>
           )}
