@@ -1,9 +1,10 @@
 import React from 'react';
+import { LoadingSpinner } from './LoadingSpinner';
 
 interface ModalFooterButton {
   label: string;
   onClick: () => void;
-  variant: 'primary' | 'secondary' | 'danger';
+  variant?: 'primary' | 'secondary' | 'danger';
   disabled?: boolean;
   loading?: boolean;
   icon?: string;
@@ -13,63 +14,37 @@ interface ModalFooterProps {
   buttons: ModalFooterButton[];
 }
 
-const BUTTON_STYLES = {
-  primary: {
-    base: 'bg-gradient-to-r from-green-500 to-emerald-500 text-white',
-    hover: 'hover:from-green-600 hover:to-emerald-600',
-    shadow: 'shadow-xl'
-  },
-  secondary: {
-    base: 'bg-gradient-to-r from-gray-500 to-gray-600 text-white',
-    hover: 'hover:from-gray-600 hover:to-gray-700',
-    shadow: 'shadow-lg'
-  },
-  danger: {
-    base: 'bg-gradient-to-r from-red-500 to-pink-500 text-white',
-    hover: 'hover:from-red-600 hover:to-pink-600',
-    shadow: 'shadow-lg'
-  }
-};
-
 export function ModalFooter({ buttons }: ModalFooterProps) {
-  const renderButton = (button: ModalFooterButton, index: number) => {
-    const styles = BUTTON_STYLES[button.variant];
-    const isPrimary = button.variant === 'primary';
-    const isDisabled = button.disabled || button.loading;
-
-    return (
-      <button
-        key={index}
-        type={isPrimary ? 'submit' : 'button'}
-        onClick={button.onClick}
-        disabled={isDisabled}
-        className={`
-          ${isPrimary ? 'flex-1' : 'min-w-[120px]'}
-          h-[52px]
-          px-6 rounded-xl font-bold text-sm sm:text-base
-          ${styles.base} ${styles.hover} ${styles.shadow}
-          transition-all duration-300 transform hover:scale-105
-          disabled:opacity-50 disabled:cursor-not-allowed disabled:transform-none
-          flex items-center justify-center gap-2
-        `}
-      >
-        {button.loading ? (
-          <span>Chargement...</span>
-        ) : (
-          <>
-            {button.icon && <span>{button.icon}</span>}
-            <span>{button.label}</span>
-          </>
-        )}
-      </button>
-    );
-  };
-
   return (
-    <div className="sticky bottom-0 -mx-4 sm:-mx-6 px-4 sm:px-6 py-4 bg-white border-t border-gray-200 mt-6">
-      <div className="flex flex-col-reverse sm:flex-row gap-3">
-        {buttons.map((button, index) => renderButton(button, index))}
-      </div>
+    <div className="flex flex-col sm:flex-row gap-3 pt-6 pb-6 border-t border-gray-200 md:sticky md:bottom-0 md:bg-white md:z-10">
+      {buttons.map((button, index) => {
+        const baseClasses = "flex-1 px-6 py-3 rounded-xl font-medium transition-all duration-300 transform hover:scale-105 disabled:opacity-50 disabled:cursor-not-allowed disabled:hover:scale-100";
+        
+        const variantClasses = {
+          primary: "bg-gradient-to-r from-blue-500 to-purple-500 text-white hover:from-blue-600 hover:to-purple-600 shadow-lg hover:shadow-xl",
+          secondary: "bg-gray-100 text-gray-700 hover:bg-gray-200",
+          danger: "bg-gradient-to-r from-red-500 to-pink-500 text-white hover:from-red-600 hover:to-pink-600 shadow-lg hover:shadow-xl"
+        };
+
+        return (
+          <button
+            key={index}
+            type={button.variant === 'primary' ? 'submit' : 'button'}
+            onClick={button.onClick}
+            disabled={button.disabled || button.loading}
+            className={`${baseClasses} ${variantClasses[button.variant || 'secondary']}`}
+          >
+            {button.loading ? (
+              <LoadingSpinner size="sm" />
+            ) : (
+              <span className="flex items-center justify-center gap-2">
+                {button.icon && <span>{button.icon}</span>}
+                {button.label}
+              </span>
+            )}
+          </button>
+        );
+      })}
     </div>
   );
 }
