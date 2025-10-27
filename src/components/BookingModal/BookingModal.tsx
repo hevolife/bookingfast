@@ -599,6 +599,11 @@ export function BookingModal({
     }
   ];
 
+  // 🎨 Couleurs du header selon le mode
+  const headerGradient = (editingBooking || (tempBookingId && isEditMode))
+    ? 'from-orange-500 via-orange-600 to-red-500' // Orange pour modifier
+    : 'from-green-500 via-emerald-600 to-teal-500'; // Vert pour nouvelle réservation
+
   return (
     <>
       <Modal
@@ -606,6 +611,7 @@ export function BookingModal({
         onClose={handleClose}
         title={(editingBooking || (tempBookingId && isEditMode)) ? 'Modifier la réservation' : 'Nouvelle réservation'}
         size="xl"
+        headerGradient={headerGradient}
       >
         <form onSubmit={handleSubmit} className="space-y-4 sm:space-y-6">
           {!editingBooking && !isEditMode && limitInfo && !isUnlimited && (

@@ -355,11 +355,11 @@ export function ServicesPage() {
         </div>
       )}
 
-      {/* Modal - Desktop: centré / Mobile: sous la navbar */}
+      {/* Modal */}
       {isModalOpen && (
         <>
-          {/* Desktop Modal */}
-          <div className="hidden sm:block fixed inset-0 bg-black/60 backdrop-blur-sm flex items-center justify-center z-50 animate-fadeIn p-4">
+          {/* Desktop Modal - CENTRÉ */}
+          <div className="hidden sm:flex fixed inset-0 bg-black/60 backdrop-blur-sm items-center justify-center z-50 animate-fadeIn p-4">
             <div className="bg-white w-full max-w-2xl max-h-[90vh] overflow-y-auto rounded-3xl shadow-2xl transform animate-slideUp">
               {/* Header */}
               <div className="bg-gradient-to-r from-purple-600 via-pink-600 to-red-500 p-6 rounded-t-3xl relative overflow-hidden sticky top-0 z-10">
