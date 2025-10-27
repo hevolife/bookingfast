@@ -35,6 +35,7 @@
   height: 100dvh !important;
   position: fixed !important;
   width: 100% !important;
+  background: transparent !important;
 }
 
 html, body {
@@ -45,6 +46,28 @@ html, body {
   -ms-user-select: none;
   user-select: none;
   -webkit-tap-highlight-color: transparent;
+  background: transparent !important;
+}
+
+/* CRITICAL: PWA Mode - Fond transparent */
+@media (display-mode: standalone) {
+  html, body {
+    background: transparent !important;
+    background-color: transparent !important;
+  }
+  
+  body {
+    background: linear-gradient(to bottom right, #eff6ff, #faf5ff, #fce7f3) !important;
+  }
+  
+  .app-container {
+    background: transparent !important;
+  }
+  
+  /* Header transparent en PWA */
+  .navbar-safe {
+    background: transparent !important;
+  }
 }
 
 input, textarea, [contenteditable] {
@@ -58,6 +81,7 @@ input, textarea, [contenteditable] {
 
 #root {
   min-height: 100vh;
+  background: transparent !important;
 }
 
 @media screen and (-webkit-min-device-pixel-ratio: 0) {
@@ -201,6 +225,7 @@ input, textarea, [contenteditable] {
     overflow: hidden !important;
     position: fixed !important;
     overscroll-behavior: none !important;
+    background: transparent !important;
   }
   
   .modal-container-mobile {
