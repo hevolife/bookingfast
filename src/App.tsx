@@ -1,5 +1,5 @@
-import React, { lazy, Suspense } from 'react';
-import { Routes, Route, Navigate, useLocation } from 'react-router-dom';
+import React, { lazy, Suspense, useEffect } from 'react';
+import { Routes, Route, Navigate, useLocation, useNavigate } from 'react-router-dom';
 import { TeamProvider } from './contexts/TeamContext';
 import { AuthProvider } from './contexts/AuthContext';
 import { Navbar } from './components/Layout/Navbar';
@@ -14,6 +14,7 @@ import { BookingDebug } from './components/IframeBooking/BookingDebug';
 import { LandingPage } from './components/Landing/LandingPage';
 import { ProtectedRoute } from './components/Auth/ProtectedRoute';
 import { PublicRoute } from './components/Auth/PublicRoute';
+import { isPWA } from './utils/pwaDetection';
 
 const DashboardPage = lazy(() => import('./components/Dashboard/DashboardPage').then(m => ({ default: m.DashboardPage })));
 const CalendarPage = lazy(() => import('./components/Calendar/CalendarPage').then(m => ({ default: m.CalendarPage })));
@@ -40,7 +41,19 @@ function App() {
 
 function AppRoutes() {
   const location = useLocation();
+  const navigate = useNavigate();
   const pathname = location.pathname;
+
+  // Détecter le mode PWA
+  const isPWAMode = isPWA();
+
+  // 🎯 Redirection PWA : Landing page → Login
+  useEffect(() => {
+    if (isPWAMode && pathname === '/') {
+      console.log('🚀 PWA Mode: Redirection landing → login');
+      navigate('/login', { replace: true });
+    }
+  }, [isPWAMode, pathname, navigate]);
 
   // 🎯 Pages TOUJOURS publiques (pas de vérification auth)
   const isAlwaysPublicPage = 
@@ -83,12 +96,14 @@ function AppRoutes() {
   }
 
   // 🎯 Pages publiques MAIS avec redirection si connecté (login, landing)
+  // En mode PWA, la landing page est bloquée (redirection déjà faite dans useEffect)
   if (pathname === '/' || pathname === '/login' || pathname === '/signup') {
     return (
       <PublicRoute>
         <Suspense fallback={<LoadingSpinner />}>
           <Routes>
-            <Route path="/" element={<LandingPage />} />
+            {/* En mode PWA, "/" redirige vers "/login" via useEffect */}
+            <Route path="/" element={isPWAMode ? <Navigate to="/login" replace /> : <LandingPage />} />
             <Route path="/login" element={<LoginPage />} />
           </Routes>
         </Suspense>
