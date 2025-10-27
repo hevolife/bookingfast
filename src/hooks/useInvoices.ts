@@ -6,9 +6,10 @@ import { useAuth } from '../contexts/AuthContext';
 export function useInvoices() {
   const { user } = useAuth();
   const [invoices, setInvoices] = useState<Invoice[]>([]);
+  const [quotes, setQuotes] = useState<Invoice[]>([]);
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
-  const [refreshKey, setRefreshKey] = useState(0); // ✅ AJOUT : Clé de refresh
+  const [refreshKey, setRefreshKey] = useState(0);
 
   const fetchInvoices = async () => {
     console.log('🔄 fetchInvoices appelé, user:', user?.id);
@@ -16,6 +17,7 @@ export function useInvoices() {
     if (!user || !isSupabaseConfigured()) {
       console.log('❌ Pas de user ou Supabase non configuré');
       setInvoices([]);
+      setQuotes([]);
       return;
     }
 
@@ -39,20 +41,45 @@ export function useInvoices() {
         throw error;
       }
       
-      console.log('✅ Factures récupérées:', data?.length, 'factures');
-      console.log('📋 Détail des factures:', data?.map(inv => inv.invoice_number));
+      console.log('✅ Documents récupérés:', data?.length, 'documents');
       
-      // ✅ CORRECTION : Créer un NOUVEAU tableau pour forcer le re-render
-      setInvoices([...(data || [])]);
+      // Séparer devis et factures
+      const allQuotes = data?.filter(doc => doc.document_type === 'quote') || [];
+      const allInvoices = data?.filter(doc => doc.document_type === 'invoice') || [];
       
-      // ✅ AJOUT : Incrémenter la clé de refresh pour forcer le re-render
+      console.log('📋 Devis:', allQuotes.length, '| Factures:', allInvoices.length);
+      
+      setQuotes([...allQuotes]);
+      setInvoices([...allInvoices]);
+      
       setRefreshKey(prev => prev + 1);
       console.log('🔑 RefreshKey incrémenté');
     } catch (err) {
-      console.error('❌ Erreur chargement factures:', err);
+      console.error('❌ Erreur chargement documents:', err);
       setError(err instanceof Error ? err.message : 'Erreur inconnue');
     } finally {
       setLoading(false);
+    }
+  };
+
+  const generateQuoteNumber = async (): Promise<string> => {
+    if (!user || !isSupabaseConfigured()) {
+      return `D${new Date().getFullYear()}-0001`;
+    }
+
+    try {
+      const { data, error } = await supabase!
+        .rpc('generate_quote_number', { p_user_id: user.id });
+
+      if (error) throw error;
+      return data;
+    } catch (err) {
+      console.error('Erreur génération numéro devis:', err);
+      const year = new Date().getFullYear();
+      const count = quotes.filter(q => 
+        q.invoice_date.startsWith(year.toString())
+      ).length + 1;
+      return `D${year}-${count.toString().padStart(4, '0')}`;
     }
   };
 
@@ -68,7 +95,7 @@ export function useInvoices() {
       if (error) throw error;
       return data;
     } catch (err) {
-      console.error('Erreur génération numéro:', err);
+      console.error('Erreur génération numéro facture:', err);
       const year = new Date().getFullYear();
       const count = invoices.filter(inv => 
         inv.invoice_date.startsWith(year.toString())
@@ -87,9 +114,9 @@ export function useInvoices() {
     try {
       setError(null);
 
-      // Générer le numéro de facture
-      const invoiceNumber = await generateInvoiceNumber();
-      console.log('📝 Numéro de facture généré:', invoiceNumber);
+      // Générer le numéro de devis
+      const quoteNumber = await generateQuoteNumber();
+      console.log('📝 Numéro de devis généré:', quoteNumber);
 
       // Calculer les totaux
       let subtotal_ht = 0;
@@ -109,14 +136,16 @@ export function useInvoices() {
 
       console.log('💰 Totaux calculés - HT:', subtotal_ht, 'TVA:', total_tva, 'TTC:', total_ttc);
 
-      // Créer la facture
-      console.log('📤 Insertion facture en base...');
+      // Créer le devis (document_type = 'quote')
+      console.log('📤 Insertion devis en base...');
       const { data: invoice, error: invoiceError } = await supabase!
         .from('invoices')
         .insert({
           ...invoiceData,
           user_id: user.id,
-          invoice_number: invoiceNumber,
+          document_type: 'quote',
+          quote_number: quoteNumber,
+          invoice_number: quoteNumber, // Utiliser le même numéro pour l'instant
           subtotal_ht,
           total_tva,
           total_ttc
@@ -125,13 +154,13 @@ export function useInvoices() {
         .single();
 
       if (invoiceError) {
-        console.error('❌ Erreur insertion facture:', invoiceError);
+        console.error('❌ Erreur insertion devis:', invoiceError);
         throw invoiceError;
       }
 
-      console.log('✅ Facture créée:', invoice.id);
+      console.log('✅ Devis créé:', invoice.id);
 
-      // Créer les lignes de facture
+      // Créer les lignes
       const invoiceItems = items.map(item => {
         const itemTotal = (item.quantity || 0) * (item.unit_price_ht || 0);
         const discount = itemTotal * ((item.discount_percent || 0) / 100);
@@ -160,14 +189,54 @@ export function useInvoices() {
 
       console.log('✅ Items créés');
 
-      // ✅ REFRESH AUTOMATIQUE APRÈS CRÉATION
+      // Refresh automatique
       console.log('🔄 Appel fetchInvoices pour refresh...');
       await fetchInvoices();
       console.log('✅ Refresh terminé');
       
       return invoice;
     } catch (err) {
-      console.error('❌ Erreur création facture:', err);
+      console.error('❌ Erreur création devis:', err);
+      setError(err instanceof Error ? err.message : 'Erreur inconnue');
+      throw err;
+    }
+  };
+
+  const convertQuoteToInvoice = async (quoteId: string): Promise<void> => {
+    console.log('🔄 Conversion devis → facture:', quoteId);
+    
+    if (!isSupabaseConfigured()) {
+      throw new Error('Supabase non configuré');
+    }
+
+    try {
+      setError(null);
+
+      // Générer le numéro de facture
+      const invoiceNumber = await generateInvoiceNumber();
+      console.log('📝 Numéro de facture généré:', invoiceNumber);
+
+      // Convertir le devis en facture
+      const { error } = await supabase!
+        .from('invoices')
+        .update({
+          document_type: 'invoice',
+          invoice_number: invoiceNumber,
+          status: 'paid',
+          converted_at: new Date().toISOString(),
+          paid_at: new Date().toISOString(),
+          updated_at: new Date().toISOString()
+        })
+        .eq('id', quoteId);
+
+      if (error) throw error;
+      
+      console.log('✅ Devis converti en facture');
+      
+      // Refresh automatique
+      await fetchInvoices();
+    } catch (err) {
+      console.error('❌ Erreur conversion:', err);
       setError(err instanceof Error ? err.message : 'Erreur inconnue');
       throw err;
     }
@@ -191,10 +260,9 @@ export function useInvoices() {
 
       if (error) throw error;
       
-      // ✅ REFRESH AUTOMATIQUE APRÈS UPDATE
       await fetchInvoices();
     } catch (err) {
-      console.error('Erreur mise à jour facture:', err);
+      console.error('Erreur mise à jour:', err);
       setError(err instanceof Error ? err.message : 'Erreur inconnue');
       throw err;
     }
@@ -215,10 +283,9 @@ export function useInvoices() {
 
       if (error) throw error;
       
-      // ✅ REFRESH AUTOMATIQUE APRÈS DELETE
       await fetchInvoices();
     } catch (err) {
-      console.error('Erreur suppression facture:', err);
+      console.error('Erreur suppression:', err);
       setError(err instanceof Error ? err.message : 'Erreur inconnue');
       throw err;
     }
@@ -233,12 +300,15 @@ export function useInvoices() {
 
   return {
     invoices,
+    quotes,
     loading,
     error,
-    refreshKey, // ✅ AJOUT : Exposer la clé de refresh
+    refreshKey,
     fetchInvoices,
+    generateQuoteNumber,
     generateInvoiceNumber,
     createInvoice,
+    convertQuoteToInvoice,
     updateInvoice,
     deleteInvoice
   };

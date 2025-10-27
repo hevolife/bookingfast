@@ -13,9 +13,10 @@ import { DatePicker } from '../BookingModal/DatePicker';
 interface CreateInvoiceModalProps {
   isOpen: boolean;
   onClose: () => void;
+  onInvoiceCreated?: () => void;
 }
 
-export function CreateInvoiceModal({ isOpen, onClose }: CreateInvoiceModalProps) {
+export function CreateInvoiceModal({ isOpen, onClose, onInvoiceCreated }: CreateInvoiceModalProps) {
   const { clients, fetchClients } = useClients();
   const { products, fetchProducts } = useProducts();
   const { createInvoice } = useInvoices();
@@ -95,7 +96,7 @@ export function CreateInvoiceModal({ isOpen, onClose }: CreateInvoiceModalProps)
 
     try {
       setLoading(true);
-      console.log('⏳ Création de la facture...');
+      console.log('⏳ Création du devis...');
 
       await createInvoice(
         {
@@ -109,8 +110,8 @@ export function CreateInvoiceModal({ isOpen, onClose }: CreateInvoiceModalProps)
         items
       );
 
-      console.log('✅ Facture créée avec succès !');
-      alert('✅ Facture créée avec succès !');
+      console.log('✅ Devis créé avec succès !');
+      alert('✅ Devis créé avec succès !');
       
       // Réinitialiser le formulaire
       setSelectedClient(null);
@@ -119,11 +120,15 @@ export function CreateInvoiceModal({ isOpen, onClose }: CreateInvoiceModalProps)
       setSearchTerm('');
       
       console.log('🚪 Fermeture du modal...');
-      // Fermer le modal - la liste se rafraîchit automatiquement via useInvoices
-      onClose();
+      
+      if (onInvoiceCreated) {
+        onInvoiceCreated();
+      } else {
+        onClose();
+      }
     } catch (error) {
-      console.error('❌ Erreur création facture:', error);
-      alert('❌ Erreur lors de la création de la facture');
+      console.error('❌ Erreur création devis:', error);
+      alert('❌ Erreur lors de la création du devis');
     } finally {
       setLoading(false);
     }
@@ -151,7 +156,7 @@ export function CreateInvoiceModal({ isOpen, onClose }: CreateInvoiceModalProps)
 
   return (
     <>
-      <Modal isOpen={isOpen} onClose={onClose} title="Nouvelle facture" size="xl">
+      <Modal isOpen={isOpen} onClose={onClose} title="Nouveau devis" size="xl">
         <form onSubmit={handleSubmit} className="space-y-6">
           {/* Sélection client avec bouton créer */}
           <div>
@@ -473,7 +478,7 @@ export function CreateInvoiceModal({ isOpen, onClose }: CreateInvoiceModalProps)
               className="flex-1"
               disabled={loading}
             >
-              {loading ? 'Création...' : 'Créer la facture'}
+              {loading ? 'Création...' : 'Créer le devis'}
             </Button>
           </div>
         </form>

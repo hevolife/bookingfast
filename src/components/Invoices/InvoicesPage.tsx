@@ -1,5 +1,5 @@
 import React, { useState, useEffect } from 'react';
-import { FileText, Plus, Search, Filter, Eye, Send, Check, X, Edit, Trash2, RefreshCw, Palette } from 'lucide-react';
+import { FileText, Plus, Search, Filter, Eye, Send, Check, X, Edit, Trash2, RefreshCw, Palette, FileCheck, Undo2 } from 'lucide-react';
 import { useInvoices } from '../../hooks/useInvoices';
 import { Invoice } from '../../types';
 import { LoadingSpinner } from '../UI/LoadingSpinner';
@@ -10,9 +10,13 @@ import { InvoiceDetailsModal } from './InvoiceDetailsModal';
 import { SendInvoiceModal } from './SendInvoiceModal';
 import { InvoicePreviewModal } from './InvoicePreviewModal';
 import { PDFCustomizationModal } from './PDFCustomizationModal';
+import { useInvoicePayments } from '../../hooks/useInvoicePayments';
+
+type ViewMode = 'quotes' | 'invoices';
 
 export function InvoicesPage() {
-  const { invoices, loading, fetchInvoices, updateInvoice, deleteInvoice } = useInvoices();
+  const { invoices, quotes, loading, fetchInvoices, updateInvoice, deleteInvoice, convertQuoteToInvoice } = useInvoices();
+  const [viewMode, setViewMode] = useState<ViewMode>('quotes');
   const [showCreateModal, setShowCreateModal] = useState(false);
   const [selectedInvoice, setSelectedInvoice] = useState<Invoice | null>(null);
   const [showDetailsModal, setShowDetailsModal] = useState(false);
@@ -22,24 +26,157 @@ export function InvoicesPage() {
   const [searchTerm, setSearchTerm] = useState('');
   const [statusFilter, setStatusFilter] = useState<string>('all');
 
-  const filteredInvoices = invoices.filter(invoice => {
-    const matchesSearch = 
-      invoice.invoice_number.toLowerCase().includes(searchTerm.toLowerCase()) ||
-      invoice.client?.firstname.toLowerCase().includes(searchTerm.toLowerCase()) ||
-      invoice.client?.lastname.toLowerCase().includes(searchTerm.toLowerCase()) ||
-      invoice.client?.email.toLowerCase().includes(searchTerm.toLowerCase());
+  const currentDocuments = viewMode === 'quotes' ? quotes : invoices;
 
-    const matchesStatus = statusFilter === 'all' || invoice.status === statusFilter;
+  const filteredDocuments = currentDocuments.filter(doc => {
+    const matchesSearch = 
+      (doc.invoice_number?.toLowerCase().includes(searchTerm.toLowerCase()) || false) ||
+      (doc.quote_number?.toLowerCase().includes(searchTerm.toLowerCase()) || false) ||
+      (doc.client?.firstname.toLowerCase().includes(searchTerm.toLowerCase()) || false) ||
+      (doc.client?.lastname.toLowerCase().includes(searchTerm.toLowerCase()) || false) ||
+      (doc.client?.email.toLowerCase().includes(searchTerm.toLowerCase()) || false);
+
+    const matchesStatus = statusFilter === 'all' || doc.status === statusFilter;
 
     return matchesSearch && matchesStatus;
   });
 
+  // Hook pour récupérer les paiements de chaque facture
+  const InvoiceRowWithPayments = ({ doc, index }: { doc: Invoice; index: number }) => {
+    const { getTotalPaid } = useInvoicePayments(doc.id);
+    const totalPaid = getTotalPaid();
+    const remainingAmount = doc.total_ttc - totalPaid;
+    
+    // Calculer le vrai statut basé sur les paiements
+    const getPaymentStatus = (): Invoice['status'] => {
+      // Pour les devis, garder le statut original
+      if (viewMode === 'quotes') return doc.status;
+      
+      // Pour les factures, calculer selon les paiements
+      if (totalPaid === 0) return 'sent'; // Non payé
+      if (remainingAmount <= 0) return 'paid'; // Payé
+      return 'sent'; // Partiellement payé
+    };
+
+    const actualStatus = getPaymentStatus();
+    const isPartiallyPaid = totalPaid > 0 && remainingAmount > 0;
+
+    return (
+      <tr
+        key={doc.id}
+        className="hover:bg-gray-50 transition-colors animate-fadeIn"
+        style={{ animationDelay: `${index * 50}ms` }}
+      >
+        <td className="px-6 py-4">
+          <div className="font-bold text-purple-600">
+            {viewMode === 'quotes' ? doc.quote_number : doc.invoice_number}
+          </div>
+        </td>
+        <td className="px-6 py-4">
+          <div className="font-medium text-gray-900">
+            {doc.client?.firstname} {doc.client?.lastname}
+          </div>
+          <div className="text-sm text-gray-600">{doc.client?.email}</div>
+        </td>
+        <td className="px-6 py-4">
+          <div className="text-sm text-gray-900">{formatDate(doc.invoice_date)}</div>
+          <div className="text-xs text-gray-600">Échéance: {formatDate(doc.due_date)}</div>
+        </td>
+        <td className="px-6 py-4">
+          <div className="font-bold text-gray-900">{doc.total_ttc.toFixed(2)}€</div>
+          {isPartiallyPaid && (
+            <div className="text-xs text-orange-600 font-bold">
+              Payé: {totalPaid.toFixed(2)}€
+            </div>
+          )}
+        </td>
+        <td className="px-6 py-4">
+          {isPartiallyPaid ? (
+            <span className="px-3 py-1 rounded-full text-xs font-bold bg-orange-100 text-orange-700">
+              Partiellement payé
+            </span>
+          ) : (
+            getStatusBadge(actualStatus)
+          )}
+        </td>
+        <td className="px-6 py-4">
+          <div className="flex gap-2">
+            <button
+              onClick={() => handlePreviewDocument(doc)}
+              className="p-2 bg-indigo-500 text-white rounded-lg hover:bg-indigo-600 transition-colors"
+              title="Aperçu"
+            >
+              <Eye className="w-4 h-4" />
+            </button>
+            <button
+              onClick={() => {
+                setSelectedInvoice(doc);
+                setShowDetailsModal(true);
+              }}
+              className="p-2 bg-blue-500 text-white rounded-lg hover:bg-blue-600 transition-colors"
+              title="Détails"
+            >
+              <FileText className="w-4 h-4" />
+            </button>
+            
+            {/* Bouton Envoyer - Devis brouillon */}
+            {viewMode === 'quotes' && doc.status === 'draft' && (
+              <button
+                onClick={() => handleSendDocument(doc)}
+                className="p-2 bg-green-500 text-white rounded-lg hover:bg-green-600 transition-colors"
+                title="Envoyer"
+              >
+                <Send className="w-4 h-4" />
+              </button>
+            )}
+            
+            {/* Bouton Renvoyer - Devis envoyé */}
+            {viewMode === 'quotes' && doc.status === 'sent' && (
+              <button
+                onClick={() => handleResendDocument(doc)}
+                className="p-2 bg-orange-500 text-white rounded-lg hover:bg-orange-600 transition-colors"
+                title="Renvoyer"
+              >
+                <RefreshCw className="w-4 h-4" />
+              </button>
+            )}
+            
+            {/* Bouton Convertir en facture - Devis envoyé */}
+            {viewMode === 'quotes' && doc.status === 'sent' && (
+              <button
+                onClick={() => handleConvertToInvoice(doc)}
+                className="p-2 bg-purple-500 text-white rounded-lg hover:bg-purple-600 transition-colors"
+                title="Convertir en facture"
+              >
+                <FileCheck className="w-4 h-4" />
+              </button>
+            )}
+
+            {/* Bouton Rembourser - Facture payée ou partiellement payée */}
+            {viewMode === 'invoices' && totalPaid > 0 && (
+              <button
+                onClick={() => {
+                  setSelectedInvoice(doc);
+                  setShowDetailsModal(true);
+                }}
+                className="p-2 bg-red-500 text-white rounded-lg hover:bg-red-600 transition-colors"
+                title="Rembourser"
+              >
+                <Undo2 className="w-4 h-4" />
+              </button>
+            )}
+          </div>
+        </td>
+      </tr>
+    );
+  };
+
   const getStatusBadge = (status: Invoice['status']) => {
     const badges = {
       draft: { label: 'Brouillon', class: 'bg-gray-100 text-gray-700' },
-      sent: { label: 'Envoyée', class: 'bg-blue-100 text-blue-700' },
-      paid: { label: 'Payée', class: 'bg-green-100 text-green-700' },
-      cancelled: { label: 'Annulée', class: 'bg-red-100 text-red-700' }
+      sent: { label: 'Non payé', class: 'bg-red-100 text-red-700' },
+      paid: { label: 'Payé', class: 'bg-green-100 text-green-700' },
+      cancelled: { label: 'Annulé', class: 'bg-red-100 text-red-700' }
     };
 
     const badge = badges[status];
@@ -58,33 +195,34 @@ export function InvoicesPage() {
     });
   };
 
-  const handleMarkAsPaid = async (invoice: Invoice) => {
+  const handleConvertToInvoice = async (quote: Invoice) => {
+    if (!confirm('Confirmer la conversion de ce devis en facture après validation du paiement ?')) {
+      return;
+    }
+
     try {
-      await updateInvoice(invoice.id, {
-        status: 'paid',
-        paid_at: new Date().toISOString()
-      });
+      await convertQuoteToInvoice(quote.id);
+      alert('✅ Devis converti en facture avec succès !');
     } catch (error) {
-      alert('Erreur lors du marquage comme payée');
+      alert('❌ Erreur lors de la conversion');
     }
   };
 
-  const handleSendInvoice = (invoice: Invoice) => {
-    setSelectedInvoice(invoice);
+  const handleSendDocument = (doc: Invoice) => {
+    setSelectedInvoice(doc);
     setShowSendModal(true);
   };
 
-  const handleResendInvoice = (invoice: Invoice) => {
-    setSelectedInvoice(invoice);
+  const handleResendDocument = (doc: Invoice) => {
+    setSelectedInvoice(doc);
     setShowSendModal(true);
   };
 
-  const handlePreviewInvoice = (invoice: Invoice) => {
-    setSelectedInvoice(invoice);
+  const handlePreviewDocument = (doc: Invoice) => {
+    setSelectedInvoice(doc);
     setShowPreviewModal(true);
   };
 
-  // ✅ CALLBACK pour forcer le refresh après création
   const handleInvoiceCreated = async () => {
     console.log('🔄 handleInvoiceCreated - Force refresh');
     await fetchInvoices();
@@ -106,10 +244,13 @@ export function InvoicesPage() {
         <div className="flex items-center justify-between mb-6">
           <div>
             <h1 className="text-2xl sm:text-3xl font-bold bg-gradient-to-r from-purple-600 to-pink-600 bg-clip-text text-transparent">
-              Factures
+              {viewMode === 'quotes' ? 'Devis' : 'Factures'}
             </h1>
             <p className="text-sm sm:text-base text-gray-600 mt-2">
-              Gérez vos factures clients ({filteredInvoices.length})
+              {viewMode === 'quotes' 
+                ? `Gérez vos devis clients (${filteredDocuments.length})`
+                : `Gérez vos factures clients (${filteredDocuments.length})`
+              }
             </p>
           </div>
 
@@ -128,8 +269,40 @@ export function InvoicesPage() {
               className="flex items-center gap-2"
             >
               <Plus className="w-5 h-5" />
-              <span className="hidden sm:inline">Nouvelle facture</span>
+              <span className="hidden sm:inline">Nouveau devis</span>
             </Button>
+          </div>
+        </div>
+
+        {/* Onglets Devis/Factures */}
+        <div className="bg-white rounded-xl sm:rounded-2xl shadow-lg p-2 mb-6">
+          <div className="flex gap-2">
+            <button
+              onClick={() => setViewMode('quotes')}
+              className={`flex-1 px-6 py-3 rounded-lg font-bold transition-all ${
+                viewMode === 'quotes'
+                  ? 'bg-gradient-to-r from-purple-600 to-pink-600 text-white shadow-lg'
+                  : 'bg-gray-100 text-gray-600 hover:bg-gray-200'
+              }`}
+            >
+              <div className="flex items-center justify-center gap-2">
+                <FileText className="w-5 h-5" />
+                <span>Devis ({quotes.length})</span>
+              </div>
+            </button>
+            <button
+              onClick={() => setViewMode('invoices')}
+              className={`flex-1 px-6 py-3 rounded-lg font-bold transition-all ${
+                viewMode === 'invoices'
+                  ? 'bg-gradient-to-r from-purple-600 to-pink-600 text-white shadow-lg'
+                  : 'bg-gray-100 text-gray-600 hover:bg-gray-200'
+              }`}
+            >
+              <div className="flex items-center justify-center gap-2">
+                <FileCheck className="w-5 h-5" />
+                <span>Factures ({invoices.length})</span>
+              </div>
+            </button>
           </div>
         </div>
 
@@ -155,30 +328,34 @@ export function InvoicesPage() {
               >
                 <option value="all">Tous les statuts</option>
                 <option value="draft">Brouillon</option>
-                <option value="sent">Envoyée</option>
-                <option value="paid">Payée</option>
-                <option value="cancelled">Annulée</option>
+                <option value="sent">Envoyé</option>
+                <option value="paid">Payé</option>
+                <option value="cancelled">Annulé</option>
               </select>
             </div>
 
             <div className="bg-gradient-to-r from-purple-50 to-pink-50 border border-purple-200 rounded-xl p-3 text-center">
               <div className="text-lg font-bold text-purple-600">
-                {invoices.reduce((sum, inv) => sum + inv.total_ttc, 0).toFixed(2)}€
+                {currentDocuments.reduce((sum, doc) => sum + doc.total_ttc, 0).toFixed(2)}€
               </div>
-              <div className="text-xs text-purple-700">Total facturé</div>
+              <div className="text-xs text-purple-700">
+                {viewMode === 'quotes' ? 'Total devis' : 'Total facturé'}
+              </div>
             </div>
           </div>
         </div>
 
-        {/* Liste des factures */}
+        {/* Liste des documents */}
         <div className="bg-white rounded-xl sm:rounded-2xl shadow-lg overflow-hidden">
-          {filteredInvoices.length > 0 ? (
+          {filteredDocuments.length > 0 ? (
             <>
               <div className="hidden lg:block overflow-x-auto">
                 <table className="w-full">
                   <thead className="bg-gradient-to-r from-gray-50 to-purple-50 border-b border-gray-200">
                     <tr>
-                      <th className="px-6 py-4 text-left text-sm font-bold text-gray-700">N° Facture</th>
+                      <th className="px-6 py-4 text-left text-sm font-bold text-gray-700">
+                        {viewMode === 'quotes' ? 'N° Devis' : 'N° Facture'}
+                      </th>
                       <th className="px-6 py-4 text-left text-sm font-bold text-gray-700">Client</th>
                       <th className="px-6 py-4 text-left text-sm font-bold text-gray-700">Date</th>
                       <th className="px-6 py-4 text-left text-sm font-bold text-gray-700">Montant TTC</th>
@@ -187,166 +364,43 @@ export function InvoicesPage() {
                     </tr>
                   </thead>
                   <tbody className="divide-y divide-gray-100">
-                    {filteredInvoices.map((invoice, index) => (
-                      <tr
-                        key={invoice.id}
-                        className="hover:bg-gray-50 transition-colors animate-fadeIn"
-                        style={{ animationDelay: `${index * 50}ms` }}
-                      >
-                        <td className="px-6 py-4">
-                          <div className="font-bold text-purple-600">{invoice.invoice_number}</div>
-                        </td>
-                        <td className="px-6 py-4">
-                          <div className="font-medium text-gray-900">
-                            {invoice.client?.firstname} {invoice.client?.lastname}
-                          </div>
-                          <div className="text-sm text-gray-600">{invoice.client?.email}</div>
-                        </td>
-                        <td className="px-6 py-4">
-                          <div className="text-sm text-gray-900">{formatDate(invoice.invoice_date)}</div>
-                          <div className="text-xs text-gray-600">Échéance: {formatDate(invoice.due_date)}</div>
-                        </td>
-                        <td className="px-6 py-4">
-                          <div className="font-bold text-gray-900">{invoice.total_ttc.toFixed(2)}€</div>
-                        </td>
-                        <td className="px-6 py-4">
-                          {getStatusBadge(invoice.status)}
-                        </td>
-                        <td className="px-6 py-4">
-                          <div className="flex gap-2">
-                            <button
-                              onClick={() => handlePreviewInvoice(invoice)}
-                              className="p-2 bg-indigo-500 text-white rounded-lg hover:bg-indigo-600 transition-colors"
-                              title="Aperçu"
-                            >
-                              <Eye className="w-4 h-4" />
-                            </button>
-                            <button
-                              onClick={() => {
-                                setSelectedInvoice(invoice);
-                                setShowDetailsModal(true);
-                              }}
-                              className="p-2 bg-blue-500 text-white rounded-lg hover:bg-blue-600 transition-colors"
-                              title="Détails"
-                            >
-                              <FileText className="w-4 h-4" />
-                            </button>
-                            {invoice.status === 'draft' && (
-                              <button
-                                onClick={() => handleSendInvoice(invoice)}
-                                className="p-2 bg-green-500 text-white rounded-lg hover:bg-green-600 transition-colors"
-                                title="Envoyer"
-                              >
-                                <Send className="w-4 h-4" />
-                              </button>
-                            )}
-                            {(invoice.status === 'sent' || invoice.status === 'paid') && (
-                              <button
-                                onClick={() => handleResendInvoice(invoice)}
-                                className="p-2 bg-orange-500 text-white rounded-lg hover:bg-orange-600 transition-colors"
-                                title="Renvoyer"
-                              >
-                                <RefreshCw className="w-4 h-4" />
-                              </button>
-                            )}
-                            {invoice.status === 'sent' && (
-                              <button
-                                onClick={() => handleMarkAsPaid(invoice)}
-                                className="p-2 bg-purple-500 text-white rounded-lg hover:bg-purple-600 transition-colors"
-                                title="Marquer comme payée"
-                              >
-                                <Check className="w-4 h-4" />
-                              </button>
-                            )}
-                          </div>
-                        </td>
-                      </tr>
+                    {filteredDocuments.map((doc, index) => (
+                      <InvoiceRowWithPayments key={doc.id} doc={doc} index={index} />
                     ))}
                   </tbody>
                 </table>
               </div>
 
               <div className="lg:hidden space-y-4 p-4">
-                {filteredInvoices.map((invoice, index) => (
-                  <div
-                    key={invoice.id}
-                    className="bg-gradient-to-r from-gray-50 to-purple-50 rounded-xl border border-purple-200 p-4 animate-fadeIn"
-                    style={{ animationDelay: `${index * 100}ms` }}
-                  >
-                    <div className="flex items-center justify-between mb-3">
-                      <div>
-                        <div className="font-bold text-purple-600">{invoice.invoice_number}</div>
-                        <div className="text-sm text-gray-600">{formatDate(invoice.invoice_date)}</div>
-                      </div>
-                      {getStatusBadge(invoice.status)}
-                    </div>
-
-                    <div className="mb-3">
-                      <div className="font-medium text-gray-900">
-                        {invoice.client?.firstname} {invoice.client?.lastname}
-                      </div>
-                      <div className="text-sm text-gray-600">{invoice.client?.email}</div>
-                    </div>
-
-                    <div className="flex items-center justify-between">
-                      <div className="font-bold text-gray-900">{invoice.total_ttc.toFixed(2)}€</div>
-                      <div className="flex gap-2">
-                        <button
-                          onClick={() => handlePreviewInvoice(invoice)}
-                          className="p-2 bg-indigo-500 text-white rounded-lg hover:bg-indigo-600 transition-colors mobile-tap-target"
-                        >
-                          <Eye className="w-4 h-4" />
-                        </button>
-                        <button
-                          onClick={() => {
-                            setSelectedInvoice(invoice);
-                            setShowDetailsModal(true);
-                          }}
-                          className="p-2 bg-blue-500 text-white rounded-lg hover:bg-blue-600 transition-colors mobile-tap-target"
-                        >
-                          <FileText className="w-4 h-4" />
-                        </button>
-                        {invoice.status === 'draft' && (
-                          <button
-                            onClick={() => handleSendInvoice(invoice)}
-                            className="p-2 bg-green-500 text-white rounded-lg hover:bg-green-600 transition-colors mobile-tap-target"
-                          >
-                            <Send className="w-4 h-4" />
-                          </button>
-                        )}
-                        {(invoice.status === 'sent' || invoice.status === 'paid') && (
-                          <button
-                            onClick={() => handleResendInvoice(invoice)}
-                            className="p-2 bg-orange-500 text-white rounded-lg hover:bg-orange-600 transition-colors mobile-tap-target"
-                          >
-                            <RefreshCw className="w-4 h-4" />
-                          </button>
-                        )}
-                        {invoice.status === 'sent' && (
-                          <button
-                            onClick={() => handleMarkAsPaid(invoice)}
-                            className="p-2 bg-purple-500 text-white rounded-lg hover:bg-purple-600 transition-colors mobile-tap-target"
-                          >
-                            <Check className="w-4 h-4" />
-                          </button>
-                        )}
-                      </div>
-                    </div>
-                  </div>
+                {filteredDocuments.map((doc, index) => (
+                  <MobileInvoiceCard key={doc.id} doc={doc} index={index} />
                 ))}
               </div>
             </>
           ) : (
             <div className="text-center py-12">
               <div className="w-16 h-16 bg-gray-100 rounded-full flex items-center justify-center mx-auto mb-4">
-                <FileText className="w-8 h-8 text-gray-400" />
+                {viewMode === 'quotes' ? (
+                  <FileText className="w-8 h-8 text-gray-400" />
+                ) : (
+                  <FileCheck className="w-8 h-8 text-gray-400" />
+                )}
               </div>
-              <h3 className="text-lg font-medium text-gray-900 mb-2">Aucune facture</h3>
-              <p className="text-gray-500 mb-4">Créez votre première facture</p>
-              <Button onClick={() => setShowCreateModal(true)}>
-                <Plus className="w-5 h-5 mr-2" />
-                Nouvelle facture
-              </Button>
+              <h3 className="text-lg font-medium text-gray-900 mb-2">
+                {viewMode === 'quotes' ? 'Aucun devis' : 'Aucune facture'}
+              </h3>
+              <p className="text-gray-500 mb-4">
+                {viewMode === 'quotes' 
+                  ? 'Créez votre premier devis'
+                  : 'Les devis validés apparaîtront ici'
+                }
+              </p>
+              {viewMode === 'quotes' && (
+                <Button onClick={() => setShowCreateModal(true)}>
+                  <Plus className="w-5 h-5 mr-2" />
+                  Nouveau devis
+                </Button>
+              )}
             </div>
           )}
         </div>
@@ -401,5 +455,90 @@ export function InvoicesPage() {
         />
       )}
     </>
+  );
+}
+
+// Composant mobile séparé
+function MobileInvoiceCard({ doc, index }: { doc: Invoice; index: number }) {
+  const { getTotalPaid } = useInvoicePayments(doc.id);
+  const totalPaid = getTotalPaid();
+  const remainingAmount = doc.total_ttc - totalPaid;
+  const isPartiallyPaid = totalPaid > 0 && remainingAmount > 0;
+
+  const formatDate = (date: string) => {
+    return new Date(date).toLocaleDateString('fr-FR', {
+      day: '2-digit',
+      month: '2-digit',
+      year: 'numeric'
+    });
+  };
+
+  const getStatusBadge = (status: Invoice['status']) => {
+    const badges = {
+      draft: { label: 'Brouillon', class: 'bg-gray-100 text-gray-700' },
+      sent: { label: 'Non payé', class: 'bg-red-100 text-red-700' },
+      paid: { label: 'Payé', class: 'bg-green-100 text-green-700' },
+      cancelled: { label: 'Annulé', class: 'bg-red-100 text-red-700' }
+    };
+
+    const badge = badges[status];
+    return (
+      <span className={`px-3 py-1 rounded-full text-xs font-bold ${badge.class}`}>
+        {badge.label}
+      </span>
+    );
+  };
+
+  // Calculer le vrai statut
+  const getPaymentStatus = (): Invoice['status'] => {
+    if (totalPaid === 0) return 'sent';
+    if (remainingAmount <= 0) return 'paid';
+    return 'sent';
+  };
+
+  const actualStatus = getPaymentStatus();
+
+  return (
+    <div
+      className="bg-gradient-to-r from-gray-50 to-purple-50 rounded-xl border border-purple-200 p-4 animate-fadeIn"
+      style={{ animationDelay: `${index * 100}ms` }}
+    >
+      <div className="flex items-center justify-between mb-3">
+        <div>
+          <div className="font-bold text-purple-600">
+            {doc.invoice_number}
+          </div>
+          <div className="text-sm text-gray-600">{formatDate(doc.invoice_date)}</div>
+        </div>
+        {isPartiallyPaid ? (
+          <span className="px-3 py-1 rounded-full text-xs font-bold bg-orange-100 text-orange-700">
+            Partiellement payé
+          </span>
+        ) : (
+          getStatusBadge(actualStatus)
+        )}
+      </div>
+
+      <div className="mb-3">
+        <div className="font-medium text-gray-900">
+          {doc.client?.firstname} {doc.client?.lastname}
+        </div>
+        <div className="text-sm text-gray-600">{doc.client?.email}</div>
+      </div>
+
+      <div className="flex items-center justify-between">
+        <div>
+          <div className="font-bold text-gray-900">{doc.total_ttc.toFixed(2)}€</div>
+          {isPartiallyPaid && (
+            <div className="text-xs text-orange-600 font-bold">
+              Payé: {totalPaid.toFixed(2)}€
+            </div>
+          )}
+        </div>
+        <div className="flex gap-2">
+          {/* Boutons actions mobile */}
+        </div>
+      </div>
+    </div>
   );
 }

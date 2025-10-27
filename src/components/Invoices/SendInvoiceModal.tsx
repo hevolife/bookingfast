@@ -4,6 +4,7 @@ import { Button } from '../UI/Button';
 import { Invoice } from '../../types';
 import { Mail, Loader2 } from 'lucide-react';
 import { sendInvoiceEmail } from '../../utils/emailService';
+import { supabase } from '../../lib/supabase';
 
 interface SendInvoiceModalProps {
   invoice: Invoice;
@@ -25,14 +26,38 @@ export function SendInvoiceModal({ invoice, isOpen, onClose }: SendInvoiceModalP
       setLoading(true);
       setMessage('');
 
+      console.log('📧 Envoi email pour:', invoice.id);
+
+      // 1. Envoyer l'email
       await sendInvoiceEmail(invoice);
+      console.log('✅ Email envoyé');
+
+      // 2. Mettre à jour le statut à "sent"
+      console.log('🔄 Mise à jour du statut à "sent"...');
+      const { error: updateError } = await supabase!
+        .from('invoices')
+        .update({
+          status: 'sent',
+          sent_at: new Date().toISOString(),
+          updated_at: new Date().toISOString()
+        })
+        .eq('id', invoice.id);
+
+      if (updateError) {
+        console.error('❌ Erreur mise à jour statut:', updateError);
+        throw updateError;
+      }
+
+      console.log('✅ Statut mis à jour à "sent"');
 
       setMessage('✅ Email envoyé avec succès !');
       setTimeout(() => {
         onClose();
-      }, 2000);
+        // Force refresh de la page
+        window.location.reload();
+      }, 1500);
     } catch (error) {
-      console.error('Erreur envoi email:', error);
+      console.error('❌ Erreur envoi email:', error);
       setMessage(`❌ Erreur: ${error instanceof Error ? error.message : 'Erreur inconnue'}`);
     } finally {
       setLoading(false);
@@ -40,7 +65,7 @@ export function SendInvoiceModal({ invoice, isOpen, onClose }: SendInvoiceModalP
   };
 
   return (
-    <Modal isOpen={isOpen} onClose={onClose} title="Envoyer la facture par email">
+    <Modal isOpen={isOpen} onClose={onClose} title="Envoyer le devis par email">
       <div className="space-y-6">
         <div className="bg-gradient-to-r from-green-50 to-emerald-50 rounded-2xl p-6 border border-green-200">
           <div className="flex items-center gap-3 mb-4">
@@ -53,8 +78,8 @@ export function SendInvoiceModal({ invoice, isOpen, onClose }: SendInvoiceModalP
 
           <div className="space-y-2 text-sm text-gray-700">
             <div className="flex justify-between">
-              <span>Facture:</span>
-              <span className="font-bold">{invoice.invoice_number}</span>
+              <span>Devis:</span>
+              <span className="font-bold">{invoice.quote_number || invoice.invoice_number}</span>
             </div>
             <div className="flex justify-between">
               <span>Montant:</span>

@@ -1,7 +1,10 @@
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 import { Modal } from '../UI/Modal';
 import { Button } from '../UI/Button';
-import { Palette, Save } from 'lucide-react';
+import { Palette, Save, Upload, X } from 'lucide-react';
+import { useCompanyInfo } from '../../hooks/useCompanyInfo';
+import { supabase } from '../../lib/supabase';
+import { useAuth } from '../../contexts/AuthContext';
 
 interface PDFCustomizationModalProps {
   isOpen: boolean;
@@ -15,11 +18,31 @@ interface PDFColors {
 }
 
 export function PDFCustomizationModal({ isOpen, onClose }: PDFCustomizationModalProps) {
+  const { user } = useAuth();
+  const { companyInfo, updateCompanyInfo } = useCompanyInfo();
   const [colors, setColors] = useState<PDFColors>({
-    primary: '#9333ea', // Purple
-    accent: '#ec4899',  // Pink
-    text: '#1f2937'     // Gray-800
+    primary: '#9333ea',
+    accent: '#ec4899',
+    text: '#1f2937'
   });
+  const [logoFile, setLogoFile] = useState<File | null>(null);
+  const [logoPreview, setLogoPreview] = useState<string | null>(null);
+  const [uploading, setUploading] = useState(false);
+
+  useEffect(() => {
+    // Charger les couleurs depuis company_info
+    if (companyInfo) {
+      setColors({
+        primary: companyInfo.pdf_primary_color || '#9333ea',
+        accent: companyInfo.pdf_accent_color || '#ec4899',
+        text: companyInfo.pdf_text_color || '#1f2937'
+      });
+      
+      if (companyInfo.logo_url) {
+        setLogoPreview(companyInfo.logo_url);
+      }
+    }
+  }, [companyInfo]);
 
   const presetThemes = [
     {
@@ -48,17 +71,130 @@ export function PDFCustomizationModal({ isOpen, onClose }: PDFCustomizationModal
     }
   ];
 
-  const handleSave = () => {
-    // Sauvegarder dans localStorage
-    localStorage.setItem('pdfCustomColors', JSON.stringify(colors));
-    alert('✅ Personnalisation enregistrée !');
-    onClose();
+  const handleLogoChange = (e: React.ChangeEvent<HTMLInputElement>) => {
+    const file = e.target.files?.[0];
+    if (file) {
+      // Vérifier le type de fichier
+      if (!file.type.startsWith('image/')) {
+        alert('❌ Veuillez sélectionner une image');
+        return;
+      }
+
+      // Vérifier la taille (max 2MB)
+      if (file.size > 2 * 1024 * 1024) {
+        alert('❌ L\'image ne doit pas dépasser 2MB');
+        return;
+      }
+
+      setLogoFile(file);
+      
+      // Créer un aperçu
+      const reader = new FileReader();
+      reader.onloadend = () => {
+        setLogoPreview(reader.result as string);
+      };
+      reader.readAsDataURL(file);
+    }
   };
 
-  const handleReset = () => {
+  const handleRemoveLogo = () => {
+    setLogoFile(null);
+    setLogoPreview(null);
+  };
+
+  const uploadLogo = async (): Promise<string | null> => {
+    if (!logoFile || !user) return null;
+
+    try {
+      setUploading(true);
+
+      // Créer un nom de fichier unique
+      const fileExt = logoFile.name.split('.').pop();
+      const fileName = `${user.id}-${Date.now()}.${fileExt}`;
+      const filePath = `logos/${fileName}`;
+
+      // Upload vers Supabase Storage
+      const { data, error } = await supabase!.storage
+        .from('company-assets')
+        .upload(filePath, logoFile, {
+          cacheControl: '3600',
+          upsert: true
+        });
+
+      if (error) throw error;
+
+      // Obtenir l'URL publique
+      const { data: { publicUrl } } = supabase!.storage
+        .from('company-assets')
+        .getPublicUrl(filePath);
+
+      return publicUrl;
+    } catch (error) {
+      console.error('Erreur upload logo:', error);
+      throw error;
+    } finally {
+      setUploading(false);
+    }
+  };
+
+  const handleSave = async () => {
+    try {
+      // Vérifier que company_info existe
+      if (!companyInfo) {
+        alert('❌ Veuillez d\'abord remplir les informations de votre entreprise dans les paramètres');
+        return;
+      }
+
+      let logoUrl = companyInfo.logo_url || null;
+
+      // Upload du logo si un nouveau fichier est sélectionné
+      if (logoFile) {
+        logoUrl = await uploadLogo();
+      } else if (logoPreview === null && companyInfo.logo_url) {
+        // Si l'utilisateur a supprimé le logo
+        logoUrl = null;
+      }
+
+      // IMPORTANT: Inclure company_name (champ obligatoire)
+      await updateCompanyInfo({
+        company_name: companyInfo.company_name,
+        pdf_primary_color: colors.primary,
+        pdf_accent_color: colors.accent,
+        pdf_text_color: colors.text,
+        logo_url: logoUrl
+      });
+
+      alert('✅ Personnalisation enregistrée ! Les couleurs et le logo seront appliqués aux PDFs (aperçu ET emails).');
+      onClose();
+    } catch (error) {
+      console.error('Erreur sauvegarde:', error);
+      alert('❌ Erreur lors de la sauvegarde');
+    }
+  };
+
+  const handleReset = async () => {
+    if (!companyInfo) {
+      alert('❌ Veuillez d\'abord remplir les informations de votre entreprise');
+      return;
+    }
+
     const defaultColors = { primary: '#9333ea', accent: '#ec4899', text: '#1f2937' };
     setColors(defaultColors);
-    localStorage.removeItem('pdfCustomColors');
+    setLogoFile(null);
+    setLogoPreview(null);
+
+    try {
+      await updateCompanyInfo({
+        company_name: companyInfo.company_name,
+        pdf_primary_color: defaultColors.primary,
+        pdf_accent_color: defaultColors.accent,
+        pdf_text_color: defaultColors.text,
+        logo_url: null
+      });
+      alert('✅ Réinitialisation effectuée !');
+    } catch (error) {
+      console.error('Erreur réinitialisation:', error);
+    }
   };
 
   return (
@@ -72,9 +208,16 @@ export function PDFCustomizationModal({ isOpen, onClose }: PDFCustomizationModal
           </h3>
           
           <div 
-            className="rounded-xl p-6 mb-4 text-white"
+            className="rounded-xl p-6 mb-4 text-white relative"
             style={{ backgroundColor: colors.primary }}
           >
+            {logoPreview && (
+              <img 
+                src={logoPreview} 
+                alt="Logo" 
+                className="absolute top-4 right-4 h-12 w-auto object-contain bg-white rounded p-1"
+              />
+            )}
             <div className="text-2xl font-bold mb-2">FACTURE</div>
             <div className="text-sm opacity-90">F2025-0001</div>
           </div>
@@ -96,6 +239,52 @@ export function PDFCustomizationModal({ isOpen, onClose }: PDFCustomizationModal
               Texte principal
             </div>
           </div>
+        </div>
+
+        {/* Upload Logo */}
+        <div>
+          <label className="block text-sm font-bold text-gray-700 mb-2">
+            Logo de l'entreprise
+          </label>
+          
+          {logoPreview ? (
+            <div className="relative inline-block">
+              <img 
+                src={logoPreview} 
+                alt="Logo preview" 
+                className="h-24 w-auto object-contain border-2 border-gray-300 rounded-lg p-2 bg-white"
+              />
+              <button
+                type="button"
+                onClick={handleRemoveLogo}
+                className="absolute -top-2 -right-2 bg-red-500 text-white rounded-full p-1 hover:bg-red-600"
+              >
+                <X className="w-4 h-4" />
+              </button>
+            </div>
+          ) : (
+            <div className="border-2 border-dashed border-gray-300 rounded-lg p-6 text-center hover:border-purple-500 transition-colors">
+              <input
+                type="file"
+                accept="image/*"
+                onChange={handleLogoChange}
+                className="hidden"
+                id="logo-upload"
+              />
+              <label 
+                htmlFor="logo-upload" 
+                className="cursor-pointer flex flex-col items-center gap-2"
+              >
+                <Upload className="w-8 h-8 text-gray-400" />
+                <span className="text-sm text-gray-600">
+                  Cliquez pour ajouter un logo
+                </span>
+                <span className="text-xs text-gray-500">
+                  PNG, JPG, SVG (max 2MB)
+                </span>
+              </label>
+            </div>
+          )}
         </div>
 
         {/* Sélecteurs de couleurs */}
@@ -202,6 +391,7 @@ export function PDFCustomizationModal({ isOpen, onClose }: PDFCustomizationModal
             variant="secondary"
             onClick={handleReset}
             className="flex-1"
+            disabled={uploading}
           >
             Réinitialiser
           </Button>
@@ -209,16 +399,17 @@ export function PDFCustomizationModal({ isOpen, onClose }: PDFCustomizationModal
             type="button"
             onClick={handleSave}
             className="flex-1 bg-gradient-to-r from-purple-600 to-pink-600 hover:from-purple-700 hover:to-pink-700"
+            disabled={uploading}
           >
             <Save className="w-4 h-4 mr-2" />
-            Enregistrer
+            {uploading ? 'Upload...' : 'Enregistrer'}
           </Button>
         </div>
 
         {/* Info */}
-        <div className="bg-blue-50 border border-blue-200 rounded-lg p-4">
-          <p className="text-sm text-blue-800">
-            💡 <strong>Astuce:</strong> Les couleurs seront appliquées à toutes vos futures factures PDF.
+        <div className="bg-green-50 border border-green-200 rounded-lg p-4">
+          <p className="text-sm text-green-800">
+            ✅ <strong>Les couleurs et le logo seront appliqués à TOUS les PDFs</strong> (aperçu ET emails envoyés aux clients).
           </p>
         </div>
       </div>

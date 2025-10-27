@@ -1,26 +1,6 @@
 import jsPDF from 'jspdf';
 import { Invoice } from '../types';
 
-// Fonction pour récupérer les couleurs personnalisées
-function getCustomColors() {
-  const savedColors = localStorage.getItem('pdfCustomColors');
-  if (savedColors) {
-    try {
-      return JSON.parse(savedColors);
-    } catch (e) {
-      console.error('Erreur parsing couleurs:', e);
-    }
-  }
-  
-  // Couleurs par défaut
-  return {
-    primary: '#9333ea',
-    accent: '#ec4899',
-    text: '#1f2937'
-  };
-}
-
-// Fonction pour convertir hex en RGB
 function hexToRgb(hex: string): [number, number, number] {
   const result = /^#?([a-f\d]{2})([a-f\d]{2})([a-f\d]{2})$/i.exec(hex);
   return result
@@ -29,12 +9,50 @@ function hexToRgb(hex: string): [number, number, number] {
         parseInt(result[2], 16),
         parseInt(result[3], 16)
       ]
-    : [147, 51, 234]; // Fallback violet
+    : [147, 51, 234]; // Couleur par défaut (violet)
+}
+
+function getColors(companyInfo?: any) {
+  // Utiliser les couleurs personnalisées si disponibles
+  if (companyInfo?.pdf_primary_color) {
+    const primaryColor = hexToRgb(companyInfo.pdf_primary_color);
+    const primaryLight: [number, number, number] = [
+      Math.min(primaryColor[0] + 50, 255),
+      Math.min(primaryColor[1] + 50, 255),
+      Math.min(primaryColor[2] + 50, 255)
+    ];
+    const accentColor = hexToRgb(companyInfo.pdf_accent_color || '#ec4899');
+    const textDark = hexToRgb(companyInfo.pdf_text_color || '#1f2937');
+    
+    return {
+      primary: primaryColor,
+      primaryLight,
+      accent: accentColor,
+      textDark,
+      textMedium: [107, 114, 128] as [number, number, number],
+      bgLight: [249, 250, 251] as [number, number, number],
+      white: [255, 255, 255] as [number, number, number]
+    };
+  }
+  
+  // Couleurs par défaut (violet & rose)
+  return {
+    primary: [147, 51, 234] as [number, number, number],
+    primaryLight: [197, 101, 255] as [number, number, number],
+    accent: [236, 72, 153] as [number, number, number],
+    textDark: [31, 41, 55] as [number, number, number],
+    textMedium: [107, 114, 128] as [number, number, number],
+    bgLight: [249, 250, 251] as [number, number, number],
+    white: [255, 255, 255] as [number, number, number]
+  };
 }
 
 export function generateInvoicePDF(invoice: Invoice, companyInfo?: any) {
   const doc = createInvoicePDF(invoice, companyInfo);
-  doc.save(`Facture_${invoice.invoice_number}.pdf`);
+  const fileName = invoice.document_type === 'quote' 
+    ? `Devis_${invoice.quote_number || invoice.invoice_number}.pdf`
+    : `Facture_${invoice.invoice_number}.pdf`;
+  doc.save(fileName);
 }
 
 export async function generateInvoicePDFBlob(invoice: Invoice, companyInfo?: any): Promise<Blob> {
@@ -50,27 +68,28 @@ export async function generateInvoicePDFDataUrl(invoice: Invoice, companyInfo?: 
 
 function createInvoicePDF(invoice: Invoice, companyInfo?: any): jsPDF {
   console.log('🏗️ Construction PDF, companyInfo reçu:', companyInfo);
+  console.log('📋 Type de document:', invoice.document_type);
   
   const doc = new jsPDF();
   
-  // Récupérer les couleurs personnalisées
-  const customColors = getCustomColors();
-  console.log('🎨 Couleurs personnalisées:', customColors);
+  // ✅ Utiliser les couleurs personnalisées pour TOUS les PDFs (preview ET email)
+  const colors = getColors(companyInfo);
+  console.log('🎨 Couleurs utilisées:', colors);
   
-  // Configuration des couleurs
-  const primaryColor = hexToRgb(customColors.primary);
-  const primaryLight: [number, number, number] = [
-    Math.min(primaryColor[0] + 50, 255),
-    Math.min(primaryColor[1] + 50, 255),
-    Math.min(primaryColor[2] + 50, 255)
-  ];
-  const accentColor = hexToRgb(customColors.accent);
-  const textDark = hexToRgb(customColors.text);
-  const textMedium: [number, number, number] = [107, 114, 128];
-  const bgLight: [number, number, number] = [249, 250, 251];
-  const white: [number, number, number] = [255, 255, 255];
+  const primaryColor = colors.primary;
+  const primaryLight = colors.primaryLight;
+  const accentColor = colors.accent;
+  const textDark = colors.textDark;
+  const textMedium = colors.textMedium;
+  const bgLight = colors.bgLight;
+  const white = colors.white;
 
   let yPos = 20;
+
+  const documentTitle = invoice.document_type === 'quote' ? 'DEVIS' : 'FACTURE';
+  const documentNumber = invoice.document_type === 'quote' 
+    ? (invoice.quote_number || invoice.invoice_number)
+    : invoice.invoice_number;
 
   // ===== EN-TÊTE AVEC DÉGRADÉ =====
   doc.setFillColor(...primaryColor);
@@ -81,14 +100,24 @@ function createInvoicePDF(invoice: Invoice, companyInfo?: any): jsPDF {
   doc.setFillColor(...primaryLight);
   doc.circle(190, 45, 10, 'F');
   
+  // ✅ Logo (si disponible) - MAINTENANT AUSSI POUR LES EMAILS
+  if (companyInfo?.logo_url) {
+    try {
+      console.log('🖼️ Ajout du logo:', companyInfo.logo_url);
+      doc.addImage(companyInfo.logo_url, 'PNG', 165, 10, 30, 30);
+    } catch (error) {
+      console.error('⚠️ Erreur ajout logo (non bloquant):', error);
+    }
+  }
+  
   doc.setTextColor(...white);
   doc.setFontSize(32);
   doc.setFont('helvetica', 'bold');
-  doc.text('FACTURE', 20, 28);
+  doc.text(documentTitle, 20, 28);
   
   doc.setFontSize(14);
   doc.setFont('helvetica', 'normal');
-  doc.text(invoice.invoice_number, 20, 40);
+  doc.text(documentNumber, 20, 40);
 
   // ===== SECTION ÉMETTEUR ET CLIENT =====
   yPos = 65;
@@ -150,7 +179,6 @@ function createInvoicePDF(invoice: Invoice, companyInfo?: any): jsPDF {
     doc.text('Informations non renseignées', 20, emitterYPos);
   }
 
-  // Carte Client
   yPos = 65;
   doc.setFillColor(...bgLight);
   doc.roundedRect(110, yPos, 85, 50, 3, 3, 'F');
@@ -190,7 +218,7 @@ function createInvoicePDF(invoice: Invoice, companyInfo?: any): jsPDF {
   doc.setTextColor(...textDark);
   doc.setFontSize(10);
   doc.setFont('helvetica', 'bold');
-  doc.text('Date de facture:', 20, yPos + 7);
+  doc.text(invoice.document_type === 'quote' ? 'Date du devis:' : 'Date de facture:', 20, yPos + 7);
   doc.text('Date d\'échéance:', 20, yPos + 14);
   
   doc.setFont('helvetica', 'normal');
@@ -313,13 +341,13 @@ function createInvoicePDF(invoice: Invoice, companyInfo?: any): jsPDF {
     doc.setFontSize(8);
     doc.setFont('helvetica', 'normal');
     doc.text(
-      `Facture ${invoice.invoice_number} - Page ${i}/${pageCount}`,
+      `${documentTitle} ${documentNumber} - Page ${i}/${pageCount}`,
       105,
       290,
       { align: 'center' }
     );
   }
 
-  console.log('✅ PDF créé avec succès');
+  console.log('✅ PDF créé avec succès avec couleurs personnalisées');
   return doc;
 }
