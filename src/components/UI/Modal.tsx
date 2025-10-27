@@ -90,15 +90,23 @@ export function Modal({ isOpen, onClose, title, children, size = 'lg', headerGra
         />
         
         <div 
-          className="fixed left-0 right-0 bottom-0 bg-white rounded-t-2xl shadow-2xl animate-slideUp flex flex-col"
+          className="fixed left-0 right-0 bottom-0 bg-white shadow-2xl animate-slideUp flex flex-col"
           style={{ 
             top: mobileModalTop,
             zIndex: 45,
-            maxHeight: `calc(100vh - ${mobileModalTop})`
+            maxHeight: `calc(100vh - ${mobileModalTop})`,
+            borderTopLeftRadius: 0,
+            borderTopRightRadius: 0
           }}
         >
-          {/* Header sticky avec gradient personnalisable */}
-          <div className={`flex-shrink-0 bg-gradient-to-r ${gradient} p-4 rounded-t-2xl relative overflow-hidden sticky top-0 z-10`}>
+          {/* Header sticky avec gradient personnalisable - SANS RADIUS sur mobile */}
+          <div 
+            className={`flex-shrink-0 bg-gradient-to-r ${gradient} p-4 relative overflow-hidden sticky top-0 z-10`}
+            style={{
+              borderTopLeftRadius: 0,
+              borderTopRightRadius: 0
+            }}
+          >
             <div className="absolute inset-0 bg-gradient-to-r from-transparent via-white/20 to-transparent -skew-x-12 animate-shimmer"></div>
             
             <div className="relative z-10">

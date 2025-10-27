@@ -190,7 +190,7 @@ export function ServiceBookingModal({
           <div className="flex items-center justify-center min-h-screen p-4">
             <div className="bg-white w-full sm:max-w-3xl max-h-[90vh] overflow-y-auto sm:rounded-3xl shadow-2xl transform animate-slideUp">
               {/* Header */}
-              <div className="relative overflow-hidden touch-action-none sticky top-0 z-10 modal-header modal-safe-top">
+              <div className="relative overflow-hidden touch-action-none sticky top-0 z-10 modal-header modal-safe-top sm:rounded-t-3xl">
                 <div className="absolute inset-0 bg-gradient-to-br from-purple-600 via-blue-600 to-cyan-600"></div>
                 <div className="absolute inset-0 bg-gradient-to-r from-transparent via-white/30 to-transparent -skew-x-12 animate-shimmer"></div>
                 <div className="absolute inset-0 opacity-10">
@@ -482,16 +482,16 @@ export function ServiceBookingModal({
               zIndex: 45,
               display: 'flex',
               flexDirection: 'column',
-              borderTopLeftRadius: '24px',
-              borderTopRightRadius: '24px',
-              background: 'transparent'
+              background: 'transparent',
+              borderTopLeftRadius: 0,
+              borderTopRightRadius: 0
             }}
           >
             <div 
               className="sticky top-0 bg-gradient-to-r from-purple-600 via-blue-600 to-cyan-600 px-4 py-4 flex items-center justify-between z-10"
               style={{
-                borderTopLeftRadius: '24px',
-                borderTopRightRadius: '24px'
+                borderTopLeftRadius: 0,
+                borderTopRightRadius: 0
               }}
             >
               <div>
@@ -770,7 +770,7 @@ export function ServiceBookingModal({
       <div className="hidden sm:block fixed inset-0 bg-black/60 backdrop-blur-sm z-50 animate-fadeIn">
         <div className="flex items-center justify-center min-h-screen p-4">
           <div className="bg-white w-full sm:max-w-4xl max-h-[90vh] overflow-y-auto sm:rounded-3xl shadow-2xl transform animate-slideUp">
-            <div className="relative overflow-hidden touch-action-none sticky top-0 z-10 modal-header modal-safe-top">
+            <div className="relative overflow-hidden touch-action-none sticky top-0 z-10 modal-header modal-safe-top sm:rounded-t-3xl">
               <div className="absolute inset-0 bg-gradient-to-br from-blue-600 via-purple-600 to-pink-600"></div>
               <div className="absolute inset-0 bg-gradient-to-r from-transparent via-white/30 to-transparent -skew-x-12 animate-shimmer"></div>
               <div className="absolute inset-0 opacity-10">
@@ -978,16 +978,16 @@ export function ServiceBookingModal({
             zIndex: 45,
             display: 'flex',
             flexDirection: 'column',
-            borderTopLeftRadius: '24px',
-            borderTopRightRadius: '24px',
-            background: 'transparent'
+            background: 'transparent',
+            borderTopLeftRadius: 0,
+            borderTopRightRadius: 0
           }}
         >
           <div 
             className="sticky top-0 bg-gradient-to-br from-blue-600 via-purple-600 to-pink-600 z-10"
             style={{
-              borderTopLeftRadius: '24px',
-              borderTopRightRadius: '24px'
+              borderTopLeftRadius: 0,
+              borderTopRightRadius: 0
             }}
           >
             <div className="px-4 py-4 flex items-center justify-between">
