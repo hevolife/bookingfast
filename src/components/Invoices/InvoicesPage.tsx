@@ -49,17 +49,20 @@ export function InvoicesPage() {
     
     // Calculer le vrai statut basé sur les paiements
     const getPaymentStatus = (): Invoice['status'] => {
-      // Pour les devis, garder le statut original
-      if (viewMode === 'quotes') return doc.status;
+      // Si brouillon, garder le statut original
+      if (doc.status === 'draft') return 'draft';
       
-      // Pour les factures, calculer selon les paiements
+      // Si annulé, garder le statut original
+      if (doc.status === 'cancelled') return 'cancelled';
+      
+      // Calculer selon les paiements
       if (totalPaid === 0) return 'sent'; // Non payé
-      if (remainingAmount <= 0) return 'paid'; // Payé
-      return 'sent'; // Partiellement payé
+      if (remainingAmount <= 0.01) return 'paid'; // Payé (tolérance de 1 centime)
+      return 'sent'; // Partiellement payé (affiché différemment)
     };
 
     const actualStatus = getPaymentStatus();
-    const isPartiallyPaid = totalPaid > 0 && remainingAmount > 0;
+    const isPartiallyPaid = totalPaid > 0 && remainingAmount > 0.01;
 
     return (
       <tr
@@ -130,8 +133,8 @@ export function InvoicesPage() {
               </button>
             )}
             
-            {/* Bouton Renvoyer - Devis envoyé */}
-            {viewMode === 'quotes' && doc.status === 'sent' && (
+            {/* Bouton Renvoyer - Devis envoyé non payé */}
+            {viewMode === 'quotes' && actualStatus === 'sent' && !isPartiallyPaid && (
               <button
                 onClick={() => handleResendDocument(doc)}
                 className="p-2 bg-gradient-to-r from-orange-500 to-yellow-500 text-white rounded-lg hover:from-orange-600 hover:to-yellow-600 transition-all duration-300 transform hover:scale-105 shadow-lg"
@@ -141,8 +144,8 @@ export function InvoicesPage() {
               </button>
             )}
             
-            {/* Bouton Convertir en facture - Devis envoyé */}
-            {viewMode === 'quotes' && doc.status === 'sent' && (
+            {/* Bouton Convertir en facture - Devis payé */}
+            {viewMode === 'quotes' && actualStatus === 'paid' && (
               <button
                 onClick={() => handleConvertToInvoice(doc)}
                 className="p-2 bg-gradient-to-r from-purple-500 to-pink-500 text-white rounded-lg hover:from-purple-600 hover:to-pink-600 transition-all duration-300 transform hover:scale-105 shadow-lg"
@@ -196,7 +199,7 @@ export function InvoicesPage() {
   };
 
   const handleConvertToInvoice = async (quote: Invoice) => {
-    if (!confirm('Confirmer la conversion de ce devis en facture après validation du paiement ?')) {
+    if (!confirm('Confirmer la conversion de ce devis en facture ?')) {
       return;
     }
 
@@ -467,7 +470,6 @@ function MobileInvoiceCard({ doc, index }: { doc: Invoice; index: number }) {
   const { getTotalPaid } = useInvoicePayments(doc.id);
   const totalPaid = getTotalPaid();
   const remainingAmount = doc.total_ttc - totalPaid;
-  const isPartiallyPaid = totalPaid > 0 && remainingAmount > 0;
   const [selectedInvoice, setSelectedInvoice] = useState<Invoice | null>(null);
   const [showDetailsModal, setShowDetailsModal] = useState(false);
   const [showSendModal, setShowSendModal] = useState(false);
@@ -498,14 +500,22 @@ function MobileInvoiceCard({ doc, index }: { doc: Invoice; index: number }) {
     );
   };
 
-  // Calculer le vrai statut
+  // Calculer le vrai statut basé sur les paiements
   const getPaymentStatus = (): Invoice['status'] => {
-    if (totalPaid === 0) return 'sent';
-    if (remainingAmount <= 0) return 'paid';
-    return 'sent';
+    // Si brouillon, garder le statut original
+    if (doc.status === 'draft') return 'draft';
+    
+    // Si annulé, garder le statut original
+    if (doc.status === 'cancelled') return 'cancelled';
+    
+    // Calculer selon les paiements
+    if (totalPaid === 0) return 'sent'; // Non payé
+    if (remainingAmount <= 0.01) return 'paid'; // Payé (tolérance de 1 centime)
+    return 'sent'; // Partiellement payé
   };
 
   const actualStatus = getPaymentStatus();
+  const isPartiallyPaid = totalPaid > 0 && remainingAmount > 0.01;
 
   const handlePreviewDocument = (invoice: Invoice) => {
     setSelectedInvoice(invoice);
@@ -518,7 +528,7 @@ function MobileInvoiceCard({ doc, index }: { doc: Invoice; index: number }) {
   };
 
   const handleConvertToInvoice = async (quote: Invoice) => {
-    if (!confirm('Confirmer la conversion de ce devis en facture après validation du paiement ?')) {
+    if (!confirm('Confirmer la conversion de ce devis en facture ?')) {
       return;
     }
 
@@ -603,8 +613,8 @@ function MobileInvoiceCard({ doc, index }: { doc: Invoice; index: number }) {
               </button>
             )}
             
-            {/* Bouton Renvoyer - Devis envoyé */}
-            {doc.status === 'sent' && !doc.invoice_number && (
+            {/* Bouton Renvoyer - Devis envoyé non payé */}
+            {actualStatus === 'sent' && !isPartiallyPaid && !doc.invoice_number && (
               <button
                 onClick={() => handleSendDocument(doc)}
                 className="flex-1 min-w-[60px] p-3 bg-gradient-to-r from-orange-500 to-yellow-500 text-white rounded-xl hover:from-orange-600 hover:to-yellow-600 transition-all duration-300 transform hover:scale-105 shadow-lg flex items-center justify-center"
@@ -614,8 +624,8 @@ function MobileInvoiceCard({ doc, index }: { doc: Invoice; index: number }) {
               </button>
             )}
             
-            {/* Bouton Convertir en facture - Devis envoyé */}
-            {doc.status === 'sent' && !doc.invoice_number && (
+            {/* Bouton Convertir en facture - Devis payé */}
+            {actualStatus === 'paid' && !doc.invoice_number && (
               <button
                 onClick={() => handleConvertToInvoice(doc)}
                 className="flex-1 min-w-[60px] p-3 bg-gradient-to-r from-purple-500 to-pink-500 text-white rounded-xl hover:from-purple-600 hover:to-pink-600 transition-all duration-300 transform hover:scale-105 shadow-lg flex items-center justify-center"

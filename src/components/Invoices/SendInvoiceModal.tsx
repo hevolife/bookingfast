@@ -17,7 +17,7 @@ export function SendInvoiceModal({ invoice, isOpen, onClose }: SendInvoiceModalP
   const [loading, setLoading] = useState(false);
   const [message, setMessage] = useState('');
 
-  const mobileModalTop = isPWA() ? '120px' : '60px';
+  const mobileModalTop = isPWA() ? '100px' : '60px';
 
   const handleSend = async () => {
     if (!invoice.client?.email) {

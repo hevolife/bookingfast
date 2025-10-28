@@ -36,7 +36,7 @@ export function CreateInvoiceModal({ isOpen, onClose, onInvoiceCreated }: Create
   const [showCreateClientModal, setShowCreateClientModal] = useState(false);
   const [showCreateProductModal, setShowCreateProductModal] = useState(false);
 
-  const mobileModalTop = isPWA() ? '120px' : '60px';
+  const mobileModalTop = isPWA() ? '100px' : '60px';
 
   const addItem = (product?: Product) => {
     const newItem: Partial<InvoiceItem> = {
@@ -511,8 +511,8 @@ export function CreateInvoiceModal({ isOpen, onClose, onInvoiceCreated }: Create
                   </div>
                 </div>
 
-                {/* Actions */}
-                <div className="flex gap-3">
+                {/* Actions avec espacement en bas */}
+                <div className="flex gap-3 pb-6">
                   <Button
                     type="button"
                     variant="secondary"
@@ -874,8 +874,8 @@ export function CreateInvoiceModal({ isOpen, onClose, onInvoiceCreated }: Create
                 </div>
               </div>
 
-              {/* Actions */}
-              <div className="flex flex-col gap-2">
+              {/* Actions avec espacement en bas */}
+              <div className="flex flex-col gap-2 pb-6">
                 <button
                   type="button"
                   onClick={onClose}
