@@ -36,7 +36,7 @@ export function CreateInvoiceModal({ isOpen, onClose, onInvoiceCreated }: Create
   const [showCreateClientModal, setShowCreateClientModal] = useState(false);
   const [showCreateProductModal, setShowCreateProductModal] = useState(false);
 
-  const mobileModalTop = isPWA() ? '100px' : '60px';
+  const mobileModalTop = isPWA() ? '120px' : '60px';
 
   const addItem = (product?: Product) => {
     const newItem: Partial<InvoiceItem> = {
