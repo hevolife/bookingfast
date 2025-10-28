@@ -37,7 +37,7 @@ export function InvoiceDetailsModal({ invoice, isOpen, onClose }: InvoiceDetails
   const remainingAmount = invoice.total_ttc - totalPaid;
   const isFullyPaid = remainingAmount <= 0;
 
-  const mobileModalTop = isPWA() ? '120px' : '80px';
+  const mobileModalTop = isPWA() ? '100px' : '60px';
 
   const formatDate = (date: string) => {
     return new Date(date).toLocaleDateString('fr-FR', {
