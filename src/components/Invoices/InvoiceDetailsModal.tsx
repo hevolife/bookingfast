@@ -358,32 +358,24 @@ export function InvoiceDetailsModal({ invoice, isOpen, onClose }: InvoiceDetails
         </div>
       </div>
 
-      {/* Mobile: Modal SOUS LA NAVBAR */}
-      <div className="sm:hidden fixed inset-0 z-40">
+      {/* Mobile: Modal SOUS LA NAVBAR AVEC HEADER FIXE */}
+      <div className="sm:hidden">
+        {/* Backdrop */}
         <div
-          className="fixed inset-0 bg-black bg-opacity-50"
+          className="fixed inset-0 bg-black bg-opacity-50 z-40"
           onClick={onClose}
-          style={{ zIndex: 40 }}
         />
         
+        {/* Modal Container - z-50 pour passer au-dessus du backdrop */}
         <div 
-          className="fixed left-0 right-0 bottom-0 shadow-2xl animate-slideUp"
+          className="fixed left-0 right-0 bottom-0 z-50 flex flex-col bg-white"
           style={{ 
-            top: mobileModalTop,
-            zIndex: 45,
-            display: 'flex',
-            flexDirection: 'column',
-            background: 'transparent',
-            borderTopLeftRadius: 0,
-            borderTopRightRadius: 0
+            top: mobileModalTop
           }}
         >
+          {/* Header FIXE - Position absolute pour rester en haut */}
           <div 
-            className="sticky top-0 bg-gradient-to-r from-purple-600 via-blue-600 to-cyan-600 px-4 py-4 flex items-center justify-between z-10"
-            style={{
-              borderTopLeftRadius: 0,
-              borderTopRightRadius: 0
-            }}
+            className="absolute top-0 left-0 right-0 bg-gradient-to-r from-purple-600 via-blue-600 to-cyan-600 px-4 py-4 flex items-center justify-between z-10"
           >
             <div>
               <h2 className="text-lg font-bold text-white">Détails de la facture</h2>
@@ -399,10 +391,12 @@ export function InvoiceDetailsModal({ invoice, isOpen, onClose }: InvoiceDetails
             </button>
           </div>
           
+          {/* Contenu avec padding-top pour compenser le header fixe */}
           <div 
-            className="overflow-y-auto flex-1 bg-white"
+            className="overflow-y-auto flex-1"
             style={{ 
               WebkitOverflowScrolling: 'touch',
+              paddingTop: '72px', // Hauteur du header
               paddingBottom: '120px'
             }}
           >
