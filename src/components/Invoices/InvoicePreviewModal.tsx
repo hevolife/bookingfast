@@ -20,7 +20,7 @@ export function InvoicePreviewModal({ invoice, isOpen, onClose }: InvoicePreview
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
 
-  const mobileModalTop = isPWA() ? '100px' : '60px';
+  const mobileModalTop = isPWA() ? '80px' : '60px';
 
   useEffect(() => {
     if (isOpen && !companyLoading) {
