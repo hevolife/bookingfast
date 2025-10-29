@@ -548,13 +548,14 @@ export function CreateInvoiceModal({ isOpen, onClose, onInvoiceCreated }: Create
 
       {/* Mobile: Modal COLLÉ SOUS LA NAVBAR */}
       <div className="sm:hidden">
-        {/* Backdrop - z-40 */}
+        {/* Backdrop - z-20 DERRIÈRE le modal */}
         <div
-          className="fixed inset-0 bg-black bg-opacity-50 z-40"
+          className="fixed inset-0 bg-black bg-opacity-50"
+          style={{ zIndex: 20 }}
           onClick={onClose}
         />
         
-        {/* Modal Container - z-30 pour être SOUS la navbar (z-40) */}
+        {/* Modal Container - z-30 DEVANT le backdrop */}
         <div 
           className="fixed left-0 right-0 bottom-0 flex flex-col bg-white"
           style={{ 
