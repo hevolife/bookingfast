@@ -13,9 +13,18 @@ interface ModalProps {
 
 export function Modal({ isOpen, onClose, title, children, size = 'lg', headerGradient }: ModalProps) {
   const [isPWAMode, setIsPWAMode] = React.useState(false);
+  const [navbarHeight, setNavbarHeight] = React.useState(64);
 
   useEffect(() => {
     setIsPWAMode(isPWA());
+    
+    // Calculer la hauteur réelle de la navbar
+    const navbar = document.querySelector('nav');
+    if (navbar) {
+      const height = navbar.offsetHeight;
+      setNavbarHeight(height);
+      console.log('📏 Navbar height:', height);
+    }
   }, []);
 
   useEffect(() => {
@@ -45,8 +54,6 @@ export function Modal({ isOpen, onClose, title, children, size = 'lg', headerGra
     xl: 'max-w-4xl',
     '2xl': 'max-w-6xl'
   };
-
-  const mobileModalTop = isPWAMode ? '120px' : '80px';
   
   // Gradient par défaut si non spécifié
   const defaultGradient = 'from-purple-600 via-pink-600 to-indigo-600';
@@ -81,7 +88,7 @@ export function Modal({ isOpen, onClose, title, children, size = 'lg', headerGra
         </div>
       </div>
 
-      {/* Mobile Modal - SOUS LA NAVBAR */}
+      {/* Mobile Modal - COLLÉ SOUS LA NAVBAR */}
       <div className="sm:hidden fixed inset-0 z-50">
         <div
           className="fixed inset-0 bg-black/60 backdrop-blur-sm"
@@ -92,9 +99,9 @@ export function Modal({ isOpen, onClose, title, children, size = 'lg', headerGra
         <div 
           className="fixed left-0 right-0 bottom-0 bg-white shadow-2xl animate-slideUp flex flex-col"
           style={{ 
-            top: mobileModalTop,
+            top: `${navbarHeight}px`,
             zIndex: 45,
-            maxHeight: `calc(100vh - ${mobileModalTop})`,
+            maxHeight: `calc(100vh - ${navbarHeight}px)`,
             borderTopLeftRadius: 0,
             borderTopRightRadius: 0
           }}
