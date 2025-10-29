@@ -93,6 +93,16 @@ export function ServicesPage() {
     }
   });
 
+  const [navbarHeight, setNavbarHeight] = useState(64);
+
+  React.useEffect(() => {
+    const navbar = document.querySelector('nav');
+    if (navbar) {
+      const height = navbar.offsetHeight;
+      setNavbarHeight(height);
+    }
+  }, []);
+
   // Recalculer le prix HT quand le prix TTC change
   useEffect(() => {
     if (formData.price_ttc > 0) {
@@ -361,7 +371,7 @@ export function ServicesPage() {
           {/* Desktop Modal - CENTRÉ */}
           <div className="hidden sm:flex fixed inset-0 bg-black/60 backdrop-blur-sm items-center justify-center z-50 animate-fadeIn p-4">
             <div className="bg-white w-full max-w-2xl max-h-[90vh] overflow-y-auto rounded-3xl shadow-2xl transform animate-slideUp">
-              {/* Header */}
+              {/* Header Desktop */}
               <div className="bg-gradient-to-r from-purple-600 via-pink-600 to-red-500 p-6 rounded-t-3xl relative overflow-hidden sticky top-0 z-10">
                 <div className="absolute inset-0 bg-gradient-to-r from-transparent via-white/20 to-transparent -skew-x-12 animate-shimmer"></div>
                 
@@ -390,7 +400,7 @@ export function ServicesPage() {
                 </div>
               </div>
 
-              {/* Form */}
+              {/* Form Desktop */}
               <form onSubmit={handleSubmit} className="p-6 space-y-6">
                 <div className="grid grid-cols-1 sm:grid-cols-2 gap-6">
                   <div className="md:col-span-2">
@@ -649,56 +659,53 @@ export function ServicesPage() {
             </div>
           </div>
 
-          {/* Mobile Modal - SOUS LA NAVBAR */}
-          <div className="sm:hidden fixed inset-0 z-50">
-            {/* Overlay */}
+          {/* Mobile Modal - SOUS LA NAVBAR avec header cohérent */}
+          <div className="sm:hidden">
+            {/* Backdrop - z-20 DERRIÈRE le modal */}
             <div
-              className="fixed inset-0 bg-black/60 backdrop-blur-sm"
+              className="fixed inset-0 bg-black bg-opacity-50"
+              style={{ zIndex: 20 }}
               onClick={handleCloseModal}
-              style={{ zIndex: 40 }}
             />
             
-            {/* Modal content - Commence sous la navbar (64px + safe area) */}
+            {/* Modal Container - z-30 DEVANT le backdrop */}
             <div 
-              className="fixed left-0 right-0 bottom-0 bg-white rounded-t-2xl shadow-2xl animate-slideUp flex flex-col"
+              className="fixed left-0 right-0 bottom-0 flex flex-col bg-white"
               style={{ 
-                top: 'calc(64px + env(safe-area-inset-top, 0px))',
-                zIndex: 45,
-                maxHeight: 'calc(100vh - 64px - env(safe-area-inset-top, 0px))'
+                top: `${navbarHeight}px`,
+                zIndex: 30,
+                maxHeight: `calc(100vh - ${navbarHeight}px)`
               }}
             >
-              {/* Header sticky */}
-              <div className="flex-shrink-0 bg-gradient-to-r from-purple-600 via-pink-600 to-red-500 p-4 rounded-t-2xl relative overflow-hidden sticky top-0 z-10">
-                <div className="absolute inset-0 bg-gradient-to-r from-transparent via-white/20 to-transparent -skew-x-12 animate-shimmer"></div>
-                
-                <div className="relative z-10">
-                  <div className="flex items-center justify-between">
-                    <div className="flex items-center gap-3">
-                      <div className="w-8 h-8 bg-white/20 rounded-lg flex items-center justify-center backdrop-blur-sm">
-                        <Package className="w-4 h-4 text-white" />
-                      </div>
-                      <div>
-                        <h2 className="text-lg font-bold text-white">
-                          {editingService ? 'Modifier le service' : 'Nouveau service'}
-                        </h2>
-                        <p className="text-white/80 text-xs">
-                          {editingService ? 'Modifiez les informations' : 'Créez un nouveau service'}
-                        </p>
-                      </div>
-                    </div>
-                    <button
-                      onClick={handleCloseModal}
-                      className="p-2 text-white hover:bg-white/20 rounded-lg transition-all duration-300 transform hover:scale-110 mobile-tap-target"
-                    >
-                      <X className="w-5 h-5" />
-                    </button>
-                  </div>
+              {/* Header Mobile - MÊME STYLE QUE LE MODAL DEVIS */}
+              <div className="flex-shrink-0 bg-gradient-to-r from-purple-600 via-pink-600 to-rose-600 px-4 py-4 flex items-center justify-between">
+                <div>
+                  <h2 className="text-lg font-bold text-white">
+                    {editingService ? 'Modifier le service' : 'Nouveau service'}
+                  </h2>
+                  <p className="text-white/80 text-sm">
+                    {editingService ? 'Modifiez les informations' : 'Créez un nouveau service'}
+                  </p>
                 </div>
+                <button
+                  onClick={handleCloseModal}
+                  className="p-2 hover:bg-white/20 rounded-lg transition-colors"
+                >
+                  <svg className="w-5 h-5 text-white" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18L18 6M6 6l12 12" />
+                  </svg>
+                </button>
               </div>
-
-              {/* Form scrollable */}
-              <div className="flex-1 overflow-y-auto" style={{ WebkitOverflowScrolling: 'touch' }}>
-                <form onSubmit={handleSubmit} className="p-4 space-y-4 pb-32">
+              
+              {/* Contenu scrollable */}
+              <div 
+                className="overflow-y-auto flex-1"
+                style={{ 
+                  WebkitOverflowScrolling: 'touch',
+                  paddingBottom: '120px'
+                }}
+              >
+                <form onSubmit={handleSubmit} className="p-4 space-y-4">
                   <div className="space-y-4">
                     <div>
                       <label className="block text-sm font-medium text-gray-700 mb-2">
