@@ -36,7 +36,17 @@ export function CreateInvoiceModal({ isOpen, onClose, onInvoiceCreated }: Create
   const [showCreateClientModal, setShowCreateClientModal] = useState(false);
   const [showCreateProductModal, setShowCreateProductModal] = useState(false);
 
-  const mobileModalTop = isPWA() ? '100px' : '60px';
+  const [navbarHeight, setNavbarHeight] = useState(64);
+
+  React.useEffect(() => {
+    // Calculer la hauteur réelle de la navbar
+    const navbar = document.querySelector('nav');
+    if (navbar) {
+      const height = navbar.offsetHeight;
+      setNavbarHeight(height);
+      console.log('📏 Navbar height:', height);
+    }
+  }, []);
 
   const addItem = (product?: Product) => {
     const newItem: Partial<InvoiceItem> = {
@@ -536,24 +546,26 @@ export function CreateInvoiceModal({ isOpen, onClose, onInvoiceCreated }: Create
         </div>
       </div>
 
-      {/* Mobile: Modal SOUS LA NAVBAR AVEC HEADER FIXE */}
+      {/* Mobile: Modal COLLÉ SOUS LA NAVBAR */}
       <div className="sm:hidden">
-        {/* Backdrop */}
+        {/* Backdrop - z-40 */}
         <div
           className="fixed inset-0 bg-black bg-opacity-50 z-40"
           onClick={onClose}
         />
         
-        {/* Modal Container - z-50 pour passer au-dessus du backdrop */}
+        {/* Modal Container - z-30 pour être SOUS la navbar (z-40) */}
         <div 
-          className="fixed left-0 right-0 bottom-0 z-50 flex flex-col bg-white"
+          className="fixed left-0 right-0 bottom-0 flex flex-col bg-white"
           style={{ 
-            top: mobileModalTop
+            top: `${navbarHeight}px`,
+            zIndex: 30,
+            maxHeight: `calc(100vh - ${navbarHeight}px)`
           }}
         >
-          {/* Header FIXE - Position absolute pour rester en haut */}
+          {/* Header - même z-index que le container */}
           <div 
-            className="absolute top-0 left-0 right-0 bg-gradient-to-r from-purple-600 via-pink-600 to-rose-600 px-4 py-4 flex items-center justify-between z-10"
+            className="flex-shrink-0 bg-gradient-to-r from-purple-600 via-pink-600 to-rose-600 px-4 py-4 flex items-center justify-between"
           >
             <div>
               <h2 className="text-lg font-bold text-white">Nouveau devis</h2>
@@ -569,12 +581,11 @@ export function CreateInvoiceModal({ isOpen, onClose, onInvoiceCreated }: Create
             </button>
           </div>
           
-          {/* Contenu avec padding-top pour compenser le header fixe */}
+          {/* Contenu scrollable */}
           <div 
             className="overflow-y-auto flex-1"
             style={{ 
               WebkitOverflowScrolling: 'touch',
-              paddingTop: '72px', // Hauteur du header
               paddingBottom: '120px'
             }}
           >
