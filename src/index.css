@@ -2,6 +2,11 @@
 @tailwind components;
 @tailwind utilities;
 
+/* CRITICAL: Dynamic viewport height for PWA */
+:root {
+  --vh: 1vh;
+}
+
 @layer base {
   * {
     box-sizing: border-box;
@@ -13,12 +18,14 @@
     text-rendering: optimizeLegibility;
     -webkit-font-smoothing: antialiased;
     -moz-osx-font-smoothing: grayscale;
-    height: 100vh;
+    /* CRITICAL: Use dynamic vh for PWA */
+    height: calc(var(--vh, 1vh) * 100);
   }
   body {
     font-feature-settings: 'kern' 1;
     text-rendering: optimizeLegibility;
-    height: 100vh;
+    /* CRITICAL: Use dynamic vh for PWA */
+    height: calc(var(--vh, 1vh) * 100);
   }
 }
 
@@ -33,7 +40,8 @@
 /* CRITICAL: Bloquer le scroll uniquement sur l'app dashboard */
 .app-container {
   overflow: hidden !important;
-  height: 100vh !important;
+  /* CRITICAL: Use dynamic vh for PWA */
+  height: calc(var(--vh, 1vh) * 100) !important;
   position: fixed !important;
   width: 100% !important;
   background: transparent !important;
@@ -47,7 +55,28 @@ html, body {
   -ms-user-select: none;
   user-select: none;
   -webkit-tap-highlight-color: transparent;
-  background: linear-gradient(to bottom right, #eff6ff, #faf5ff, #fce7f3) !important;
+  background: transparent !important;
+}
+
+/* CRITICAL: PWA Mode - Fond transparent */
+@media (display-mode: standalone) {
+  html, body {
+    background: transparent !important;
+    background-color: transparent !important;
+  }
+  
+  body {
+    background: linear-gradient(to bottom right, #eff6ff, #faf5ff, #fce7f3) !important;
+  }
+  
+  .app-container {
+    background: transparent !important;
+  }
+  
+  /* Header transparent en PWA */
+  .navbar-safe {
+    background: transparent !important;
+  }
 }
 
 input, textarea, [contenteditable] {
@@ -60,7 +89,8 @@ input, textarea, [contenteditable] {
 }
 
 #root {
-  min-height: 100vh;
+  /* CRITICAL: Use dynamic vh for PWA */
+  min-height: calc(var(--vh, 1vh) * 100);
   background: transparent !important;
 }
 
@@ -82,7 +112,8 @@ input, textarea, [contenteditable] {
   }
   
   .modal-content {
-    max-height: 85vh !important;
+    /* CRITICAL: Use dynamic vh for PWA */
+    max-height: calc(var(--vh, 1vh) * 85) !important;
     height: auto !important;
     border-radius: 1.5rem !important;
     box-shadow: 0 25px 50px -12px rgba(0, 0, 0, 0.25) !important;
@@ -112,8 +143,9 @@ input, textarea, [contenteditable] {
     bottom: 0 !important;
     width: 100% !important;
     max-width: 100% !important;
-    height: calc(100vh - 64px - env(safe-area-inset-top, 0px)) !important;
-    max-height: calc(100vh - 64px - env(safe-area-inset-top, 0px)) !important;
+    /* CRITICAL: Use dynamic vh for PWA */
+    height: calc(var(--vh, 1vh) * 100 - 64px - env(safe-area-inset-top, 0px)) !important;
+    max-height: calc(var(--vh, 1vh) * 100 - 64px - env(safe-area-inset-top, 0px)) !important;
     border-radius: 1.5rem 1.5rem 0 0 !important;
     margin: 0 !important;
     overflow: hidden !important;
@@ -196,6 +228,27 @@ input, textarea, [contenteditable] {
     padding-right: 0.25rem;
     padding-top: 0.45rem;
     padding-bottom: 0.45rem;
+  }
+}
+
+/* PWA standalone mode */
+@media (display-mode: standalone) and (max-width: 640px) {
+  .app-container {
+    overflow: hidden !important;
+    position: fixed !important;
+    overscroll-behavior: none !important;
+    background: transparent !important;
+  }
+  
+  .modal-container-mobile {
+    top: calc(64px + env(safe-area-inset-top, 0px)) !important;
+  }
+  
+  .modal-content-mobile {
+    top: calc(64px + env(safe-area-inset-top, 0px)) !important;
+    /* CRITICAL: Use dynamic vh for PWA */
+    height: calc(var(--vh, 1vh) * 100 - 64px - env(safe-area-inset-top, 0px)) !important;
+    max-height: calc(var(--vh, 1vh) * 100 - 64px - env(safe-area-inset-top, 0px)) !important;
   }
 }
 
@@ -539,8 +592,9 @@ input, textarea, [contenteditable] {
   padding-right: env(safe-area-inset-right);
 }
 
+/* CRITICAL: Use dynamic vh for PWA */
 .h-screen-safe {
-  height: 100vh;
+  height: calc(var(--vh, 1vh) * 100);
 }
 
 .modal-safe-top {
@@ -566,9 +620,10 @@ input, textarea, [contenteditable] {
   padding-right: max(1rem, env(safe-area-inset-right));
 }
 
+/* CRITICAL: Use dynamic vh for PWA */
 .modal-height-safe {
-  max-height: calc(100vh - env(safe-area-inset-top) - env(safe-area-inset-bottom));
-  height: calc(100vh - env(safe-area-inset-top) - env(safe-area-inset-bottom));
+  max-height: calc(var(--vh, 1vh) * 100 - env(safe-area-inset-top) - env(safe-area-inset-bottom));
+  height: calc(var(--vh, 1vh) * 100 - env(safe-area-inset-top) - env(safe-area-inset-bottom));
 }
 
 .navbar-safe {

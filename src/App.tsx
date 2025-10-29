@@ -72,7 +72,7 @@ function AppRoutes() {
   // Callback OAuth
   if (pathname.includes('/auth/google/callback')) {
     return (
-      <div className="flex items-center justify-center min-h-screen bg-gradient-to-br from-blue-50 via-purple-50 to-pink-50">
+      <div className="flex items-center justify-center bg-gradient-to-br from-blue-50 via-purple-50 to-pink-50" style={{ minHeight: 'calc(var(--vh, 1vh) * 100)' }}>
         <Suspense fallback={<LoadingSpinner />}>
           <GoogleCalendarCallback />
         </Suspense>
@@ -118,7 +118,7 @@ function AppRoutes() {
         className="app-container flex flex-col overflow-hidden" 
         style={{ 
           background: 'linear-gradient(to bottom right, #eff6ff, #faf5ff, #fce7f3)',
-          height: '100vh'
+          height: 'calc(var(--vh, 1vh) * 100)'
         }}
       >
         <Navbar />
