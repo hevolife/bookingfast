@@ -114,7 +114,13 @@ function AppRoutes() {
   // 🎯 Pages protégées (dashboard, services, etc.)
   return (
     <ProtectedRoute>
-      <div className="app-container flex flex-col h-screen overflow-hidden" style={{ background: 'linear-gradient(to bottom right, #eff6ff, #faf5ff, #fce7f3)' }}>
+      <div 
+        className="app-container flex flex-col overflow-hidden" 
+        style={{ 
+          background: 'linear-gradient(to bottom right, #eff6ff, #faf5ff, #fce7f3)',
+          height: '100vh'
+        }}
+      >
         <Navbar />
         <main 
           className="flex-1 overflow-y-auto scrollable-area"

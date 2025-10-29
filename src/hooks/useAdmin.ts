@@ -36,35 +36,10 @@ export interface SubscriptionPlan {
   max_team_members: number | null;
 }
 
-export interface AccessCode {
-  id: string;
-  code: string;
-  description: string | null;
-  access_type: 'days' | 'weeks' | 'months' | 'lifetime';
-  access_duration: number | null;
-  max_uses: number;
-  current_uses: number;
-  is_active: boolean;
-  expires_at: string | null;
-  created_at: string;
-}
-
-export interface CodeRedemption {
-  id: string;
-  code_id: string;
-  user_id: string;
-  redeemed_at: string;
-  access_granted_until: string | null;
-  code?: AccessCode;
-  user?: User;
-}
-
 export function useAdmin() {
   const [users, setUsers] = useState<User[]>([]);
   const [subscriptions, setSubscriptions] = useState<Subscription[]>([]);
   const [subscriptionPlans, setSubscriptionPlans] = useState<SubscriptionPlan[]>([]);
-  const [accessCodes, setAccessCodes] = useState<AccessCode[]>([]);
-  const [redemptions, setRedemptions] = useState<CodeRedemption[]>([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
 
@@ -107,36 +82,6 @@ export function useAdmin() {
 
       if (plansError) throw plansError;
       setSubscriptionPlans(plansData || []);
-
-      // Charger les codes d'accès
-      const { data: codesData, error: codesError } = await supabase
-        .from('access_codes')
-        .select('*')
-        .order('created_at', { ascending: false });
-
-      if (codesError) {
-        console.error('Error loading access codes:', codesError);
-        setAccessCodes([]);
-      } else {
-        setAccessCodes(codesData || []);
-      }
-
-      // Charger les utilisations de codes
-      const { data: redemptionsData, error: redemptionsError } = await supabase
-        .from('code_redemptions')
-        .select(`
-          *,
-          code:access_codes(*),
-          user:users(*)
-        `)
-        .order('redeemed_at', { ascending: false });
-
-      if (redemptionsError) {
-        console.error('Error loading redemptions:', redemptionsError);
-        setRedemptions([]);
-      } else {
-        setRedemptions(redemptionsData || []);
-      }
 
     } catch (error) {
       console.error('Error loading admin data:', error);
@@ -326,46 +271,10 @@ export function useAdmin() {
     }
   };
 
-  const createAccessCode = async (codeData: {
-    code: string;
-    description?: string;
-    access_type: 'days' | 'weeks' | 'months' | 'lifetime';
-    access_duration?: number;
-    max_uses: number;
-    expires_at?: string;
-  }) => {
-    try {
-      const { data, error } = await supabase
-        .from('access_codes')
-        .insert({
-          code: codeData.code.toUpperCase(),
-          description: codeData.description || null,
-          access_type: codeData.access_type,
-          access_duration: codeData.access_type === 'lifetime' ? null : codeData.access_duration,
-          max_uses: codeData.max_uses,
-          current_uses: 0,
-          is_active: true,
-          expires_at: codeData.expires_at || null
-        })
-        .select()
-        .single();
-
-      if (error) throw error;
-
-      await loadData();
-      return data;
-    } catch (error) {
-      console.error('Error creating access code:', error);
-      throw error;
-    }
-  };
-
   return {
     users,
     subscriptions,
     subscriptionPlans,
-    accessCodes,
-    redemptions,
     loading,
     error,
     isSuperAdmin,
@@ -373,7 +282,6 @@ export function useAdmin() {
     deleteUser,
     createSubscription,
     cancelSubscription,
-    createAccessCode,
-    refetch: loadData
+    refreshData: loadData
   };
 }
