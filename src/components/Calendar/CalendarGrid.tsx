@@ -74,6 +74,7 @@ export function CalendarGrid({
   const [selectedServiceName, setSelectedServiceName] = useState('');
   const [showDatePicker, setShowDatePicker] = useState(false);
   const [deletingUnavailabilityId, setDeletingUnavailabilityId] = useState<string | null>(null);
+  const [isInitialLoad, setIsInitialLoad] = useState(true);
   const scrollContainerRef = useRef<HTMLDivElement>(null);
   const timeGridRef = useRef<HTMLDivElement>(null);
   const monthButtonRef = useRef<HTMLButtonElement>(null);
@@ -169,7 +170,7 @@ export function CalendarGrid({
       setRefreshTrigger(prev => prev + 1);
       
       setTimeout(() => {
-        scrollToSelectedDate();
+        scrollToSelectedDate(true);
         window.dispatchEvent(new CustomEvent('refreshBookings'));
       }, 100);
     };
@@ -182,27 +183,6 @@ export function CalendarGrid({
       bookingEvents.off('bookingCreated', handleBookingChange);
       bookingEvents.off('bookingUpdated', handleBookingChange);
       bookingEvents.off('bookingDeleted', handleBookingChange);
-    };
-  }, [selectedDate, days]);
-
-  // 🔥 NOUVEAU: Détecteur d'animation fadeIn pour centrer automatiquement
-  useEffect(() => {
-    if (!scrollContainerRef.current) return;
-
-    const handleAnimationStart = (e: AnimationEvent) => {
-      if (e.animationName.includes('fadeIn')) {
-        console.log('🎬 CalendarGrid - Animation fadeIn détectée, centrage automatique...');
-        setTimeout(() => {
-          scrollToSelectedDate();
-        }, 50);
-      }
-    };
-
-    const container = scrollContainerRef.current;
-    container.addEventListener('animationstart', handleAnimationStart as EventListener);
-
-    return () => {
-      container.removeEventListener('animationstart', handleAnimationStart as EventListener);
     };
   }, [selectedDate, days]);
 
@@ -355,8 +335,8 @@ export function CalendarGrid({
     setSelectedDate(now);
   };
 
-  const scrollToSelectedDate = () => {
-    console.log('🎯 scrollToSelectedDate - Début centrage');
+  const scrollToSelectedDate = (animated: boolean = false) => {
+    console.log('🎯 scrollToSelectedDate - Début centrage, animated:', animated);
     if (scrollContainerRef.current) {
       const container = scrollContainerRef.current;
       const selectedIndex = days.findIndex(day => isSelected(day.date));
@@ -383,12 +363,13 @@ export function CalendarGrid({
             totalItemWidth,
             itemPosition,
             containerWidth,
-            scrollPosition: Math.max(0, scrollPosition)
+            scrollPosition: Math.max(0, scrollPosition),
+            animated
           });
           
           container.scrollTo({
             left: Math.max(0, scrollPosition),
-            behavior: 'smooth'
+            behavior: animated ? 'smooth' : 'auto'
           });
           
           console.log('✅ scrollToSelectedDate - Centrage effectué');
@@ -398,18 +379,25 @@ export function CalendarGrid({
   };
 
   useEffect(() => {
-    const timer = setTimeout(() => {
-      scrollToSelectedDate();
-    }, 100);
-    return () => clearTimeout(timer);
-  }, [selectedDate, viewMonth]);
+    if (isInitialLoad) {
+      console.log('🚀 CalendarGrid - Chargement initial, scroll SANS animation');
+      const timer = setTimeout(() => {
+        scrollToSelectedDate(false);
+        setIsInitialLoad(false);
+      }, 100);
+      return () => clearTimeout(timer);
+    }
+  }, []);
 
   useEffect(() => {
-    const timer = setTimeout(() => {
-      scrollToSelectedDate();
-    }, 300);
-    return () => clearTimeout(timer);
-  }, []);
+    if (!isInitialLoad) {
+      console.log('🔄 CalendarGrid - Changement de date utilisateur, scroll AVEC animation');
+      const timer = setTimeout(() => {
+        scrollToSelectedDate(true);
+      }, 100);
+      return () => clearTimeout(timer);
+    }
+  }, [selectedDate, viewMonth]);
 
   const getBookingsForDay = (date: Date) => {
     const dateString = `${date.getFullYear()}-${(date.getMonth() + 1).toString().padStart(2, '0')}-${date.getDate().toString().padStart(2, '0')}`;
@@ -600,7 +588,8 @@ export function CalendarGrid({
         }}
       >
         <div className="bg-white/90 backdrop-blur-md border-b border-gray-100 shadow-lg p-3 sm:p-4 flex-shrink-0">
-          <div className="flex items-center justify-between mb-3 sm:mb-4">
+          {/* HEADER - Masqué sur mobile */}
+          <div className="hidden md:flex items-center justify-between mb-3 sm:mb-4">
             <div className="flex items-center gap-2 sm:gap-3">
               <div>
                 <h1 className="text-xl sm:text-2xl font-bold bg-gradient-to-r from-purple-600 via-pink-600 to-red-600 bg-clip-text text-transparent">
@@ -615,15 +604,9 @@ export function CalendarGrid({
             <div className="text-right">
               <div className="text-base sm:text-lg font-bold text-gray-900 flex items-center gap-2">
                 <div className="w-2 h-2 sm:w-3 sm:h-3 bg-gradient-to-r from-blue-500 to-purple-500 rounded-full animate-pulse"></div>
-                <span className="hidden sm:inline">
+                <span>
                   {selectedDate.toLocaleDateString('fr-FR', { 
                     weekday: 'long',
-                    day: 'numeric', 
-                    month: 'short'
-                  })}
-                </span>
-                <span className="sm:hidden">
-                  {selectedDate.toLocaleDateString('fr-FR', { 
                     day: 'numeric', 
                     month: 'short'
                   })}

@@ -11,7 +11,7 @@ import { useTeamMembers } from '../../hooks/useTeamMembers';
 import { usePlugins } from '../../hooks/usePlugins';
 import { PermissionGate, UsageLimitIndicator } from '../UI/PermissionGate';
 import { Booking } from '../../types';
-import { UserCheck, X, Ban, RotateCcw } from 'lucide-react';
+import { UserCheck, X, Ban, RotateCcw, Filter, ChevronDown, ChevronUp } from 'lucide-react';
 import { bookingEvents } from '../../lib/bookingEvents';
 import { unavailabilityEvents } from '../../lib/unavailabilityEvents';
 
@@ -27,6 +27,7 @@ export function CalendarPage({ view = 'calendar' }: CalendarPageProps) {
   const [selectedTime, setSelectedTime] = useState('');
   const [editingBooking, setEditingBooking] = useState<Booking | null>(null);
   const [selectedTeamMember, setSelectedTeamMember] = useState<string>('all');
+  const [isFiltersExpanded, setIsFiltersExpanded] = useState(false);
   
   const { bookings, loading, addBooking, updateBooking, deleteBooking, refetch } = useBookings();
   const { unavailabilities, addUnavailability, updateUnavailability, deleteUnavailability, refetch: refetchUnavailabilities } = useUnavailabilities();
@@ -214,74 +215,108 @@ export function CalendarPage({ view = 'calendar' }: CalendarPageProps) {
       }}
     >
       {shouldShowTeamFilter && (
-        <div className="bg-white border-b border-gray-200 px-4 py-3">
-          <div className="flex items-center gap-3">
-            <div className="hidden md:flex items-center gap-2 text-gray-700 flex-shrink-0">
-              <UserCheck className="w-5 h-5 text-purple-600" />
-              <span className="font-medium text-sm">Filtrer par membre :</span>
-            </div>
-            
-            <div className="flex-1 flex items-center gap-2">
-              <select
-                value={selectedTeamMember}
-                onChange={(e) => setSelectedTeamMember(e.target.value)}
-                className="flex-1 px-3 py-2 border border-gray-300 rounded-lg text-sm focus:ring-2 focus:ring-purple-500 focus:border-transparent"
-                disabled={membersLoading}
-              >
-                <option value="all">
-                  {membersLoading ? 'Chargement...' : `Tous les membres (${teamMembers.length})`}
-                </option>
-                {teamMembers.map(member => {
-                  const displayName = getMemberDisplayName(member);
-                  return (
-                    <option key={member.user_id} value={member.user_id}>
-                      {displayName}
-                      {member.email && displayName !== member.email ? ` (${member.email})` : ''}
-                    </option>
-                  );
-                })}
-                <option value="unassigned">Non assigné</option>
-              </select>
-              
-              {selectedTeamMember !== 'all' && (
-                <button
-                  onClick={() => setSelectedTeamMember('all')}
-                  className="px-3 sm:px-4 py-2 text-sm font-medium text-white bg-gradient-to-r from-purple-600 to-pink-600 hover:from-purple-700 hover:to-pink-700 rounded-xl transition-all duration-300 transform hover:scale-105 shadow-lg flex items-center gap-2"
-                  title="Réinitialiser le filtre"
-                >
-                  <RotateCcw className="w-4 h-4" />
-                  <span className="hidden sm:inline">Réinitialiser</span>
-                </button>
+        <div className="bg-white border-b border-gray-200">
+          {/* Bouton Filtres repliable */}
+          <div className="px-4 py-3">
+            <button
+              onClick={() => setIsFiltersExpanded(!isFiltersExpanded)}
+              className="w-full flex items-center justify-between px-4 py-2.5 bg-gradient-to-r from-purple-50 to-pink-50 hover:from-purple-100 hover:to-pink-100 rounded-xl transition-all duration-300 border border-purple-200"
+            >
+              <div className="flex items-center gap-2">
+                <Filter className="w-5 h-5 text-purple-600" />
+                <span className="font-medium text-gray-700">
+                  Filtres
+                  {selectedTeamMember !== 'all' && (
+                    <span className="ml-2 px-2 py-0.5 bg-purple-600 text-white text-xs rounded-full">
+                      1
+                    </span>
+                  )}
+                </span>
+              </div>
+              {isFiltersExpanded ? (
+                <ChevronUp className="w-5 h-5 text-gray-600" />
+              ) : (
+                <ChevronDown className="w-5 h-5 text-gray-600" />
               )}
+            </button>
+          </div>
 
+          {/* Panneau de filtres dépliable */}
+          <div
+            className={`overflow-hidden transition-all duration-300 ease-in-out ${
+              isFiltersExpanded ? 'max-h-96 opacity-100' : 'max-h-0 opacity-0'
+            }`}
+          >
+            <div className="px-4 pb-4 space-y-3">
+              {/* Filtre par membre */}
+              <div className="bg-white rounded-xl border border-gray-200 p-3">
+                <div className="flex items-center gap-2 mb-2">
+                  <UserCheck className="w-4 h-4 text-purple-600" />
+                  <span className="font-medium text-sm text-gray-700">Filtrer par membre</span>
+                </div>
+                
+                <div className="flex items-center gap-2">
+                  <select
+                    value={selectedTeamMember}
+                    onChange={(e) => setSelectedTeamMember(e.target.value)}
+                    className="flex-1 px-3 py-2 border border-gray-300 rounded-lg text-sm focus:ring-2 focus:ring-purple-500 focus:border-transparent"
+                    disabled={membersLoading}
+                  >
+                    <option value="all">
+                      {membersLoading ? 'Chargement...' : `Tous les membres (${teamMembers.length})`}
+                    </option>
+                    {teamMembers.map(member => {
+                      const displayName = getMemberDisplayName(member);
+                      return (
+                        <option key={member.user_id} value={member.user_id}>
+                          {displayName}
+                          {member.email && displayName !== member.email ? ` (${member.email})` : ''}
+                        </option>
+                      );
+                    })}
+                    <option value="unassigned">Non assigné</option>
+                  </select>
+                  
+                  {selectedTeamMember !== 'all' && (
+                    <button
+                      onClick={() => setSelectedTeamMember('all')}
+                      className="p-2 text-gray-600 hover:text-purple-600 hover:bg-purple-50 rounded-lg transition-all duration-300"
+                      title="Réinitialiser"
+                    >
+                      <RotateCcw className="w-4 h-4" />
+                    </button>
+                  )}
+                </div>
+
+                {selectedTeamMember !== 'all' && (
+                  <div className="mt-2 flex items-center gap-2 text-xs text-purple-700 bg-purple-50 px-3 py-2 rounded-lg">
+                    <span className="font-medium">Filtre actif :</span>
+                    <span className="flex-1 truncate">
+                      {selectedTeamMember === 'unassigned' 
+                        ? 'Non assignées'
+                        : (() => {
+                            const member = teamMembers.find(m => m.user_id === selectedTeamMember);
+                            return member ? getMemberDisplayName(member) : 'Inconnu';
+                          })()
+                      }
+                    </span>
+                    <span className="ml-auto font-bold">
+                      {filteredBookings.length} réservation(s)
+                    </span>
+                  </div>
+                )}
+              </div>
+
+              {/* Bouton Indisponibilité */}
               <button
                 onClick={() => handleAddUnavailability()}
-                className="px-3 sm:px-4 py-2 text-sm font-medium text-white bg-gradient-to-r from-red-600 to-pink-600 hover:from-red-700 hover:to-pink-700 rounded-xl transition-all duration-300 transform hover:scale-105 shadow-lg flex items-center gap-2"
-                title="Ajouter une indisponibilité"
+                className="w-full px-4 py-3 text-sm font-medium text-white bg-gradient-to-r from-red-600 to-pink-600 hover:from-red-700 hover:to-pink-700 rounded-xl transition-all duration-300 transform hover:scale-[1.02] shadow-lg flex items-center justify-center gap-2"
               >
-                <Ban className="w-4 h-4" />
-                <span className="hidden sm:inline">Indisponibilité</span>
+                <Ban className="w-5 h-5" />
+                <span>Ajouter une indisponibilité</span>
               </button>
             </div>
           </div>
-          
-          {selectedTeamMember !== 'all' && (
-            <div className="mt-2 flex items-center gap-2 text-xs text-purple-700 bg-purple-50 px-3 py-2 rounded-lg">
-              <span className="font-medium">Filtre actif :</span>
-              <span>
-                {selectedTeamMember === 'unassigned' 
-                  ? 'Réservations non assignées'
-                  : (() => {
-                      const member = teamMembers.find(m => m.user_id === selectedTeamMember);
-                      return member ? getMemberDisplayName(member) : 'Membre inconnu';
-                    })()
-                }
-              </span>
-              <span className="ml-auto font-bold">
-                {filteredBookings.length} réservation(s)
-              </span>
-            </div>
-          )}
         </div>
       )}
 

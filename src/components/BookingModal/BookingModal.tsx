@@ -20,6 +20,7 @@ import { TeamMemberSelector } from './TeamMemberSelector';
 import { useAuth } from '../../contexts/AuthContext';
 import { bookingEvents } from '../../lib/bookingEvents';
 import { triggerWorkflow } from '../../lib/workflowEngine';
+import { isPWA } from '../../utils/pwaDetection';
 
 interface BookingModalProps {
   isOpen: boolean;
@@ -48,6 +49,7 @@ export function BookingModal({
   const { userPlugins } = usePlugins();
   const { limitInfo, canCreateBooking, isUnlimited, refetch: refetchLimit } = useBookingLimit();
   const { createPaymentLink } = usePaymentLinks();
+  const [isPWAMode, setIsPWAMode] = useState(false);
   
   const [selectedService, setSelectedService] = useState<Service | null>(null);
   const [isCustomService, setIsCustomService] = useState(false);
@@ -75,6 +77,10 @@ export function BookingModal({
   const occupiedSlots = bookings
     .filter(booking => booking.date === date && (!editingBooking || booking.id !== editingBooking.id))
     .map(booking => booking.time);
+
+  useEffect(() => {
+    setIsPWAMode(isPWA());
+  }, []);
 
   useEffect(() => {
     if (editingBooking) {
@@ -227,7 +233,6 @@ export function BookingModal({
     try {
       setSaving(true);
 
-      // 🔥 CRÉER UNE RÉSERVATION TEMPORAIRE SI NÉCESSAIRE (MAIS NE PAS PASSER EN MODE EDIT)
       let bookingId = tempBookingId || editingBooking?.id;
 
       if (!bookingId) {
@@ -296,7 +301,6 @@ export function BookingModal({
         console.log('⚠️ IMPORTANT: NE PAS PASSER EN MODE EDIT');
       }
 
-      // 🔥 GÉNÉRER LE LIEN DE PAIEMENT
       const expiryMinutes = settings?.payment_link_expiry_minutes || 30;
       
       console.log('🔵 Appel createPaymentLink...');
@@ -309,7 +313,6 @@ export function BookingModal({
       console.log('✅ Lien créé avec succès:', paymentLink);
       console.log('🔗 URL FINALE:', paymentLink.payment_url);
 
-      // 🔥 AJOUTER UNE TRANSACTION "PENDING"
       const pendingTransaction = {
         amount: amount,
         method: 'stripe' as const,
@@ -328,7 +331,6 @@ export function BookingModal({
       
       console.log('💾 Transaction ajoutée avec payment_link_id:', newTransaction);
       
-      // 🔥 COPIER LE LIEN SILENCIEUSEMENT (SANS POPUP)
       try {
         await navigator.clipboard.writeText(paymentLink.payment_url);
         console.log('✅ Lien copié dans le presse-papiers:', paymentLink.payment_url);
@@ -336,7 +338,6 @@ export function BookingModal({
         console.warn('⚠️ Impossible de copier automatiquement:', clipboardError);
       }
       
-      // Déclencher le workflow payment_link_created
       if (user?.id) {
         console.log('🔥 DÉCLENCHEMENT WORKFLOW payment_link_created');
         
@@ -544,9 +545,7 @@ export function BookingModal({
     return `${unitName}(s)`;
   };
 
-  // 🎯 NOUVEL ORDRE DES BOUTONS : Modifier → Annuler → Supprimer
   const footerButtons = [
-    // 1️⃣ MODIFIER (en premier, à la place de Supprimer)
     ...((editingBooking || (tempBookingId && isEditMode)) ? [{
       label: 'Modifier',
       onClick: () => {},
@@ -556,7 +555,6 @@ export function BookingModal({
         (!editingBooking && !tempBookingId && !canCreateBooking),
       icon: '✏️'
     }] : [
-      // Bouton CRÉER pour les nouvelles réservations
       {
         label: 'Créer',
         onClick: () => {},
@@ -567,14 +565,12 @@ export function BookingModal({
         icon: '✨'
       }
     ]),
-    // 2️⃣ ANNULER (au milieu)
     {
       label: 'Annuler',
       onClick: handleClose,
       variant: 'secondary' as const,
       disabled: saving
     },
-    // 3️⃣ SUPPRIMER (en dernier, en dessous de Annuler)
     ...((editingBooking || (tempBookingId && isEditMode)) ? [{
       label: 'Supprimer',
       onClick: () => setShowDeleteConfirm(true),
@@ -599,91 +595,679 @@ export function BookingModal({
     }
   ];
 
-  // 🎨 Couleurs du header selon le mode
   const headerGradient = (editingBooking || (tempBookingId && isEditMode))
-    ? 'from-orange-500 via-orange-600 to-red-500' // Orange pour modifier
-    : 'from-green-500 via-emerald-600 to-teal-500'; // Vert pour nouvelle réservation
+    ? 'from-orange-500 via-orange-600 to-red-500'
+    : 'from-green-500 via-emerald-600 to-teal-500';
+
+  const mobileModalTop = isPWAMode ? '120px' : '80px';
+
+  if (!isOpen) return null;
 
   return (
     <>
-      <Modal
-        isOpen={isOpen}
-        onClose={handleClose}
-        title={(editingBooking || (tempBookingId && isEditMode)) ? 'Modifier la réservation' : 'Nouvelle réservation'}
-        size="xl"
-        headerGradient={headerGradient}
-      >
-        <form onSubmit={handleSubmit} className="space-y-4 sm:space-y-6">
-          {!editingBooking && !isEditMode && limitInfo && !isUnlimited && (
-            <div className={`rounded-xl p-4 ${
-              canCreateBooking 
-                ? limitInfo.remaining! <= 10
-                  ? 'bg-yellow-50 border-2 border-yellow-300'
-                  : 'bg-blue-50 border-2 border-blue-300'
-                : 'bg-red-50 border-2 border-red-300'
-            }`}>
-              <div className="flex items-start gap-3">
-                <AlertCircle className={`w-5 h-5 mt-0.5 ${
-                  canCreateBooking
+      {/* Desktop Modal */}
+      <div className="hidden sm:flex fixed inset-0 bg-black/60 backdrop-blur-sm items-center justify-center z-50 animate-fadeIn p-4">
+        <div className="bg-white w-full max-w-4xl max-h-[90vh] rounded-3xl shadow-2xl transform animate-slideUp flex flex-col">
+          {/* Header Desktop - FIXE (OUTSIDE scroll) */}
+          <div className="flex-shrink-0 relative overflow-hidden rounded-t-3xl">
+            <div className={`absolute inset-0 bg-gradient-to-br ${headerGradient}`}></div>
+            <div className="absolute inset-0 bg-gradient-to-r from-transparent via-white/30 to-transparent -skew-x-12 animate-shimmer"></div>
+            <div className="absolute inset-0 opacity-10">
+              <div className="absolute top-0 left-0 w-32 h-32 bg-white rounded-full blur-3xl"></div>
+              <div className="absolute bottom-0 right-0 w-40 h-40 bg-white rounded-full blur-3xl"></div>
+            </div>
+            
+            <div className="relative z-10 p-6">
+              <div className="flex items-center justify-between">
+                <div className="flex items-center gap-4 flex-1">
+                  <div className="w-12 h-12 bg-white/20 backdrop-blur-sm rounded-2xl flex items-center justify-center shadow-lg">
+                    <Calendar className="w-6 h-6 text-white" />
+                  </div>
+                  <div>
+                    <h2 className="text-2xl font-bold text-white drop-shadow-lg">
+                      {(editingBooking || (tempBookingId && isEditMode)) ? 'Modifier la réservation' : 'Nouvelle réservation'}
+                    </h2>
+                    <p className="text-white/80 mt-1">
+                      {(editingBooking || (tempBookingId && isEditMode)) ? 'Modifiez les informations' : 'Créez une nouvelle réservation'}
+                    </p>
+                  </div>
+                </div>
+                
+                <button
+                  onClick={handleClose}
+                  className="group relative p-3 text-white hover:bg-white/20 rounded-2xl transition-all duration-300 transform hover:scale-110 hover:rotate-90 backdrop-blur-sm"
+                  aria-label="Fermer"
+                >
+                  <div className="absolute inset-0 bg-white/10 rounded-2xl opacity-0 group-hover:opacity-100 transition-opacity duration-300"></div>
+                  <svg className="w-6 h-6 relative z-10" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18L18 6M6 6l12 12" />
+                  </svg>
+                </button>
+              </div>
+            </div>
+            
+            <div className="absolute bottom-0 left-0 right-0 h-1 bg-gradient-to-r from-transparent via-white/50 to-transparent"></div>
+          </div>
+
+          {/* Form - SCROLLABLE */}
+          <div className="flex-1 overflow-y-auto">
+            <form onSubmit={handleSubmit} className="p-6 space-y-4 sm:space-y-6">
+              {!editingBooking && !isEditMode && limitInfo && !isUnlimited && (
+                <div className={`rounded-xl p-4 ${
+                  canCreateBooking 
                     ? limitInfo.remaining! <= 10
-                      ? 'text-yellow-600'
-                      : 'text-blue-600'
-                    : 'text-red-600'
-                }`} />
-                <div className="flex-1">
-                  <h4 className={`font-bold mb-1 ${
-                    canCreateBooking
-                      ? limitInfo.remaining! <= 10
-                        ? 'text-yellow-800'
-                        : 'text-blue-800'
-                      : 'text-red-800'
-                  }`}>
-                    {canCreateBooking 
-                      ? `${limitInfo.remaining} réservation${limitInfo.remaining! > 1 ? 's' : ''} restante${limitInfo.remaining! > 1 ? 's' : ''} ce mois-ci`
-                      : 'Limite de réservations atteinte !'
-                    }
-                  </h4>
-                  <p className={`text-sm ${
-                    canCreateBooking
-                      ? limitInfo.remaining! <= 10
-                        ? 'text-yellow-700'
-                        : 'text-blue-700'
-                      : 'text-red-700'
-                  }`}>
-                    {canCreateBooking
-                      ? `Vous avez utilisé ${limitInfo.current}/${limitInfo.limit} réservations. ${
-                          limitInfo.remaining! <= 10 
-                            ? 'Pensez à passer au plan Pro pour des réservations illimitées !' 
-                            : ''
-                        }`
-                      : `Vous avez atteint votre limite de ${limitInfo.limit} réservations pour ce mois. Passez au plan Pro pour continuer !`
-                    }
-                  </p>
+                      ? 'bg-yellow-50 border-2 border-yellow-300'
+                      : 'bg-blue-50 border-2 border-blue-300'
+                    : 'bg-red-50 border-2 border-red-300'
+                }`}>
+                  <div className="flex items-start gap-3">
+                    <AlertCircle className={`w-5 h-5 mt-0.5 ${
+                      canCreateBooking
+                        ? limitInfo.remaining! <= 10
+                          ? 'text-yellow-600'
+                          : 'text-blue-600'
+                        : 'text-red-600'
+                    }`} />
+                    <div className="flex-1">
+                      <h4 className={`font-bold mb-1 ${
+                        canCreateBooking
+                          ? limitInfo.remaining! <= 10
+                            ? 'text-yellow-800'
+                            : 'text-blue-800'
+                          : 'text-red-800'
+                      }`}>
+                        {canCreateBooking 
+                          ? `${limitInfo.remaining} réservation${limitInfo.remaining! > 1 ? 's' : ''} restante${limitInfo.remaining! > 1 ? 's' : ''} ce mois-ci`
+                          : 'Limite de réservations atteinte !'
+                        }
+                      </h4>
+                      <p className={`text-sm ${
+                        canCreateBooking
+                          ? limitInfo.remaining! <= 10
+                            ? 'text-yellow-700'
+                            : 'text-blue-700'
+                          : 'text-red-700'
+                      }`}>
+                        {canCreateBooking
+                          ? `Vous avez utilisé ${limitInfo.current}/${limitInfo.limit} réservations. ${
+                              limitInfo.remaining! <= 10 
+                                ? 'Pensez à passer au plan Pro pour des réservations illimitées !' 
+                                : ''
+                            }`
+                          : `Vous avez atteint votre limite de ${limitInfo.limit} réservations pour ce mois. Passez au plan Pro pour continuer !`
+                        }
+                      </p>
+                    </div>
+                  </div>
+                </div>
+              )}
+
+              {tempBookingId && !isEditMode && (
+                <div className="rounded-xl p-4 bg-blue-50 border-2 border-blue-300">
+                  <div className="flex items-start gap-3">
+                    <AlertCircle className="w-5 h-5 mt-0.5 text-blue-600" />
+                    <div className="flex-1">
+                      <h4 className="font-bold mb-1 text-blue-800">
+                        ⚠️ Réservation temporaire créée
+                      </h4>
+                      <p className="text-sm text-blue-700">
+                        Un lien de paiement a été généré. N'oubliez pas de cliquer sur <strong>"Créer"</strong> pour finaliser la réservation !
+                      </p>
+                    </div>
+                  </div>
+                </div>
+              )}
+
+              <div className="grid grid-cols-1 lg:grid-cols-2 gap-4 sm:gap-6">
+                <div className="space-y-4 sm:space-y-6">
+                  <div>
+                    <label className="block text-sm font-medium text-gray-700 mb-2 sm:mb-3">
+                      Service
+                    </label>
+                    
+                    <div className="flex gap-1 mb-3 bg-gray-100 rounded-xl p-1">
+                      <button
+                        type="button"
+                        onClick={() => {
+                          setIsCustomService(false);
+                          setSelectedService(null);
+                          setIsServiceListExpanded(true);
+                        }}
+                        className={`flex-1 py-2 px-3 rounded-lg font-medium transition-all duration-300 text-sm ${
+                          !isCustomService
+                            ? 'bg-white text-blue-600 shadow-md'
+                            : 'text-gray-600 hover:text-gray-800'
+                        }`}
+                      >
+                        Services standards
+                      </button>
+                      <button
+                        type="button"
+                        onClick={() => {
+                          setIsCustomService(true);
+                          setSelectedService(null);
+                          setIsServiceListExpanded(true);
+                        }}
+                        className={`flex-1 py-2 px-3 rounded-lg font-medium transition-all duration-300 text-sm ${
+                          isCustomService
+                            ? 'bg-white text-purple-600 shadow-md'
+                            : 'text-gray-600 hover:text-gray-800'
+                        }`}
+                      >
+                        Service personnalisé
+                      </button>
+                    </div>
+                    
+                    {servicesLoading ? (
+                      <div className="flex items-center justify-center p-6 sm:p-8">
+                        <LoadingSpinner size="lg" />
+                      </div>
+                    ) : !isCustomService ? (
+                      <>
+                        {!isServiceListExpanded && selectedService ? (
+                          <button
+                            type="button"
+                            onClick={() => setIsServiceListExpanded(true)}
+                            className="w-full p-3 sm:p-4 rounded-xl sm:rounded-2xl border-2 border-blue-500 bg-gradient-to-r from-blue-50 to-purple-50 shadow-lg text-left hover:shadow-xl transition-all duration-300"
+                          >
+                            <div className="flex items-center gap-3 sm:gap-4">
+                              <div className="w-10 h-10 sm:w-12 sm:h-12 rounded-lg sm:rounded-xl flex items-center justify-center bg-gradient-to-r from-blue-500 to-purple-500 text-white">
+                                <Package className="w-5 h-5 sm:w-6 sm:h-6" />
+                              </div>
+                              <div className="flex-1">
+                                <div className="font-bold text-gray-900 text-sm sm:text-base">{selectedService.name}</div>
+                                <div className="text-xs sm:text-sm text-gray-600 mt-1">{selectedService.description}</div>
+                                <div className="flex items-center gap-2 sm:gap-4 mt-2 text-xs sm:text-sm">
+                                  <span className="font-medium text-green-600">{selectedService.price_ttc.toFixed(2)}€</span>
+                                  <span className="text-gray-500">{selectedService.duration_minutes}min</span>
+                                  <span className="text-gray-500">Max {selectedService.capacity} {selectedService.unit_name || 'pers.'}</span>
+                                </div>
+                              </div>
+                              <ChevronDown className="w-5 h-5 text-blue-500" />
+                            </div>
+                          </button>
+                        ) : (
+                          <div className="grid grid-cols-1 gap-2 sm:gap-3">
+                            {services.filter(service => service.description !== 'Service personnalisé').map((service) => (
+                              <button
+                                key={service.id}
+                                type="button"
+                                onClick={() => handleServiceSelect(service)}
+                                className={`p-3 sm:p-4 rounded-xl sm:rounded-2xl border-2 transition-all duration-300 transform hover:scale-[1.02] text-left ${
+                                  selectedService?.id === service.id
+                                    ? 'border-blue-500 bg-gradient-to-r from-blue-50 to-purple-50 shadow-lg'
+                                    : 'border-gray-200 bg-white hover:border-blue-300 hover:shadow-md'
+                                }`}
+                              >
+                                <div className="flex items-center gap-3 sm:gap-4">
+                                  <div className={`w-10 h-10 sm:w-12 sm:h-12 rounded-lg sm:rounded-xl flex items-center justify-center ${
+                                    selectedService?.id === service.id
+                                      ? 'bg-gradient-to-r from-blue-500 to-purple-500 text-white'
+                                      : 'bg-gray-100 text-gray-600'
+                                  }`}>
+                                    <Package className="w-5 h-5 sm:w-6 sm:h-6" />
+                                  </div>
+                                  <div className="flex-1">
+                                    <div className="font-bold text-gray-900 text-sm sm:text-base">{service.name}</div>
+                                    <div className="text-xs sm:text-sm text-gray-600 mt-1 line-clamp-1 sm:line-clamp-none">{service.description}</div>
+                                    <div className="flex items-center gap-2 sm:gap-4 mt-2 text-xs sm:text-sm">
+                                      <span className="font-medium text-green-600">{service.price_ttc.toFixed(2)}€</span>
+                                      <span className="text-gray-500">{service.duration_minutes}min</span>
+                                      <span className="text-gray-500">Max {service.capacity} {service.unit_name || 'pers.'}</span>
+                                    </div>
+                                  </div>
+                                </div>
+                              </button>
+                            ))}
+                          </div>
+                        )}
+                      </>
+                    ) : (
+                      <>
+                        {!isServiceListExpanded && customServiceData.name && customServiceData.price > 0 ? (
+                          <button
+                            type="button"
+                            onClick={() => setIsServiceListExpanded(true)}
+                            className="w-full bg-gradient-to-r from-purple-50 to-pink-50 border-2 border-purple-500 rounded-xl sm:rounded-2xl p-4 sm:p-6 text-left hover:shadow-xl transition-all duration-300"
+                          >
+                            <div className="flex items-center gap-3">
+                              <div className="w-10 h-10 sm:w-12 sm:h-12 bg-gradient-to-r from-purple-500 to-pink-500 rounded-lg sm:rounded-xl flex items-center justify-center text-white">
+                                <Package className="w-5 h-5 sm:w-6 sm:h-6" />
+                              </div>
+                              <div className="flex-1">
+                                <div className="font-bold text-gray-900 text-sm sm:text-base">{customServiceData.name}</div>
+                                <div className="flex items-center gap-3 mt-1 text-xs sm:text-sm text-gray-600">
+                                  <span className="font-medium text-green-600">{customServiceData.price.toFixed(2)}€</span>
+                                  <span className="text-gray-500">{customServiceData.duration}min</span>
+                                  <span className="text-gray-500">Capacité illimitée</span>
+                                </div>
+                              </div>
+                              <ChevronDown className="w-5 h-5 text-purple-500" />
+                            </div>
+                          </button>
+                        ) : (
+                          <div className="bg-gradient-to-r from-purple-50 to-pink-50 border-2 border-purple-200 rounded-xl sm:rounded-2xl p-4 sm:p-6">
+                            <div className="flex items-center gap-3 mb-4">
+                              <div className="w-10 h-10 sm:w-12 sm:h-12 bg-gradient-to-r from-purple-500 to-pink-500 rounded-lg sm:rounded-xl flex items-center justify-center text-white">
+                                <Package className="w-5 h-5 sm:w-6 sm:h-6" />
+                              </div>
+                              <div>
+                                <h3 className="text-base sm:text-lg font-bold text-purple-800">Service personnalisé</h3>
+                                <p className="text-purple-600 text-xs sm:text-sm">Créez un service sur mesure</p>
+                              </div>
+                            </div>
+                            
+                            <div className="space-y-4">
+                              <div>
+                                <label className="block text-sm font-medium text-purple-700 mb-2">
+                                  Nom du service *
+                                </label>
+                                <input
+                                  type="text"
+                                  value={customServiceData.name}
+                                  onChange={(e) => setCustomServiceData(prev => ({ ...prev, name: e.target.value }))}
+                                  className="w-full pl-12 pr-4 py-3 border border-purple-300 rounded-xl focus:ring-2 focus:ring-purple-500 focus:border-purple-500 transition-all duration-300 text-base bg-white"
+                                  placeholder="Ex: Consultation spécialisée"
+                                  required
+                                />
+                              </div>
+                              
+                              <div className="grid grid-cols-2 gap-3">
+                                <div>
+                                  <label className="block text-sm font-medium text-purple-700 mb-2">
+                                    Prix (€) *
+                                  </label>
+                                  <input
+                                    type="number"
+                                    step="0.01"
+                                    min="0.01"
+                                    value={customServiceData.price || ''}
+                                    onChange={(e) => setCustomServiceData(prev => ({ ...prev, price: parseFloat(e.target.value) || 0 }))}
+                                    className="w-full p-3 border border-purple-300 rounded-xl focus:ring-2 focus:ring-purple-500 focus:border-purple-500 transition-all duration-300 text-base bg-white"
+                                    placeholder="0.00"
+                                    required
+                                  />
+                                </div>
+                                
+                                <div>
+                                  <label className="block text-sm font-medium text-purple-700 mb-2">
+                                    Durée (min) *
+                                  </label>
+                                  <input
+                                    type="number"
+                                    min="15"
+                                    step="15"
+                                    value={customServiceData.duration || ''}
+                                    onChange={(e) => setCustomServiceData(prev => ({ ...prev, duration: parseInt(e.target.value) || 60 }))}
+                                    className="w-full p-3 border border-purple-300 rounded-xl focus:ring-2 focus:ring-purple-500 focus:border-purple-500 transition-all duration-300 text-base bg-white"
+                                    placeholder="60"
+                                    required
+                                  />
+                                </div>
+                              </div>
+                              
+                              {customServiceData.name && customServiceData.price > 0 && (
+                                <button
+                                  type="button"
+                                  onClick={handleCustomServiceComplete}
+                                  className="w-full bg-gradient-to-r from-purple-500 to-pink-500 text-white py-3 rounded-xl hover:from-purple-600 hover:to-pink-600 transition-all duration-300 font-medium"
+                                >
+                                  ✓ Valider le service
+                                </button>
+                              )}
+                            </div>
+                          </div>
+                        )}
+                      </>
+                    )}
+                  </div>
+
+                  <ClientSearch
+                    selectedClient={selectedClient}
+                    onClientSelect={setSelectedClient}
+                  />
+
+                  <div className="grid grid-cols-2 gap-3 sm:gap-4">
+                    <DatePicker
+                      value={date}
+                      onChange={setDate}
+                      required
+                    />
+
+                    <TimeSlotPicker
+                      selectedDate={date}
+                      selectedTime={time}
+                      onTimeSelect={setTime}
+                      occupiedSlots={occupiedSlots}
+                      serviceDuration={isCustomService ? customServiceData.duration : selectedService?.duration_minutes || 60}
+                    />
+                  </div>
+
+                  {(selectedService || (isCustomService && customServiceData.name && customServiceData.price > 0)) && (
+                    <ParticipantSelector
+                      quantity={quantity}
+                      maxCapacity={isCustomService ? 10 : selectedService?.capacity || 1}
+                      onQuantityChange={setQuantity}
+                      unitName={getUnitName()}
+                    />
+                  )}
+
+                  {hasMultiUserPlugin && (
+                    <TeamMemberSelector
+                      value={assignedUserId}
+                      onChange={setAssignedUserId}
+                    />
+                  )}
+
+                  <div>
+                    <label className="block text-sm font-medium text-gray-700 mb-2">
+                      <FileText className="w-4 h-4 inline mr-2" />
+                      Notes internes (optionnel)
+                    </label>
+                    <textarea
+                      value={notes}
+                      onChange={(e) => setNotes(e.target.value)}
+                      className="w-full px-4 py-3 border border-gray-300 rounded-xl focus:ring-2 focus:ring-blue-500 focus:border-blue-500 transition-all duration-300 text-base resize-none"
+                      rows={3}
+                      placeholder="Ajoutez des notes ou commentaires sur cette réservation..."
+                    />
+                    <p className="text-xs text-gray-500 mt-1">
+                      Ces notes sont visibles uniquement par vous et votre équipe
+                    </p>
+                  </div>
+                </div>
+
+                <div className="space-y-4 sm:space-y-6">
+                  {selectedClient && (
+                    <div className="bg-gradient-to-r from-gray-50 to-blue-50 rounded-xl sm:rounded-2xl p-4 sm:p-6 border border-blue-200">
+                      <div className="flex items-center gap-3 mb-3 sm:mb-4">
+                        <div className="w-8 h-8 sm:w-10 sm:h-10 bg-gradient-to-r from-blue-500 to-purple-500 rounded-lg sm:rounded-xl flex items-center justify-center text-white">
+                          <User className="w-4 h-4 sm:w-5 sm:h-5" />
+                        </div>
+                        <h3 className="text-base sm:text-lg font-bold text-gray-900">Informations client</h3>
+                      </div>
+                      
+                      <div className="space-y-2 sm:space-y-3 text-sm sm:text-base">
+                        <div>
+                          <div className="text-xs sm:text-sm text-gray-600">Nom complet</div>
+                          <div className="font-medium text-gray-900">
+                            {selectedClient.firstname} {selectedClient.lastname}
+                          </div>
+                        </div>
+                        {selectedClient.email && (
+                          <div>
+                            <div className="text-xs sm:text-sm text-gray-600">Email</div>
+                            <div className="font-medium text-gray-900">{selectedClient.email}</div>
+                          </div>
+                        )}
+                        {selectedClient.phone && (
+                          <div>
+                            <div className="text-xs sm:text-sm text-gray-600">Téléphone</div>
+                            <div className="font-medium text-gray-900">{selectedClient.phone}</div>
+                          </div>
+                        )}
+                      </div>
+                    </div>
+                  )}
+
+                  {(selectedService || (isCustomService && customServiceData.name && customServiceData.price > 0)) && (
+                    <div className="bg-gradient-to-r from-green-50 to-emerald-50 rounded-xl sm:rounded-2xl p-4 sm:p-6 border border-green-200">
+                      <div className="flex items-center gap-3 mb-3 sm:mb-4">
+                        <div className="w-8 h-8 sm:w-10 sm:h-10 bg-gradient-to-r from-green-500 to-emerald-500 rounded-lg sm:rounded-xl flex items-center justify-center text-white">
+                          <Euro className="w-4 h-4 sm:w-5 sm:h-5" />
+                        </div>
+                        <h3 className="text-base sm:text-lg font-bold text-gray-900">Récapitulatif</h3>
+                      </div>
+                      
+                      <div className="space-y-2 sm:space-y-3 text-sm sm:text-base">
+                        <div className="flex justify-between">
+                          <span className="text-gray-600">Service</span>
+                          <span className="font-medium text-right">
+                            {isCustomService ? customServiceData.name : selectedService?.name}
+                          </span>
+                        </div>
+                        <div className="flex justify-between">
+                          <span className="text-gray-600">Prix unitaire</span>
+                          <span className="font-medium">
+                            {isCustomService ? customServiceData.price.toFixed(2) : selectedService?.price_ttc.toFixed(2)}€
+                          </span>
+                        </div>
+                        <div className="flex justify-between">
+                          <span className="text-gray-600">Quantité</span>
+                          <span className="font-medium">{quantity} {getPluralUnitName(quantity)}</span>
+                        </div>
+                        <div className="flex justify-between">
+                          <span className="text-gray-600">Durée</span>
+                          <span className="font-medium">
+                            {isCustomService ? customServiceData.duration : selectedService?.duration_minutes} minutes
+                          </span>
+                        </div>
+                        <div className="flex justify-between">
+                          <span className="text-gray-600">Date et heure</span>
+                          <span className="font-medium">
+                            {new Date(date).toLocaleDateString('fr-FR')} à {time.slice(0, 5)}
+                          </span>
+                        </div>
+                        <hr className="border-green-200" />
+                        <div className="flex justify-between text-base sm:text-lg font-bold">
+                          <span className="text-gray-900">Total</span>
+                          <span className="text-green-600">{totalAmount.toFixed(2)}€</span>
+                        </div>
+                      </div>
+                    </div>
+                  )}
+
+                  {(selectedService || (isCustomService && customServiceData.name && customServiceData.price > 0)) && selectedClient && (
+                    <div className="bg-gradient-to-r from-blue-50 to-purple-50 rounded-2xl p-6 border border-blue-200">
+                      <div className="flex items-center gap-3 mb-4">
+                        <div className="w-10 h-10 bg-gradient-to-r from-blue-500 to-purple-500 rounded-xl flex items-center justify-center text-white">
+                          <Calendar className="w-5 h-5" />
+                        </div>
+                        <h3 className="text-lg font-bold text-gray-900">Statut de la réservation</h3>
+                      </div>
+                      
+                      <div className="grid grid-cols-3 gap-2">
+                        <button
+                          type="button"
+                          onClick={() => setBookingStatus('pending')}
+                          className={`p-3 rounded-2xl border-2 transition-all duration-300 transform hover:scale-105 ${
+                            bookingStatus === 'pending'
+                              ? 'bg-gradient-to-r from-yellow-50 to-orange-50 border-yellow-500 text-yellow-700 shadow-lg'
+                              : 'bg-white border-gray-200 text-gray-700 hover:border-yellow-300 hover:shadow-md'
+                          }`}
+                        >
+                          <div className="text-center">
+                            <div className="text-xl mb-1">⏳</div>
+                            <div className="text-xs font-bold">En attente</div>
+                          </div>
+                        </button>
+                        <button
+                          type="button"
+                          onClick={() => setBookingStatus('confirmed')}
+                          className={`p-3 rounded-2xl border-2 transition-all duration-300 transform hover:scale-105 ${
+                            bookingStatus === 'confirmed'
+                              ? 'bg-gradient-to-r from-green-50 to-emerald-50 border-green-500 text-green-700 shadow-lg'
+                              : 'bg-white border-gray-200 text-gray-700 hover:border-green-300 hover:shadow-md'
+                          }`}
+                        >
+                          <div className="text-center">
+                            <div className="text-xl mb-1">✅</div>
+                            <div className="text-xs font-bold">Confirmée</div>
+                          </div>
+                        </button>
+                        <button
+                          type="button"
+                          onClick={() => setBookingStatus('cancelled')}
+                          className={`p-3 rounded-2xl border-2 transition-all duration-300 transform hover:scale-105 ${
+                            bookingStatus === 'cancelled'
+                              ? 'bg-gradient-to-r from-red-50 to-pink-50 border-red-500 text-red-700 shadow-lg'
+                              : 'bg-white border-gray-200 text-gray-700 hover:border-red-300 hover:shadow-md'
+                          }`}
+                        >
+                          <div className="text-center">
+                            <div className="text-xl mb-1">❌</div>
+                            <div className="text-xs font-bold">Annulée</div>
+                          </div>
+                        </button>
+                      </div>
+                    </div>
+                  )}
+
+                  {(selectedService || (isCustomService && customServiceData.name && customServiceData.price > 0)) && selectedClient && (
+                    <PaymentSection
+                      totalAmount={totalAmount}
+                      currentPaid={currentPaid}
+                      transactions={transactions}
+                      onAddTransaction={handleAddTransaction}
+                      onDeleteTransaction={handleDeleteTransaction}
+                      onGeneratePaymentLink={handleGeneratePaymentLink}
+                      clientEmail={selectedClient?.email || ''}
+                      serviceName={isCustomService ? customServiceData.name : selectedService?.name || ''}
+                      bookingDate={date}
+                      bookingTime={time}
+                      selectedClient={selectedClient}
+                    />
+                  )}
                 </div>
               </div>
-            </div>
-          )}
 
-          {tempBookingId && !isEditMode && (
-            <div className="rounded-xl p-4 bg-blue-50 border-2 border-blue-300">
-              <div className="flex items-start gap-3">
-                <AlertCircle className="w-5 h-5 mt-0.5 text-blue-600" />
-                <div className="flex-1">
-                  <h4 className="font-bold mb-1 text-blue-800">
-                    ⚠️ Réservation temporaire créée
-                  </h4>
-                  <p className="text-sm text-blue-700">
-                    Un lien de paiement a été généré. N'oubliez pas de cliquer sur <strong>"Créer"</strong> pour finaliser la réservation !
-                  </p>
+              <ModalFooter buttons={footerButtons} />
+            </form>
+          </div>
+        </div>
+      </div>
+
+      {/* Mobile Modal */}
+      <div className="sm:hidden fixed inset-0 z-40">
+        <div
+          className="fixed inset-0 bg-black bg-opacity-50"
+          onClick={handleClose}
+          style={{ zIndex: 40 }}
+        />
+        
+        <div 
+          className="fixed left-0 right-0 bottom-0 shadow-2xl animate-slideUp flex flex-col"
+          style={{ 
+            top: mobileModalTop,
+            zIndex: 45,
+            background: 'white',
+            borderTopLeftRadius: 0,
+            borderTopRightRadius: 0
+          }}
+        >
+          {/* Header Mobile - FIXE (OUTSIDE scroll) */}
+          <div 
+            className="flex-shrink-0 relative overflow-hidden"
+            style={{
+              borderTopLeftRadius: 0,
+              borderTopRightRadius: 0
+            }}
+          >
+            <div className={`absolute inset-0 bg-gradient-to-br ${headerGradient}`}></div>
+            <div className="absolute inset-0 bg-gradient-to-r from-transparent via-white/30 to-transparent -skew-x-12 animate-shimmer"></div>
+            <div className="absolute inset-0 opacity-10">
+              <div className="absolute top-0 left-0 w-32 h-32 bg-white rounded-full blur-3xl"></div>
+              <div className="absolute bottom-0 right-0 w-40 h-40 bg-white rounded-full blur-3xl"></div>
+            </div>
+            
+            <div className="relative z-10 p-4">
+              <div className="flex items-center justify-between">
+                <div className="flex items-center gap-3">
+                  <div className="w-8 h-8 bg-white/20 backdrop-blur-sm rounded-lg flex items-center justify-center shadow-lg">
+                    <Calendar className="w-4 h-4 text-white" />
+                  </div>
+                  <div>
+                    <h2 className="text-lg font-bold text-white drop-shadow-lg">
+                      {(editingBooking || (tempBookingId && isEditMode)) ? 'Modifier la réservation' : 'Nouvelle réservation'}
+                    </h2>
+                    <p className="text-white/80 text-xs">
+                      {(editingBooking || (tempBookingId && isEditMode)) ? 'Modifiez les informations' : 'Créez une nouvelle réservation'}
+                    </p>
+                  </div>
                 </div>
+                <button
+                  onClick={handleClose}
+                  className="p-2 text-white hover:bg-white/20 rounded-lg transition-all duration-300 transform hover:scale-110 mobile-tap-target"
+                >
+                  <X className="w-5 h-5" />
+                </button>
               </div>
             </div>
-          )}
+            
+            <div className="absolute bottom-0 left-0 right-0 h-1 bg-gradient-to-r from-transparent via-white/50 to-transparent"></div>
+          </div>
 
-          <div className="grid grid-cols-1 lg:grid-cols-2 gap-4 sm:gap-6">
-            <div className="space-y-4 sm:space-y-6">
+          {/* Content - SCROLLABLE */}
+          <div className="flex-1 overflow-y-auto bg-white" style={{ WebkitOverflowScrolling: 'touch' }}>
+            <form onSubmit={handleSubmit} className="p-4 space-y-4 pb-32">
+              {!editingBooking && !isEditMode && limitInfo && !isUnlimited && (
+                <div className={`rounded-xl p-4 ${
+                  canCreateBooking 
+                    ? limitInfo.remaining! <= 10
+                      ? 'bg-yellow-50 border-2 border-yellow-300'
+                      : 'bg-blue-50 border-2 border-blue-300'
+                    : 'bg-red-50 border-2 border-red-300'
+                }`}>
+                  <div className="flex items-start gap-3">
+                    <AlertCircle className={`w-5 h-5 mt-0.5 ${
+                      canCreateBooking
+                        ? limitInfo.remaining! <= 10
+                          ? 'text-yellow-600'
+                          : 'text-blue-600'
+                        : 'text-red-600'
+                    }`} />
+                    <div className="flex-1">
+                      <h4 className={`font-bold mb-1 text-sm ${
+                        canCreateBooking
+                          ? limitInfo.remaining! <= 10
+                            ? 'text-yellow-800'
+                            : 'text-blue-800'
+                          : 'text-red-800'
+                      }`}>
+                        {canCreateBooking 
+                          ? `${limitInfo.remaining} réservation${limitInfo.remaining! > 1 ? 's' : ''} restante${limitInfo.remaining! > 1 ? 's' : ''} ce mois-ci`
+                          : 'Limite de réservations atteinte !'
+                        }
+                      </h4>
+                      <p className={`text-xs ${
+                        canCreateBooking
+                          ? limitInfo.remaining! <= 10
+                            ? 'text-yellow-700'
+                            : 'text-blue-700'
+                          : 'text-red-700'
+                      }`}>
+                        {canCreateBooking
+                          ? `Vous avez utilisé ${limitInfo.current}/${limitInfo.limit} réservations. ${
+                              limitInfo.remaining! <= 10 
+                                ? 'Pensez à passer au plan Pro pour des réservations illimitées !' 
+                                : ''
+                            }`
+                          : `Vous avez atteint votre limite de ${limitInfo.limit} réservations pour ce mois. Passez au plan Pro pour continuer !`
+                        }
+                      </p>
+                    </div>
+                  </div>
+                </div>
+              )}
+
+              {tempBookingId && !isEditMode && (
+                <div className="rounded-xl p-3 bg-blue-50 border-2 border-blue-300">
+                  <div className="flex items-start gap-2">
+                    <AlertCircle className="w-4 h-4 mt-0.5 text-blue-600 flex-shrink-0" />
+                    <div className="flex-1">
+                      <h4 className="font-bold mb-1 text-blue-800 text-sm">
+                        ⚠️ Réservation temporaire créée
+                      </h4>
+                      <p className="text-xs text-blue-700">
+                        Un lien de paiement a été généré. N'oubliez pas de cliquer sur <strong>"Créer"</strong> pour finaliser la réservation !
+                      </p>
+                    </div>
+                  </div>
+                </div>
+              )}
+
               <div>
-                <label className="block text-sm font-medium text-gray-700 mb-2 sm:mb-3">
+                <label className="block text-sm font-medium text-gray-700 mb-2">
                   Service
                 </label>
                 
@@ -695,7 +1279,7 @@ export function BookingModal({
                       setSelectedService(null);
                       setIsServiceListExpanded(true);
                     }}
-                    className={`flex-1 py-2 px-3 rounded-lg font-medium transition-all duration-300 text-sm ${
+                    className={`flex-1 py-2 px-3 rounded-lg font-medium transition-all duration-300 text-xs ${
                       !isCustomService
                         ? 'bg-white text-blue-600 shadow-md'
                         : 'text-gray-600 hover:text-gray-800'
@@ -710,7 +1294,7 @@ export function BookingModal({
                       setSelectedService(null);
                       setIsServiceListExpanded(true);
                     }}
-                    className={`flex-1 py-2 px-3 rounded-lg font-medium transition-all duration-300 text-sm ${
+                    className={`flex-1 py-2 px-3 rounded-lg font-medium transition-all duration-300 text-xs ${
                       isCustomService
                         ? 'bg-white text-purple-600 shadow-md'
                         : 'text-gray-600 hover:text-gray-800'
@@ -719,9 +1303,9 @@ export function BookingModal({
                     Service personnalisé
                   </button>
                 </div>
-                
+
                 {servicesLoading ? (
-                  <div className="flex items-center justify-center p-6 sm:p-8">
+                  <div className="flex items-center justify-center p-8">
                     <LoadingSpinner size="lg" />
                   </div>
                 ) : !isCustomService ? (
@@ -730,16 +1314,16 @@ export function BookingModal({
                       <button
                         type="button"
                         onClick={() => setIsServiceListExpanded(true)}
-                        className="w-full p-3 sm:p-4 rounded-xl sm:rounded-2xl border-2 border-blue-500 bg-gradient-to-r from-blue-50 to-purple-50 shadow-lg text-left hover:shadow-xl transition-all duration-300"
+                        className="w-full p-3 rounded-xl border-2 border-blue-500 bg-gradient-to-r from-blue-50 to-purple-50 shadow-lg text-left hover:shadow-xl transition-all duration-300"
                       >
-                        <div className="flex items-center gap-3 sm:gap-4">
-                          <div className="w-10 h-10 sm:w-12 sm:h-12 rounded-lg sm:rounded-xl flex items-center justify-center bg-gradient-to-r from-blue-500 to-purple-500 text-white">
-                            <Package className="w-5 h-5 sm:w-6 sm:h-6" />
+                        <div className="flex items-center gap-3">
+                          <div className="w-10 h-10 rounded-lg flex items-center justify-center bg-gradient-to-r from-blue-500 to-purple-500 text-white">
+                            <Package className="w-5 h-5" />
                           </div>
                           <div className="flex-1">
-                            <div className="font-bold text-gray-900 text-sm sm:text-base">{selectedService.name}</div>
-                            <div className="text-xs sm:text-sm text-gray-600 mt-1">{selectedService.description}</div>
-                            <div className="flex items-center gap-2 sm:gap-4 mt-2 text-xs sm:text-sm">
+                            <div className="font-bold text-gray-900 text-sm">{selectedService.name}</div>
+                            <div className="text-xs text-gray-600 mt-1">{selectedService.description}</div>
+                            <div className="flex items-center gap-2 mt-2 text-xs">
                               <span className="font-medium text-green-600">{selectedService.price_ttc.toFixed(2)}€</span>
                               <span className="text-gray-500">{selectedService.duration_minutes}min</span>
                               <span className="text-gray-500">Max {selectedService.capacity} {selectedService.unit_name || 'pers.'}</span>
@@ -749,30 +1333,30 @@ export function BookingModal({
                         </div>
                       </button>
                     ) : (
-                      <div className="grid grid-cols-1 gap-2 sm:gap-3">
+                      <div className="grid grid-cols-1 gap-2">
                         {services.filter(service => service.description !== 'Service personnalisé').map((service) => (
                           <button
                             key={service.id}
                             type="button"
                             onClick={() => handleServiceSelect(service)}
-                            className={`p-3 sm:p-4 rounded-xl sm:rounded-2xl border-2 transition-all duration-300 transform hover:scale-[1.02] text-left ${
+                            className={`p-3 rounded-xl border-2 transition-all duration-300 text-left ${
                               selectedService?.id === service.id
                                 ? 'border-blue-500 bg-gradient-to-r from-blue-50 to-purple-50 shadow-lg'
                                 : 'border-gray-200 bg-white hover:border-blue-300 hover:shadow-md'
                             }`}
                           >
-                            <div className="flex items-center gap-3 sm:gap-4">
-                              <div className={`w-10 h-10 sm:w-12 sm:h-12 rounded-lg sm:rounded-xl flex items-center justify-center ${
+                            <div className="flex items-center gap-3">
+                              <div className={`w-10 h-10 rounded-lg flex items-center justify-center ${
                                 selectedService?.id === service.id
                                   ? 'bg-gradient-to-r from-blue-500 to-purple-500 text-white'
                                   : 'bg-gray-100 text-gray-600'
                               }`}>
-                                <Package className="w-5 h-5 sm:w-6 sm:h-6" />
+                                <Package className="w-5 h-5" />
                               </div>
                               <div className="flex-1">
-                                <div className="font-bold text-gray-900 text-sm sm:text-base">{service.name}</div>
-                                <div className="text-xs sm:text-sm text-gray-600 mt-1 line-clamp-1 sm:line-clamp-none">{service.description}</div>
-                                <div className="flex items-center gap-2 sm:gap-4 mt-2 text-xs sm:text-sm">
+                                <div className="font-bold text-gray-900 text-sm">{service.name}</div>
+                                <div className="text-xs text-gray-600 mt-1 line-clamp-1">{service.description}</div>
+                                <div className="flex items-center gap-2 mt-2 text-xs">
                                   <span className="font-medium text-green-600">{service.price_ttc.toFixed(2)}€</span>
                                   <span className="text-gray-500">{service.duration_minutes}min</span>
                                   <span className="text-gray-500">Max {service.capacity} {service.unit_name || 'pers.'}</span>
@@ -790,15 +1374,15 @@ export function BookingModal({
                       <button
                         type="button"
                         onClick={() => setIsServiceListExpanded(true)}
-                        className="w-full bg-gradient-to-r from-purple-50 to-pink-50 border-2 border-purple-500 rounded-xl sm:rounded-2xl p-4 sm:p-6 text-left hover:shadow-xl transition-all duration-300"
+                        className="w-full bg-gradient-to-r from-purple-50 to-pink-50 border-2 border-purple-500 rounded-xl p-4 text-left hover:shadow-xl transition-all duration-300"
                       >
                         <div className="flex items-center gap-3">
-                          <div className="w-10 h-10 sm:w-12 sm:h-12 bg-gradient-to-r from-purple-500 to-pink-500 rounded-lg sm:rounded-xl flex items-center justify-center text-white">
-                            <Package className="w-5 h-5 sm:w-6 sm:h-6" />
+                          <div className="w-10 h-10 bg-gradient-to-r from-purple-500 to-pink-500 rounded-lg flex items-center justify-center text-white">
+                            <Package className="w-5 h-5" />
                           </div>
                           <div className="flex-1">
-                            <div className="font-bold text-gray-900 text-sm sm:text-base">{customServiceData.name}</div>
-                            <div className="flex items-center gap-3 mt-1 text-xs sm:text-sm text-gray-600">
+                            <div className="font-bold text-gray-900 text-sm">{customServiceData.name}</div>
+                            <div className="flex items-center gap-3 mt-1 text-xs text-gray-600">
                               <span className="font-medium text-green-600">{customServiceData.price.toFixed(2)}€</span>
                               <span className="text-gray-500">{customServiceData.duration}min</span>
                               <span className="text-gray-500">Capacité illimitée</span>
@@ -808,14 +1392,14 @@ export function BookingModal({
                         </div>
                       </button>
                     ) : (
-                      <div className="bg-gradient-to-r from-purple-50 to-pink-50 border-2 border-purple-200 rounded-xl sm:rounded-2xl p-4 sm:p-6">
+                      <div className="bg-gradient-to-r from-purple-50 to-pink-50 border-2 border-purple-200 rounded-xl p-4">
                         <div className="flex items-center gap-3 mb-4">
-                          <div className="w-10 h-10 sm:w-12 sm:h-12 bg-gradient-to-r from-purple-500 to-pink-500 rounded-lg sm:rounded-xl flex items-center justify-center text-white">
-                            <Package className="w-5 h-5 sm:w-6 sm:h-6" />
+                          <div className="w-10 h-10 bg-gradient-to-r from-purple-500 to-pink-500 rounded-lg flex items-center justify-center text-white">
+                            <Package className="w-5 h-5" />
                           </div>
                           <div>
-                            <h3 className="text-base sm:text-lg font-bold text-purple-800">Service personnalisé</h3>
-                            <p className="text-purple-600 text-xs sm:text-sm">Créez un service sur mesure</p>
+                            <h3 className="text-base font-bold text-purple-800">Service personnalisé</h3>
+                            <p className="text-purple-600 text-xs">Créez un service sur mesure</p>
                           </div>
                         </div>
                         
@@ -828,7 +1412,7 @@ export function BookingModal({
                               type="text"
                               value={customServiceData.name}
                               onChange={(e) => setCustomServiceData(prev => ({ ...prev, name: e.target.value }))}
-                              className="w-full pl-12 pr-4 py-3 border border-purple-300 rounded-xl focus:ring-2 focus:ring-purple-500 focus:border-purple-500 transition-all duration-300 text-base bg-white"
+                              className="w-full px-4 py-3 border border-purple-300 rounded-xl focus:ring-2 focus:ring-purple-500 focus:border-purple-500 transition-all duration-300 text-base bg-white"
                               placeholder="Ex: Consultation spécialisée"
                               required
                             />
@@ -889,7 +1473,7 @@ export function BookingModal({
                 onClientSelect={setSelectedClient}
               />
 
-              <div className="grid grid-cols-2 gap-3 sm:gap-4">
+              <div className="grid grid-cols-2 gap-3">
                 <DatePicker
                   value={date}
                   onChange={setDate}
@@ -937,34 +1521,32 @@ export function BookingModal({
                   Ces notes sont visibles uniquement par vous et votre équipe
                 </p>
               </div>
-            </div>
 
-            <div className="space-y-4 sm:space-y-6">
               {selectedClient && (
-                <div className="bg-gradient-to-r from-gray-50 to-blue-50 rounded-xl sm:rounded-2xl p-4 sm:p-6 border border-blue-200">
-                  <div className="flex items-center gap-3 mb-3 sm:mb-4">
-                    <div className="w-8 h-8 sm:w-10 sm:h-10 bg-gradient-to-r from-blue-500 to-purple-500 rounded-lg sm:rounded-xl flex items-center justify-center text-white">
-                      <User className="w-4 h-4 sm:w-5 sm:h-5" />
+                <div className="bg-gradient-to-r from-gray-50 to-blue-50 rounded-xl p-4 border border-blue-200">
+                  <div className="flex items-center gap-3 mb-3">
+                    <div className="w-8 h-8 bg-gradient-to-r from-blue-500 to-purple-500 rounded-lg flex items-center justify-center text-white">
+                      <User className="w-4 h-4" />
                     </div>
-                    <h3 className="text-base sm:text-lg font-bold text-gray-900">Informations client</h3>
+                    <h3 className="text-base font-bold text-gray-900">Informations client</h3>
                   </div>
                   
-                  <div className="space-y-2 sm:space-y-3 text-sm sm:text-base">
+                  <div className="space-y-2 text-sm">
                     <div>
-                      <div className="text-xs sm:text-sm text-gray-600">Nom complet</div>
+                      <div className="text-xs text-gray-600">Nom complet</div>
                       <div className="font-medium text-gray-900">
                         {selectedClient.firstname} {selectedClient.lastname}
                       </div>
                     </div>
                     {selectedClient.email && (
                       <div>
-                        <div className="text-xs sm:text-sm text-gray-600">Email</div>
+                        <div className="text-xs text-gray-600">Email</div>
                         <div className="font-medium text-gray-900">{selectedClient.email}</div>
                       </div>
                     )}
                     {selectedClient.phone && (
                       <div>
-                        <div className="text-xs sm:text-sm text-gray-600">Téléphone</div>
+                        <div className="text-xs text-gray-600">Téléphone</div>
                         <div className="font-medium text-gray-900">{selectedClient.phone}</div>
                       </div>
                     )}
@@ -973,15 +1555,15 @@ export function BookingModal({
               )}
 
               {(selectedService || (isCustomService && customServiceData.name && customServiceData.price > 0)) && (
-                <div className="bg-gradient-to-r from-green-50 to-emerald-50 rounded-xl sm:rounded-2xl p-4 sm:p-6 border border-green-200">
-                  <div className="flex items-center gap-3 mb-3 sm:mb-4">
-                    <div className="w-8 h-8 sm:w-10 sm:h-10 bg-gradient-to-r from-green-500 to-emerald-500 rounded-lg sm:rounded-xl flex items-center justify-center text-white">
-                      <Euro className="w-4 h-4 sm:w-5 sm:h-5" />
+                <div className="bg-gradient-to-r from-green-50 to-emerald-50 rounded-xl p-4 border border-green-200">
+                  <div className="flex items-center gap-3 mb-3">
+                    <div className="w-8 h-8 bg-gradient-to-r from-green-500 to-emerald-500 rounded-lg flex items-center justify-center text-white">
+                      <Euro className="w-4 h-4" />
                     </div>
-                    <h3 className="text-base sm:text-lg font-bold text-gray-900">Récapitulatif</h3>
+                    <h3 className="text-base font-bold text-gray-900">Récapitulatif</h3>
                   </div>
                   
-                  <div className="space-y-2 sm:space-y-3 text-sm sm:text-base">
+                  <div className="space-y-2 text-sm">
                     <div className="flex justify-between">
                       <span className="text-gray-600">Service</span>
                       <span className="font-medium text-right">
@@ -1011,7 +1593,7 @@ export function BookingModal({
                       </span>
                     </div>
                     <hr className="border-green-200" />
-                    <div className="flex justify-between text-base sm:text-lg font-bold">
+                    <div className="flex justify-between text-base font-bold">
                       <span className="text-gray-900">Total</span>
                       <span className="text-green-600">{totalAmount.toFixed(2)}€</span>
                     </div>
@@ -1020,54 +1602,54 @@ export function BookingModal({
               )}
 
               {(selectedService || (isCustomService && customServiceData.name && customServiceData.price > 0)) && selectedClient && (
-                <div className="bg-gradient-to-r from-blue-50 to-purple-50 rounded-2xl p-6 border border-blue-200">
+                <div className="bg-gradient-to-r from-blue-50 to-purple-50 rounded-xl p-4 border border-blue-200">
                   <div className="flex items-center gap-3 mb-4">
-                    <div className="w-10 h-10 bg-gradient-to-r from-blue-500 to-purple-500 rounded-xl flex items-center justify-center text-white">
-                      <Calendar className="w-5 h-5" />
+                    <div className="w-8 h-8 bg-gradient-to-r from-blue-500 to-purple-500 rounded-lg flex items-center justify-center text-white">
+                      <Calendar className="w-4 h-4" />
                     </div>
-                    <h3 className="text-lg font-bold text-gray-900">Statut de la réservation</h3>
+                    <h3 className="text-base font-bold text-gray-900">Statut de la réservation</h3>
                   </div>
                   
                   <div className="grid grid-cols-3 gap-2">
                     <button
                       type="button"
                       onClick={() => setBookingStatus('pending')}
-                      className={`p-3 rounded-2xl border-2 transition-all duration-300 transform hover:scale-105 ${
+                      className={`p-3 rounded-xl border-2 transition-all duration-300 ${
                         bookingStatus === 'pending'
                           ? 'bg-gradient-to-r from-yellow-50 to-orange-50 border-yellow-500 text-yellow-700 shadow-lg'
                           : 'bg-white border-gray-200 text-gray-700 hover:border-yellow-300 hover:shadow-md'
                       }`}
                     >
                       <div className="text-center">
-                        <div className="text-xl mb-1">⏳</div>
+                        <div className="text-lg mb-1">⏳</div>
                         <div className="text-xs font-bold">En attente</div>
                       </div>
                     </button>
                     <button
                       type="button"
                       onClick={() => setBookingStatus('confirmed')}
-                      className={`p-3 rounded-2xl border-2 transition-all duration-300 transform hover:scale-105 ${
+                      className={`p-3 rounded-xl border-2 transition-all duration-300 ${
                         bookingStatus === 'confirmed'
                           ? 'bg-gradient-to-r from-green-50 to-emerald-50 border-green-500 text-green-700 shadow-lg'
                           : 'bg-white border-gray-200 text-gray-700 hover:border-green-300 hover:shadow-md'
                       }`}
                     >
                       <div className="text-center">
-                        <div className="text-xl mb-1">✅</div>
+                        <div className="text-lg mb-1">✅</div>
                         <div className="text-xs font-bold">Confirmée</div>
                       </div>
                     </button>
                     <button
                       type="button"
                       onClick={() => setBookingStatus('cancelled')}
-                      className={`p-3 rounded-2xl border-2 transition-all duration-300 transform hover:scale-105 ${
+                      className={`p-3 rounded-xl border-2 transition-all duration-300 ${
                         bookingStatus === 'cancelled'
                           ? 'bg-gradient-to-r from-red-50 to-pink-50 border-red-500 text-red-700 shadow-lg'
                           : 'bg-white border-gray-200 text-gray-700 hover:border-red-300 hover:shadow-md'
                       }`}
                     >
                       <div className="text-center">
-                        <div className="text-xl mb-1">❌</div>
+                        <div className="text-lg mb-1">❌</div>
                         <div className="text-xs font-bold">Annulée</div>
                       </div>
                     </button>
@@ -1090,12 +1672,47 @@ export function BookingModal({
                   selectedClient={selectedClient}
                 />
               )}
-            </div>
+            </form>
           </div>
 
-          <ModalFooter buttons={footerButtons} />
-        </form>
-      </Modal>
+          {/* Footer FIXE EN BAS (OUTSIDE scroll) */}
+          <div 
+            className="flex-shrink-0 bg-white border-t border-gray-200 p-4 flex flex-col gap-3"
+            style={{
+              boxShadow: '0 -4px 6px -1px rgba(0, 0, 0, 0.1)',
+              paddingBottom: 'calc(1rem + env(safe-area-inset-bottom, 0px))'
+            }}
+          >
+            <button
+              type="button"
+              onClick={handleClose}
+              className="w-full bg-gray-500 text-white px-4 py-3 rounded-xl hover:bg-gray-600 transition-colors font-medium text-sm"
+            >
+              Annuler
+            </button>
+            <button
+              type="submit"
+              disabled={saving || (!selectedService && (!isCustomService || !customServiceData.name || customServiceData.price <= 0)) || 
+                !selectedClient?.firstname || !selectedClient?.lastname || !selectedClient?.email || !selectedClient?.phone ||
+                (!editingBooking && !tempBookingId && !canCreateBooking)}
+              onClick={handleSubmit}
+              className="w-full bg-gradient-to-r from-green-500 to-emerald-500 text-white px-4 py-3 rounded-xl hover:from-green-600 hover:to-emerald-600 disabled:opacity-50 disabled:cursor-not-allowed transition-all duration-300 font-medium flex items-center justify-center gap-2 text-sm"
+            >
+              {saving ? (
+                <>
+                  <div className="w-4 h-4 border-2 border-white/30 border-t-white rounded-full animate-spin"></div>
+                  Sauvegarde...
+                </>
+              ) : (
+                <>
+                  <span>{(editingBooking || (tempBookingId && isEditMode)) ? '✏️' : '✨'}</span>
+                  <span>{(editingBooking || (tempBookingId && isEditMode)) ? 'Modifier' : 'Créer'}</span>
+                </>
+              )}
+            </button>
+          </div>
+        </div>
+      </div>
 
       <Modal
         isOpen={showDeleteConfirm}

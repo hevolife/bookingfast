@@ -93,16 +93,6 @@ export function ServicesPage() {
     }
   });
 
-  const [navbarHeight, setNavbarHeight] = useState(64);
-
-  React.useEffect(() => {
-    const navbar = document.querySelector('nav');
-    if (navbar) {
-      const height = navbar.offsetHeight;
-      setNavbarHeight(height);
-    }
-  }, []);
-
   // Recalculer le prix HT quand le prix TTC change
   useEffect(() => {
     if (formData.price_ttc > 0) {
@@ -368,344 +358,368 @@ export function ServicesPage() {
       {/* Modal */}
       {isModalOpen && (
         <>
-          {/* Desktop Modal - CENTRÉ */}
+          {/* Desktop Modal - STRUCTURE FIXE */}
           <div className="hidden sm:flex fixed inset-0 bg-black/60 backdrop-blur-sm items-center justify-center z-50 animate-fadeIn p-4">
-            <div className="bg-white w-full max-w-2xl max-h-[90vh] overflow-y-auto rounded-3xl shadow-2xl transform animate-slideUp">
-              {/* Header Desktop */}
-              <div className="bg-gradient-to-r from-purple-600 via-pink-600 to-red-500 p-6 rounded-t-3xl relative overflow-hidden sticky top-0 z-10">
-                <div className="absolute inset-0 bg-gradient-to-r from-transparent via-white/20 to-transparent -skew-x-12 animate-shimmer"></div>
+            <div className="bg-white w-full max-w-2xl max-h-[90vh] rounded-3xl shadow-2xl transform animate-slideUp flex flex-col">
+              {/* Header Desktop - FIXE (pas dans le scroll) */}
+              <div className="flex-shrink-0 relative overflow-hidden rounded-t-3xl">
+                <div className="absolute inset-0 bg-gradient-to-br from-purple-600 via-pink-600 to-rose-600"></div>
+                <div className="absolute inset-0 bg-gradient-to-r from-transparent via-white/30 to-transparent -skew-x-12 animate-shimmer"></div>
+                <div className="absolute inset-0 opacity-10">
+                  <div className="absolute top-0 left-0 w-32 h-32 bg-white rounded-full blur-3xl"></div>
+                  <div className="absolute bottom-0 right-0 w-40 h-40 bg-white rounded-full blur-3xl"></div>
+                </div>
                 
-                <div className="relative z-10">
+                <div className="relative z-10 p-6">
                   <div className="flex items-center justify-between">
-                    <div className="flex items-center gap-3">
-                      <div className="w-10 h-10 bg-white/20 rounded-xl flex items-center justify-center backdrop-blur-sm">
-                        <Package className="w-5 h-5 text-white" />
+                    <div className="flex items-center gap-4 flex-1">
+                      <div className="w-12 h-12 bg-white/20 backdrop-blur-sm rounded-2xl flex items-center justify-center shadow-lg">
+                        <Package className="w-6 h-6 text-white" />
                       </div>
                       <div>
-                        <h2 className="text-xl font-bold text-white">
+                        <h2 className="text-2xl font-bold text-white drop-shadow-lg">
                           {editingService ? 'Modifier le service' : 'Nouveau service'}
                         </h2>
-                        <p className="text-white/80 text-sm">
+                        <p className="text-white/80 mt-1">
+                          {editingService ? 'Modifiez les informations' : 'Créez un nouveau service'}
+                        </p>
+                      </div>
+                    </div>
+                    
+                    <button
+                      onClick={handleCloseModal}
+                      className="group relative p-3 text-white hover:bg-white/20 rounded-2xl transition-all duration-300 transform hover:scale-110 hover:rotate-90 backdrop-blur-sm"
+                      aria-label="Fermer"
+                    >
+                      <div className="absolute inset-0 bg-white/10 rounded-2xl opacity-0 group-hover:opacity-100 transition-opacity duration-300"></div>
+                      <svg className="w-6 h-6 relative z-10" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18L18 6M6 6l12 12" />
+                      </svg>
+                    </button>
+                  </div>
+                </div>
+                
+                <div className="absolute bottom-0 left-0 right-0 h-1 bg-gradient-to-r from-transparent via-white/50 to-transparent"></div>
+              </div>
+
+              {/* Form - SCROLLABLE */}
+              <div className="flex-1 overflow-y-auto">
+                <form onSubmit={handleSubmit} className="p-6 space-y-6">
+                  <div className="grid grid-cols-1 sm:grid-cols-2 gap-6">
+                    <div className="md:col-span-2">
+                      <label className="block text-sm font-medium text-gray-700 mb-2">
+                        Nom du service
+                      </label>
+                      <input
+                        type="text"
+                        value={formData.name}
+                        onChange={(e) => setFormData(prev => ({ ...prev, name: e.target.value }))}
+                        required
+                        className="w-full p-3 border border-gray-300 rounded-lg focus:ring-2 focus:ring-purple-500 focus:border-purple-500 transition-all duration-300"
+                        placeholder="Ex: Massage relaxant"
+                      />
+                    </div>
+
+                    {/* Section Prix avec calcul automatique */}
+                    <div className="md:col-span-2 bg-gradient-to-r from-emerald-50 to-teal-50 rounded-xl p-4 border border-emerald-200">
+                      <div className="flex items-center gap-2 mb-4">
+                        <Calculator className="w-5 h-5 text-emerald-600" />
+                        <h3 className="font-bold text-gray-900">Tarification (TVA: {taxRate}%)</h3>
+                      </div>
+
+                      <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+                        <div>
+                          <label className="block text-sm font-medium text-gray-700 mb-2">
+                            Prix TTC (€) *
+                          </label>
+                          <input
+                            type="number"
+                            step="0.01"
+                            min="0"
+                            value={formData.price_ttc === 0 ? '' : formData.price_ttc}
+                            onChange={(e) => {
+                              const ttc = e.target.value === '' ? 0 : parseFloat(e.target.value) || 0;
+                              setFormData(prev => ({ 
+                                ...prev, 
+                                price_ttc: ttc
+                              }));
+                            }}
+                            required
+                            className="w-full p-3 border border-gray-300 rounded-lg focus:ring-2 focus:ring-emerald-500 focus:border-emerald-500 transition-all duration-300"
+                            placeholder="120.00"
+                          />
+                          <div className="text-xs text-gray-500 mt-1">
+                            Prix toutes taxes comprises
+                          </div>
+                        </div>
+
+                        <div className="bg-white rounded-lg p-3 border border-emerald-300">
+                          <label className="block text-sm font-medium text-gray-700 mb-2">
+                            Prix HT (calculé automatiquement)
+                          </label>
+                          <div className="text-2xl font-bold text-emerald-600">
+                            {formatPrice(formData.price_ht)}
+                          </div>
+                          <div className="text-xs text-gray-500 mt-1">
+                            TVA: {formatPrice(formData.price_ttc - formData.price_ht)}
+                          </div>
+                        </div>
+                      </div>
+
+                      <div className="mt-3 bg-blue-50 border border-blue-200 rounded-lg p-3">
+                        <div className="text-xs text-blue-700">
+                          <strong>💡 Calcul automatique:</strong> Le prix HT est calculé à partir du prix TTC avec la formule: 
+                          HT = TTC ÷ (1 + {taxRate}%)
+                        </div>
+                      </div>
+                    </div>
+
+                    <div>
+                      <label className="block text-sm font-medium text-gray-700 mb-2">
+                        Durée (minutes)
+                      </label>
+                      <input
+                        type="number"
+                        min="1"
+                        value={formData.duration_minutes === 0 ? '' : formData.duration_minutes}
+                        onChange={(e) => setFormData(prev => ({ ...prev, duration_minutes: e.target.value === '' ? 0 : parseInt(e.target.value) || 60 }))}
+                        required
+                        className="w-full p-3 border border-gray-300 rounded-lg focus:ring-2 focus:ring-purple-500 focus:border-purple-500 transition-all duration-300"
+                      />
+                    </div>
+
+                    <div>
+                      <label className="block text-sm font-medium text-gray-700 mb-2">
+                        Capacité (personnes)
+                      </label>
+                      <input
+                        type="number"
+                        min="1"
+                        value={formData.capacity === 0 ? '' : formData.capacity}
+                        onChange={(e) => setFormData(prev => ({ ...prev, capacity: e.target.value === '' ? 0 : parseInt(e.target.value) || 1 }))}
+                        required
+                        className="w-full p-3 border border-gray-300 rounded-lg focus:ring-2 focus:ring-purple-500 focus:border-purple-500 transition-all duration-300"
+                      />
+                    </div>
+
+                    <div>
+                      <label className="block text-sm font-medium text-gray-700 mb-2">
+                        Nom de l'unité (optionnel)
+                      </label>
+                      <input
+                        type="text"
+                        value={formData.unit_name}
+                        onChange={(e) => setFormData(prev => ({ ...prev, unit_name: e.target.value }))}
+                        className="w-full p-3 border border-gray-300 rounded-lg focus:ring-2 focus:ring-purple-500 focus:border-purple-500 transition-all duration-300"
+                        placeholder="Ex: Jet ski, Vélo, Chambre..."
+                      />
+                      <div className="text-xs text-gray-500 mt-1">
+                        Ce mot remplacera "participants" dans la réservation
+                      </div>
+                    </div>
+
+                    <div className="md:col-span-2">
+                      <label className="block text-sm font-medium text-gray-700 mb-2">
+                        URL de l'image (optionnel)
+                      </label>
+                      <div className="relative">
+                        <Image className="absolute left-3 top-3 w-5 h-5 text-gray-400" />
+                        <input
+                          type="url"
+                          value={formData.image_url}
+                          onChange={(e) => setFormData(prev => ({ ...prev, image_url: e.target.value }))}
+                          className="w-full pl-10 pr-4 py-3 border border-gray-300 rounded-lg focus:ring-2 focus:ring-purple-500 focus:border-purple-500 transition-all duration-300"
+                          placeholder="https://exemple.com/image.jpg"
+                        />
+                      </div>
+                    </div>
+
+                    <div className="md:col-span-2">
+                      <label className="block text-sm font-medium text-gray-700 mb-2">
+                        Description
+                      </label>
+                      <textarea
+                        value={formData.description}
+                        onChange={(e) => setFormData(prev => ({ ...prev, description: e.target.value }))}
+                        rows={3}
+                        className="w-full p-3 border border-gray-300 rounded-lg focus:ring-2 focus:ring-purple-500 focus:border-purple-500 transition-all duration-300"
+                        placeholder="Décrivez votre service..."
+                      />
+                    </div>
+
+                    {/* Horaires de disponibilité */}
+                    <div className="md:col-span-2">
+                      <label className="block text-sm font-medium text-gray-700 mb-4">
+                        Horaires de disponibilité du service
+                      </label>
+                      <div className="bg-gradient-to-r from-blue-50 to-purple-50 border border-blue-200 rounded-xl p-4 mb-4">
+                        <p className="text-sm text-blue-700 mb-2">
+                          <strong>💡 Conseil :</strong> Configurez des horaires spécifiques pour ce service.
+                        </p>
+                        <p className="text-xs text-blue-600">
+                          Si aucun horaire n'est défini, les horaires généraux de l'entreprise seront utilisés.
+                        </p>
+                      </div>
+                      
+                      <div className="space-y-4">
+                        {Object.entries(formData.availability_hours).map(([day, hours]) => (
+                          <div key={day} className="p-4 bg-white border border-gray-200 rounded-xl">
+                            <div className="text-sm font-medium text-gray-700 capitalize mb-2">
+                              {day === 'monday' ? 'Lundi' :
+                               day === 'tuesday' ? 'Mardi' :
+                               day === 'wednesday' ? 'Mercredi' :
+                               day === 'thursday' ? 'Jeudi' :
+                               day === 'friday' ? 'Vendredi' :
+                               day === 'saturday' ? 'Samedi' :
+                               day === 'sunday' ? 'Dimanche' : day}
+                            </div>
+                            
+                            <div className="flex items-center gap-2 mb-3">
+                              <input
+                                type="checkbox"
+                                checked={!hours.closed}
+                                onChange={(e) => handleAvailabilityChange(day, 'closed', e.target.checked)}
+                                className="w-4 h-4 text-purple-600 rounded focus:ring-purple-500"
+                              />
+                              <span className="text-sm text-gray-600">Disponible</span>
+                            </div>
+                            
+                            {!hours.closed && (
+                              <div className="space-y-3">
+                                {hours.ranges.map((range, rangeIndex) => (
+                                  <div key={rangeIndex} className="flex items-center gap-3 p-3 bg-gray-50 rounded-lg">
+                                    <input
+                                      type="time"
+                                      value={range.start}
+                                      onChange={(e) => handleRangeChange(day, rangeIndex, 'start', e.target.value)}
+                                      className="p-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-purple-500 focus:border-purple-500"
+                                    />
+                                    <span className="text-gray-500 font-medium">à</span>
+                                    <input
+                                      type="time"
+                                      value={range.end}
+                                      onChange={(e) => handleRangeChange(day, rangeIndex, 'end', e.target.value)}
+                                      className="p-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-purple-500 focus:border-purple-500"
+                                    />
+                                    
+                                    {hours.ranges.length > 1 && (
+                                      <button
+                                        type="button"
+                                        onClick={() => removeTimeRange(day, rangeIndex)}
+                                        className="p-2 text-red-500 hover:bg-red-100 rounded-lg transition-colors"
+                                        title="Supprimer cette plage"
+                                      >
+                                        <X className="w-4 h-4" />
+                                      </button>
+                                    )}
+                                  </div>
+                                ))}
+                                
+                                <button
+                                  type="button"
+                                  onClick={() => addTimeRange(day)}
+                                  className="flex items-center gap-2 px-3 py-2 text-purple-600 hover:bg-purple-50 rounded-lg transition-colors text-sm font-medium"
+                                >
+                                  <Plus className="w-4 h-4" />
+                                  Ajouter une plage horaire
+                                </button>
+                              </div>
+                            )}
+                          </div>
+                        ))}
+                      </div>
+                    </div>
+                  </div>
+
+                  {/* Actions */}
+                  <div className="flex gap-3 pt-4">
+                    <button
+                      type="button"
+                      onClick={handleCloseModal}
+                      className="flex-1 bg-gray-500 text-white px-6 py-3 rounded-2xl hover:bg-gray-600 transition-all duration-300 transform hover:scale-105 shadow-lg font-medium"
+                    >
+                      Annuler
+                    </button>
+                    <button
+                      type="submit"
+                      disabled={saving}
+                      className="flex-1 bg-gradient-to-r from-purple-600 via-pink-600 to-red-500 text-white px-6 py-3 rounded-2xl hover:from-purple-700 hover:via-pink-700 hover:to-red-600 disabled:opacity-50 disabled:cursor-not-allowed transition-all duration-300 transform hover:scale-105 shadow-lg font-medium flex items-center justify-center gap-2"
+                    >
+                      {saving ? (
+                        <>
+                          <div className="w-5 h-5 border-2 border-white/30 border-t-white rounded-full animate-spin"></div>
+                          Sauvegarde...
+                        </>
+                      ) : (
+                        <>
+                          <Save className="w-5 h-5" />
+                          {editingService ? 'Modifier' : 'Créer'}
+                        </>
+                      )}
+                    </button>
+                  </div>
+                </form>
+              </div>
+            </div>
+          </div>
+
+          {/* Mobile Modal - SOUS LA NAVBAR */}
+          <div className="sm:hidden fixed inset-0 z-50">
+            {/* Overlay */}
+            <div
+              className="fixed inset-0 bg-black/60 backdrop-blur-sm"
+              onClick={handleCloseModal}
+              style={{ zIndex: 40 }}
+            />
+            
+            {/* Modal content - Commence sous la navbar (64px + safe area) */}
+            <div 
+              className="fixed left-0 right-0 bottom-0 bg-white rounded-t-2xl shadow-2xl animate-slideUp flex flex-col"
+              style={{ 
+                top: 'calc(64px + env(safe-area-inset-top, 0px))',
+                zIndex: 45,
+                maxHeight: 'calc(100vh - 64px - env(safe-area-inset-top, 0px))'
+              }}
+            >
+              {/* Header Mobile - FIXE (pas dans le scroll) */}
+              <div className="flex-shrink-0 relative overflow-hidden rounded-t-2xl">
+                <div className="absolute inset-0 bg-gradient-to-br from-purple-600 via-pink-600 to-rose-600"></div>
+                <div className="absolute inset-0 bg-gradient-to-r from-transparent via-white/30 to-transparent -skew-x-12 animate-shimmer"></div>
+                <div className="absolute inset-0 opacity-10">
+                  <div className="absolute top-0 left-0 w-32 h-32 bg-white rounded-full blur-3xl"></div>
+                  <div className="absolute bottom-0 right-0 w-40 h-40 bg-white rounded-full blur-3xl"></div>
+                </div>
+                
+                <div className="relative z-10 p-4">
+                  <div className="flex items-center justify-between">
+                    <div className="flex items-center gap-3">
+                      <div className="w-8 h-8 bg-white/20 backdrop-blur-sm rounded-lg flex items-center justify-center shadow-lg">
+                        <Package className="w-4 h-4 text-white" />
+                      </div>
+                      <div>
+                        <h2 className="text-lg font-bold text-white drop-shadow-lg">
+                          {editingService ? 'Modifier le service' : 'Nouveau service'}
+                        </h2>
+                        <p className="text-white/80 text-xs">
                           {editingService ? 'Modifiez les informations' : 'Créez un nouveau service'}
                         </p>
                       </div>
                     </div>
                     <button
                       onClick={handleCloseModal}
-                      className="p-2 text-white hover:bg-white/20 rounded-xl transition-all duration-300 transform hover:scale-110"
+                      className="p-2 text-white hover:bg-white/20 rounded-lg transition-all duration-300 transform hover:scale-110 mobile-tap-target"
                     >
-                      <X className="w-6 h-6" />
+                      <X className="w-5 h-5" />
                     </button>
                   </div>
                 </div>
+                
+                <div className="absolute bottom-0 left-0 right-0 h-1 bg-gradient-to-r from-transparent via-white/50 to-transparent"></div>
               </div>
 
-              {/* Form Desktop */}
-              <form onSubmit={handleSubmit} className="p-6 space-y-6">
-                <div className="grid grid-cols-1 sm:grid-cols-2 gap-6">
-                  <div className="md:col-span-2">
-                    <label className="block text-sm font-medium text-gray-700 mb-2">
-                      Nom du service
-                    </label>
-                    <input
-                      type="text"
-                      value={formData.name}
-                      onChange={(e) => setFormData(prev => ({ ...prev, name: e.target.value }))}
-                      required
-                      className="w-full p-3 border border-gray-300 rounded-lg focus:ring-2 focus:ring-purple-500 focus:border-purple-500 transition-all duration-300"
-                      placeholder="Ex: Massage relaxant"
-                    />
-                  </div>
-
-                  {/* Section Prix avec calcul automatique */}
-                  <div className="md:col-span-2 bg-gradient-to-r from-emerald-50 to-teal-50 rounded-xl p-4 border border-emerald-200">
-                    <div className="flex items-center gap-2 mb-4">
-                      <Calculator className="w-5 h-5 text-emerald-600" />
-                      <h3 className="font-bold text-gray-900">Tarification (TVA: {taxRate}%)</h3>
-                    </div>
-
-                    <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
-                      <div>
-                        <label className="block text-sm font-medium text-gray-700 mb-2">
-                          Prix TTC (€) *
-                        </label>
-                        <input
-                          type="number"
-                          step="0.01"
-                          min="0"
-                          value={formData.price_ttc === 0 ? '' : formData.price_ttc}
-                          onChange={(e) => {
-                            const ttc = e.target.value === '' ? 0 : parseFloat(e.target.value) || 0;
-                            setFormData(prev => ({ 
-                              ...prev, 
-                              price_ttc: ttc
-                            }));
-                          }}
-                          required
-                          className="w-full p-3 border border-gray-300 rounded-lg focus:ring-2 focus:ring-emerald-500 focus:border-emerald-500 transition-all duration-300"
-                          placeholder="120.00"
-                        />
-                        <div className="text-xs text-gray-500 mt-1">
-                          Prix toutes taxes comprises
-                        </div>
-                      </div>
-
-                      <div className="bg-white rounded-lg p-3 border border-emerald-300">
-                        <label className="block text-sm font-medium text-gray-700 mb-2">
-                          Prix HT (calculé automatiquement)
-                        </label>
-                        <div className="text-2xl font-bold text-emerald-600">
-                          {formatPrice(formData.price_ht)}
-                        </div>
-                        <div className="text-xs text-gray-500 mt-1">
-                          TVA: {formatPrice(formData.price_ttc - formData.price_ht)}
-                        </div>
-                      </div>
-                    </div>
-
-                    <div className="mt-3 bg-blue-50 border border-blue-200 rounded-lg p-3">
-                      <div className="text-xs text-blue-700">
-                        <strong>💡 Calcul automatique:</strong> Le prix HT est calculé à partir du prix TTC avec la formule: 
-                        HT = TTC ÷ (1 + {taxRate}%)
-                      </div>
-                    </div>
-                  </div>
-
-                  <div>
-                    <label className="block text-sm font-medium text-gray-700 mb-2">
-                      Durée (minutes)
-                    </label>
-                    <input
-                      type="number"
-                      min="1"
-                      value={formData.duration_minutes === 0 ? '' : formData.duration_minutes}
-                      onChange={(e) => setFormData(prev => ({ ...prev, duration_minutes: e.target.value === '' ? 0 : parseInt(e.target.value) || 60 }))}
-                      required
-                      className="w-full p-3 border border-gray-300 rounded-lg focus:ring-2 focus:ring-purple-500 focus:border-purple-500 transition-all duration-300"
-                    />
-                  </div>
-
-                  <div>
-                    <label className="block text-sm font-medium text-gray-700 mb-2">
-                      Capacité (personnes)
-                    </label>
-                    <input
-                      type="number"
-                      min="1"
-                      value={formData.capacity === 0 ? '' : formData.capacity}
-                      onChange={(e) => setFormData(prev => ({ ...prev, capacity: e.target.value === '' ? 0 : parseInt(e.target.value) || 1 }))}
-                      required
-                      className="w-full p-3 border border-gray-300 rounded-lg focus:ring-2 focus:ring-purple-500 focus:border-purple-500 transition-all duration-300"
-                    />
-                  </div>
-
-                  <div>
-                    <label className="block text-sm font-medium text-gray-700 mb-2">
-                      Nom de l'unité (optionnel)
-                    </label>
-                    <input
-                      type="text"
-                      value={formData.unit_name}
-                      onChange={(e) => setFormData(prev => ({ ...prev, unit_name: e.target.value }))}
-                      className="w-full p-3 border border-gray-300 rounded-lg focus:ring-2 focus:ring-purple-500 focus:border-purple-500 transition-all duration-300"
-                      placeholder="Ex: Jet ski, Vélo, Chambre..."
-                    />
-                    <div className="text-xs text-gray-500 mt-1">
-                      Ce mot remplacera "participants" dans la réservation
-                    </div>
-                  </div>
-
-                  <div className="md:col-span-2">
-                    <label className="block text-sm font-medium text-gray-700 mb-2">
-                      URL de l'image (optionnel)
-                    </label>
-                    <div className="relative">
-                      <Image className="absolute left-3 top-3 w-5 h-5 text-gray-400" />
-                      <input
-                        type="url"
-                        value={formData.image_url}
-                        onChange={(e) => setFormData(prev => ({ ...prev, image_url: e.target.value }))}
-                        className="w-full pl-10 pr-4 py-3 border border-gray-300 rounded-lg focus:ring-2 focus:ring-purple-500 focus:border-purple-500 transition-all duration-300"
-                        placeholder="https://exemple.com/image.jpg"
-                      />
-                    </div>
-                  </div>
-
-                  <div className="md:col-span-2">
-                    <label className="block text-sm font-medium text-gray-700 mb-2">
-                      Description
-                    </label>
-                    <textarea
-                      value={formData.description}
-                      onChange={(e) => setFormData(prev => ({ ...prev, description: e.target.value }))}
-                      rows={3}
-                      className="w-full p-3 border border-gray-300 rounded-lg focus:ring-2 focus:ring-purple-500 focus:border-purple-500 transition-all duration-300"
-                      placeholder="Décrivez votre service..."
-                    />
-                  </div>
-
-                  {/* Horaires de disponibilité */}
-                  <div className="md:col-span-2">
-                    <label className="block text-sm font-medium text-gray-700 mb-4">
-                      Horaires de disponibilité du service
-                    </label>
-                    <div className="bg-gradient-to-r from-blue-50 to-purple-50 border border-blue-200 rounded-xl p-4 mb-4">
-                      <p className="text-sm text-blue-700 mb-2">
-                        <strong>💡 Conseil :</strong> Configurez des horaires spécifiques pour ce service.
-                      </p>
-                      <p className="text-xs text-blue-600">
-                        Si aucun horaire n'est défini, les horaires généraux de l'entreprise seront utilisés.
-                      </p>
-                    </div>
-                    
-                    <div className="space-y-4">
-                      {Object.entries(formData.availability_hours).map(([day, hours]) => (
-                        <div key={day} className="p-4 bg-white border border-gray-200 rounded-xl">
-                          <div className="text-sm font-medium text-gray-700 capitalize mb-2">
-                            {day === 'monday' ? 'Lundi' :
-                             day === 'tuesday' ? 'Mardi' :
-                             day === 'wednesday' ? 'Mercredi' :
-                             day === 'thursday' ? 'Jeudi' :
-                             day === 'friday' ? 'Vendredi' :
-                             day === 'saturday' ? 'Samedi' :
-                             day === 'sunday' ? 'Dimanche' : day}
-                          </div>
-                          
-                          <div className="flex items-center gap-2 mb-3">
-                            <input
-                              type="checkbox"
-                              checked={!hours.closed}
-                              onChange={(e) => handleAvailabilityChange(day, 'closed', e.target.checked)}
-                              className="w-4 h-4 text-purple-600 rounded focus:ring-purple-500"
-                            />
-                            <span className="text-sm text-gray-600">Disponible</span>
-                          </div>
-                          
-                          {!hours.closed && (
-                            <div className="space-y-3">
-                              {hours.ranges.map((range, rangeIndex) => (
-                                <div key={rangeIndex} className="flex items-center gap-3 p-3 bg-gray-50 rounded-lg">
-                                  <input
-                                    type="time"
-                                    value={range.start}
-                                    onChange={(e) => handleRangeChange(day, rangeIndex, 'start', e.target.value)}
-                                    className="p-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-purple-500 focus:border-purple-500"
-                                  />
-                                  <span className="text-gray-500 font-medium">à</span>
-                                  <input
-                                    type="time"
-                                    value={range.end}
-                                    onChange={(e) => handleRangeChange(day, rangeIndex, 'end', e.target.value)}
-                                    className="p-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-purple-500 focus:border-purple-500"
-                                  />
-                                  
-                                  {hours.ranges.length > 1 && (
-                                    <button
-                                      type="button"
-                                      onClick={() => removeTimeRange(day, rangeIndex)}
-                                      className="p-2 text-red-500 hover:bg-red-100 rounded-lg transition-colors"
-                                      title="Supprimer cette plage"
-                                    >
-                                      <X className="w-4 h-4" />
-                                    </button>
-                                  )}
-                                </div>
-                              ))}
-                              
-                              <button
-                                type="button"
-                                onClick={() => addTimeRange(day)}
-                                className="flex items-center gap-2 px-3 py-2 text-purple-600 hover:bg-purple-50 rounded-lg transition-colors text-sm font-medium"
-                              >
-                                <Plus className="w-4 h-4" />
-                                Ajouter une plage horaire
-                              </button>
-                            </div>
-                          )}
-                        </div>
-                      ))}
-                    </div>
-                  </div>
-                </div>
-
-                {/* Actions */}
-                <div className="flex gap-3 pt-4">
-                  <button
-                    type="button"
-                    onClick={handleCloseModal}
-                    className="flex-1 bg-gray-500 text-white px-6 py-3 rounded-2xl hover:bg-gray-600 transition-all duration-300 transform hover:scale-105 shadow-lg font-medium"
-                  >
-                    Annuler
-                  </button>
-                  <button
-                    type="submit"
-                    disabled={saving}
-                    className="flex-1 bg-gradient-to-r from-purple-600 via-pink-600 to-red-500 text-white px-6 py-3 rounded-2xl hover:from-purple-700 hover:via-pink-700 hover:to-red-600 disabled:opacity-50 disabled:cursor-not-allowed transition-all duration-300 transform hover:scale-105 shadow-lg font-medium flex items-center justify-center gap-2"
-                  >
-                    {saving ? (
-                      <>
-                        <div className="w-5 h-5 border-2 border-white/30 border-t-white rounded-full animate-spin"></div>
-                        Sauvegarde...
-                      </>
-                    ) : (
-                      <>
-                        <Save className="w-5 h-5" />
-                        {editingService ? 'Modifier' : 'Créer'}
-                      </>
-                    )}
-                  </button>
-                </div>
-              </form>
-            </div>
-          </div>
-
-          {/* Mobile Modal - SOUS LA NAVBAR avec header cohérent */}
-          <div className="sm:hidden">
-            {/* Backdrop - z-20 DERRIÈRE le modal */}
-            <div
-              className="fixed inset-0 bg-black bg-opacity-50"
-              style={{ zIndex: 20 }}
-              onClick={handleCloseModal}
-            />
-            
-            {/* Modal Container - z-30 DEVANT le backdrop */}
-            <div 
-              className="fixed left-0 right-0 bottom-0 flex flex-col bg-white"
-              style={{ 
-                top: `${navbarHeight}px`,
-                zIndex: 30,
-                maxHeight: `calc(100vh - ${navbarHeight}px)`
-              }}
-            >
-              {/* Header Mobile - MÊME STYLE QUE LE MODAL DEVIS */}
-              <div className="flex-shrink-0 bg-gradient-to-r from-purple-600 via-pink-600 to-rose-600 px-4 py-4 flex items-center justify-between">
-                <div>
-                  <h2 className="text-lg font-bold text-white">
-                    {editingService ? 'Modifier le service' : 'Nouveau service'}
-                  </h2>
-                  <p className="text-white/80 text-sm">
-                    {editingService ? 'Modifiez les informations' : 'Créez un nouveau service'}
-                  </p>
-                </div>
-                <button
-                  onClick={handleCloseModal}
-                  className="p-2 hover:bg-white/20 rounded-lg transition-colors"
-                >
-                  <svg className="w-5 h-5 text-white" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18L18 6M6 6l12 12" />
-                  </svg>
-                </button>
-              </div>
-              
-              {/* Contenu scrollable */}
-              <div 
-                className="overflow-y-auto flex-1"
-                style={{ 
-                  WebkitOverflowScrolling: 'touch',
-                  paddingBottom: '120px'
-                }}
-              >
-                <form onSubmit={handleSubmit} className="p-4 space-y-4">
+              {/* Form scrollable */}
+              <div className="flex-1 overflow-y-auto" style={{ WebkitOverflowScrolling: 'touch' }}>
+                <form onSubmit={handleSubmit} className="p-4 space-y-4 pb-32">
                   <div className="space-y-4">
                     <div>
                       <label className="block text-sm font-medium text-gray-700 mb-2">

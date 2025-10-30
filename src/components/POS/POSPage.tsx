@@ -1,5 +1,5 @@
 import React, { useState } from 'react';
-import { ShoppingCart, Package, Plus, Minus, Trash2, CreditCard, User, Mail, Phone, FileText, Settings, BarChart3, Edit, Search, Calendar, X, Banknote, Smartphone, FileCheck, ArrowLeftRight, ChevronLeft, Menu, Clock } from 'lucide-react';
+import { ShoppingCart, Package, Plus, Minus, Trash2, CreditCard, User, Mail, Phone, FileText, Settings, BarChart3, Edit, Search, Calendar, X, Banknote, Smartphone, FileCheck, ArrowLeftRight, ChevronLeft, Menu, Clock, Sparkles } from 'lucide-react';
 import { usePOS } from '../../hooks/usePOS';
 import { useClients } from '../../hooks/useClients';
 import { useBookings } from '../../hooks/useBookings';
@@ -278,7 +278,6 @@ export function POSPage() {
     e.preventDefault();
     e.stopPropagation();
     
-    // Ne pas permettre l'édition des services de réservation
     if (product._isBookingService) {
       alert('Les services de réservation ne peuvent pas être modifiés depuis le POS. Utilisez la page Services.');
       return;
@@ -357,12 +356,32 @@ export function POSPage() {
   }
 
   const getColorClasses = (color: string) => {
-    const colors: Record<string, string> = {
-      blue: 'from-blue-500 to-cyan-500',
-      green: 'from-green-500 to-emerald-500',
-      red: 'from-red-500 to-pink-500',
-      purple: 'from-purple-500 to-pink-500',
-      orange: 'from-orange-500 to-red-500'
+    const colors: Record<string, { gradient: string; shadow: string; hover: string }> = {
+      blue: { 
+        gradient: 'from-blue-500 via-blue-600 to-cyan-600',
+        shadow: 'shadow-blue-500/30',
+        hover: 'hover:shadow-blue-500/50'
+      },
+      green: { 
+        gradient: 'from-green-500 via-green-600 to-emerald-600',
+        shadow: 'shadow-green-500/30',
+        hover: 'hover:shadow-green-500/50'
+      },
+      red: { 
+        gradient: 'from-red-500 via-red-600 to-pink-600',
+        shadow: 'shadow-red-500/30',
+        hover: 'hover:shadow-red-500/50'
+      },
+      purple: { 
+        gradient: 'from-purple-500 via-purple-600 to-pink-600',
+        shadow: 'shadow-purple-500/30',
+        hover: 'hover:shadow-purple-500/50'
+      },
+      orange: { 
+        gradient: 'from-orange-500 via-orange-600 to-red-600',
+        shadow: 'shadow-orange-500/30',
+        hover: 'hover:shadow-orange-500/50'
+      }
     };
     return colors[color] || colors.blue;
   };
@@ -379,14 +398,12 @@ export function POSPage() {
 
   const hasItems = cart.length > 0 || selectedBooking !== null;
   const cartItemCount = selectedBooking ? 1 : cart.reduce((sum, item) => sum + item.quantity, 0);
-
-  // Vérifier si le panier contient des produits TTC
   const hasTTCProducts = cart.some(item => item.product._isTTCPrice);
 
   return (
     <div className="h-full flex flex-col bg-gradient-to-br from-blue-50 via-purple-50 to-pink-50">
       {/* Header - Responsive */}
-      <div className="bg-white border-b border-gray-200 px-3 sm:px-6 py-3 sm:py-4">
+      <div className="bg-white border-b border-gray-200 px-3 sm:px-6 py-3 sm:py-4 flex-shrink-0">
         <div className="flex items-center justify-between">
           <div className="flex items-center gap-2 sm:gap-4">
             <div className="text-lg sm:text-2xl font-bold text-gray-900">
@@ -498,12 +515,7 @@ export function POSPage() {
         )}
       </div>
 
-      <div 
-        className="flex-1 flex overflow-hidden"
-        style={{
-          paddingBottom: 'max(6rem, calc(6rem + env(safe-area-inset-bottom)))'
-        }}
-      >
+      <div className="flex-1 flex overflow-hidden min-h-0">
         {/* Main Content - Responsive */}
         <div className="flex-1 p-2 sm:p-4 overflow-y-auto">
           {currentView === 'services' ? (
@@ -568,7 +580,7 @@ export function POSPage() {
                       onClick={(e) => handleCategoryChange(e, category.id)}
                       className={`px-2.5 sm:px-3 py-1 rounded-lg font-medium whitespace-nowrap transition-all text-[10px] sm:text-xs ${
                         selectedCategory === category.id
-                          ? `bg-gradient-to-r ${getColorClasses(category.color)} text-white shadow-lg`
+                          ? `bg-gradient-to-r ${getColorClasses(category.color).gradient} text-white shadow-lg`
                           : 'bg-white text-gray-700 hover:bg-gray-50 border border-gray-200'
                       }`}
                     >
@@ -578,53 +590,100 @@ export function POSPage() {
                 </div>
               </div>
 
-              {/* Grille de services - Textes optimisés pour la lisibilité */}
-              <div className="grid grid-cols-3 sm:grid-cols-4 lg:grid-cols-5 xl:grid-cols-6 gap-1.5 sm:gap-2">
-                {filteredProducts.map(product => (
-                  <div
-                    key={product.id}
-                    className={`bg-gradient-to-r ${getColorClasses(product.color)} rounded-lg text-white hover:shadow-xl transition-all duration-300 transform hover:scale-105 relative group aspect-square flex flex-col`}
-                  >
-                    {!product._isBookingService && (
-                      <button
-                        type="button"
-                        onClick={(e) => handleEditProduct(e, product)}
-                        className="absolute top-1 right-1 bg-white/20 hover:bg-white/30 p-0.5 rounded opacity-0 group-hover:opacity-100 transition-opacity z-10"
-                      >
-                        <Edit className="w-2.5 h-2.5" />
-                      </button>
-                    )}
-                    {product._isBookingService && (
-                      <div className="absolute top-1 right-1 bg-white/20 backdrop-blur-sm px-1.5 py-0.5 rounded text-[9px] font-semibold z-10">
-                        📅
-                      </div>
-                    )}
-                    <button
-                      type="button"
-                      onClick={(e) => handleAddToCart(e, product)}
-                      className="text-left w-full h-full p-2 sm:p-2.5 flex flex-col justify-between"
+              {/* Grille de services - NOUVEAU DESIGN */}
+              <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-4 xl:grid-cols-5 2xl:grid-cols-6 gap-2 sm:gap-3">
+                {filteredProducts.map(product => {
+                  const colorClasses = getColorClasses(product.color);
+                  return (
+                    <div
+                      key={product.id}
+                      className="group relative"
                     >
-                      <div className="flex-1 flex flex-col justify-center min-h-0">
-                        <h3 className="font-bold text-xs sm:text-sm leading-snug line-clamp-2 mb-1">{product.name}</h3>
-                        {product.duration_minutes && (
-                          <div className="flex items-center gap-1 text-[10px] sm:text-xs opacity-95 font-medium">
-                            <Clock className="w-2.5 h-2.5 sm:w-3 sm:h-3" />
-                            {product.duration_minutes}min
+                      {/* Card Container */}
+                      <div className={`relative bg-white rounded-2xl overflow-hidden shadow-lg ${colorClasses.shadow} ${colorClasses.hover} transition-all duration-300 hover:scale-[1.02] hover:-translate-y-1`}>
+                        {/* Gradient Header */}
+                        <div className={`bg-gradient-to-br ${colorClasses.gradient} p-3 sm:p-4 relative overflow-hidden`}>
+                          {/* Decorative Pattern */}
+                          <div className="absolute inset-0 opacity-10">
+                            <div className="absolute top-0 right-0 w-20 h-20 bg-white rounded-full -mr-10 -mt-10"></div>
+                            <div className="absolute bottom-0 left-0 w-16 h-16 bg-white rounded-full -ml-8 -mb-8"></div>
                           </div>
-                        )}
+
+                          {/* Edit Button */}
+                          {!product._isBookingService && (
+                            <button
+                              type="button"
+                              onClick={(e) => handleEditProduct(e, product)}
+                              className="absolute top-2 right-2 bg-white/20 backdrop-blur-sm hover:bg-white/30 p-1.5 rounded-lg opacity-0 group-hover:opacity-100 transition-all z-10"
+                            >
+                              <Edit className="w-3 h-3 text-white" />
+                            </button>
+                          )}
+
+                          {/* Booking Badge */}
+                          {product._isBookingService && (
+                            <div className="absolute top-2 right-2 bg-white/20 backdrop-blur-sm px-2 py-1 rounded-lg z-10">
+                              <Calendar className="w-3 h-3 text-white" />
+                            </div>
+                          )}
+
+                          {/* Service Name */}
+                          <h3 className="text-white font-bold text-sm sm:text-base leading-tight line-clamp-2 mb-2 relative z-10">
+                            {product.name}
+                          </h3>
+
+                          {/* Duration Badge */}
+                          {product.duration_minutes && (
+                            <div className="inline-flex items-center gap-1 bg-white/20 backdrop-blur-sm px-2 py-1 rounded-lg relative z-10">
+                              <Clock className="w-3 h-3 text-white" />
+                              <span className="text-xs font-semibold text-white">
+                                {product.duration_minutes}min
+                              </span>
+                            </div>
+                          )}
+                        </div>
+
+                        {/* Content */}
+                        <div className="p-3 sm:p-4">
+                          {/* Price Section */}
+                          <div className="mb-3">
+                            <div className="flex items-baseline gap-1 mb-1">
+                              <span className="text-2xl sm:text-3xl font-black text-gray-900">
+                                {product.price.toFixed(0)}
+                              </span>
+                              <span className="text-lg sm:text-xl font-bold text-gray-900">
+                                .{(product.price % 1).toFixed(2).split('.')[1]}
+                              </span>
+                              <span className="text-sm font-bold text-gray-600 ml-1">€</span>
+                            </div>
+                            <div className="flex items-center gap-2">
+                              {product._isTTCPrice && (
+                                <span className="text-[10px] font-semibold text-gray-500 bg-gray-100 px-2 py-0.5 rounded">
+                                  TTC
+                                </span>
+                              )}
+                              {product.track_stock && (
+                                <span className="text-[10px] font-semibold text-blue-600 bg-blue-50 px-2 py-0.5 rounded">
+                                  Stock: {product.stock}
+                                </span>
+                              )}
+                            </div>
+                          </div>
+
+                          {/* Add to Cart Button */}
+                          <button
+                            type="button"
+                            onClick={(e) => handleAddToCart(e, product)}
+                            className={`w-full bg-gradient-to-r ${colorClasses.gradient} text-white py-2.5 sm:py-3 rounded-xl font-bold hover:shadow-lg transition-all duration-300 flex items-center justify-center gap-2 group-hover:scale-105`}
+                          >
+                            <Plus className="w-4 h-4" />
+                            <span className="text-sm">Ajouter</span>
+                          </button>
+                        </div>
                       </div>
-                      <div className="mt-auto pt-1.5 border-t border-white/20">
-                        <div className="text-sm sm:text-base font-extrabold leading-none">{product.price.toFixed(2)} €</div>
-                        {product._isTTCPrice && (
-                          <div className="text-[9px] sm:text-[10px] opacity-90 font-medium leading-none mt-1">TTC</div>
-                        )}
-                        {product.track_stock && (
-                          <div className="text-[9px] sm:text-[10px] opacity-90 font-medium leading-none mt-1">Stock: {product.stock}</div>
-                        )}
-                      </div>
-                    </button>
-                  </div>
-                ))}
+                    </div>
+                  );
+                })}
               </div>
             </>
           ) : (
@@ -637,8 +696,8 @@ export function POSPage() {
         </div>
 
         {/* Desktop Cart Sidebar */}
-        <div className="hidden lg:flex w-80 xl:w-96 bg-white border-l border-gray-200 flex-col">
-          <div className="p-4 xl:p-6 border-b border-gray-200">
+        <div className="hidden lg:flex w-80 xl:w-96 bg-white border-l border-gray-200 flex-col h-full">
+          <div className="p-4 xl:p-6 border-b border-gray-200 flex-shrink-0">
             <div className="flex items-center justify-between mb-4">
               <h3 className="text-lg xl:text-xl font-bold text-gray-900">Panier</h3>
               <div className={`w-8 xl:w-10 h-8 xl:h-10 rounded-xl flex items-center justify-center font-bold text-sm xl:text-base ${
@@ -651,7 +710,7 @@ export function POSPage() {
             </div>
           </div>
 
-          <div className="flex-1 overflow-y-auto p-4 xl:p-6">
+          <div className="flex-1 overflow-y-auto p-4 xl:p-6 min-h-0">
             {!hasItems ? (
               <div className="flex flex-col items-center justify-center h-full text-gray-400">
                 <ShoppingCart className="w-12 xl:w-16 h-12 xl:h-16 mb-4" />
@@ -764,7 +823,7 @@ export function POSPage() {
             )}
           </div>
 
-          <div className="p-4 xl:p-6 border-t border-gray-200 space-y-4">
+          <div className="p-4 xl:p-6 border-t border-gray-200 space-y-4 flex-shrink-0">
             {!selectedBooking && (
               <div className="space-y-2">
                 <div className="flex justify-between text-gray-600 text-sm xl:text-base">

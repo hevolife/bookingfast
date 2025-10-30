@@ -334,7 +334,7 @@ export function BookingHistoryModal({ isOpen, onClose, bookingId, clientName }: 
                 </div>
                 <div className="flex-1">
                   <h2 className="text-base sm:text-2xl font-bold text-white drop-shadow-lg">
-                    Historique de la réservation
+                    Historique de la réservation3
                   </h2>
                   <p className="text-xs sm:text-base text-white/80 mt-0.5 sm:mt-1">
                     {clientName}
