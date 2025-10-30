@@ -16,7 +16,7 @@ interface ModalFooterProps {
 
 export function ModalFooter({ buttons }: ModalFooterProps) {
   return (
-    <div className="flex flex-col sm:flex-row gap-3 pt-6 pb-6 border-t border-gray-200 md:sticky md:bottom-0 md:bg-white md:z-10">
+    <div className="flex flex-col sm:flex-row gap-2 sm:gap-3 pt-6 pb-6 border-t border-gray-200 md:sticky md:bottom-0 md:bg-white md:z-10">
       {buttons.map((button, index) => {
         const baseClasses = "flex-1 px-6 py-3 rounded-xl font-medium transition-all duration-300 transform hover:scale-105 disabled:opacity-50 disabled:cursor-not-allowed disabled:hover:scale-100";
         

@@ -1677,7 +1677,7 @@ export function BookingModal({
 
           {/* Footer FIXE EN BAS (OUTSIDE scroll) */}
           <div 
-            className="flex-shrink-0 bg-white border-t border-gray-200 p-4 flex flex-col gap-3"
+            className="flex-shrink-0 bg-white border-t border-gray-200 p-4 flex flex-col gap-2"
             style={{
               boxShadow: '0 -4px 6px -1px rgba(0, 0, 0, 0.1)',
               paddingBottom: 'calc(1rem + env(safe-area-inset-bottom, 0px))'
