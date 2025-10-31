@@ -599,8 +599,6 @@ export function BookingModal({
     ? 'from-orange-500 via-orange-600 to-red-500'
     : 'from-green-500 via-emerald-600 to-teal-500';
 
-  const mobileModalTop = isPWAMode ? '120px' : '80px';
-
   if (!isOpen) return null;
 
   return (
@@ -1137,30 +1135,27 @@ export function BookingModal({
         </div>
       </div>
 
-      {/* Mobile Modal */}
-      <div className="sm:hidden fixed inset-0 z-40">
+      {/* Mobile Modal - PLEIN ÉCRAN AU-DESSUS DE LA NAVBAR */}
+      <div className="sm:hidden fixed inset-0 z-50">
+        {/* Backdrop */}
         <div
           className="fixed inset-0 bg-black bg-opacity-50"
           onClick={handleClose}
-          style={{ zIndex: 40 }}
+          style={{ zIndex: 50 }}
         />
         
+        {/* Modal content - PLEIN ÉCRAN */}
         <div 
-          className="fixed left-0 right-0 bottom-0 shadow-2xl animate-slideUp flex flex-col"
+          className="fixed inset-0 bg-white shadow-2xl animate-slideUp flex flex-col"
           style={{ 
-            top: mobileModalTop,
-            zIndex: 45,
-            background: 'white',
-            borderTopLeftRadius: 0,
-            borderTopRightRadius: 0
+            zIndex: 55
           }}
         >
           {/* Header Mobile - FIXE (OUTSIDE scroll) */}
           <div 
             className="flex-shrink-0 relative overflow-hidden"
             style={{
-              borderTopLeftRadius: 0,
-              borderTopRightRadius: 0
+              paddingTop: 'env(safe-area-inset-top, 0px)'
             }}
           >
             <div className={`absolute inset-0 bg-gradient-to-br ${headerGradient}`}></div>
@@ -1198,7 +1193,7 @@ export function BookingModal({
           </div>
 
           {/* Content - SCROLLABLE */}
-          <div className="flex-1 overflow-y-auto bg-white" style={{ WebkitOverflowScrolling: 'touch' }}>
+          <div className="flex-1 overflow-y-auto" style={{ WebkitOverflowScrolling: 'touch' }}>
             <form onSubmit={handleSubmit} className="p-4 space-y-4 pb-32">
               {!editingBooking && !isEditMode && limitInfo && !isUnlimited && (
                 <div className={`rounded-xl p-4 ${
@@ -1677,7 +1672,7 @@ export function BookingModal({
 
           {/* Footer FIXE EN BAS (OUTSIDE scroll) */}
           <div 
-            className="flex-shrink-0 bg-white border-t border-gray-200 p-4 flex flex-col gap-2"
+            className="flex-shrink-0 bg-white border-t border-gray-200 p-4 flex flex-col gap-3"
             style={{
               boxShadow: '0 -4px 6px -1px rgba(0, 0, 0, 0.1)',
               paddingBottom: 'calc(1rem + env(safe-area-inset-bottom, 0px))'
