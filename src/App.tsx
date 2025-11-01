@@ -15,6 +15,7 @@ import { LandingPage } from './components/Landing/LandingPage';
 import { ProtectedRoute } from './components/Auth/ProtectedRoute';
 import { PublicRoute } from './components/Auth/PublicRoute';
 import { isPWA } from './utils/pwaDetection';
+import { BrowserRouter } from 'react-router-dom';
 
 const DashboardPage = lazy(() => import('./components/Dashboard/DashboardPage').then(m => ({ default: m.DashboardPage })));
 const CalendarPage = lazy(() => import('./components/Calendar/CalendarPage').then(m => ({ default: m.CalendarPage })));
@@ -29,13 +30,15 @@ const PluginsPage = lazy(() => import('./components/Plugins/PluginsPage').then(m
 const LoginPage = lazy(() => import('./components/Auth/LoginPage').then(m => ({ default: m.LoginPage })));
 const InvoicesPage = lazy(() => import('./components/Invoices/InvoicesPage').then(m => ({ default: m.InvoicesPage })));
 
-function App() {
+export function App() {
   return (
-    <AuthProvider>
-      <TeamProvider>
-        <AppRoutes />
-      </TeamProvider>
-    </AuthProvider>
+    <BrowserRouter>
+      <AuthProvider>
+        <TeamProvider>
+          <AppRoutes />
+        </TeamProvider>
+      </AuthProvider>
+    </BrowserRouter>
   );
 }
 
@@ -165,5 +168,3 @@ function AppRoutes() {
     </ProtectedRoute>
   );
 }
-
-export default App;
