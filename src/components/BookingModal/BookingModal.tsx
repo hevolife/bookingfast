@@ -599,7 +599,7 @@ export function BookingModal({
     ? 'from-orange-500 via-orange-600 to-red-500'
     : 'from-green-500 via-emerald-600 to-teal-500';
 
-  const mobileModalTop = isPWAMode ? '120px' : '0px';
+  const mobileModalTop = isPWAMode ? '120px' : '80px';
 
   if (!isOpen) return null;
 
