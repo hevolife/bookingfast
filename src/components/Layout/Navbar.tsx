@@ -254,7 +254,7 @@ export function Navbar() {
         <div 
           className="lg:hidden fixed inset-0 bg-gradient-to-br from-purple-900/95 via-pink-900/95 to-blue-900/95 backdrop-blur-md animate-fadeIn safe-all scrollable-area"
           style={{
-            zIndex: 45,
+            zIndex: 9998,
             overflow: 'auto',
             WebkitOverflowScrolling: 'touch',
             touchAction: 'pan-y',
